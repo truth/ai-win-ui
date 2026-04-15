@@ -80,7 +80,7 @@
 ### 3.2 运行时加载逻辑
 
 - 首先尝试从程序目录下的 `assets.zip` 加载资源。
-- 如果 `assets.zip` 不存在，则退回到 `resource/` 目录模式：
+- 如果 `assets.zip` 不存在，或某个资源在 ZIP 包中缺失，则退回到 `resource/` 目录模式：
   - `resource/layouts/`
   - `resource/images/`
   - `resource/fonts/`

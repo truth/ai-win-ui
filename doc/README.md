@@ -34,9 +34,19 @@
 
 - `UIElement::OnMouseMove/OnMouseDown/OnMouseUp`
   - 自动递归到子节点，并在命中子组件后停止传播。
+  - 鼠标移出控件或窗口时会触发 hover 状态回收。
 - `Button`
   - 支持 hover、pressed、click 三种交互状态。
   - 点击触发 `SetOnClick` 注册的回调。
+
+## 当前布局属性支持
+
+- 通用属性
+  - `width`、`height`、`margin`
+- `Panel`
+  - `padding`、`spacing`、`alignItems`、`justifyContent`
+- `Grid`
+  - `columns`、`rowHeight`、`spacing`
 
 ## Skia 集成建议
 

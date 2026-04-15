@@ -8,6 +8,7 @@
 - 支持资源目录模式 `resource/`，运行时加载布局与图片
 - 支持 JSON 和 XML 两种布局定义格式
 - 支持优先加载 `assets.zip`，并回退到 `resource/` 目录模式
+- `assets.zip` 当前是首选资源包，缺失资源时自动回退到 `resource/` 目录加载
 - 为未来集成 Skia、Yoga 或其它渲染/布局后端提供可扩展基础
 
 ## 当前实现
@@ -15,13 +16,14 @@
 - `src/main.cpp`
   - 程序入口，初始化 Win32 窗口与渲染器
   - 加载 `resource/layouts/ui.json` 或 `resource/layouts/ui.xml`
-  - 支持窗口尺寸调整、鼠标事件转发与 UI 重绘
+  - 支持窗口尺寸调整、鼠标事件转发、`WM_MOUSELEAVE` 状态回收与 UI 重绘
 - `src/renderer.*`
   - 封装 Direct2D / DirectWrite / WIC 基础绘制能力
   - 支持文本、矩形、边框与位图绘制
 - `src/ui.h`
   - 定义 UI 元素树与组件
   - 支持递归布局、渲染与事件命中
+  - 支持通用 `width` / `height` / `margin` 与 `Panel` 的 `alignItems` / `justifyContent`
 - `src/resource_provider.*`
   - 实现 `DirectoryResourceProvider`，从 `resource/` 目录读取文件
 - `src/layout_parser.*`

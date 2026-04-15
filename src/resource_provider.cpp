@@ -62,3 +62,42 @@ std::string DirectoryResourceProvider::LoadText(const std::string& path) {
     content << stream.rdbuf();
     return content.str();
 }
+
+FallbackResourceProvider::FallbackResourceProvider(std::unique_ptr<IResourceProvider> primary,
+                                                   std::unique_ptr<IResourceProvider> secondary)
+    : m_primary(std::move(primary)),
+      m_secondary(std::move(secondary)) {
+}
+
+bool FallbackResourceProvider::Exists(const std::string& path) {
+    if (m_primary && m_primary->Exists(path)) {
+        return true;
+    }
+    return m_secondary ? m_secondary->Exists(path) : false;
+}
+
+std::vector<uint8_t> FallbackResourceProvider::LoadBytes(const std::string& path) {
+    if (m_primary && m_primary->Exists(path)) {
+        auto bytes = m_primary->LoadBytes(path);
+        if (!bytes.empty()) {
+            return bytes;
+        }
+    }
+    if (m_secondary) {
+        return m_secondary->LoadBytes(path);
+    }
+    return {};
+}
+
+std::string FallbackResourceProvider::LoadText(const std::string& path) {
+    if (m_primary && m_primary->Exists(path)) {
+        auto text = m_primary->LoadText(path);
+        if (!text.empty()) {
+            return text;
+        }
+    }
+    if (m_secondary) {
+        return m_secondary->LoadText(path);
+    }
+    return {};
+}

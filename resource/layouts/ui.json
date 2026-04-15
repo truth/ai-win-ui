@@ -2,61 +2,101 @@
   "type": "Panel",
   "props": {
     "padding": [24, 24, 24, 24],
-    "spacing": 10,
+    "spacing": 18,
     "cornerRadius": 16,
-    "background": "#171717"
+    "background": "#171717",
+    "alignItems": "center",
+    "justifyContent": "center"
   },
   "children": [
     {
       "type": "Label",
       "props": {
-        "text": "DirectUI-style Retained UI Tree"
+        "text": "DirectUI-style Retained UI Tree",
+        "fontSize": 28,
+        "color": "#F5F5F5",
+        "margin": [0, 0, 0, 4]
       }
     },
     {
       "type": "Label",
       "props": {
-        "text": "Backend: Win32 + Direct2D + DirectWrite"
+        "text": "Backend: Win32 + Direct2D + DirectWrite",
+        "fontSize": 16,
+        "color": "#B7B7B7"
       }
     },
     {
       "type": "Grid",
       "props": {
+        "width": 900,
         "columns": 4,
         "spacing": 12,
         "rowHeight": 140,
         "cornerRadius": 12,
         "padding": [0, 12, 0, 12],
-        "background": "#121212"
+        "background": "#121212",
+        "margin": [0, 6, 0, 0]
       },
       "children": [
-        { "type": "Image", "props": { "source": "images/img1.jpg" } },
-        { "type": "Image", "props": { "source": "images/3d-design_9390515.png" } },
-        { "type": "Image", "props": { "source": "images/ai_10439488.png" } },
-        { "type": "Image", "props": { "source": "images/airplane_10521325.png" } },
-        { "type": "Image", "props": { "source": "images/advent-calendar_13366705.png" } },
-        { "type": "Image", "props": { "source": "images/agreement_3188314.png" } },
-        { "type": "Image", "props": { "source": "images/airplane_1350172.png" } },
-        { "type": "Image", "props": { "source": "images/alzheimer_7096033.png" } }
+        { "type": "Image", "props": { "source": "images/img1.jpg", "cornerRadius": 10 } },
+        { "type": "Image", "props": { "source": "images/3d-design_9390515.png", "cornerRadius": 10 } },
+        { "type": "Image", "props": { "source": "images/ai_10439488.png", "cornerRadius": 10 } },
+        { "type": "Image", "props": { "source": "images/airplane_10521325.png", "cornerRadius": 10 } },
+        { "type": "Image", "props": { "source": "images/advent-calendar_13366705.png", "cornerRadius": 10 } },
+        { "type": "Image", "props": { "source": "images/agreement_3188314.png", "cornerRadius": 10 } },
+        { "type": "Image", "props": { "source": "images/airplane_1350172.png", "cornerRadius": 10 } },
+        { "type": "Image", "props": { "source": "images/alzheimer_7096033.png", "cornerRadius": 10 } }
       ]
     },
     {
-      "type": "Button",
+      "type": "Panel",
       "props": {
-        "text": "Primary Action"
+        "width": 900,
+        "height": 190,
+        "padding": [24, 18, 24, 18],
+        "spacing": 10,
+        "cornerRadius": 14,
+        "background": "#1E1E1E",
+        "alignItems": "center",
+        "justifyContent": "center"
       },
-      "events": {
-        "onClick": "primaryAction"
-      }
-    },
-    {
-      "type": "Button",
-      "props": {
-        "text": "Secondary Action"
-      },
-      "events": {
-        "onClick": "secondaryAction"
-      }
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "Layout props now support alignItems / justifyContent / width / height / margin",
+            "fontSize": 14,
+            "color": "#BDBDBD"
+          }
+        },
+        {
+          "type": "Button",
+          "props": {
+            "text": "Primary Action",
+            "width": 240,
+            "fontSize": 15,
+            "background": "#2D6CDF",
+            "cornerRadius": 8,
+            "margin": [0, 4, 0, 0]
+          },
+          "events": {
+            "onClick": "primaryAction"
+          }
+        },
+        {
+          "type": "Button",
+          "props": {
+            "text": "Secondary Action",
+            "width": 240,
+            "fontSize": 15,
+            "cornerRadius": 8
+          },
+          "events": {
+            "onClick": "secondaryAction"
+          }
+        }
+      ]
     }
   ]
 }

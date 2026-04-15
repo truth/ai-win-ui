@@ -80,10 +80,11 @@ private:
 
         std::unique_ptr<IResourceProvider> resourceProvider;
         auto zipProvider = std::make_unique<ZipResourceProvider>(zipPath);
+        auto dirProvider = std::make_unique<DirectoryResourceProvider>(resourceDir);
         if (zipProvider->IsValid()) {
-            resourceProvider = std::move(zipProvider);
+            resourceProvider = std::make_unique<FallbackResourceProvider>(std::move(zipProvider), std::move(dirProvider));
         } else {
-            resourceProvider = std::make_unique<DirectoryResourceProvider>(resourceDir);
+            resourceProvider = std::move(dirProvider);
         }
 
         auto eventResolver = [this](const std::string& eventId) -> std::function<void()> {
@@ -173,6 +174,7 @@ private:
         if (!m_root) {
             return;
         }
+        EnsureMouseLeaveTracking();
         const float x = static_cast<float>(GET_X_LPARAM(lParam));
         const float y = static_cast<float>(GET_Y_LPARAM(lParam));
         if (m_root->OnMouseMove(x, y)) {
@@ -202,6 +204,27 @@ private:
         }
     }
 
+    void OnMouseLeave() {
+        m_isTrackingMouseLeave = false;
+        if (m_root && m_root->OnMouseLeave()) {
+            InvalidateRect(m_hwnd, nullptr, FALSE);
+        }
+    }
+
+    void EnsureMouseLeaveTracking() {
+        if (m_isTrackingMouseLeave) {
+            return;
+        }
+
+        TRACKMOUSEEVENT tme{};
+        tme.cbSize = sizeof(tme);
+        tme.dwFlags = TME_LEAVE;
+        tme.hwndTrack = m_hwnd;
+        if (TrackMouseEvent(&tme)) {
+            m_isTrackingMouseLeave = true;
+        }
+    }
+
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         if (msg == WM_NCCREATE) {
             const auto* cs = reinterpret_cast<CREATESTRUCTW*>(lParam);
@@ -225,6 +248,9 @@ private:
                 return 0;
             case WM_MOUSEMOVE:
                 OnMouseMove(lParam);
+                return 0;
+            case WM_MOUSELEAVE:
+                OnMouseLeave();
                 return 0;
             case WM_LBUTTONDOWN:
                 SetCapture(hwnd);
@@ -251,6 +277,7 @@ private:
     Renderer m_renderer;
     std::unique_ptr<UIElement> m_root;
     bool m_isInitialized = false;
+    bool m_isTrackingMouseLeave = false;
 };
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {

@@ -194,6 +194,34 @@ void Renderer::DrawRoundedRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& colo
     m_renderTarget->DrawRoundedRectangle(&roundedRect, m_solidBrush.Get(), strokeWidth);
 }
 
+void Renderer::PushRoundedClip(const D2D1_RECT_F& rect, float radius) {
+    if (!m_renderTarget || !m_d2dFactory) {
+        return;
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1RoundedRectangleGeometry> geometry;
+    if (FAILED(m_d2dFactory->CreateRoundedRectangleGeometry(D2D1::RoundedRect(rect, radius, radius), geometry.ReleaseAndGetAddressOf()))) {
+        return;
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1Layer> layer;
+    if (FAILED(m_renderTarget->CreateLayer(layer.ReleaseAndGetAddressOf()))) {
+        return;
+    }
+
+    D2D1_LAYER_PARAMETERS params = D2D1::LayerParameters(rect, geometry.Get(), D2D1_ANTIALIAS_MODE_PER_PRIMITIVE,
+                                                           D2D1::Matrix3x2F::Identity(), 1.0f, nullptr,
+                                                           D2D1_LAYER_OPTIONS_NONE);
+    m_renderTarget->PushLayer(&params, layer.Get());
+}
+
+void Renderer::PopLayer() {
+    if (!m_renderTarget) {
+        return;
+    }
+    m_renderTarget->PopLayer();
+}
+
 void Renderer::DrawTextW(const wchar_t* text, UINT32 len, const D2D1_RECT_F& rect, const D2D1_COLOR_F& color, float fontSize) {
     if (!m_renderTarget || !m_solidBrush || !m_dwriteFactory) {
         return;

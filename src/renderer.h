@@ -22,6 +22,8 @@ public:
     void FillRoundedRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color, float radius);
     void DrawRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color, float strokeWidth = 1.0f);
     void DrawRoundedRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color, float strokeWidth, float radius);
+    void PushRoundedClip(const D2D1_RECT_F& rect, float radius);
+    void PopLayer();
     void DrawTextW(const wchar_t* text, UINT32 len, const D2D1_RECT_F& rect, const D2D1_COLOR_F& color, float fontSize = 16.0f);
     Microsoft::WRL::ComPtr<ID2D1Bitmap> CreateBitmapFromBytes(const uint8_t* data, size_t size);
     void DrawBitmap(ID2D1Bitmap* bitmap, const D2D1_RECT_F& rect);

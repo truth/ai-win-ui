@@ -1,16 +1,19 @@
-<Panel padding="24,24,24,24" spacing="10" cornerRadius="16" background="#171717">
-  <Label text="DirectUI-style Retained UI Tree" />
-  <Label text="Backend: Win32 + Direct2D + DirectWrite" />
-  <Grid columns="4" spacing="12" rowHeight="140" cornerRadius="12" padding="0,12,0,12" background="#121212">
-    <Image source="images/img1.jpg" />
-    <Image source="images/3d-design_9390515.png" />
-    <Image source="images/ai_10439488.png" />
-    <Image source="images/airplane_10521325.png" />
-    <Image source="images/advent-calendar_13366705.png" />
-    <Image source="images/agreement_3188314.png" />
-    <Image source="images/airplane_1350172.png" />
-    <Image source="images/alzheimer_7096033.png" />
+<Panel padding="24,24,24,24" spacing="18" cornerRadius="16" background="#171717" alignItems="center" justifyContent="center">
+  <Label text="DirectUI-style Retained UI Tree" fontSize="28" color="#F5F5F5" margin="0,0,0,4" />
+  <Label text="Backend: Win32 + Direct2D + DirectWrite" fontSize="16" color="#B7B7B7" />
+  <Grid width="900" columns="4" spacing="12" rowHeight="140" cornerRadius="12" padding="0,12,0,12" background="#121212" margin="0,6,0,0">
+    <Image source="images/img1.jpg" cornerRadius="10" />
+    <Image source="images/3d-design_9390515.png" cornerRadius="10" />
+    <Image source="images/ai_10439488.png" cornerRadius="10" />
+    <Image source="images/airplane_10521325.png" cornerRadius="10" />
+    <Image source="images/advent-calendar_13366705.png" cornerRadius="10" />
+    <Image source="images/agreement_3188314.png" cornerRadius="10" />
+    <Image source="images/airplane_1350172.png" cornerRadius="10" />
+    <Image source="images/alzheimer_7096033.png" cornerRadius="10" />
   </Grid>
-  <Button text="Primary Action" onClick="primaryAction" />
-  <Button text="Secondary Action" onClick="secondaryAction" />
+  <Panel width="900" height="190" padding="24,18,24,18" spacing="10" cornerRadius="14" background="#1E1E1E" alignItems="center" justifyContent="center">
+    <Label text="Layout props now support alignItems / justifyContent / width / height / margin" fontSize="14" color="#BDBDBD" />
+    <Button text="Primary Action" width="240" fontSize="15" background="#2D6CDF" cornerRadius="8" margin="0,4,0,0" onClick="primaryAction" />
+    <Button text="Secondary Action" width="240" fontSize="15" cornerRadius="8" onClick="secondaryAction" />
+  </Panel>
 </Panel>

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -23,4 +24,18 @@ private:
     std::wstring GetFullPath(const std::string& path) const;
 
     std::wstring m_rootDir;
+};
+
+class FallbackResourceProvider : public IResourceProvider {
+public:
+    FallbackResourceProvider(std::unique_ptr<IResourceProvider> primary,
+                             std::unique_ptr<IResourceProvider> secondary);
+
+    bool Exists(const std::string& path) override;
+    std::vector<uint8_t> LoadBytes(const std::string& path) override;
+    std::string LoadText(const std::string& path) override;
+
+private:
+    std::unique_ptr<IResourceProvider> m_primary;
+    std::unique_ptr<IResourceProvider> m_secondary;
 };

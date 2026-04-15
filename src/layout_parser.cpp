@@ -310,6 +310,108 @@ std::vector<std::string> SplitString(const std::string& value, char separator) {
     return pieces;
 }
 
+std::string TrimString(const std::string& value) {
+    size_t start = 0;
+    while (start < value.size() && isspace(static_cast<unsigned char>(value[start]))) {
+        start++;
+    }
+
+    size_t end = value.size();
+    while (end > start && isspace(static_cast<unsigned char>(value[end - 1]))) {
+        end--;
+    }
+
+    return value.substr(start, end - start);
+}
+
+std::string ToLowerAscii(std::string value) {
+    std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
+        return static_cast<char>(tolower(ch));
+    });
+    return value;
+}
+
+Thickness ParseThickness(const std::vector<std::string>& values) {
+    Thickness thickness;
+    if (values.size() == 4) {
+        thickness.left = std::stof(TrimString(values[0]));
+        thickness.top = std::stof(TrimString(values[1]));
+        thickness.right = std::stof(TrimString(values[2]));
+        thickness.bottom = std::stof(TrimString(values[3]));
+    }
+    return thickness;
+}
+
+Thickness ParseThickness(const JsonValue& value) {
+    Thickness thickness;
+    if (value.IsArray() && value.arrayValue.size() == 4) {
+        thickness.left = static_cast<float>(value[0].numberValue);
+        thickness.top = static_cast<float>(value[1].numberValue);
+        thickness.right = static_cast<float>(value[2].numberValue);
+        thickness.bottom = static_cast<float>(value[3].numberValue);
+    }
+    return thickness;
+}
+
+Panel::AlignItems ParseAlignItems(const std::string& value) {
+    const std::string normalized = ToLowerAscii(TrimString(value));
+    if (normalized == "start" || normalized == "left") {
+        return Panel::AlignItems::Start;
+    }
+    if (normalized == "center") {
+        return Panel::AlignItems::Center;
+    }
+    if (normalized == "end" || normalized == "right") {
+        return Panel::AlignItems::End;
+    }
+    return Panel::AlignItems::Stretch;
+}
+
+Panel::JustifyContent ParseJustifyContent(const std::string& value) {
+    const std::string normalized = ToLowerAscii(TrimString(value));
+    if (normalized == "center") {
+        return Panel::JustifyContent::Center;
+    }
+    if (normalized == "end") {
+        return Panel::JustifyContent::End;
+    }
+    if (normalized == "space-between") {
+        return Panel::JustifyContent::SpaceBetween;
+    }
+    return Panel::JustifyContent::Start;
+}
+
+void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
+    if (!props.IsObject()) {
+        return;
+    }
+
+    if (props["width"].IsNumber()) {
+        element.SetFixedWidth(static_cast<float>(props["width"].numberValue));
+    }
+    if (props["height"].IsNumber()) {
+        element.SetFixedHeight(static_cast<float>(props["height"].numberValue));
+    }
+    if (props["margin"].IsArray() && props["margin"].arrayValue.size() == 4) {
+        element.SetMargin(ParseThickness(props["margin"]));
+    }
+}
+
+void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
+    if (auto it = node.attributes.find("width"); it != node.attributes.end()) {
+        element.SetFixedWidth(std::stof(TrimString(it->second)));
+    }
+    if (auto it = node.attributes.find("height"); it != node.attributes.end()) {
+        element.SetFixedHeight(std::stof(TrimString(it->second)));
+    }
+    if (auto it = node.attributes.find("margin"); it != node.attributes.end()) {
+        const auto values = SplitString(it->second, ',');
+        if (values.size() == 4) {
+            element.SetMargin(ParseThickness(values));
+        }
+    }
+}
+
 D2D1_COLOR_F ParseHexColor(const std::string& value) {
     std::string hex = value;
     if (!hex.empty() && hex[0] == '#') {
@@ -451,25 +553,56 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
                 panel->spacing = static_cast<float>(props["spacing"].numberValue);
             }
             if (props["padding"].IsArray() && props["padding"].arrayValue.size() == 4) {
-                panel->padding.left = static_cast<float>(props["padding"][0].numberValue);
-                panel->padding.top = static_cast<float>(props["padding"][1].numberValue);
-                panel->padding.right = static_cast<float>(props["padding"][2].numberValue);
-                panel->padding.bottom = static_cast<float>(props["padding"][3].numberValue);
+                panel->padding = ParseThickness(props["padding"]);
             }
+            if (props["alignItems"].IsString()) {
+                panel->alignItems = ParseAlignItems(props["alignItems"].stringValue);
+            }
+            if (props["justifyContent"].IsString()) {
+                panel->justifyContent = ParseJustifyContent(props["justifyContent"].stringValue);
+            }
+            ApplyCommonJsonProps(*panel, props);
         }
         element = std::move(panel);
     } else if (type == "Label") {
         std::wstring text = L"";
-        if (node["props"].IsObject() && node["props"]["text"].IsString()) {
-            text = LayoutParser::Utf8ToUtf16(node["props"]["text"].stringValue);
+        auto label = std::make_unique<Label>(std::move(text));
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["text"].IsString()) {
+                label->SetText(LayoutParser::Utf8ToUtf16(props["text"].stringValue));
+            }
+            if (props["fontSize"].IsNumber()) {
+                label->m_fontSize = static_cast<float>(props["fontSize"].numberValue);
+            }
+            if (props["color"].IsString()) {
+                label->m_color = LayoutParser::ColorFromString(props["color"].stringValue);
+            }
+            ApplyCommonJsonProps(*label, props);
         }
-        element = std::make_unique<Label>(std::move(text));
+        element = std::move(label);
     } else if (type == "Button") {
         std::wstring text = L"Button";
-        if (node["props"].IsObject() && node["props"]["text"].IsString()) {
-            text = LayoutParser::Utf8ToUtf16(node["props"]["text"].stringValue);
-        }
         auto button = std::make_unique<Button>(std::move(text));
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["text"].IsString()) {
+                button->SetText(LayoutParser::Utf8ToUtf16(props["text"].stringValue));
+            }
+            if (props["fontSize"].IsNumber()) {
+                button->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            }
+            if (props["background"].IsString()) {
+                button->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["foreground"].IsString()) {
+                button->foreground = LayoutParser::ColorFromString(props["foreground"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                button->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            ApplyCommonJsonProps(*button, props);
+        }
         if (node["events"].IsObject() && node["events"]["onClick"].IsString()) {
             const std::string eventId = node["events"]["onClick"].stringValue;
             auto handler = eventResolver(eventId);
@@ -495,14 +628,12 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
                 grid->columns = static_cast<int>(props["columns"].numberValue);
             }
             if (props["padding"].IsArray() && props["padding"].arrayValue.size() == 4) {
-                grid->padding.left = static_cast<float>(props["padding"][0].numberValue);
-                grid->padding.top = static_cast<float>(props["padding"][1].numberValue);
-                grid->padding.right = static_cast<float>(props["padding"][2].numberValue);
-                grid->padding.bottom = static_cast<float>(props["padding"][3].numberValue);
+                grid->padding = ParseThickness(props["padding"]);
             }
             if (props["rowHeight"].IsNumber()) {
                 grid->rowHeight = static_cast<float>(props["rowHeight"].numberValue);
             }
+            ApplyCommonJsonProps(*grid, props);
         }
         element = std::move(grid);
     } else if (type == "Image") {
@@ -511,11 +642,27 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             source = LayoutParser::Utf8ToUtf16(node["props"]["source"].stringValue);
         }
         auto image = std::make_unique<Image>(std::move(source));
-        if (node["props"].IsObject() && node["props"]["source"].IsString()) {
-            const std::string sourcePath = node["props"]["source"].stringValue;
-            if (provider.Exists(sourcePath)) {
-                image->SetImageData(provider.LoadBytes(sourcePath));
+        if (node["props"].IsObject()) {
+            if (node["props"]["cornerRadius"].IsNumber()) {
+                image->cornerRadius = static_cast<float>(node["props"]["cornerRadius"].numberValue);
             }
+            if (node["props"]["stretch"].IsString()) {
+                const std::string stretchMode = node["props"]["stretch"].stringValue;
+                if (stretchMode == "fill") {
+                    image->stretch = Image::StretchMode::Fill;
+                } else if (stretchMode == "uniformToFill") {
+                    image->stretch = Image::StretchMode::UniformToFill;
+                } else {
+                    image->stretch = Image::StretchMode::Uniform;
+                }
+            }
+            if (node["props"]["source"].IsString()) {
+                const std::string sourcePath = node["props"]["source"].stringValue;
+                if (provider.Exists(sourcePath)) {
+                    image->SetImageData(provider.LoadBytes(sourcePath));
+                }
+            }
+            ApplyCommonJsonProps(*image, node["props"]);
         }
         element = std::move(image);
     }
@@ -555,25 +702,50 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         if (auto it = node.attributes.find("padding"); it != node.attributes.end()) {
             const auto values = SplitString(it->second, ',');
             if (values.size() == 4) {
-                panel->padding.left = std::stof(values[0]);
-                panel->padding.top = std::stof(values[1]);
-                panel->padding.right = std::stof(values[2]);
-                panel->padding.bottom = std::stof(values[3]);
+                panel->padding = ParseThickness(values);
             }
         }
+        if (auto it = node.attributes.find("alignItems"); it != node.attributes.end()) {
+            panel->alignItems = ParseAlignItems(it->second);
+        }
+        if (auto it = node.attributes.find("justifyContent"); it != node.attributes.end()) {
+            panel->justifyContent = ParseJustifyContent(it->second);
+        }
+        ApplyCommonXmlAttributes(*panel, node);
         element = std::move(panel);
     } else if (node.name == "Label") {
         std::wstring text = L"";
+        auto label = std::make_unique<Label>(std::move(text));
         if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
-            text = LayoutParser::Utf8ToUtf16(it->second);
+            label->SetText(LayoutParser::Utf8ToUtf16(it->second));
         }
-        element = std::make_unique<Label>(std::move(text));
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            label->m_fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("color"); it != node.attributes.end()) {
+            label->m_color = LayoutParser::ColorFromString(it->second);
+        }
+        ApplyCommonXmlAttributes(*label, node);
+        element = std::move(label);
     } else if (node.name == "Button") {
         std::wstring text = L"Button";
-        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
-            text = LayoutParser::Utf8ToUtf16(it->second);
-        }
         auto button = std::make_unique<Button>(std::move(text));
+        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
+            button->SetText(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            button->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            button->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("foreground"); it != node.attributes.end()) {
+            button->foreground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            button->cornerRadius = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*button, node);
         if (auto it = node.attributes.find("onClick"); it != node.attributes.end()) {
             auto handler = eventResolver(it->second);
             if (handler) {
@@ -598,15 +770,13 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         if (auto it = node.attributes.find("padding"); it != node.attributes.end()) {
             const auto values = SplitString(it->second, ',');
             if (values.size() == 4) {
-                grid->padding.left = std::stof(values[0]);
-                grid->padding.top = std::stof(values[1]);
-                grid->padding.right = std::stof(values[2]);
-                grid->padding.bottom = std::stof(values[3]);
+                grid->padding = ParseThickness(values);
             }
         }
         if (auto it = node.attributes.find("rowHeight"); it != node.attributes.end()) {
             grid->rowHeight = std::stof(it->second);
         }
+        ApplyCommonXmlAttributes(*grid, node);
         element = std::move(grid);
     } else if (node.name == "Image") {
         std::wstring source = L"";
@@ -614,11 +784,25 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             source = LayoutParser::Utf8ToUtf16(it->second);
         }
         auto image = std::make_unique<Image>(std::move(source));
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            image->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("stretch"); it != node.attributes.end()) {
+            const std::string stretchMode = it->second;
+            if (stretchMode == "fill") {
+                image->stretch = Image::StretchMode::Fill;
+            } else if (stretchMode == "uniformToFill") {
+                image->stretch = Image::StretchMode::UniformToFill;
+            } else {
+                image->stretch = Image::StretchMode::Uniform;
+            }
+        }
         if (auto it = node.attributes.find("source"); it != node.attributes.end()) {
             if (provider.Exists(it->second)) {
                 image->SetImageData(provider.LoadBytes(it->second));
             }
         }
+        ApplyCommonXmlAttributes(*image, node);
         element = std::move(image);
     }
 
