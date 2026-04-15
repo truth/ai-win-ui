@@ -372,28 +372,46 @@ D2D1_COLOR_F LayoutParser::ColorFromString(const std::string& value) {
     return ParseHexColor(value);
 }
 
-std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, LayoutParser::EventResolver eventResolver);
-std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, LayoutParser::EventResolver eventResolver);
+std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourceProvider& provider, LayoutParser::EventResolver eventResolver);
+std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourceProvider& provider, LayoutParser::EventResolver eventResolver);
 
 std::unique_ptr<UIElement> LayoutParser::BuildFromFile(IResourceProvider& provider,
                                                       const std::string& resourcePath,
                                                       EventResolver eventResolver) {
-    if (!provider.Exists(resourcePath)) {
+    std::string path = resourcePath;
+    if (!provider.Exists(path)) {
+        const bool isJson = path.size() >= 5 && path.substr(path.size() - 5) == ".json";
+        const bool isXml = path.size() >= 4 && path.substr(path.size() - 4) == ".xml";
+
+        if (isJson) {
+            std::string xmlPath = path.substr(0, path.size() - 5) + ".xml";
+            if (provider.Exists(xmlPath)) {
+                path = std::move(xmlPath);
+            }
+        } else if (isXml) {
+            std::string jsonPath = path.substr(0, path.size() - 4) + ".json";
+            if (provider.Exists(jsonPath)) {
+                path = std::move(jsonPath);
+            }
+        }
+    }
+
+    if (!provider.Exists(path)) {
         return nullptr;
     }
 
-    const std::string text = provider.LoadText(resourcePath);
-    const bool isJson = resourcePath.size() >= 5 && resourcePath.substr(resourcePath.size() - 5) == ".json";
-    const bool isXml = resourcePath.size() >= 4 && resourcePath.substr(resourcePath.size() - 4) == ".xml";
+    const std::string text = provider.LoadText(path);
+    const bool isJson = path.size() >= 5 && path.substr(path.size() - 5) == ".json";
+    const bool isXml = path.size() >= 4 && path.substr(path.size() - 4) == ".xml";
 
     try {
         if (isJson) {
             JsonValue root = ParseJson(text);
-            return CreateElementFromJson(root, std::move(eventResolver));
+            return CreateElementFromJson(root, provider, std::move(eventResolver));
         }
         if (isXml) {
             XmlNode root = ParseXml(text);
-            return CreateElementFromXml(root, std::move(eventResolver));
+            return CreateElementFromXml(root, provider, std::move(eventResolver));
         }
     } catch (const std::exception&) {
         return nullptr;
@@ -411,7 +429,7 @@ std::wstring MakeUtf16(const std::string& text) {
     return result;
 }
 
-std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, LayoutParser::EventResolver eventResolver) {
+std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourceProvider& provider, LayoutParser::EventResolver eventResolver) {
     if (!node.IsObject()) {
         return nullptr;
     }
@@ -457,6 +475,19 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, LayoutPa
             }
         }
         element = std::move(button);
+    } else if (type == "Image") {
+        std::wstring source = L"";
+        if (node["props"].IsObject() && node["props"]["source"].IsString()) {
+            source = LayoutParser::Utf8ToUtf16(node["props"]["source"].stringValue);
+        }
+        auto image = std::make_unique<Image>(std::move(source));
+        if (node["props"].IsObject() && node["props"]["source"].IsString()) {
+            const std::string sourcePath = node["props"]["source"].stringValue;
+            if (provider.Exists(sourcePath)) {
+                image->SetImageData(provider.LoadBytes(sourcePath));
+            }
+        }
+        element = std::move(image);
     }
 
     if (!element) {
@@ -465,7 +496,7 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, LayoutPa
 
     if (node["children"].IsArray()) {
         for (const auto& childNode : node["children"].arrayValue) {
-            if (auto child = CreateElementFromJson(childNode, eventResolver)) {
+            if (auto child = CreateElementFromJson(childNode, provider, eventResolver)) {
                 element->AddChild(std::move(child));
             }
         }
@@ -474,7 +505,7 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, LayoutPa
     return element;
 }
 
-std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, LayoutParser::EventResolver eventResolver) {
+std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourceProvider& provider, LayoutParser::EventResolver eventResolver) {
     if (node.name.empty()) {
         return nullptr;
     }
@@ -517,6 +548,18 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, LayoutParse
             }
         }
         element = std::move(button);
+    } else if (node.name == "Image") {
+        std::wstring source = L"";
+        if (auto it = node.attributes.find("source"); it != node.attributes.end()) {
+            source = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        auto image = std::make_unique<Image>(std::move(source));
+        if (auto it = node.attributes.find("source"); it != node.attributes.end()) {
+            if (provider.Exists(it->second)) {
+                image->SetImageData(provider.LoadBytes(it->second));
+            }
+        }
+        element = std::move(image);
     }
 
     if (!element) {
@@ -524,7 +567,7 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, LayoutParse
     }
 
     for (const auto& child : node.children) {
-        if (auto childElement = CreateElementFromXml(child, eventResolver)) {
+        if (auto childElement = CreateElementFromXml(child, provider, eventResolver)) {
             element->AddChild(std::move(childElement));
         }
     }

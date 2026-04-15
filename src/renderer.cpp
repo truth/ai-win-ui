@@ -14,6 +14,18 @@ bool Renderer::Initialize(HWND hwnd) {
         return false;
     }
 
+    if (FAILED(CoInitializeEx(nullptr, COINIT_MULTITHREADED))) {
+        return false;
+    }
+
+    if (FAILED(CoCreateInstance(
+            CLSID_WICImagingFactory,
+            nullptr,
+            CLSCTX_INPROC_SERVER,
+            IID_PPV_ARGS(m_wicFactory.ReleaseAndGetAddressOf())))) {
+        return false;
+    }
+
     if (FAILED(m_dwriteFactory->CreateTextFormat(
             L"Segoe UI",
             nullptr,
@@ -85,6 +97,63 @@ void Renderer::EndFrame() {
         m_solidBrush.Reset();
         m_renderTarget.Reset();
     }
+}
+
+Microsoft::WRL::ComPtr<ID2D1Bitmap> Renderer::CreateBitmapFromBytes(const uint8_t* data, size_t size) {
+    if (!EnsureRenderTarget() || !m_wicFactory) {
+        return nullptr;
+    }
+
+    Com<IWICStream> stream;
+    if (FAILED(m_wicFactory->CreateStream(stream.ReleaseAndGetAddressOf()))) {
+        return nullptr;
+    }
+    if (FAILED(stream->InitializeFromMemory(const_cast<BYTE*>(data), static_cast<DWORD>(size)))) {
+        return nullptr;
+    }
+
+    Com<IWICBitmapDecoder> decoder;
+    if (FAILED(m_wicFactory->CreateDecoderFromStream(
+            stream.Get(),
+            nullptr,
+            WICDecodeMetadataCacheOnLoad,
+            decoder.ReleaseAndGetAddressOf()))) {
+        return nullptr;
+    }
+
+    Com<IWICBitmapFrameDecode> frame;
+    if (FAILED(decoder->GetFrame(0, frame.ReleaseAndGetAddressOf()))) {
+        return nullptr;
+    }
+
+    Com<IWICFormatConverter> converter;
+    if (FAILED(m_wicFactory->CreateFormatConverter(converter.ReleaseAndGetAddressOf()))) {
+        return nullptr;
+    }
+
+    if (FAILED(converter->Initialize(
+            frame.Get(),
+            GUID_WICPixelFormat32bppPBGRA,
+            WICBitmapDitherTypeNone,
+            nullptr,
+            0.0,
+            WICBitmapPaletteTypeMedianCut))) {
+        return nullptr;
+    }
+
+    Com<ID2D1Bitmap> bitmap;
+    if (FAILED(Target()->CreateBitmapFromWicBitmap(converter.Get(), nullptr, bitmap.ReleaseAndGetAddressOf()))) {
+        return nullptr;
+    }
+
+    return bitmap;
+}
+
+void Renderer::DrawBitmap(ID2D1Bitmap* bitmap, const D2D1_RECT_F& rect) {
+    if (!m_renderTarget || !bitmap) {
+        return;
+    }
+    m_renderTarget->DrawBitmap(bitmap, rect);
 }
 
 void Renderer::FillRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color) {

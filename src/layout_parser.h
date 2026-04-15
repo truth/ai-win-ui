@@ -50,8 +50,10 @@ public:
 
 private:
     static std::unique_ptr<UIElement> BuildFromJson(const JsonValue& node,
+                                                    IResourceProvider& provider,
                                                     EventResolver eventResolver);
     static std::unique_ptr<UIElement> BuildFromXml(const XmlNode& node,
+                                                   IResourceProvider& provider,
                                                    EventResolver eventResolver);
 
     static JsonValue ParseJson(const std::string& text);

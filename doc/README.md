@@ -47,6 +47,7 @@
 - 将 `Panel` 布局模型扩展为真正的 Flex 布局，增加 `flex-grow`、`flex-shrink`、对齐方式等属性。
 - 考虑使用 `Yoga` 布局引擎将现有容器体系升级为标准 Flexbox 布局。
 - 使用 XML/JSON 定义布局，建立数据驱动 UI 构建流程。
+- 支持 `Image` 组件，从 `resource/images/` 加载位图资源。
 - 支持将布局与资源打包为 `assets.zip`，同时兼容开发阶段的 `resource/` 目录模式。
 - 增加 `OnMouseLeave`、键盘事件、焦点管理、拖拽区域等事件能力。
 

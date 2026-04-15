@@ -1,0 +1,6 @@
+<Panel padding="24,24,24,24" spacing="10" background="#171717">
+  <Label text="DirectUI-style Retained UI Tree" />
+  <Label text="Backend: Win32 + Direct2D + DirectWrite" />
+  <Button text="Primary Action" onClick="primaryAction" />
+  <Button text="Secondary Action" onClick="secondaryAction" />
+</Panel>

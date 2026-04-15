@@ -50,7 +50,19 @@
 <Panel padding="24,24,24,24" spacing="10" background="#171717">
   <Label text="DirectUI-style Retained UI Tree" fontSize="18" color="#EDEDED" />
   <Button text="Primary Action" onClick="primaryAction" />
+  <Image source="images/sample.png" />
 </Panel>
+```
+
+### 2.3 Image 组件示例
+
+```json
+{
+  "type": "Image",
+  "props": {
+    "source": "images/sample.png"
+  }
+}
 ```
 
 ## 3. 资源打包与加载策略

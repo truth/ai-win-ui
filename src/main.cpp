@@ -6,6 +6,7 @@
 #include <Windowsx.h>
 #include <memory>
 #include <string>
+#include <vector>
 
 class App {
 public:
@@ -63,7 +64,7 @@ public:
 private:
     void BuildUI() {
         DirectoryResourceProvider resourceProvider(L"resource");
-        m_root = LayoutParser::BuildFromFile(resourceProvider, "layouts/ui.json", [this](const std::string& eventId) -> std::function<void()> {
+        auto eventResolver = [this](const std::string& eventId) -> std::function<void()> {
             if (eventId == "primaryAction") {
                 return [this]() { SetWindowTextW(m_hwnd, L"Clicked: Primary Action"); };
             }
@@ -71,7 +72,19 @@ private:
                 return [this]() { SetWindowTextW(m_hwnd, L"Clicked: Secondary Action"); };
             }
             return std::function<void()>();
-        });
+        };
+
+        const std::vector<std::string> layoutCandidates = {
+            "layouts/ui.json",
+            "layouts/ui.xml"
+        };
+
+        for (const auto& path : layoutCandidates) {
+            m_root = LayoutParser::BuildFromFile(resourceProvider, path, eventResolver);
+            if (m_root) {
+                break;
+            }
+        }
 
         if (!m_root) {
             BuildDefaultUI();

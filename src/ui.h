@@ -1,6 +1,7 @@
 #pragma once
 
 #include "renderer.h"
+#include <wrl/client.h>
 
 #include <algorithm>
 #include <functional>
@@ -119,6 +120,31 @@ public:
 
 private:
     std::wstring m_text;
+};
+
+class Image : public UIElement {
+public:
+    explicit Image(std::wstring source) : m_source(std::move(source)) {}
+
+    void SetImageData(std::vector<uint8_t> imageData) {
+        m_imageData = std::move(imageData);
+    }
+
+    void Render(Renderer& renderer) override {
+        if (!m_bitmap && !m_imageData.empty()) {
+            m_bitmap = renderer.CreateBitmapFromBytes(m_imageData.data(), m_imageData.size());
+        }
+        if (m_bitmap) {
+            renderer.DrawBitmap(m_bitmap.Get(), m_bounds);
+        } else {
+            renderer.FillRect(m_bounds, D2D1::ColorF(0x404040));
+        }
+    }
+
+private:
+    std::wstring m_source;
+    std::vector<uint8_t> m_imageData;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_bitmap;
 };
 
 class Button : public UIElement {
