@@ -136,6 +136,42 @@
 
 ---
 
+## 六、迭代执行计划
+
+建议按周执行，快速交付并逐步验证。每周结束后评估结果并调整下一周计划。
+
+### Week 1：MVP 骨架搭建
+
+- [ ] 确认 `lib/`、`resource/`、`doc/` 目录结构
+- [ ] 完成 `DirectoryResourceProvider` 实现
+- [ ] 增加 `resource/layouts/` 示例布局文件
+- [ ] 基于现有 `UIElement` 构建 JSON/XML 解析器
+- [ ] 确保 `Panel/Label/Button` 可以从布局文件实例化并正确渲染
+
+### Week 2：运行时资源加载与交互
+
+- [ ] 实现 `Button` 点击、hover、pressed 行为
+- [ ] 完成 `resource/images/` 图片资源加载支持
+- [ ] 支持 `assets.zip` 资源包的加载骨架
+- [ ] 运行时从 `resource/` 目录加载布局并正常显示
+- [ ] 验证 `.gitignore`、`lib/` 与 `resource/` 保持版本控制一致性
+
+### Week 3：布局与资源扩展
+
+- [ ] 增强 `Panel` 布局属性，支持 `padding`、`spacing`、`align` 映射
+- [ ] 增加 `Image` 组件与 `Font`/`Style` 基础属性
+- [ ] 实现 `ZipResourceProvider` 并验证 `assets.zip` 加载
+- [ ] 产出一套可运行的布局示例，覆盖多层嵌套与基础样式
+
+### Week 4：工程化与后续预研
+
+- [ ] 设计 `IRenderer` 接口，抽象现有 Direct2D 实现
+- [ ] 准备 `lib/` 中的预编译 Yoga/Skia 引入示例
+- [ ] 评估 Yoga 布局引擎与 Skia 渲染后端的最小切换点
+- [ ] 更新文档为可复用开发规范与工程模板
+
+---
+
 ## 五、最小 MVP 关键指标
 
 - ✅ 可以用 `resource/layouts/ui.json` 或 `ui.xml` 构建界面
