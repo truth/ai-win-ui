@@ -61,3 +61,7 @@
 - `resource/layouts/`：布局定义文件（JSON / XML）。
 - `resource/images/`：图片资源。
 - 支持无 title 窗口的自定义拖拽区域与圆角/不规则形状窗口，不改变内部布局逻辑。
+
+## MVP 与发展路线
+
+详见 `doc/mvp-roadmap.md`。
