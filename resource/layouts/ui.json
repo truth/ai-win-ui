@@ -1,0 +1,40 @@
+{
+  "type": "Panel",
+  "props": {
+    "padding": [24, 24, 24, 24],
+    "spacing": 10,
+    "background": "#171717"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": {
+        "text": "DirectUI-style Retained UI Tree"
+      }
+    },
+    {
+      "type": "Label",
+      "props": {
+        "text": "Backend: Win32 + Direct2D + DirectWrite"
+      }
+    },
+    {
+      "type": "Button",
+      "props": {
+        "text": "Primary Action"
+      },
+      "events": {
+        "onClick": "primaryAction"
+      }
+    },
+    {
+      "type": "Button",
+      "props": {
+        "text": "Secondary Action"
+      },
+      "events": {
+        "onClick": "secondaryAction"
+      }
+    }
+  ]
+}

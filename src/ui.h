@@ -105,6 +105,8 @@ class Label : public UIElement {
 public:
     explicit Label(std::wstring text) : m_text(std::move(text)) {}
 
+    void SetText(std::wstring text) { m_text = std::move(text); }
+
     void Render(Renderer& renderer) override {
         renderer.DrawTextW(
             m_text.c_str(),

@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_executable(ai_win_ui WIN32
     src/main.cpp
     src/renderer.cpp
+    src/resource_provider.cpp
+    src/layout_parser.cpp
 )
 
 target_include_directories(ai_win_ui PRIVATE src)

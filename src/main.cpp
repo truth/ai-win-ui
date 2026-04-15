@@ -1,4 +1,6 @@
+#include "layout_parser.h"
 #include "renderer.h"
+#include "resource_provider.h"
 #include "ui.h"
 
 #include <Windowsx.h>
@@ -60,10 +62,27 @@ public:
 
 private:
     void BuildUI() {
-        m_root = std::make_unique<Panel>();
-        m_root->background = D2D1::ColorF(0x171717);
-        m_root->padding = {24, 24, 24, 24};
-        m_root->spacing = 10.0f;
+        DirectoryResourceProvider resourceProvider(L"resource");
+        m_root = LayoutParser::BuildFromFile(resourceProvider, "layouts/ui.json", [this](const std::string& eventId) -> std::function<void()> {
+            if (eventId == "primaryAction") {
+                return [this]() { SetWindowTextW(m_hwnd, L"Clicked: Primary Action"); };
+            }
+            if (eventId == "secondaryAction") {
+                return [this]() { SetWindowTextW(m_hwnd, L"Clicked: Secondary Action"); };
+            }
+            return std::function<void()>();
+        });
+
+        if (!m_root) {
+            BuildDefaultUI();
+        }
+    }
+
+    void BuildDefaultUI() {
+        auto panel = std::make_unique<Panel>();
+        panel->background = D2D1::ColorF(0x171717);
+        panel->padding = {24, 24, 24, 24};
+        panel->spacing = 10.0f;
 
         auto title = std::make_unique<Label>(L"DirectUI-style Retained UI Tree");
         auto desc = std::make_unique<Label>(L"Backend: Win32 + Direct2D + DirectWrite");
@@ -78,10 +97,11 @@ private:
             SetWindowTextW(m_hwnd, L"Clicked: Secondary Action");
         });
 
-        m_root->AddChild(std::move(title));
-        m_root->AddChild(std::move(desc));
-        m_root->AddChild(std::move(btn1));
-        m_root->AddChild(std::move(btn2));
+        panel->AddChild(std::move(title));
+        panel->AddChild(std::move(desc));
+        panel->AddChild(std::move(btn1));
+        panel->AddChild(std::move(btn2));
+        m_root = std::move(panel);
     }
 
     void OnResize() {
@@ -194,7 +214,7 @@ private:
 
     HWND m_hwnd = nullptr;
     Renderer m_renderer;
-    std::unique_ptr<Panel> m_root;
+    std::unique_ptr<UIElement> m_root;
     bool m_isInitialized = false;
 };
 
