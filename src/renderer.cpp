@@ -165,6 +165,16 @@ void Renderer::FillRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color) {
     m_renderTarget->FillRectangle(rect, m_solidBrush.Get());
 }
 
+void Renderer::FillRoundedRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color, float radius) {
+    if (!m_renderTarget || !m_solidBrush) {
+        return;
+    }
+
+    m_solidBrush->SetColor(color);
+    D2D1_ROUNDED_RECT roundedRect = D2D1::RoundedRect(rect, radius, radius);
+    m_renderTarget->FillRoundedRectangle(&roundedRect, m_solidBrush.Get());
+}
+
 void Renderer::DrawRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color, float strokeWidth) {
     if (!m_renderTarget || !m_solidBrush) {
         return;
@@ -172,6 +182,16 @@ void Renderer::DrawRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color, floa
 
     m_solidBrush->SetColor(color);
     m_renderTarget->DrawRectangle(rect, m_solidBrush.Get(), strokeWidth);
+}
+
+void Renderer::DrawRoundedRect(const D2D1_RECT_F& rect, const D2D1_COLOR_F& color, float strokeWidth, float radius) {
+    if (!m_renderTarget || !m_solidBrush) {
+        return;
+    }
+
+    m_solidBrush->SetColor(color);
+    D2D1_ROUNDED_RECT roundedRect = D2D1::RoundedRect(rect, radius, radius);
+    m_renderTarget->DrawRoundedRectangle(&roundedRect, m_solidBrush.Get(), strokeWidth);
 }
 
 void Renderer::DrawTextW(const wchar_t* text, UINT32 len, const D2D1_RECT_F& rect, const D2D1_COLOR_F& color, float fontSize) {

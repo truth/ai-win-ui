@@ -444,6 +444,9 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["background"].IsString()) {
                 panel->background = LayoutParser::ColorFromString(props["background"].stringValue);
             }
+            if (props["cornerRadius"].IsNumber()) {
+                panel->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
             if (props["spacing"].IsNumber()) {
                 panel->spacing = static_cast<float>(props["spacing"].numberValue);
             }
@@ -475,6 +478,33 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
         }
         element = std::move(button);
+    } else if (type == "Grid") {
+        auto grid = std::make_unique<GridPanel>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["background"].IsString()) {
+                grid->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                grid->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            if (props["spacing"].IsNumber()) {
+                grid->cellSpacing = static_cast<float>(props["spacing"].numberValue);
+            }
+            if (props["columns"].IsNumber()) {
+                grid->columns = static_cast<int>(props["columns"].numberValue);
+            }
+            if (props["padding"].IsArray() && props["padding"].arrayValue.size() == 4) {
+                grid->padding.left = static_cast<float>(props["padding"][0].numberValue);
+                grid->padding.top = static_cast<float>(props["padding"][1].numberValue);
+                grid->padding.right = static_cast<float>(props["padding"][2].numberValue);
+                grid->padding.bottom = static_cast<float>(props["padding"][3].numberValue);
+            }
+            if (props["rowHeight"].IsNumber()) {
+                grid->rowHeight = static_cast<float>(props["rowHeight"].numberValue);
+            }
+        }
+        element = std::move(grid);
     } else if (type == "Image") {
         std::wstring source = L"";
         if (node["props"].IsObject() && node["props"]["source"].IsString()) {
@@ -516,6 +546,9 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
             panel->background = LayoutParser::ColorFromString(it->second);
         }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            panel->cornerRadius = std::stof(it->second);
+        }
         if (auto it = node.attributes.find("spacing"); it != node.attributes.end()) {
             panel->spacing = std::stof(it->second);
         }
@@ -548,6 +581,33 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             }
         }
         element = std::move(button);
+    } else if (node.name == "Grid") {
+        auto grid = std::make_unique<GridPanel>();
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            grid->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            grid->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("spacing"); it != node.attributes.end()) {
+            grid->cellSpacing = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("columns"); it != node.attributes.end()) {
+            grid->columns = std::max(1, std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("padding"); it != node.attributes.end()) {
+            const auto values = SplitString(it->second, ',');
+            if (values.size() == 4) {
+                grid->padding.left = std::stof(values[0]);
+                grid->padding.top = std::stof(values[1]);
+                grid->padding.right = std::stof(values[2]);
+                grid->padding.bottom = std::stof(values[3]);
+            }
+        }
+        if (auto it = node.attributes.find("rowHeight"); it != node.attributes.end()) {
+            grid->rowHeight = std::stof(it->second);
+        }
+        element = std::move(grid);
     } else if (node.name == "Image") {
         std::wstring source = L"";
         if (auto it = node.attributes.find("source"); it != node.attributes.end()) {

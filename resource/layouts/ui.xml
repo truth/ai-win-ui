@@ -1,6 +1,16 @@
-<Panel padding="24,24,24,24" spacing="10" background="#171717">
+<Panel padding="24,24,24,24" spacing="10" cornerRadius="16" background="#171717">
   <Label text="DirectUI-style Retained UI Tree" />
   <Label text="Backend: Win32 + Direct2D + DirectWrite" />
+  <Grid columns="4" spacing="12" rowHeight="140" cornerRadius="12" padding="0,12,0,12" background="#121212">
+    <Image source="images/img1.jpg" />
+    <Image source="images/3d-design_9390515.png" />
+    <Image source="images/ai_10439488.png" />
+    <Image source="images/airplane_10521325.png" />
+    <Image source="images/advent-calendar_13366705.png" />
+    <Image source="images/agreement_3188314.png" />
+    <Image source="images/airplane_1350172.png" />
+    <Image source="images/alzheimer_7096033.png" />
+  </Grid>
   <Button text="Primary Action" onClick="primaryAction" />
   <Button text="Secondary Action" onClick="secondaryAction" />
 </Panel>

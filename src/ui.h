@@ -78,6 +78,7 @@ class Panel : public UIElement {
 public:
     Thickness padding{8, 8, 8, 8};
     float spacing = 6.0f;
+    float cornerRadius = 0.0f;
     D2D1_COLOR_F background = D2D1::ColorF(0x1E1E1E);
 
     void Arrange(const D2D1_RECT_F& finalRect) override {
@@ -91,6 +92,47 @@ public:
             const float h = 36.0f;
             child->Arrange(D2D1::RectF(x, y, x + maxWidth, y + h));
             y += h + spacing;
+        }
+    }
+
+    void Render(Renderer& renderer) override {
+        renderer.FillRect(m_bounds, background);
+        for (auto& child : m_children) {
+            child->Render(renderer);
+        }
+    }
+};
+
+class GridPanel : public UIElement {
+public:
+    int columns = 3;
+    float cellSpacing = 8.0f;
+    float cornerRadius = 0.0f;
+    Thickness padding{8, 8, 8, 8};
+    D2D1_COLOR_F background = D2D1::ColorF(0x1A1A1A);
+    float rowHeight = 120.0f;
+
+    void Arrange(const D2D1_RECT_F& finalRect) override {
+        UIElement::Arrange(finalRect);
+
+        const float x0 = m_bounds.left + padding.left;
+        float y = m_bounds.top + padding.top;
+        const float contentWidth = (m_bounds.right - m_bounds.left) - padding.left - padding.right;
+        const int cols = std::max(1, columns);
+        const float cellWidth = (contentWidth - cellSpacing * (cols - 1)) / cols;
+
+        float x = x0;
+        int col = 0;
+        for (auto& child : m_children) {
+            child->Arrange(D2D1::RectF(x, y, x + cellWidth, y + rowHeight));
+            col++;
+            if (col >= cols) {
+                col = 0;
+                x = x0;
+                y += rowHeight + cellSpacing;
+            } else {
+                x += cellWidth + cellSpacing;
+            }
         }
     }
 
@@ -153,6 +195,8 @@ public:
 
     void SetOnClick(std::function<void()> onClick) { m_onClick = std::move(onClick); }
 
+    float cornerRadius = 4.0f;
+
     void Render(Renderer& renderer) override {
         D2D1_COLOR_F bg = D2D1::ColorF(0x2D2D30);
         if (m_pressed) {
@@ -161,8 +205,13 @@ public:
             bg = D2D1::ColorF(0x3E3E42);
         }
 
-        renderer.FillRect(m_bounds, bg);
-        renderer.DrawRect(m_bounds, D2D1::ColorF(0x6A6A6A), 1.0f);
+        if (cornerRadius > 0.0f) {
+            renderer.FillRoundedRect(m_bounds, bg, cornerRadius);
+            renderer.DrawRoundedRect(m_bounds, D2D1::ColorF(0x6A6A6A), 1.0f, cornerRadius);
+        } else {
+            renderer.FillRect(m_bounds, bg);
+            renderer.DrawRect(m_bounds, D2D1::ColorF(0x6A6A6A), 1.0f);
+        }
 
         D2D1_RECT_F textRect = m_bounds;
         textRect.left += 10.0f;
