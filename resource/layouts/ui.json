@@ -71,6 +71,18 @@
           }
         },
         {
+          "type": "TextInput",
+          "props": {
+            "text": "Type here...",
+            "width": 560,
+            "fontSize": 14,
+            "background": "#242424",
+            "textColor": "#FFFFFF",
+            "cornerRadius": 8,
+            "margin": [0, 8, 0, 0]
+          }
+        },
+        {
           "type": "Button",
           "props": {
             "text": "Primary Action",
@@ -94,6 +106,46 @@
           },
           "events": {
             "onClick": "secondaryAction"
+          }
+        },
+        {
+          "type": "Checkbox",
+          "props": {
+            "text": "Remember me",
+            "checked": true,
+            "width": 260,
+            "margin": [0, 8, 0, 0]
+          }
+        },
+        {
+          "type": "RadioButton",
+          "props": {
+            "text": "Option A",
+            "group": "choices",
+            "checked": true,
+            "width": 260,
+            "margin": [0, 4, 0, 0]
+          }
+        },
+        {
+          "type": "RadioButton",
+          "props": {
+            "text": "Option B",
+            "group": "choices",
+            "width": 260,
+            "margin": [0, 4, 0, 0]
+          }
+        },
+        {
+          "type": "Slider",
+          "props": {
+            "label": "Volume",
+            "width": 900,
+            "min": 0,
+            "max": 100,
+            "value": 40,
+            "step": 5,
+            "margin": [0, 12, 0, 0]
           }
         }
       ]

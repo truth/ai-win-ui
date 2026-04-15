@@ -13,7 +13,12 @@
   </Grid>
   <Panel width="900" height="190" padding="24,18,24,18" spacing="10" cornerRadius="14" background="#1E1E1E" alignItems="center" justifyContent="center">
     <Label text="Layout props now support alignItems / justifyContent / width / height / margin" fontSize="14" color="#BDBDBD" />
+    <TextInput text="Type here..." width="560" fontSize="14" background="#242424" textColor="#FFFFFF" cornerRadius="8" margin="0,8,0,0" />
     <Button text="Primary Action" width="240" fontSize="15" background="#2D6CDF" cornerRadius="8" margin="0,4,0,0" onClick="primaryAction" />
     <Button text="Secondary Action" width="240" fontSize="15" cornerRadius="8" onClick="secondaryAction" />
+    <Checkbox text="Remember me" checked="true" width="260" margin="0,8,0,0" />
+    <RadioButton text="Option A" group="choices" checked="true" width="260" margin="0,4,0,0" />
+    <RadioButton text="Option B" group="choices" width="260" margin="0,4,0,0" />
+    <Slider label="Volume" width="900" min="0" max="100" value="40" step="5" margin="0,12,0,0" />
   </Panel>
 </Panel>

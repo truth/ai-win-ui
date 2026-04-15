@@ -611,6 +611,84 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
         }
         element = std::move(button);
+    } else if (type == "TextInput") {
+        std::wstring text = L"";
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["text"].IsString()) {
+                text = LayoutParser::Utf8ToUtf16(props["text"].stringValue);
+            }
+        }
+        auto input = std::make_unique<TextInput>(std::move(text));
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["fontSize"].IsNumber()) {
+                input->SetFontSize(static_cast<float>(props["fontSize"].numberValue));
+            }
+            if (props["background"].IsString()) {
+                input->SetBackgroundColor(LayoutParser::ColorFromString(props["background"].stringValue));
+            }
+            if (props["textColor"].IsString()) {
+                input->SetTextColor(LayoutParser::ColorFromString(props["textColor"].stringValue));
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                input->SetCornerRadius(static_cast<float>(props["cornerRadius"].numberValue));
+            }
+            ApplyCommonJsonProps(*input, props);
+        }
+        element = std::move(input);
+    } else if (type == "Checkbox") {
+        std::wstring text = L"";
+        auto checkbox = std::make_unique<Checkbox>(std::move(text));
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["text"].IsString()) {
+                checkbox->SetText(LayoutParser::Utf8ToUtf16(props["text"].stringValue));
+            }
+            if (props["checked"].IsBool()) {
+                checkbox->SetChecked(props["checked"].boolValue);
+            }
+            ApplyCommonJsonProps(*checkbox, props);
+        }
+        element = std::move(checkbox);
+    } else if (type == "RadioButton") {
+        std::wstring text = L"";
+        std::wstring group = L"default";
+        auto radio = std::make_unique<RadioButton>(std::move(text), std::move(group));
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["text"].IsString()) {
+                radio->SetText(LayoutParser::Utf8ToUtf16(props["text"].stringValue));
+            }
+            if (props["group"].IsString()) {
+                radio->SetGroup(LayoutParser::Utf8ToUtf16(props["group"].stringValue));
+            }
+            if (props["checked"].IsBool()) {
+                radio->SetChecked(props["checked"].boolValue);
+            }
+            ApplyCommonJsonProps(*radio, props);
+        }
+        element = std::move(radio);
+    } else if (type == "Slider") {
+        std::wstring label = L"";
+        auto slider = std::make_unique<Slider>(std::move(label));
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["label"].IsString()) {
+                slider->SetText(LayoutParser::Utf8ToUtf16(props["label"].stringValue));
+            }
+            if (props["min"].IsNumber() && props["max"].IsNumber()) {
+                slider->SetRange(static_cast<float>(props["min"].numberValue), static_cast<float>(props["max"].numberValue));
+            }
+            if (props["value"].IsNumber()) {
+                slider->SetValue(static_cast<float>(props["value"].numberValue));
+            }
+            if (props["step"].IsNumber()) {
+                slider->SetStep(static_cast<float>(props["step"].numberValue));
+            }
+            ApplyCommonJsonProps(*slider, props);
+        }
+        element = std::move(slider);
     } else if (type == "Grid") {
         auto grid = std::make_unique<GridPanel>();
         if (node["props"].IsObject()) {
@@ -753,6 +831,73 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             }
         }
         element = std::move(button);
+    } else if (node.name == "TextInput") {
+        std::wstring text = L"";
+        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
+            text = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        auto input = std::make_unique<TextInput>(std::move(text));
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            input->SetFontSize(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            input->SetBackgroundColor(LayoutParser::ColorFromString(it->second));
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            input->SetTextColor(LayoutParser::ColorFromString(it->second));
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            input->SetCornerRadius(std::stof(it->second));
+        }
+        ApplyCommonXmlAttributes(*input, node);
+        element = std::move(input);
+    } else if (node.name == "Checkbox") {
+        std::wstring text = L"";
+        auto checkbox = std::make_unique<Checkbox>(std::move(text));
+        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
+            checkbox->SetText(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("checked"); it != node.attributes.end()) {
+            checkbox->SetChecked(ToLowerAscii(it->second) == "true");
+        }
+        ApplyCommonXmlAttributes(*checkbox, node);
+        element = std::move(checkbox);
+    } else if (node.name == "RadioButton") {
+        std::wstring text = L"";
+        std::wstring group = L"default";
+        auto radio = std::make_unique<RadioButton>(std::move(text), std::move(group));
+        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
+            radio->SetText(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("group"); it != node.attributes.end()) {
+            radio->SetGroup(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("checked"); it != node.attributes.end()) {
+            radio->SetChecked(ToLowerAscii(it->second) == "true");
+        }
+        ApplyCommonXmlAttributes(*radio, node);
+        element = std::move(radio);
+    } else if (node.name == "Slider") {
+        std::wstring label = L"";
+        auto slider = std::make_unique<Slider>(std::move(label));
+        if (auto it = node.attributes.find("label"); it != node.attributes.end()) {
+            slider->SetText(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("min"); it != node.attributes.end()) {
+            const float minVal = std::stof(it->second);
+            if (auto it2 = node.attributes.find("max"); it2 != node.attributes.end()) {
+                const float maxVal = std::stof(it2->second);
+                slider->SetRange(minVal, maxVal);
+            }
+        }
+        if (auto it = node.attributes.find("value"); it != node.attributes.end()) {
+            slider->SetValue(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("step"); it != node.attributes.end()) {
+            slider->SetStep(std::stof(it->second));
+        }
+        ApplyCommonXmlAttributes(*slider, node);
+        element = std::move(slider);
     } else if (node.name == "Grid") {
         auto grid = std::make_unique<GridPanel>();
         if (auto it = node.attributes.find("background"); it != node.attributes.end()) {

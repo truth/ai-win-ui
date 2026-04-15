@@ -50,6 +50,7 @@ public:
         OnResize();
         ShowWindow(m_hwnd, cmdShow);
         UpdateWindow(m_hwnd);
+        SetTimer(m_hwnd, 1, 500, nullptr);
         return true;
     }
 
@@ -112,6 +113,12 @@ private:
         if (!m_root) {
             BuildDefaultUI();
         }
+        SetFocusedElement(GetFirstFocusable());
+    }
+
+    UIElement* GetFirstFocusable() const {
+        const auto focusables = CollectFocusableElements();
+        return focusables.empty() ? nullptr : focusables.front();
     }
 
     void BuildDefaultUI() {
@@ -122,6 +129,9 @@ private:
 
         auto title = std::make_unique<Label>(L"DirectUI-style Retained UI Tree");
         auto desc = std::make_unique<Label>(L"Backend: Win32 + Direct2D + DirectWrite");
+
+        auto input = std::make_unique<TextInput>(L"Hello, world!");
+        input->SetFixedWidth(360.0f);
 
         auto btn1 = std::make_unique<Button>(L"Primary Action");
         btn1->SetOnClick([this]() {
@@ -135,6 +145,7 @@ private:
 
         panel->AddChild(std::move(title));
         panel->AddChild(std::move(desc));
+        panel->AddChild(std::move(input));
         panel->AddChild(std::move(btn1));
         panel->AddChild(std::move(btn2));
         m_root = std::move(panel);
@@ -188,6 +199,14 @@ private:
         }
         const float x = static_cast<float>(GET_X_LPARAM(lParam));
         const float y = static_cast<float>(GET_Y_LPARAM(lParam));
+
+        UIElement* focusTarget = m_root->FindFocusableAt(x, y);
+        if (!focusTarget) {
+            SetFocusedElement(nullptr);
+        } else {
+            SetFocusedElement(focusTarget);
+        }
+
         if (m_root->OnMouseDown(x, y)) {
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
@@ -209,6 +228,69 @@ private:
         if (m_root && m_root->OnMouseLeave()) {
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
+    }
+
+    void SetFocusedElement(UIElement* element) {
+        if (m_focusedElement == element) {
+            return;
+        }
+        if (m_focusedElement) {
+            m_focusedElement->OnBlur();
+        }
+        m_focusedElement = element;
+        if (m_focusedElement) {
+            m_focusedElement->OnFocus();
+        }
+        InvalidateRect(m_hwnd, nullptr, FALSE);
+    }
+
+    std::vector<UIElement*> CollectFocusableElements() const {
+        std::vector<UIElement*> focusables;
+        if (m_root) {
+            m_root->CollectFocusable(focusables);
+        }
+        return focusables;
+    }
+
+    UIElement* FindFocusableAt(float x, float y) const {
+        return m_root ? m_root->FindFocusableAt(x, y) : nullptr;
+    }
+
+    void MoveFocus(bool reverse) {
+        const auto focusables = CollectFocusableElements();
+        if (focusables.empty()) {
+            return;
+        }
+
+        auto it = std::find(focusables.begin(), focusables.end(), m_focusedElement);
+        size_t nextIndex = 0;
+        if (it != focusables.end()) {
+            if (reverse) {
+                nextIndex = (it == focusables.begin()) ? focusables.size() - 1 : static_cast<size_t>(std::distance(focusables.begin(), it) - 1);
+            } else {
+                nextIndex = (static_cast<size_t>(std::distance(focusables.begin(), it)) + 1) % focusables.size();
+            }
+        }
+
+        SetFocusedElement(focusables[nextIndex]);
+    }
+
+    bool OnKeyDown(WPARAM wParam, LPARAM lParam) {
+        if (wParam == VK_TAB) {
+            MoveFocus((GetKeyState(VK_SHIFT) & 0x8000) != 0);
+            return true;
+        }
+        if (m_focusedElement && m_focusedElement->OnKeyDown(wParam, lParam)) {
+            return true;
+        }
+        return false;
+    }
+
+    bool OnKeyUp(WPARAM wParam, LPARAM lParam) {
+        if (m_focusedElement && m_focusedElement->OnKeyUp(wParam, lParam)) {
+            return true;
+        }
+        return false;
     }
 
     void EnsureMouseLeaveTracking() {
@@ -260,22 +342,55 @@ private:
                 ReleaseCapture();
                 OnMouseUp(lParam);
                 return 0;
+            case WM_SETFOCUS:
+                if (!m_focusedElement) {
+                    SetFocusedElement(GetFirstFocusable());
+                }
+                return 0;
+            case WM_KILLFOCUS:
+                SetFocusedElement(nullptr);
+                return 0;
+            case WM_KEYDOWN:
+                if (OnKeyDown(wParam, lParam)) {
+                    return 0;
+                }
+                break;
+            case WM_CHAR:
+                if (m_focusedElement && m_focusedElement->OnChar(static_cast<wchar_t>(wParam))) {
+                    InvalidateRect(m_hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                break;
+            case WM_KEYUP:
+                if (OnKeyUp(wParam, lParam)) {
+                    return 0;
+                }
+                break;
+            case WM_TIMER:
+                if (m_focusedElement && m_focusedElement->OnTimer(wParam)) {
+                    InvalidateRect(m_hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                break;
             case WM_PAINT:
                 OnPaint();
                 return 0;
             case WM_ERASEBKGND:
                 return 1;
             case WM_DESTROY:
+                KillTimer(hwnd, 1);
                 PostQuitMessage(0);
                 return 0;
             default:
                 return DefWindowProcW(hwnd, msg, wParam, lParam);
         }
+        return DefWindowProcW(hwnd, msg, wParam, lParam);
     }
 
     HWND m_hwnd = nullptr;
     Renderer m_renderer;
     std::unique_ptr<UIElement> m_root;
+    UIElement* m_focusedElement = nullptr;
     bool m_isInitialized = false;
     bool m_isTrackingMouseLeave = false;
 };
