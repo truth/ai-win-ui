@@ -53,6 +53,25 @@
 
 ## 快速启动
 
-1. 运行 `cmake -S . -B build`
-2. 运行 `cmake --build build --config Debug`
+1. 运行 `.\build.ps1`
+2. 或运行 `build.cmd`
 3. 启动 `build/Debug/ai_win_ui.exe`
+
+## 编译脚本
+
+- `build.ps1`
+  - 默认执行 Debug 构建
+  - 自动调用 CMake 配置与编译
+  - 自动把 `resource/` 复制到可执行文件旁边，保证运行时资源可用
+  - 可选参数：
+    - `-Configuration Release`
+    - `-Clean`
+    - `-Run`
+- `build.cmd`
+  - Windows 命令行包装脚本，内部调用 `build.ps1`
+
+### 示例
+
+- `.\build.ps1 -Configuration Debug`
+- `.\build.ps1 -Configuration Release -Clean`
+- `.\build.ps1 -Run`

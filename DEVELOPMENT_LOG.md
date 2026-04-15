@@ -14,6 +14,8 @@
   - 扩展 `Panel` 布局能力：支持 `alignItems`、`justifyContent`
   - 完善鼠标状态处理：补充 `WM_MOUSELEAVE` 与控件级 hover/pressed 状态回收
   - 更新 JSON/XML 示例布局，覆盖新的布局属性与事件表现
+  - 新增 `build.ps1` / `build.cmd` 编译脚本，统一 CMake 配置与构建入口
+  - 在 CMake 中增加构建后资源复制，确保 `build/<Config>/ai_win_ui.exe` 可直接运行
   - 成功通过 `cmake --build build --config Debug`
 - 待办：
   - 增强文本测量与自动尺寸精度

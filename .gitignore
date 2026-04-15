@@ -1,5 +1,7 @@
 # Visual Studio / CMake build artifacts
 build/
+.tmp-build/
+dist/
 *.vcxproj.user
 *.suo
 *.user
