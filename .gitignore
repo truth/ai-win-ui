@@ -1,0 +1,16 @@
+# Visual Studio / CMake build artifacts
+build/
+*.vcxproj.user
+*.suo
+*.user
+*.idb
+*.pdb
+*.ipch
+*.obj
+*.exe
+*.ilk
+*.log
+
+# Keep lib/ and resource/ directories in repo for dependency binaries and runtime assets
+!lib/
+!resource/
