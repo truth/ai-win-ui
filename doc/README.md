@@ -21,6 +21,7 @@
   - 支持矩形填充、矩形描边、文本绘制。
 - `src/main.cpp`
   - 初始化窗口，构建 UI 树，转发 `WM_SIZE`、`WM_PAINT` 与鼠标事件。
+  - 优先加载 `assets.zip` 中的布局与资源，若缺失则回退到 `resource/` 目录模式。
 
 ## UI 设计规则
 

@@ -8,6 +8,7 @@ add_executable(ai_win_ui WIN32
     src/main.cpp
     src/renderer.cpp
     src/resource_provider.cpp
+    src/zip_resource_provider.cpp
     src/layout_parser.cpp
 )
 

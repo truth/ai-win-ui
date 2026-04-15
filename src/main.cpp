@@ -2,6 +2,7 @@
 #include "renderer.h"
 #include "resource_provider.h"
 #include "ui.h"
+#include "zip_resource_provider.h"
 
 #include <Windowsx.h>
 #include <memory>
@@ -62,8 +63,29 @@ public:
     }
 
 private:
+    std::wstring GetExecutableDirectory() const {
+        wchar_t path[MAX_PATH] = {};
+        if (GetModuleFileNameW(nullptr, path, ARRAYSIZE(path)) == 0) {
+            return L"";
+        }
+        std::wstring exePath(path);
+        const size_t pos = exePath.find_last_of(L"\\/");
+        return pos != std::wstring::npos ? exePath.substr(0, pos) : exePath;
+    }
+
     void BuildUI() {
-        DirectoryResourceProvider resourceProvider(L"resource");
+        const std::wstring baseDir = GetExecutableDirectory();
+        const std::wstring zipPath = baseDir.empty() ? L"assets.zip" : baseDir + L"\\assets.zip";
+        const std::wstring resourceDir = baseDir.empty() ? L"resource" : baseDir + L"\\resource";
+
+        std::unique_ptr<IResourceProvider> resourceProvider;
+        auto zipProvider = std::make_unique<ZipResourceProvider>(zipPath);
+        if (zipProvider->IsValid()) {
+            resourceProvider = std::move(zipProvider);
+        } else {
+            resourceProvider = std::make_unique<DirectoryResourceProvider>(resourceDir);
+        }
+
         auto eventResolver = [this](const std::string& eventId) -> std::function<void()> {
             if (eventId == "primaryAction") {
                 return [this]() { SetWindowTextW(m_hwnd, L"Clicked: Primary Action"); };
@@ -80,7 +102,7 @@ private:
         };
 
         for (const auto& path : layoutCandidates) {
-            m_root = LayoutParser::BuildFromFile(resourceProvider, path, eventResolver);
+            m_root = LayoutParser::BuildFromFile(*resourceProvider, path, eventResolver);
             if (m_root) {
                 break;
             }

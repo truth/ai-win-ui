@@ -7,7 +7,8 @@
 - 提供可扩展的 UI 组件体系（`Panel`、`Label`、`Button`、`Image`）
 - 支持资源目录模式 `resource/`，运行时加载布局与图片
 - 支持 JSON 和 XML 两种布局定义格式
-- 为未来集成 Skia、Yoga 或 ZIP 打包资源提供可扩展基础
+- 支持优先加载 `assets.zip`，并回退到 `resource/` 目录模式
+- 为未来集成 Skia、Yoga 或其它渲染/布局后端提供可扩展基础
 
 ## 当前实现
 
