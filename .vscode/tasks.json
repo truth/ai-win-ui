@@ -1,0 +1,40 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Configure ai_win_ui",
+			"type": "process",
+			"command": "cmake",
+			"args": [
+				"-S",
+				".",
+				"-B",
+				"build"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Build ai_win_ui",
+			"type": "process",
+			"command": "cmake",
+			"args": [
+				"--build",
+				"build",
+				"--config",
+				"Debug"
+			],
+			"dependsOn": [
+				"Configure ai_win_ui"
+			],
+			"dependsOrder": "sequence",
+			"isBackground": false,
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"problemMatcher": [
+				"$msCompile"
+			]
+		}
+	]
+}

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "resource_provider.h"
+#include "ui_context.h"
 #include "ui.h"
 
 #include <functional>
@@ -39,22 +39,19 @@ struct XmlNode {
 
 class LayoutParser {
 public:
-    using EventResolver = std::function<std::function<void()>(const std::string&)>;
+    static std::unique_ptr<UIElement> BuildFromFile(UIContext& context,
+                                                    const std::string& resourcePath);
 
-    static std::unique_ptr<UIElement> BuildFromFile(IResourceProvider& provider,
-                                                    const std::string& resourcePath,
-                                                    EventResolver eventResolver);
-
-    static D2D1_COLOR_F ColorFromString(const std::string& value);
+    static Color ColorFromString(const std::string& value);
     static std::wstring Utf8ToUtf16(const std::string& utf8);
 
 private:
     static std::unique_ptr<UIElement> BuildFromJson(const JsonValue& node,
                                                     IResourceProvider& provider,
-                                                    EventResolver eventResolver);
+                                                    UIEventResolver eventResolver);
     static std::unique_ptr<UIElement> BuildFromXml(const XmlNode& node,
                                                    IResourceProvider& provider,
-                                                   EventResolver eventResolver);
+                                                   UIEventResolver eventResolver);
 
     static JsonValue ParseJson(const std::string& text);
     static XmlNode ParseXml(const std::string& text);

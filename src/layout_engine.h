@@ -1,0 +1,56 @@
+#pragma once
+
+#include "graphics_types.h"
+
+#include <memory>
+#include <vector>
+
+class UIElement;
+
+struct LayoutSpacing {
+    float left = 0.0f;
+    float top = 0.0f;
+    float right = 0.0f;
+    float bottom = 0.0f;
+};
+
+enum class StackAlignItems {
+    Stretch,
+    Start,
+    Center,
+    End
+};
+
+enum class StackJustifyContent {
+    Start,
+    Center,
+    End,
+    SpaceBetween
+};
+
+struct StackLayoutStyle {
+    LayoutSpacing padding{};
+    float spacing = 0.0f;
+    StackAlignItems alignItems = StackAlignItems::Stretch;
+    StackJustifyContent justifyContent = StackJustifyContent::Start;
+};
+
+struct StackLayoutChild {
+    UIElement* element = nullptr;
+    LayoutSpacing margin{};
+};
+
+class ILayoutEngine {
+public:
+    virtual ~ILayoutEngine() = default;
+    virtual float MeasureVerticalStack(const StackLayoutStyle& style,
+                                       const std::vector<StackLayoutChild>& children,
+                                       float availableWidth,
+                                       float availableHeight) = 0;
+    virtual void ArrangeVerticalStack(const StackLayoutStyle& style,
+                                      const std::vector<StackLayoutChild>& children,
+                                      const Rect& bounds) = 0;
+};
+
+std::unique_ptr<ILayoutEngine> CreateDefaultLayoutEngine();
+std::unique_ptr<ILayoutEngine> CreateYogaLayoutEngine();

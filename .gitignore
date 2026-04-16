@@ -16,3 +16,6 @@ dist/
 # Keep lib/ and resource/ directories in repo for dependency binaries and runtime assets
 !lib/
 !resource/
+
+# yoga 
+third_party/yoga-3.2.1

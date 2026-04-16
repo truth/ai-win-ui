@@ -1,7 +1,10 @@
 #pragma once
 
+#include "graphics_types.h"
+#include "layout_engine.h"
 #include "renderer.h"
-#include <wrl/client.h>
+#include "ui_context.h"
+#include "ui_text_metrics.h"
 
 #include <algorithm>
 #include <functional>
@@ -17,70 +20,26 @@ struct Thickness {
     float bottom = 0;
 };
 
-static D2D1_SIZE_F MeasureTextLayout(const std::wstring& text, float fontSize, float maxWidth) {
-    if (text.empty() || fontSize <= 0.0f) {
-        return D2D1::SizeF(0.0f, 0.0f);
-    }
-
-    static Microsoft::WRL::ComPtr<IDWriteFactory> s_dwriteFactory;
-    if (!s_dwriteFactory) {
-        if (FAILED(DWriteCreateFactory(
-                DWRITE_FACTORY_TYPE_SHARED,
-                __uuidof(IDWriteFactory),
-                reinterpret_cast<IUnknown**>(s_dwriteFactory.ReleaseAndGetAddressOf())))) {
-            return D2D1::SizeF(0.0f, 0.0f);
-        }
-    }
-
-    Microsoft::WRL::ComPtr<IDWriteTextFormat> textFormat;
-    if (FAILED(s_dwriteFactory->CreateTextFormat(
-            L"Segoe UI",
-            nullptr,
-            DWRITE_FONT_WEIGHT_NORMAL,
-            DWRITE_FONT_STYLE_NORMAL,
-            DWRITE_FONT_STRETCH_NORMAL,
-            fontSize,
-            L"",
-            textFormat.ReleaseAndGetAddressOf()))) {
-        return D2D1::SizeF(0.0f, 0.0f);
-    }
-
-    textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-    textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
-
-    const float layoutWidth = std::max(1.0f, maxWidth);
-    Microsoft::WRL::ComPtr<IDWriteTextLayout> textLayout;
-    if (FAILED(s_dwriteFactory->CreateTextLayout(
-            text.c_str(),
-            static_cast<UINT32>(text.size()),
-            textFormat.Get(),
-            layoutWidth,
-            4096.0f,
-            textLayout.ReleaseAndGetAddressOf()))) {
-        return D2D1::SizeF(0.0f, 0.0f);
-    }
-
-    DWRITE_TEXT_METRICS metrics{};
-    if (FAILED(textLayout->GetMetrics(&metrics))) {
-        return D2D1::SizeF(0.0f, 0.0f);
-    }
-
-    return D2D1::SizeF(metrics.widthIncludingTrailingWhitespace, metrics.height);
-}
-
 class UIElement {
 public:
     virtual ~UIElement() = default;
 
-    void SetBounds(const D2D1_RECT_F& rect) { m_bounds = rect; }
-    D2D1_RECT_F Bounds() const { return m_bounds; }
-    D2D1_SIZE_F DesiredSize() const { return m_desiredSize; }
+    void SetBounds(const Rect& rect) { m_bounds = rect; }
+    Rect Bounds() const { return m_bounds; }
+    Size DesiredSize() const { return m_desiredSize; }
     void SetMargin(const Thickness& margin) { m_margin = margin; }
     const Thickness& Margin() const { return m_margin; }
     void SetFixedWidth(float width) { m_fixedWidth = width; }
     void SetFixedHeight(float height) { m_fixedHeight = height; }
     bool HasFixedWidth() const { return m_fixedWidth >= 0.0f; }
     bool HasFixedHeight() const { return m_fixedHeight >= 0.0f; }
+    void SetContext(UIContext* context) {
+        m_context = context;
+        for (auto& child : m_children) {
+            child->SetContext(context);
+        }
+    }
+    UIContext* Context() const { return m_context; }
 
     float GetPreferredWidth(float availableWidth) const {
         const float clampedWidth = std::max(0.0f, availableWidth);
@@ -98,10 +57,11 @@ public:
 
     virtual void Measure(float availableWidth, float availableHeight) {
         (void)availableHeight;
-        m_desiredSize.width = GetPreferredWidth(availableWidth);
-        m_desiredSize.height = GetPreferredHeight(m_desiredSize.width);
+        const float width = GetPreferredWidth(availableWidth);
+        m_desiredSize.width = width;
+        m_desiredSize.height = GetPreferredHeight(width);
     }
-    virtual void Arrange(const D2D1_RECT_F& finalRect) { m_bounds = finalRect; }
+    virtual void Arrange(const Rect& finalRect) { m_bounds = finalRect; }
     virtual void Render(IRenderer& renderer) {
         for (auto& child : m_children) {
             child->Render(renderer);
@@ -228,17 +188,27 @@ public:
         return x >= m_bounds.left && x <= m_bounds.right && y >= m_bounds.top && y <= m_bounds.bottom;
     }
 
-    void AddChild(std::unique_ptr<UIElement> child) { m_children.emplace_back(std::move(child)); }
+    void AddChild(std::unique_ptr<UIElement> child) {
+        if (child) {
+            child->SetContext(m_context);
+        }
+        m_children.emplace_back(std::move(child));
+    }
     std::vector<std::unique_ptr<UIElement>>& Children() { return m_children; }
 
 protected:
-    D2D1_RECT_F m_bounds = D2D1::RectF();
-    D2D1_SIZE_F m_desiredSize = D2D1::SizeF();
+    Size MeasureTextValue(const std::wstring& text, float fontSize, float maxWidth) const {
+        return MeasureTextLayout(m_context ? m_context->textMeasurer : nullptr, text, fontSize, maxWidth);
+    }
+
+    Rect m_bounds{};
+    Size m_desiredSize{};
     std::vector<std::unique_ptr<UIElement>> m_children;
     Thickness m_margin{};
     float m_fixedWidth = -1.0f;
     float m_fixedHeight = -1.0f;
     bool m_hasFocus = false;
+    UIContext* m_context = nullptr;
 };
 
 class Panel : public UIElement {
@@ -260,17 +230,22 @@ public:
     Thickness padding{8, 8, 8, 8};
     float spacing = 6.0f;
     float cornerRadius = 0.0f;
-    D2D1_COLOR_F background = D2D1::ColorF(0x1E1E1E);
+    Color background = ColorFromHex(0x1E1E1E);
     AlignItems alignItems = AlignItems::Stretch;
     JustifyContent justifyContent = JustifyContent::Start;
 
-    void Arrange(const D2D1_RECT_F& finalRect) override {
+    void Arrange(const Rect& finalRect) override {
         UIElement::Arrange(finalRect);
+
+        if (m_context && m_context->layoutEngine) {
+            m_context->layoutEngine->ArrangeVerticalStack(ToStackLayoutStyle(), BuildLayoutChildren(), m_bounds);
+            return;
+        }
 
         const float contentLeft = m_bounds.left + padding.left;
         const float contentTop = m_bounds.top + padding.top;
-        const float contentWidth = std::max(0.0f, (m_bounds.right - m_bounds.left) - padding.left - padding.right);
-        const float contentHeight = std::max(0.0f, (m_bounds.bottom - m_bounds.top) - padding.top - padding.bottom);
+        const float contentWidth = std::max(0.0f, m_bounds.Width() - padding.left - padding.right);
+        const float contentHeight = std::max(0.0f, m_bounds.Height() - padding.top - padding.bottom);
 
         struct ChildLayout {
             UIElement* element;
@@ -345,7 +320,7 @@ public:
             }
 
             y += layout.margin.top;
-            layout.element->Arrange(D2D1::RectF(x, y, x + layout.width, y + layout.height));
+            layout.element->Arrange(Rect::Make(x, y, x + layout.width, y + layout.height));
             y += layout.height + layout.margin.bottom;
             if (i + 1 < layouts.size()) {
                 y += spacingBetweenChildren;
@@ -354,6 +329,16 @@ public:
     }
 
     void Measure(float availableWidth, float availableHeight) override {
+        if (m_context && m_context->layoutEngine) {
+            m_desiredSize.width = availableWidth;
+            m_desiredSize.height = m_context->layoutEngine->MeasureVerticalStack(
+                ToStackLayoutStyle(),
+                BuildLayoutChildren(),
+                availableWidth,
+                availableHeight);
+            return;
+        }
+
         const float contentWidth = std::max(0.0f, availableWidth - padding.left - padding.right);
         float totalHeight = padding.top + padding.bottom;
         bool first = true;
@@ -379,6 +364,28 @@ public:
     }
 
 protected:
+    StackLayoutStyle ToStackLayoutStyle() const {
+        return StackLayoutStyle{
+            LayoutSpacing{padding.left, padding.top, padding.right, padding.bottom},
+            spacing,
+            static_cast<StackAlignItems>(alignItems),
+            static_cast<StackJustifyContent>(justifyContent)
+        };
+    }
+
+    std::vector<StackLayoutChild> BuildLayoutChildren() const {
+        std::vector<StackLayoutChild> children;
+        children.reserve(m_children.size());
+        for (const auto& child : m_children) {
+            const Thickness margin = child->Margin();
+            children.push_back(StackLayoutChild{
+                child.get(),
+                LayoutSpacing{margin.left, margin.top, margin.right, margin.bottom}
+            });
+        }
+        return children;
+    }
+
     float MeasurePreferredHeight(float width) const override {
         float totalHeight = padding.top + padding.bottom;
         const float contentWidth = std::max(0.0f, width - padding.left - padding.right);
@@ -402,7 +409,7 @@ public:
     void Render(IRenderer& renderer) override {
         if (cornerRadius > 0.0f) {
             renderer.FillRoundedRect(m_bounds, background, cornerRadius);
-            renderer.DrawRoundedRect(m_bounds, D2D1::ColorF(0x333333), 1.0f, cornerRadius);
+            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x333333), 1.0f, cornerRadius);
         } else {
             renderer.FillRect(m_bounds, background);
         }
@@ -418,15 +425,15 @@ public:
     float cellSpacing = 8.0f;
     float cornerRadius = 0.0f;
     Thickness padding{8, 8, 8, 8};
-    D2D1_COLOR_F background = D2D1::ColorF(0x1A1A1A);
+    Color background = ColorFromHex(0x1A1A1A);
     float rowHeight = 120.0f;
 
-    void Arrange(const D2D1_RECT_F& finalRect) override {
+    void Arrange(const Rect& finalRect) override {
         UIElement::Arrange(finalRect);
 
         const float x0 = m_bounds.left + padding.left;
         float y = m_bounds.top + padding.top;
-        const float contentWidth = (m_bounds.right - m_bounds.left) - padding.left - padding.right;
+        const float contentWidth = m_bounds.Width() - padding.left - padding.right;
         const int cols = std::max(1, columns);
         const float cellWidth = (contentWidth - cellSpacing * (cols - 1)) / cols;
 
@@ -439,7 +446,7 @@ public:
             const float childHeight = std::min(
                 std::max(0.0f, rowHeight - margin.top - margin.bottom),
                 child->GetPreferredHeight(childWidth));
-            child->Arrange(D2D1::RectF(
+            child->Arrange(Rect::Make(
                 x + margin.left,
                 y + margin.top,
                 x + margin.left + childWidth,
@@ -491,7 +498,7 @@ public:
     void Render(IRenderer& renderer) override {
         if (cornerRadius > 0.0f) {
             renderer.FillRoundedRect(m_bounds, background, cornerRadius);
-            renderer.DrawRoundedRect(m_bounds, D2D1::ColorF(0x333333), 1.0f, cornerRadius);
+            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x333333), 1.0f, cornerRadius);
         } else {
             renderer.FillRect(m_bounds, background);
         }
@@ -509,12 +516,12 @@ public:
 
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
-        const D2D1_SIZE_F measured = MeasureTextLayout(m_text, m_fontSize, availableWidth > 0.0f ? availableWidth : 4096.0f);
+        const Size measured = MeasureTextValue(m_text, m_fontSize, availableWidth > 0.0f ? availableWidth : 4096.0f);
         return std::min(availableWidth, measured.width + 4.0f);
     }
 
     float MeasurePreferredHeight(float width) const override {
-        const D2D1_SIZE_F measured = MeasureTextLayout(m_text, m_fontSize, width > 0.0f ? width : 4096.0f);
+        const Size measured = MeasureTextValue(m_text, m_fontSize, width > 0.0f ? width : 4096.0f);
         return measured.height + 8.0f;
     }
 
@@ -530,7 +537,7 @@ public:
     }
 
     float m_fontSize = 15.0f;
-    D2D1_COLOR_F m_color = D2D1::ColorF(0xEDEDED);
+    Color m_color = ColorFromHex(0xEDEDED);
 
 private:
     std::wstring m_text;
@@ -565,9 +572,9 @@ public:
             m_bitmap = renderer.CreateBitmapFromBytes(m_imageData.data(), m_imageData.size());
         }
         if (m_bitmap) {
-            D2D1_RECT_F drawRect = m_bounds;
+            Rect drawRect = m_bounds;
             if (stretch != StretchMode::Fill) {
-                const D2D1_SIZE_F sourceSize = m_bitmap->GetSize();
+                const Size sourceSize = renderer.GetBitmapSize(m_bitmap);
                 if (sourceSize.width > 0 && sourceSize.height > 0) {
                     const float targetWidth = m_bounds.right - m_bounds.left;
                     const float targetHeight = m_bounds.bottom - m_bounds.top;
@@ -578,21 +585,21 @@ public:
                         if (sourceRatio > targetRatio) {
                             const float scaledHeight = targetWidth / sourceRatio;
                             const float offsetY = (targetHeight - scaledHeight) * 0.5f;
-                            drawRect = D2D1::RectF(m_bounds.left, m_bounds.top + offsetY, m_bounds.right, m_bounds.top + offsetY + scaledHeight);
+                            drawRect = Rect::Make(m_bounds.left, m_bounds.top + offsetY, m_bounds.right, m_bounds.top + offsetY + scaledHeight);
                         } else {
                             const float scaledWidth = targetHeight * sourceRatio;
                             const float offsetX = (targetWidth - scaledWidth) * 0.5f;
-                            drawRect = D2D1::RectF(m_bounds.left + offsetX, m_bounds.top, m_bounds.left + offsetX + scaledWidth, m_bounds.bottom);
+                            drawRect = Rect::Make(m_bounds.left + offsetX, m_bounds.top, m_bounds.left + offsetX + scaledWidth, m_bounds.bottom);
                         }
                     } else if (stretch == StretchMode::UniformToFill) {
                         if (sourceRatio > targetRatio) {
                             const float scaledWidth = targetHeight * sourceRatio;
                             const float offsetX = (targetWidth - scaledWidth) * 0.5f;
-                            drawRect = D2D1::RectF(m_bounds.left + offsetX, m_bounds.top, m_bounds.left + offsetX + scaledWidth, m_bounds.bottom);
+                            drawRect = Rect::Make(m_bounds.left + offsetX, m_bounds.top, m_bounds.left + offsetX + scaledWidth, m_bounds.bottom);
                         } else {
                             const float scaledHeight = targetWidth / sourceRatio;
                             const float offsetY = (targetHeight - scaledHeight) * 0.5f;
-                            drawRect = D2D1::RectF(m_bounds.left, m_bounds.top + offsetY, m_bounds.right, m_bounds.top + offsetY + scaledHeight);
+                            drawRect = Rect::Make(m_bounds.left, m_bounds.top + offsetY, m_bounds.right, m_bounds.top + offsetY + scaledHeight);
                         }
                     }
                 }
@@ -600,20 +607,20 @@ public:
 
             if (cornerRadius > 0.0f) {
                 renderer.PushRoundedClip(m_bounds, cornerRadius);
-                renderer.DrawBitmap(m_bitmap.Get(), drawRect);
+                renderer.DrawBitmap(m_bitmap, drawRect);
                 renderer.PopLayer();
             } else {
-                renderer.DrawBitmap(m_bitmap.Get(), drawRect);
+                renderer.DrawBitmap(m_bitmap, drawRect);
             }
         } else {
-            renderer.FillRect(m_bounds, D2D1::ColorF(0x404040));
+            renderer.FillRect(m_bounds, ColorFromHex(0x404040));
         }
     }
 
 private:
     std::wstring m_source;
     std::vector<uint8_t> m_imageData;
-    Microsoft::WRL::ComPtr<ID2D1Bitmap> m_bitmap;
+    BitmapHandle m_bitmap = nullptr;
 };
 
 class Button : public UIElement {
@@ -625,8 +632,8 @@ public:
 
     float cornerRadius = 4.0f;
     float fontSize = 14.0f;
-    D2D1_COLOR_F background = D2D1::ColorF(0x2D2D30);
-    D2D1_COLOR_F foreground = D2D1::ColorF(0xFFFFFF);
+    Color background = ColorFromHex(0x2D2D30);
+    Color foreground = ColorFromHex(0xFFFFFF);
 
     bool IsFocusable() const override { return true; }
 
@@ -669,39 +676,39 @@ public:
 
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
-        const D2D1_SIZE_F measured = MeasureTextLayout(m_text, fontSize, availableWidth > 0.0f ? availableWidth : 4096.0f);
+        const Size measured = MeasureTextValue(m_text, fontSize, availableWidth > 0.0f ? availableWidth : 4096.0f);
         return std::min(availableWidth, measured.width + 24.0f);
     }
 
     float MeasurePreferredHeight(float width) const override {
-        const D2D1_SIZE_F measured = MeasureTextLayout(m_text, fontSize, width > 0.0f ? width : 4096.0f);
+        const Size measured = MeasureTextValue(m_text, fontSize, width > 0.0f ? width : 4096.0f);
         return measured.height + 14.0f;
     }
 
 public:
     void Render(IRenderer& renderer) override {
-        D2D1_COLOR_F bg = background;
+        Color bg = background;
         if (m_pressed && m_hovered) {
-            bg = D2D1::ColorF(0x0E639C);
+            bg = ColorFromHex(0x0E639C);
         } else if (m_hovered) {
-            bg = D2D1::ColorF(0x3E3E42);
+            bg = ColorFromHex(0x3E3E42);
         }
 
         if (cornerRadius > 0.0f) {
             renderer.FillRoundedRect(m_bounds, bg, cornerRadius);
-            renderer.DrawRoundedRect(m_bounds, D2D1::ColorF(0x6A6A6A), 1.0f, cornerRadius);
+            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x6A6A6A), 1.0f, cornerRadius);
             if (m_hasFocus) {
-                renderer.DrawRoundedRect(m_bounds, D2D1::ColorF(0xFFFFFF), 2.0f, cornerRadius);
+                renderer.DrawRoundedRect(m_bounds, ColorFromHex(0xFFFFFF), 2.0f, cornerRadius);
             }
         } else {
             renderer.FillRect(m_bounds, bg);
-            renderer.DrawRect(m_bounds, D2D1::ColorF(0x6A6A6A), 1.0f);
+            renderer.DrawRect(m_bounds, ColorFromHex(0x6A6A6A), 1.0f);
             if (m_hasFocus) {
-                renderer.DrawRect(m_bounds, D2D1::ColorF(0xFFFFFF), 2.0f);
+                renderer.DrawRect(m_bounds, ColorFromHex(0xFFFFFF), 2.0f);
             }
         }
 
-        D2D1_RECT_F textRect = m_bounds;
+        Rect textRect = m_bounds;
         textRect.left += 10.0f;
         renderer.DrawTextW(
             m_text.c_str(),
@@ -953,7 +960,7 @@ public:
     }
 
     bool OnMouseDown(float x, float y) override {
-        const D2D1_RECT_F textRect = D2D1::RectF(m_bounds.left + 8.0f, m_bounds.top + 6.0f, m_bounds.right - 8.0f, m_bounds.bottom - 6.0f);
+        const Rect textRect = Rect::Make(m_bounds.left + 8.0f, m_bounds.top + 6.0f, m_bounds.right - 8.0f, m_bounds.bottom - 6.0f);
         if (!HitTest(x, y)) {
             return false;
         }
@@ -984,7 +991,7 @@ public:
             return false;
         }
 
-        const D2D1_RECT_F textRect = D2D1::RectF(m_bounds.left + 8.0f, m_bounds.top + 6.0f, m_bounds.right - 8.0f, m_bounds.bottom - 6.0f);
+        const Rect textRect = Rect::Make(m_bounds.left + 8.0f, m_bounds.top + 6.0f, m_bounds.right - 8.0f, m_bounds.bottom - 6.0f);
         const float localX = x - textRect.left;
         const size_t newCaret = ComputeCaretIndex(localX, textRect);
         if (newCaret == m_caretPosition) {
@@ -1016,11 +1023,11 @@ public:
         return true;
     }
 
-    size_t ComputeCaretIndex(float localX, const D2D1_RECT_F& textRect) const {
+    size_t ComputeCaretIndex(float localX, const Rect& textRect) const {
         size_t newCaret = m_text.size();
         for (size_t i = 0; i <= m_text.size(); ++i) {
             const std::wstring prefix = m_text.substr(0, i);
-            const D2D1_SIZE_F metrics = MeasureTextLayout(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
+            const Size metrics = MeasureTextValue(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
             if (localX < metrics.width + 4.0f) {
                 newCaret = i;
                 break;
@@ -1043,20 +1050,20 @@ public:
     }
 
     void SetFontSize(float size) { fontSize = size; }
-    void SetBackgroundColor(const D2D1_COLOR_F& color) { background = color; }
-    void SetTextColor(const D2D1_COLOR_F& color) { textColor = color; }
+    void SetBackgroundColor(const Color& color) { background = color; }
+    void SetTextColor(const Color& color) { textColor = color; }
     void SetCornerRadius(float radius) { cornerRadius = radius; }
 
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
         const std::wstring measureText = m_text.empty() ? L" " : m_text;
-        const D2D1_SIZE_F measured = MeasureTextLayout(measureText, fontSize, std::max(1.0f, availableWidth - 16.0f));
+        const Size measured = MeasureTextValue(measureText, fontSize, std::max(1.0f, availableWidth - 16.0f));
         return std::min(availableWidth, measured.width + 16.0f);
     }
 
     float MeasurePreferredHeight(float width) const override {
         const std::wstring measureText = m_text.empty() ? L" " : m_text;
-        const D2D1_SIZE_F measured = MeasureTextLayout(measureText, fontSize, std::max(1.0f, width - 16.0f));
+        const Size measured = MeasureTextValue(measureText, fontSize, std::max(1.0f, width - 16.0f));
         return measured.height + 12.0f;
     }
 
@@ -1068,33 +1075,33 @@ public:
             renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, cornerRadius);
         }
 
-        D2D1_RECT_F textRect = m_bounds;
+        Rect textRect = m_bounds;
         textRect.left += 8.0f;
         textRect.top += 6.0f;
         if (HasSelection()) {
             const auto [selStart, selEnd] = GetSelectionRange();
             std::wstring prefix = m_text.substr(0, selStart);
             std::wstring selection = m_text.substr(selStart, selEnd - selStart);
-            const D2D1_SIZE_F prefixMetrics = MeasureTextLayout(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
-            const D2D1_SIZE_F selectionMetrics = MeasureTextLayout(selection.empty() ? L" " : selection, fontSize, std::max(1.0f, textRect.right - textRect.left));
-            D2D1_RECT_F selectionRect = D2D1::RectF(
+            const Size prefixMetrics = MeasureTextValue(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
+            const Size selectionMetrics = MeasureTextValue(selection.empty() ? L" " : selection, fontSize, std::max(1.0f, textRect.right - textRect.left));
+            Rect selectionRect = Rect::Make(
                 textRect.left + prefixMetrics.width,
                 textRect.top,
                 textRect.left + prefixMetrics.width + selectionMetrics.width,
                 textRect.top + selectionMetrics.height
             );
-            renderer.FillRect(selectionRect, D2D1::ColorF(0x3A86FF));
+            renderer.FillRect(selectionRect, ColorFromHex(0x3A86FF));
         }
         renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, fontSize);
 
         if (m_hasFocus) {
             const std::wstring prefix = m_text.substr(0, m_caretPosition);
-            const D2D1_SIZE_F caretMetrics = MeasureTextLayout(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
+            const Size caretMetrics = MeasureTextValue(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
             const float caretX = textRect.left + caretMetrics.width;
             const float caretTop = textRect.top;
-            const float caretBottom = textRect.top + MeasureTextLayout(L"|", fontSize, std::max(1.0f, textRect.right - textRect.left)).height;
+            const float caretBottom = textRect.top + MeasureTextValue(L"|", fontSize, std::max(1.0f, textRect.right - textRect.left)).height;
             if (m_showCaret) {
-                renderer.DrawRect(D2D1::RectF(caretX, caretTop, caretX + 1.0f, caretBottom), textColor, 1.0f);
+                renderer.DrawRect(Rect::Make(caretX, caretTop, caretX + 1.0f, caretBottom), textColor, 1.0f);
             }
         }
     }
@@ -1107,10 +1114,10 @@ private:
     bool m_showCaret = true;
     DWORD m_lastBlink = 0;
     float fontSize = 14.0f;
-    D2D1_COLOR_F background = D2D1::ColorF(0x1F1F1F);
-    D2D1_COLOR_F borderColor = D2D1::ColorF(0x6A6A6A);
-    D2D1_COLOR_F focusBorderColor = D2D1::ColorF(0xFFFFFF);
-    D2D1_COLOR_F textColor = D2D1::ColorF(0xEDEDED);
+    Color background = ColorFromHex(0x1F1F1F);
+    Color borderColor = ColorFromHex(0x6A6A6A);
+    Color focusBorderColor = ColorFromHex(0xFFFFFF);
+    Color textColor = ColorFromHex(0xEDEDED);
     float cornerRadius = 4.0f;
 
     bool HasSelection() const {
@@ -1177,28 +1184,28 @@ public:
     }
 
     float MeasurePreferredWidth(float availableWidth) const override {
-        const D2D1_SIZE_F textSize = MeasureTextLayout(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, availableWidth - 30.0f));
+        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, availableWidth - 30.0f));
         return std::min(availableWidth, textSize.width + 30.0f);
     }
 
     float MeasurePreferredHeight(float width) const override {
-        const D2D1_SIZE_F textSize = MeasureTextLayout(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, width - 30.0f));
+        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, width - 30.0f));
         return textSize.height + 10.0f;
     }
 
     void Render(IRenderer& renderer) override {
-        const D2D1_RECT_F box = D2D1::RectF(m_bounds.left, m_bounds.top + 2.0f, m_bounds.left + 18.0f, m_bounds.top + 20.0f);
-        renderer.FillRect(box, D2D1::ColorF(0x2D2D30));
-        renderer.DrawRect(box, D2D1::ColorF(0x6A6A6A), 1.0f);
+        const Rect box = Rect::Make(m_bounds.left, m_bounds.top + 2.0f, m_bounds.left + 18.0f, m_bounds.top + 20.0f);
+        renderer.FillRect(box, ColorFromHex(0x2D2D30));
+        renderer.DrawRect(box, ColorFromHex(0x6A6A6A), 1.0f);
         if (m_checked) {
-            const D2D1_RECT_F mark = D2D1::RectF(box.left + 4.0f, box.top + 4.0f, box.right - 4.0f, box.bottom - 4.0f);
-            renderer.FillRect(mark, D2D1::ColorF(0x2D6CDF));
+            const Rect mark = Rect::Make(box.left + 4.0f, box.top + 4.0f, box.right - 4.0f, box.bottom - 4.0f);
+            renderer.FillRect(mark, ColorFromHex(0x2D6CDF));
         }
         if (m_hasFocus) {
-            renderer.DrawRect(box, D2D1::ColorF(0xFFFFFF), 2.0f);
+            renderer.DrawRect(box, ColorFromHex(0xFFFFFF), 2.0f);
         }
 
-        D2D1_RECT_F textRect = m_bounds;
+        Rect textRect = m_bounds;
         textRect.left += 26.0f;
         renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, fontSize);
     }
@@ -1236,7 +1243,7 @@ private:
     std::wstring m_text;
     bool m_checked = false;
     bool m_pressed = false;
-    D2D1_COLOR_F textColor = D2D1::ColorF(0xEDEDED);
+    Color textColor = ColorFromHex(0xEDEDED);
     float fontSize = 14.0f;
 };
 
@@ -1279,27 +1286,27 @@ public:
     }
 
     float MeasurePreferredWidth(float availableWidth) const override {
-        const D2D1_SIZE_F textSize = MeasureTextLayout(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, availableWidth - 28.0f));
+        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, availableWidth - 28.0f));
         return std::min(availableWidth, textSize.width + 28.0f);
     }
 
     float MeasurePreferredHeight(float width) const override {
-        const D2D1_SIZE_F textSize = MeasureTextLayout(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, width - 28.0f));
+        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, width - 28.0f));
         return textSize.height + 10.0f;
     }
 
     void Render(IRenderer& renderer) override {
-        const D2D1_RECT_F circle = D2D1::RectF(m_bounds.left, m_bounds.top + 2.0f, m_bounds.left + 18.0f, m_bounds.top + 20.0f);
-        renderer.DrawRoundedRect(circle, D2D1::ColorF(0x6A6A6A), 1.0f, 9.0f);
+        const Rect circle = Rect::Make(m_bounds.left, m_bounds.top + 2.0f, m_bounds.left + 18.0f, m_bounds.top + 20.0f);
+        renderer.DrawRoundedRect(circle, ColorFromHex(0x6A6A6A), 1.0f, 9.0f);
         if (m_checked) {
-            const D2D1_RECT_F dot = D2D1::RectF(circle.left + 5.0f, circle.top + 5.0f, circle.right - 5.0f, circle.bottom - 5.0f);
-            renderer.FillRoundedRect(dot, D2D1::ColorF(0x2D6CDF), 5.0f);
+            const Rect dot = Rect::Make(circle.left + 5.0f, circle.top + 5.0f, circle.right - 5.0f, circle.bottom - 5.0f);
+            renderer.FillRoundedRect(dot, ColorFromHex(0x2D6CDF), 5.0f);
         }
         if (m_hasFocus) {
-            renderer.DrawRoundedRect(circle, D2D1::ColorF(0xFFFFFF), 2.0f, 9.0f);
+            renderer.DrawRoundedRect(circle, ColorFromHex(0xFFFFFF), 2.0f, 9.0f);
         }
 
-        D2D1_RECT_F textRect = m_bounds;
+        Rect textRect = m_bounds;
         textRect.left += 26.0f;
         renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, fontSize);
     }
@@ -1348,7 +1355,7 @@ private:
     std::wstring m_group;
     bool m_checked = false;
     bool m_pressed = false;
-    D2D1_COLOR_F textColor = D2D1::ColorF(0xEDEDED);
+    Color textColor = ColorFromHex(0xEDEDED);
     float fontSize = 14.0f;
     inline static std::map<std::wstring, std::vector<RadioButton*>> s_groups;
 };
@@ -1440,16 +1447,16 @@ public:
         const float trackRight = m_bounds.right - 14.0f;
         const float trackTop = m_bounds.top + (m_bounds.bottom - m_bounds.top) * 0.5f - 4.0f;
         const float trackBottom = trackTop + 8.0f;
-        const D2D1_RECT_F trackRect = D2D1::RectF(trackLeft, trackTop, trackRight, trackBottom);
-        renderer.FillRect(trackRect, D2D1::ColorF(0x333333));
+        const Rect trackRect = Rect::Make(trackLeft, trackTop, trackRight, trackBottom);
+        renderer.FillRect(trackRect, ColorFromHex(0x333333));
 
         const float position = trackLeft + (trackRight - trackLeft) * ((m_value - m_min) / std::max(1.0f, m_max - m_min));
-        const D2D1_RECT_F thumbRect = D2D1::RectF(position - 8.0f, trackTop - 6.0f, position + 8.0f, trackBottom + 6.0f);
+        const Rect thumbRect = Rect::Make(position - 8.0f, trackTop - 6.0f, position + 8.0f, trackBottom + 6.0f);
         renderer.FillRoundedRect(thumbRect, highlightColor, 8.0f);
-        renderer.DrawRoundedRect(thumbRect, D2D1::ColorF(0x6A6A6A), 1.0f, 8.0f);
+        renderer.DrawRoundedRect(thumbRect, ColorFromHex(0x6A6A6A), 1.0f, 8.0f);
 
         if (!m_label.empty()) {
-            D2D1_RECT_F labelRect = m_bounds;
+            Rect labelRect = m_bounds;
             labelRect.right = trackLeft - 8.0f;
             renderer.DrawTextW(m_label.c_str(), static_cast<UINT32>(m_label.size()), labelRect, textColor, fontSize);
         }
@@ -1475,10 +1482,10 @@ private:
     float m_step = 0.05f;
     bool m_dragging = false;
     float fontSize = 13.0f;
-    D2D1_COLOR_F background = D2D1::ColorF(0x1F1F1F);
-    D2D1_COLOR_F borderColor = D2D1::ColorF(0x6A6A6A);
-    D2D1_COLOR_F focusBorderColor = D2D1::ColorF(0xFFFFFF);
-    D2D1_COLOR_F textColor = D2D1::ColorF(0xEDEDED);
-    D2D1_COLOR_F highlightColor = D2D1::ColorF(0x2D6CDF);
+    Color background = ColorFromHex(0x1F1F1F);
+    Color borderColor = ColorFromHex(0x6A6A6A);
+    Color focusBorderColor = ColorFromHex(0xFFFFFF);
+    Color textColor = ColorFromHex(0xEDEDED);
+    Color highlightColor = ColorFromHex(0x2D6CDF);
     float cornerRadius = 8.0f;
 };

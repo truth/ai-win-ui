@@ -1,6 +1,9 @@
 #include "layout_parser.h"
+#include "layout_engine.h"
 #include "renderer.h"
 #include "resource_provider.h"
+#include "text_measurer.h"
+#include "ui_context.h"
 #include "ui.h"
 #include "zip_resource_provider.h"
 
@@ -41,11 +44,28 @@ public:
             return false;
         }
 
-        if (!m_renderer.Initialize(m_hwnd)) {
+        m_renderer = CreateRenderer();
+        if (!m_renderer || !m_renderer->Initialize(m_hwnd)) {
             return false;
         }
+        m_uiContext.renderer = m_renderer.get();
+
+        m_textMeasurer = CreateTextMeasurer();
+        if (!m_textMeasurer) {
+            return false;
+        }
+        m_uiContext.textMeasurer = m_textMeasurer.get();
+
+        m_layoutEngine = CreateDefaultLayoutEngine();
+        if (!m_layoutEngine) {
+            return false;
+        }
+        m_uiContext.layoutEngine = m_layoutEngine.get();
 
         BuildUI();
+        if (m_root) {
+            m_root->SetContext(&m_uiContext);
+        }
         m_isInitialized = true;
         OnResize();
         ShowWindow(m_hwnd, cmdShow);
@@ -79,23 +99,23 @@ private:
         const std::wstring zipPath = baseDir.empty() ? L"assets.zip" : baseDir + L"\\assets.zip";
         const std::wstring resourceDir = baseDir.empty() ? L"resource" : baseDir + L"\\resource";
 
-        std::unique_ptr<IResourceProvider> resourceProvider;
         auto zipProvider = std::make_unique<ZipResourceProvider>(zipPath);
         auto dirProvider = std::make_unique<DirectoryResourceProvider>(resourceDir);
         if (zipProvider->IsValid()) {
-            resourceProvider = std::make_unique<FallbackResourceProvider>(std::move(zipProvider), std::move(dirProvider));
+            m_resourceProvider = std::make_unique<FallbackResourceProvider>(std::move(zipProvider), std::move(dirProvider));
         } else {
-            resourceProvider = std::move(dirProvider);
+            m_resourceProvider = std::move(dirProvider);
         }
+        m_uiContext.resourceProvider = m_resourceProvider.get();
 
-        auto eventResolver = [this](const std::string& eventId) -> std::function<void()> {
+        m_uiContext.eventResolver = [this](const std::string& eventId) -> UIEventHandler {
             if (eventId == "primaryAction") {
                 return [this]() { SetWindowTextW(m_hwnd, L"Clicked: Primary Action"); };
             }
             if (eventId == "secondaryAction") {
                 return [this]() { SetWindowTextW(m_hwnd, L"Clicked: Secondary Action"); };
             }
-            return std::function<void()>();
+            return UIEventHandler();
         };
 
         const std::vector<std::string> layoutCandidates = {
@@ -104,7 +124,7 @@ private:
         };
 
         for (const auto& path : layoutCandidates) {
-            m_root = LayoutParser::BuildFromFile(*resourceProvider, path, eventResolver);
+            m_root = LayoutParser::BuildFromFile(m_uiContext, path);
             if (m_root) {
                 break;
             }
@@ -123,12 +143,12 @@ private:
 
     void BuildDefaultUI() {
         auto panel = std::make_unique<Panel>();
-        panel->background = D2D1::ColorF(0x171717);
+        panel->background = ColorFromHex(0x171717);
         panel->padding = {24, 24, 24, 24};
         panel->spacing = 10.0f;
 
         auto title = std::make_unique<Label>(L"DirectUI-style Retained UI Tree");
-        auto desc = std::make_unique<Label>(L"Backend: Win32 + Direct2D + DirectWrite");
+        auto desc = std::make_unique<Label>(L"Backend: Win32 + abstract renderer/text services");
 
         auto input = std::make_unique<TextInput>(L"Hello, world!");
         input->SetFixedWidth(360.0f);
@@ -148,6 +168,7 @@ private:
         panel->AddChild(std::move(input));
         panel->AddChild(std::move(btn1));
         panel->AddChild(std::move(btn2));
+        panel->SetContext(&m_uiContext);
         m_root = std::move(panel);
     }
 
@@ -159,10 +180,12 @@ private:
         GetClientRect(m_hwnd, &rc);
         const UINT w = static_cast<UINT>(rc.right - rc.left);
         const UINT h = static_cast<UINT>(rc.bottom - rc.top);
-        m_renderer.Resize(w, h);
+        if (m_renderer) {
+            m_renderer->Resize(w, h);
+        }
         if (m_root) {
             m_root->Measure(static_cast<float>(w), static_cast<float>(h));
-            m_root->Arrange(D2D1::RectF(0, 0, static_cast<float>(w), static_cast<float>(h)));
+            m_root->Arrange(Rect::Make(0, 0, static_cast<float>(w), static_cast<float>(h)));
         }
         InvalidateRect(m_hwnd, nullptr, FALSE);
     }
@@ -171,12 +194,12 @@ private:
         PAINTSTRUCT ps{};
         BeginPaint(m_hwnd, &ps);
 
-        if (m_isInitialized) {
-            m_renderer.BeginFrame(D2D1::ColorF(0x101010));
+        if (m_isInitialized && m_renderer) {
+            m_renderer->BeginFrame(ColorFromHex(0x101010));
             if (m_root) {
-                m_root->Render(m_renderer);
+                m_root->Render(*m_renderer);
             }
-            m_renderer.EndFrame();
+            m_renderer->EndFrame();
         }
 
         EndPaint(m_hwnd, &ps);
@@ -405,7 +428,11 @@ private:
     }
 
     HWND m_hwnd = nullptr;
-    Renderer m_renderer;
+    UIContext m_uiContext{};
+    std::unique_ptr<IRenderer> m_renderer;
+    std::unique_ptr<ITextMeasurer> m_textMeasurer;
+    std::unique_ptr<ILayoutEngine> m_layoutEngine;
+    std::unique_ptr<IResourceProvider> m_resourceProvider;
     std::unique_ptr<UIElement> m_root;
     UIElement* m_focusedElement = nullptr;
     UIElement* m_mouseCaptureTarget = nullptr;

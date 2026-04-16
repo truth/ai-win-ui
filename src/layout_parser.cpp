@@ -1,4 +1,5 @@
 #include "layout_parser.h"
+#include "resource_provider.h"
 
 #include <stdexcept>
 #include <sstream>
@@ -412,7 +413,7 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
     }
 }
 
-D2D1_COLOR_F ParseHexColor(const std::string& value) {
+Color ParseHexColor(const std::string& value) {
     std::string hex = value;
     if (!hex.empty() && hex[0] == '#') {
         hex.erase(0, 1);
@@ -425,9 +426,9 @@ D2D1_COLOR_F ParseHexColor(const std::string& value) {
         float r = ((rgb >> 16) & 0xFF) / 255.0f;
         float g = ((rgb >> 8) & 0xFF) / 255.0f;
         float b = (rgb & 0xFF) / 255.0f;
-        return D2D1::ColorF(r, g, b);
+        return ColorFromHex(rgb);
     }
-    return D2D1::ColorF(D2D1::ColorF::White);
+    return ColorFromHex(0xFFFFFF);
 }
 
 } // namespace
@@ -470,16 +471,20 @@ std::wstring LayoutParser::Utf8ToUtf16(const std::string& utf8) {
     return result;
 }
 
-D2D1_COLOR_F LayoutParser::ColorFromString(const std::string& value) {
+Color LayoutParser::ColorFromString(const std::string& value) {
     return ParseHexColor(value);
 }
 
-std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourceProvider& provider, LayoutParser::EventResolver eventResolver);
-std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourceProvider& provider, LayoutParser::EventResolver eventResolver);
+std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourceProvider& provider, UIEventResolver eventResolver);
+std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourceProvider& provider, UIEventResolver eventResolver);
 
-std::unique_ptr<UIElement> LayoutParser::BuildFromFile(IResourceProvider& provider,
-                                                      const std::string& resourcePath,
-                                                      EventResolver eventResolver) {
+std::unique_ptr<UIElement> LayoutParser::BuildFromFile(UIContext& context,
+                                                       const std::string& resourcePath) {
+    if (!context.resourceProvider) {
+        return nullptr;
+    }
+
+    IResourceProvider& provider = *context.resourceProvider;
     std::string path = resourcePath;
     if (!provider.Exists(path)) {
         const bool isJson = path.size() >= 5 && path.substr(path.size() - 5) == ".json";
@@ -509,11 +514,19 @@ std::unique_ptr<UIElement> LayoutParser::BuildFromFile(IResourceProvider& provid
     try {
         if (isJson) {
             JsonValue root = ParseJson(text);
-            return CreateElementFromJson(root, provider, std::move(eventResolver));
+            auto element = CreateElementFromJson(root, provider, context.eventResolver);
+            if (element) {
+                element->SetContext(&context);
+            }
+            return element;
         }
         if (isXml) {
             XmlNode root = ParseXml(text);
-            return CreateElementFromXml(root, provider, std::move(eventResolver));
+            auto element = CreateElementFromXml(root, provider, context.eventResolver);
+            if (element) {
+                element->SetContext(&context);
+            }
+            return element;
         }
     } catch (const std::exception&) {
         return nullptr;
@@ -531,7 +544,7 @@ std::wstring MakeUtf16(const std::string& text) {
     return result;
 }
 
-std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourceProvider& provider, LayoutParser::EventResolver eventResolver) {
+std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourceProvider& provider, UIEventResolver eventResolver) {
     if (!node.IsObject()) {
         return nullptr;
     }
@@ -768,7 +781,7 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
     return element;
 }
 
-std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourceProvider& provider, LayoutParser::EventResolver eventResolver) {
+std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourceProvider& provider, UIEventResolver eventResolver) {
     if (node.name.empty()) {
         return nullptr;
     }

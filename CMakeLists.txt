@@ -7,17 +7,25 @@ set(AI_WIN_UI_RESOURCE_DIR "${CMAKE_SOURCE_DIR}/resource")
 
 add_executable(ai_win_ui WIN32
     src/main.cpp
+    src/layout_engine.cpp
     src/renderer.cpp
+    src/text_measurer_dwrite.cpp
+    src/ui_text_metrics.cpp
     src/resource_provider.cpp
     src/zip_resource_provider.cpp
     src/layout_parser.cpp
 )
 
-target_include_directories(ai_win_ui PRIVATE src)
+target_include_directories(ai_win_ui PRIVATE
+    src
+    third_party/yoga-3.2.1
+)
 
 target_compile_definitions(ai_win_ui PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
 
 target_link_libraries(ai_win_ui
+    "$<$<CONFIG:Debug>:${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1/build/yoga/Debug/yogacore.lib>"
+    "$<$<NOT:$<CONFIG:Debug>>:${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1/build/yoga/Release/yogacore.lib>"
     d2d1
     dwrite
     windowscodecs
