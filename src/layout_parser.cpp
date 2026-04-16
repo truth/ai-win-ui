@@ -368,6 +368,14 @@ Panel::AlignItems ParseAlignItems(const std::string& value) {
     return Panel::AlignItems::Stretch;
 }
 
+Panel::Direction ParseDirection(const std::string& value) {
+    const std::string normalized = ToLowerAscii(TrimString(value));
+    if (normalized == "row" || normalized == "horizontal") {
+        return Panel::Direction::Row;
+    }
+    return Panel::Direction::Column;
+}
+
 Panel::JustifyContent ParseJustifyContent(const std::string& value) {
     const std::string normalized = ToLowerAscii(TrimString(value));
     if (normalized == "center") {
@@ -396,6 +404,21 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
     if (props["margin"].IsArray() && props["margin"].arrayValue.size() == 4) {
         element.SetMargin(ParseThickness(props["margin"]));
     }
+    if (props["flexGrow"].IsNumber()) {
+        element.SetFlexGrow(static_cast<float>(props["flexGrow"].numberValue));
+    } else if (props["flex-grow"].IsNumber()) {
+        element.SetFlexGrow(static_cast<float>(props["flex-grow"].numberValue));
+    }
+    if (props["flexShrink"].IsNumber()) {
+        element.SetFlexShrink(static_cast<float>(props["flexShrink"].numberValue));
+    } else if (props["flex-shrink"].IsNumber()) {
+        element.SetFlexShrink(static_cast<float>(props["flex-shrink"].numberValue));
+    }
+    if (props["flexBasis"].IsNumber()) {
+        element.SetFlexBasis(static_cast<float>(props["flexBasis"].numberValue));
+    } else if (props["flex-basis"].IsNumber()) {
+        element.SetFlexBasis(static_cast<float>(props["flex-basis"].numberValue));
+    }
 }
 
 void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
@@ -410,6 +433,21 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
         if (values.size() == 4) {
             element.SetMargin(ParseThickness(values));
         }
+    }
+    if (auto it = node.attributes.find("flexGrow"); it != node.attributes.end()) {
+        element.SetFlexGrow(std::stof(TrimString(it->second)));
+    } else if (auto it2 = node.attributes.find("flex-grow"); it2 != node.attributes.end()) {
+        element.SetFlexGrow(std::stof(TrimString(it2->second)));
+    }
+    if (auto it = node.attributes.find("flexShrink"); it != node.attributes.end()) {
+        element.SetFlexShrink(std::stof(TrimString(it->second)));
+    } else if (auto it2 = node.attributes.find("flex-shrink"); it2 != node.attributes.end()) {
+        element.SetFlexShrink(std::stof(TrimString(it2->second)));
+    }
+    if (auto it = node.attributes.find("flexBasis"); it != node.attributes.end()) {
+        element.SetFlexBasis(std::stof(TrimString(it->second)));
+    } else if (auto it2 = node.attributes.find("flex-basis"); it2 != node.attributes.end()) {
+        element.SetFlexBasis(std::stof(TrimString(it2->second)));
     }
 }
 
@@ -567,6 +605,9 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
             if (props["padding"].IsArray() && props["padding"].arrayValue.size() == 4) {
                 panel->padding = ParseThickness(props["padding"]);
+            }
+            if (props["direction"].IsString()) {
+                panel->direction = ParseDirection(props["direction"].stringValue);
             }
             if (props["alignItems"].IsString()) {
                 panel->alignItems = ParseAlignItems(props["alignItems"].stringValue);
@@ -764,6 +805,12 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*image, node["props"]);
         }
         element = std::move(image);
+    } else if (type == "Spacer") {
+        auto spacer = std::make_unique<Spacer>();
+        if (node["props"].IsObject()) {
+            ApplyCommonJsonProps(*spacer, node["props"]);
+        }
+        element = std::move(spacer);
     }
 
     if (!element) {
@@ -803,6 +850,9 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             if (values.size() == 4) {
                 panel->padding = ParseThickness(values);
             }
+        }
+        if (auto it = node.attributes.find("direction"); it != node.attributes.end()) {
+            panel->direction = ParseDirection(it->second);
         }
         if (auto it = node.attributes.find("alignItems"); it != node.attributes.end()) {
             panel->alignItems = ParseAlignItems(it->second);
@@ -978,6 +1028,10 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*image, node);
         element = std::move(image);
+    } else if (node.name == "Spacer") {
+        auto spacer = std::make_unique<Spacer>();
+        ApplyCommonXmlAttributes(*spacer, node);
+        element = std::move(spacer);
     }
 
     if (!element) {

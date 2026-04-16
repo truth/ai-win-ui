@@ -21,6 +21,11 @@ enum class StackAlignItems {
     End
 };
 
+enum class StackDirection {
+    Column,
+    Row
+};
+
 enum class StackJustifyContent {
     Start,
     Center,
@@ -29,6 +34,7 @@ enum class StackJustifyContent {
 };
 
 struct StackLayoutStyle {
+    StackDirection direction = StackDirection::Column;
     LayoutSpacing padding{};
     float spacing = 0.0f;
     StackAlignItems alignItems = StackAlignItems::Stretch;
@@ -43,13 +49,13 @@ struct StackLayoutChild {
 class ILayoutEngine {
 public:
     virtual ~ILayoutEngine() = default;
-    virtual float MeasureVerticalStack(const StackLayoutStyle& style,
-                                       const std::vector<StackLayoutChild>& children,
-                                       float availableWidth,
-                                       float availableHeight) = 0;
-    virtual void ArrangeVerticalStack(const StackLayoutStyle& style,
-                                      const std::vector<StackLayoutChild>& children,
-                                      const Rect& bounds) = 0;
+    virtual Size MeasureStack(const StackLayoutStyle& style,
+                              const std::vector<StackLayoutChild>& children,
+                              float availableWidth,
+                              float availableHeight) = 0;
+    virtual void ArrangeStack(const StackLayoutStyle& style,
+                              const std::vector<StackLayoutChild>& children,
+                              const Rect& bounds) = 0;
 };
 
 std::unique_ptr<ILayoutEngine> CreateDefaultLayoutEngine();

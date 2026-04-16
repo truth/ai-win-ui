@@ -31,8 +31,15 @@ public:
     const Thickness& Margin() const { return m_margin; }
     void SetFixedWidth(float width) { m_fixedWidth = width; }
     void SetFixedHeight(float height) { m_fixedHeight = height; }
+    void SetFlexGrow(float flexGrow) { m_flexGrow = std::max(0.0f, flexGrow); }
+    void SetFlexShrink(float flexShrink) { m_flexShrink = std::max(0.0f, flexShrink); }
+    void SetFlexBasis(float flexBasis) { m_flexBasis = std::max(0.0f, flexBasis); }
     bool HasFixedWidth() const { return m_fixedWidth >= 0.0f; }
     bool HasFixedHeight() const { return m_fixedHeight >= 0.0f; }
+    float FlexGrow() const { return m_flexGrow; }
+    float FlexShrink() const { return m_flexShrink; }
+    bool HasFlexBasis() const { return m_flexBasis >= 0.0f; }
+    float FlexBasis() const { return m_flexBasis; }
     void SetContext(UIContext* context) {
         m_context = context;
         for (auto& child : m_children) {
@@ -207,12 +214,20 @@ protected:
     Thickness m_margin{};
     float m_fixedWidth = -1.0f;
     float m_fixedHeight = -1.0f;
+    float m_flexGrow = 0.0f;
+    float m_flexShrink = 0.0f;
+    float m_flexBasis = -1.0f;
     bool m_hasFocus = false;
     UIContext* m_context = nullptr;
 };
 
 class Panel : public UIElement {
 public:
+    enum class Direction {
+        Column,
+        Row
+    };
+
     enum class AlignItems {
         Stretch,
         Start,
@@ -231,6 +246,7 @@ public:
     float spacing = 6.0f;
     float cornerRadius = 0.0f;
     Color background = ColorFromHex(0x1E1E1E);
+    Direction direction = Direction::Column;
     AlignItems alignItems = AlignItems::Stretch;
     JustifyContent justifyContent = JustifyContent::Start;
 
@@ -238,7 +254,12 @@ public:
         UIElement::Arrange(finalRect);
 
         if (m_context && m_context->layoutEngine) {
-            m_context->layoutEngine->ArrangeVerticalStack(ToStackLayoutStyle(), BuildLayoutChildren(), m_bounds);
+            m_context->layoutEngine->ArrangeStack(ToStackLayoutStyle(), BuildLayoutChildren(), m_bounds);
+            return;
+        }
+
+        if (direction == Direction::Row) {
+            ArrangeRowFallback();
             return;
         }
 
@@ -330,12 +351,16 @@ public:
 
     void Measure(float availableWidth, float availableHeight) override {
         if (m_context && m_context->layoutEngine) {
-            m_desiredSize.width = availableWidth;
-            m_desiredSize.height = m_context->layoutEngine->MeasureVerticalStack(
+            m_desiredSize = m_context->layoutEngine->MeasureStack(
                 ToStackLayoutStyle(),
                 BuildLayoutChildren(),
                 availableWidth,
                 availableHeight);
+            return;
+        }
+
+        if (direction == Direction::Row) {
+            MeasureRowFallback(availableWidth, availableHeight);
             return;
         }
 
@@ -366,6 +391,7 @@ public:
 protected:
     StackLayoutStyle ToStackLayoutStyle() const {
         return StackLayoutStyle{
+            direction == Direction::Row ? StackDirection::Row : StackDirection::Column,
             LayoutSpacing{padding.left, padding.top, padding.right, padding.bottom},
             spacing,
             static_cast<StackAlignItems>(alignItems),
@@ -387,6 +413,28 @@ protected:
     }
 
     float MeasurePreferredHeight(float width) const override {
+        if (direction == Direction::Row) {
+            float maxHeight = 0.0f;
+            bool first = true;
+            float totalWidth = padding.left + padding.right;
+            const float contentHeight = 4096.0f;
+            for (const auto& child : m_children) {
+                if (!first) {
+                    totalWidth += spacing;
+                }
+                const Thickness& margin = child->Margin();
+                const float preferredWidth = child->HasFixedWidth()
+                    ? child->GetPreferredWidth(std::max(0.0f, width))
+                    : child->GetPreferredWidth(std::max(0.0f, width));
+                const float preferredHeight = child->GetPreferredHeight(preferredWidth);
+                totalWidth += margin.left + preferredWidth + margin.right;
+                maxHeight = std::max(maxHeight, margin.top + preferredHeight + margin.bottom);
+                first = false;
+            }
+            (void)contentHeight;
+            return padding.top + maxHeight + padding.bottom;
+        }
+
         float totalHeight = padding.top + padding.bottom;
         const float contentWidth = std::max(0.0f, width - padding.left - padding.right);
         bool first = true;
@@ -415,6 +463,93 @@ public:
         }
         for (auto& child : m_children) {
             child->Render(renderer);
+        }
+    }
+
+private:
+    void MeasureRowFallback(float availableWidth, float availableHeight) {
+        const float contentHeight = std::max(0.0f, availableHeight - padding.top - padding.bottom);
+        float totalWidth = padding.left + padding.right;
+        float maxHeight = 0.0f;
+        bool first = true;
+
+        for (auto& child : m_children) {
+            const Thickness& margin = child->Margin();
+            const float availableChildHeight = std::max(0.0f, contentHeight - margin.top - margin.bottom);
+            const float childWidth = child->GetPreferredWidth(std::max(0.0f, availableWidth));
+            child->Measure(childWidth, availableChildHeight);
+            const float childHeight = child->DesiredSize().height;
+
+            if (!first) {
+                totalWidth += spacing;
+            }
+            totalWidth += margin.left + childWidth + margin.right;
+            maxHeight = std::max(maxHeight, margin.top + childHeight + margin.bottom);
+            first = false;
+        }
+
+        m_desiredSize.width = totalWidth;
+        m_desiredSize.height = padding.top + maxHeight + padding.bottom;
+    }
+
+    void ArrangeRowFallback() {
+        const float contentLeft = m_bounds.left + padding.left;
+        const float contentTop = m_bounds.top + padding.top;
+        const float contentWidth = std::max(0.0f, m_bounds.Width() - padding.left - padding.right);
+        const float contentHeight = std::max(0.0f, m_bounds.Height() - padding.top - padding.bottom);
+
+        struct ChildLayout {
+            UIElement* element = nullptr;
+            Thickness margin{};
+            float width = 0.0f;
+            float height = 0.0f;
+        };
+
+        std::vector<ChildLayout> layouts;
+        layouts.reserve(m_children.size());
+
+        float totalWidth = 0.0f;
+        bool first = true;
+        for (auto& child : m_children) {
+            const Thickness margin = child->Margin();
+            const float availableChildHeight = std::max(0.0f, contentHeight - margin.top - margin.bottom);
+            const float childWidth = child->GetPreferredWidth(contentWidth);
+            child->Measure(childWidth, availableChildHeight);
+            const float childHeight = child->DesiredSize().height;
+
+            if (!first) {
+                totalWidth += spacing;
+            }
+            totalWidth += margin.left + childWidth + margin.right;
+            first = false;
+
+            layouts.push_back(ChildLayout{child.get(), margin, childWidth, childHeight});
+        }
+
+        float x = contentLeft;
+        if (justifyContent == JustifyContent::Center) {
+            x += std::max(0.0f, (contentWidth - totalWidth) * 0.5f);
+        } else if (justifyContent == JustifyContent::End) {
+            x += std::max(0.0f, contentWidth - totalWidth);
+        }
+
+        for (size_t i = 0; i < layouts.size(); ++i) {
+            const auto& layout = layouts[i];
+            float y = contentTop + layout.margin.top;
+            const float availableChildHeight = std::max(0.0f, contentHeight - layout.margin.top - layout.margin.bottom);
+
+            if (alignItems == AlignItems::Center) {
+                y += std::max(0.0f, (availableChildHeight - layout.height) * 0.5f);
+            } else if (alignItems == AlignItems::End) {
+                y += std::max(0.0f, availableChildHeight - layout.height);
+            }
+
+            x += layout.margin.left;
+            layout.element->Arrange(Rect::Make(x, y, x + layout.width, y + layout.height));
+            x += layout.width + layout.margin.right;
+            if (i + 1 < layouts.size()) {
+                x += spacing;
+            }
         }
     }
 };
@@ -541,6 +676,20 @@ public:
 
 private:
     std::wstring m_text;
+};
+
+class Spacer : public UIElement {
+protected:
+    float MeasurePreferredWidth(float /*availableWidth*/) const override {
+        return 0.0f;
+    }
+
+    float MeasurePreferredHeight(float /*width*/) const override {
+        return 0.0f;
+    }
+
+public:
+    void Render(IRenderer& /*renderer*/) override {}
 };
 
 class Image : public UIElement {

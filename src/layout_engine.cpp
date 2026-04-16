@@ -49,6 +49,16 @@ YGJustify ToYogaJustify(StackJustifyContent justify) {
     }
 }
 
+YGFlexDirection ToYogaDirection(StackDirection direction) {
+    switch (direction) {
+        case StackDirection::Row:
+            return YGFlexDirectionRow;
+        case StackDirection::Column:
+        default:
+            return YGFlexDirectionColumn;
+    }
+}
+
 void ApplyPadding(YGNodeRef node, const LayoutSpacing& padding) {
     YGNodeStyleSetPadding(node, YGEdgeLeft, padding.left);
     YGNodeStyleSetPadding(node, YGEdgeTop, padding.top);
@@ -69,11 +79,12 @@ struct BuiltYogaLayout {
     std::vector<UIElement*> elements;
 };
 
-BuiltYogaLayout BuildVerticalStackLayout(const StackLayoutStyle& style,
-                                         const std::vector<StackLayoutChild>& children,
-                                         float availableWidth,
-                                         float availableHeight,
-                                         bool exactHeight) {
+BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
+                                 const std::vector<StackLayoutChild>& children,
+                                 float availableWidth,
+                                 float availableHeight,
+                                 bool exactWidth,
+                                 bool exactHeight) {
     BuiltYogaLayout layout;
     layout.root = YogaTree(YGNodeNew());
     if (!layout.root) {
@@ -81,18 +92,22 @@ BuiltYogaLayout BuildVerticalStackLayout(const StackLayoutStyle& style,
     }
 
     YGNodeRef root = layout.root.get();
-    YGNodeStyleSetFlexDirection(root, YGFlexDirectionColumn);
+    YGNodeStyleSetFlexDirection(root, ToYogaDirection(style.direction));
     YGNodeStyleSetAlignItems(root, ToYogaAlign(style.alignItems));
     YGNodeStyleSetJustifyContent(root, ToYogaJustify(style.justifyContent));
-    YGNodeStyleSetGap(root, YGGutterRow, style.spacing);
+    YGNodeStyleSetGap(root, style.direction == StackDirection::Row ? YGGutterColumn : YGGutterRow, style.spacing);
     ApplyPadding(root, style.padding);
 
     const float clampedWidth = std::max(0.0f, availableWidth);
     const float clampedHeight = std::max(0.0f, availableHeight);
     const float contentWidth =
         std::max(0.0f, clampedWidth - style.padding.left - style.padding.right);
+    const float contentHeight =
+        std::max(0.0f, clampedHeight - style.padding.top - style.padding.bottom);
 
-    YGNodeStyleSetWidth(root, clampedWidth);
+    if (exactWidth) {
+        YGNodeStyleSetWidth(root, clampedWidth);
+    }
     if (exactHeight) {
         YGNodeStyleSetHeight(root, clampedHeight);
     }
@@ -114,19 +129,50 @@ BuiltYogaLayout BuildVerticalStackLayout(const StackLayoutStyle& style,
 
         const float availableChildWidth =
             std::max(0.0f, contentWidth - child.margin.left - child.margin.right);
-        const bool stretchWidth =
-            style.alignItems == StackAlignItems::Stretch && !child.element->HasFixedWidth();
-        const float measuredWidth = stretchWidth
-            ? availableChildWidth
+        const float availableChildHeight =
+            std::max(0.0f, contentHeight - child.margin.top - child.margin.bottom);
+        const bool stretchCrossAxis = style.alignItems == StackAlignItems::Stretch &&
+            ((style.direction == StackDirection::Column && !child.element->HasFixedWidth()) ||
+             (style.direction == StackDirection::Row && !child.element->HasFixedHeight()));
+        const float measuredWidth = style.direction == StackDirection::Column
+            ? (stretchCrossAxis ? availableChildWidth : child.element->GetPreferredWidth(availableChildWidth))
             : child.element->GetPreferredWidth(availableChildWidth);
+        const float flexGrow = child.element->FlexGrow();
+        const float flexShrink = child.element->FlexShrink();
+        const bool hasFlexBasis = child.element->HasFlexBasis();
 
-        child.element->Measure(measuredWidth, clampedHeight);
+        child.element->Measure(measuredWidth, availableChildHeight);
         const float measuredHeight = child.element->DesiredSize().height;
 
-        if (!stretchWidth) {
+        if (style.direction == StackDirection::Column) {
+            if (!stretchCrossAxis) {
+                YGNodeStyleSetWidth(childNode, measuredWidth);
+            }
+        } else {
             YGNodeStyleSetWidth(childNode, measuredWidth);
+            if (stretchCrossAxis) {
+                YGNodeStyleSetHeight(childNode, availableChildHeight);
+            } else {
+                YGNodeStyleSetHeight(childNode, measuredHeight);
+            }
         }
-        YGNodeStyleSetHeight(childNode, measuredHeight);
+        if (flexGrow > 0.0f) {
+            YGNodeStyleSetFlexGrow(childNode, flexGrow);
+        }
+        if (flexShrink > 0.0f) {
+            YGNodeStyleSetFlexShrink(childNode, flexShrink);
+        }
+
+        if (flexGrow > 0.0f || flexShrink > 0.0f || hasFlexBasis) {
+            const float intrinsicMainAxis = style.direction == StackDirection::Column ? measuredHeight : measuredWidth;
+            const float flexBasis = hasFlexBasis ? child.element->FlexBasis() : intrinsicMainAxis;
+            YGNodeStyleSetFlexBasis(childNode, std::max(0.0f, flexBasis));
+            if (style.direction == StackDirection::Column) {
+                YGNodeStyleSetHeight(childNode, measuredHeight);
+            }
+        } else if (style.direction == StackDirection::Column) {
+            YGNodeStyleSetHeight(childNode, measuredHeight);
+        }
 
         YGNodeInsertChild(root, childNode, YGNodeGetChildCount(root));
         layout.childNodes.push_back(childNode);
@@ -138,14 +184,14 @@ BuiltYogaLayout BuildVerticalStackLayout(const StackLayoutStyle& style,
 
 class YogaLayoutEngine final : public ILayoutEngine {
 public:
-    float MeasureVerticalStack(const StackLayoutStyle& style,
-                               const std::vector<StackLayoutChild>& children,
-                               float availableWidth,
-                               float availableHeight) override {
+    Size MeasureStack(const StackLayoutStyle& style,
+                      const std::vector<StackLayoutChild>& children,
+                      float availableWidth,
+                      float availableHeight) override {
         BuiltYogaLayout layout =
-            BuildVerticalStackLayout(style, children, availableWidth, availableHeight, false);
+            BuildStackLayout(style, children, availableWidth, availableHeight, true, false);
         if (!layout.root) {
-            return 0.0f;
+            return {};
         }
 
         YGNodeCalculateLayout(
@@ -153,14 +199,17 @@ public:
             std::max(0.0f, availableWidth),
             YGUndefined,
             YGDirectionLTR);
-        return YGNodeLayoutGetHeight(layout.root.get());
+        return Size{
+            YGNodeLayoutGetWidth(layout.root.get()),
+            YGNodeLayoutGetHeight(layout.root.get())
+        };
     }
 
-    void ArrangeVerticalStack(const StackLayoutStyle& style,
-                              const std::vector<StackLayoutChild>& children,
-                              const Rect& bounds) override {
+    void ArrangeStack(const StackLayoutStyle& style,
+                      const std::vector<StackLayoutChild>& children,
+                      const Rect& bounds) override {
         BuiltYogaLayout layout =
-            BuildVerticalStackLayout(style, children, bounds.Width(), bounds.Height(), true);
+            BuildStackLayout(style, children, bounds.Width(), bounds.Height(), true, true);
         if (!layout.root) {
             return;
         }

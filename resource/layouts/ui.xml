@@ -1,24 +1,34 @@
-<Panel padding="24,24,24,24" spacing="18" cornerRadius="16" background="#171717" alignItems="center" justifyContent="center">
-  <Label text="DirectUI-style Retained UI Tree" fontSize="28" color="#F5F5F5" margin="0,0,0,4" />
-  <Label text="Backend: Win32 + Direct2D + DirectWrite" fontSize="16" color="#B7B7B7" />
-  <Grid width="900" columns="4" spacing="12" rowHeight="140" cornerRadius="12" padding="0,12,0,12" background="#121212" margin="0,6,0,0">
-    <Image source="images/img1.jpg" cornerRadius="10" />
-    <Image source="images/3d-design_9390515.png" cornerRadius="10" />
-    <Image source="images/ai_10439488.png" cornerRadius="10" />
-    <Image source="images/airplane_10521325.png" cornerRadius="10" />
-    <Image source="images/advent-calendar_13366705.png" cornerRadius="10" />
-    <Image source="images/agreement_3188314.png" cornerRadius="10" />
-    <Image source="images/airplane_1350172.png" cornerRadius="10" />
-    <Image source="images/alzheimer_7096033.png" cornerRadius="10" />
-  </Grid>
-  <Panel width="900" height="190" padding="24,18,24,18" spacing="10" cornerRadius="14" background="#1E1E1E" alignItems="center" justifyContent="center">
-    <Label text="Layout props now support alignItems / justifyContent / width / height / margin" fontSize="14" color="#BDBDBD" />
-    <TextInput text="Type here..." width="560" fontSize="14" background="#242424" textColor="#FFFFFF" cornerRadius="8" margin="0,8,0,0" />
-    <Button text="Primary Action" width="240" fontSize="15" background="#2D6CDF" cornerRadius="8" margin="0,4,0,0" onClick="primaryAction" />
-    <Button text="Secondary Action" width="240" fontSize="15" cornerRadius="8" onClick="secondaryAction" />
-    <Checkbox text="Remember me" checked="true" width="260" margin="0,8,0,0" />
-    <RadioButton text="Option A" group="choices" checked="true" width="260" margin="0,4,0,0" />
-    <RadioButton text="Option B" group="choices" width="260" margin="0,4,0,0" />
-    <Slider label="Volume" width="900" min="0" max="100" value="40" step="5" margin="0,12,0,0" />
+<Panel padding="24,24,24,24" spacing="16" cornerRadius="16" background="#151515" alignItems="stretch" justifyContent="start">
+  <Label text="Yoga-backed Vertical Stack" fontSize="28" color="#F5F5F5" />
+  <Label text="This sample demonstrates flexGrow, flexBasis, and Spacer in the current Panel bridge." fontSize="15" color="#B7B7B7" margin="0,0,0,6" />
+  <Panel height="620" padding="20,20,20,20" spacing="14" cornerRadius="16" background="#1E1E1E" alignItems="stretch">
+    <Panel height="96" padding="18,16,18,16" spacing="6" cornerRadius="12" background="#242424" alignItems="start">
+      <Label text="Release Checklist" fontSize="20" color="#FFFFFF" />
+      <Label text="The gallery keeps a fixed block height, the spacer grows, and the action tray stays pinned to the bottom." fontSize="14" color="#C8C8C8" />
+    </Panel>
+    <Grid height="160" columns="4" spacing="12" rowHeight="136" cornerRadius="12" padding="0,12,0,12" background="#161616">
+      <Image source="images/img1.jpg" cornerRadius="10" />
+      <Image source="images/3d-design_9390515.png" cornerRadius="10" />
+      <Image source="images/ai_10439488.png" cornerRadius="10" />
+      <Image source="images/airplane_10521325.png" cornerRadius="10" />
+    </Grid>
+    <Panel padding="16,16,16,16" spacing="8" cornerRadius="12" background="#202A35" alignItems="stretch">
+      <Label text="Flex card" fontSize="18" color="#F5F5F5" />
+      <Label text="This card keeps its intrinsic height and lets the spacer absorb the remaining vertical room." fontSize="14" color="#C7D2E2" />
+      <TextInput text="Focus the next milestone..." fontSize="14" background="#16202A" textColor="#FFFFFF" cornerRadius="8" />
+    </Panel>
+    <Panel direction="row" padding="14,14,14,14" spacing="12" cornerRadius="12" background="#1A2330" alignItems="center">
+      <Label text="Row toolbar:" fontSize="15" color="#F5F5F5" />
+      <Button text="Preview" width="120" height="38" fontSize="14" cornerRadius="8" />
+      <Button text="Publish" width="120" height="38" fontSize="14" background="#2D6CDF" cornerRadius="8" />
+      <Spacer flexGrow="1" flexBasis="0" />
+      <Label text="3 tasks left" fontSize="14" color="#AFC3DA" />
+    </Panel>
+    <Spacer flexGrow="1" flexBasis="0" />
+    <Panel padding="16,16,16,16" spacing="10" cornerRadius="12" background="#242424" alignItems="stretch">
+      <Label text="Pinned action tray" fontSize="17" color="#FFFFFF" />
+      <Button text="Primary Action" height="42" fontSize="15" background="#2D6CDF" cornerRadius="8" onClick="primaryAction" />
+      <Button text="Secondary Action" height="42" fontSize="15" cornerRadius="8" onClick="secondaryAction" />
+    </Panel>
   </Panel>
 </Panel>

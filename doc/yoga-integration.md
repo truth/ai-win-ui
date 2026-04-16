@@ -125,6 +125,7 @@ Yoga 不直接进入 `UI` 公共接口，而是挂在：
 当前 Yoga 接入范围：
 
 - `Panel` 的垂直栈布局
+- `Panel` 的 `row / column` 主轴切换
 - `padding`
 - `spacing`
 - `alignItems`
@@ -136,7 +137,6 @@ Yoga 不直接进入 `UI` 公共接口，而是挂在：
 - `flex-grow`
 - `flex-shrink`
 - `flex-basis`
-- `row/column` 双向容器
 - 叶子节点的 Yoga `measure func`
 
 一个需要明确记录的小差异是：
@@ -164,3 +164,50 @@ Yoga 不直接进入 `UI` 公共接口，而是挂在：
 2. 为叶子节点接入 Yoga `measure func`，减少“先手工测量，再映射”的过渡层。
 3. 把更多容器布局能力统一收进 `ILayoutEngine`。
 4. 等 Yoga 稳定后，再继续推进 `SkiaRenderer`，避免布局迁移和渲染迁移同时发生。
+
+## 11. 布局示例
+
+当前仓库已经把默认示例布局更新成 Yoga 展示版，文件在：
+
+- `resource/layouts/ui.xml`
+- `resource/layouts/ui.json`
+
+这个示例重点演示了三件事：
+
+- 固定高度区块和自适应高度区块混排。
+- `Spacer + flexGrow=1 + flexBasis=0` 吸收剩余垂直空间。
+- 底部操作区被稳定压到容器底边，而不是依赖手写坐标。
+- 横向 `direction="row"` 工具条里，按钮和状态文本沿主轴分布。
+
+### 11.1 XML 示例片段
+
+```xml
+<Panel height="620" padding="20,20,20,20" spacing="14" alignItems="stretch">
+  <Panel height="96" />
+  <Grid height="160" columns="4" spacing="12" rowHeight="136" />
+  <Panel padding="16,16,16,16" spacing="8" />
+  <Spacer flexGrow="1" flexBasis="0" />
+  <Panel padding="16,16,16,16" spacing="10" />
+</Panel>
+```
+
+### 11.2 JSON 示例片段
+
+```json
+{
+  "type": "Spacer",
+  "props": {
+    "flexGrow": 1,
+    "flexBasis": 0
+  }
+}
+```
+
+### 11.3 适合继续扩展的用法
+
+基于当前这套桥接方式，接下来比较适合补的布局模式是：
+
+- 顶部固定、底部固定、中间内容弹性撑开。
+- 表单区固定高度，底部按钮区贴边。
+- 卡片堆叠中插入一个或多个弹性间隔器。
+- 横向工具条、筛选栏、标签条。

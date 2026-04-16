@@ -2,151 +2,234 @@
   "type": "Panel",
   "props": {
     "padding": [24, 24, 24, 24],
-    "spacing": 18,
+    "spacing": 16,
     "cornerRadius": 16,
-    "background": "#171717",
-    "alignItems": "center",
-    "justifyContent": "center"
+    "background": "#151515",
+    "alignItems": "stretch",
+    "justifyContent": "start"
   },
   "children": [
     {
       "type": "Label",
       "props": {
-        "text": "DirectUI-style Retained UI Tree",
+        "text": "Yoga-backed Vertical Stack",
         "fontSize": 28,
-        "color": "#F5F5F5",
-        "margin": [0, 0, 0, 4]
+        "color": "#F5F5F5"
       }
     },
     {
       "type": "Label",
       "props": {
-        "text": "Backend: Win32 + Direct2D + DirectWrite",
-        "fontSize": 16,
-        "color": "#B7B7B7"
+        "text": "This sample demonstrates flexGrow, flexBasis, and Spacer in the current Panel bridge.",
+        "fontSize": 15,
+        "color": "#B7B7B7",
+        "margin": [0, 0, 0, 6]
       }
-    },
-    {
-      "type": "Grid",
-      "props": {
-        "width": 900,
-        "columns": 4,
-        "spacing": 12,
-        "rowHeight": 140,
-        "cornerRadius": 12,
-        "padding": [0, 12, 0, 12],
-        "background": "#121212",
-        "margin": [0, 6, 0, 0]
-      },
-      "children": [
-        { "type": "Image", "props": { "source": "images/img1.jpg", "cornerRadius": 10 } },
-        { "type": "Image", "props": { "source": "images/3d-design_9390515.png", "cornerRadius": 10 } },
-        { "type": "Image", "props": { "source": "images/ai_10439488.png", "cornerRadius": 10 } },
-        { "type": "Image", "props": { "source": "images/airplane_10521325.png", "cornerRadius": 10 } },
-        { "type": "Image", "props": { "source": "images/advent-calendar_13366705.png", "cornerRadius": 10 } },
-        { "type": "Image", "props": { "source": "images/agreement_3188314.png", "cornerRadius": 10 } },
-        { "type": "Image", "props": { "source": "images/airplane_1350172.png", "cornerRadius": 10 } },
-        { "type": "Image", "props": { "source": "images/alzheimer_7096033.png", "cornerRadius": 10 } }
-      ]
     },
     {
       "type": "Panel",
       "props": {
-        "width": 900,
-        "height": 190,
-        "padding": [24, 18, 24, 18],
-        "spacing": 10,
-        "cornerRadius": 14,
+        "height": 620,
+        "padding": [20, 20, 20, 20],
+        "spacing": 14,
+        "cornerRadius": 16,
         "background": "#1E1E1E",
-        "alignItems": "center",
-        "justifyContent": "center"
+        "alignItems": "stretch"
       },
       "children": [
         {
-          "type": "Label",
+          "type": "Panel",
           "props": {
-            "text": "Layout props now support alignItems / justifyContent / width / height / margin",
-            "fontSize": 14,
-            "color": "#BDBDBD"
-          }
-        },
-        {
-          "type": "TextInput",
-          "props": {
-            "text": "Type here...",
-            "width": 560,
-            "fontSize": 14,
+            "height": 96,
+            "padding": [18, 16, 18, 16],
+            "spacing": 6,
+            "cornerRadius": 12,
             "background": "#242424",
-            "textColor": "#FFFFFF",
-            "cornerRadius": 8,
-            "margin": [0, 8, 0, 0]
-          }
-        },
-        {
-          "type": "Button",
-          "props": {
-            "text": "Primary Action",
-            "width": 240,
-            "fontSize": 15,
-            "background": "#2D6CDF",
-            "cornerRadius": 8,
-            "margin": [0, 4, 0, 0]
+            "alignItems": "start"
           },
-          "events": {
-            "onClick": "primaryAction"
-          }
+          "children": [
+            {
+              "type": "Label",
+              "props": {
+                "text": "Release Checklist",
+                "fontSize": 20,
+                "color": "#FFFFFF"
+              }
+            },
+            {
+              "type": "Label",
+              "props": {
+                "text": "The gallery keeps a fixed block height, the spacer grows, and the action tray stays pinned to the bottom.",
+                "fontSize": 14,
+                "color": "#C8C8C8"
+              }
+            }
+          ]
         },
         {
-          "type": "Button",
+          "type": "Grid",
           "props": {
-            "text": "Secondary Action",
-            "width": 240,
-            "fontSize": 15,
-            "cornerRadius": 8
+            "height": 160,
+            "columns": 4,
+            "spacing": 12,
+            "rowHeight": 136,
+            "cornerRadius": 12,
+            "padding": [0, 12, 0, 12],
+            "background": "#161616"
           },
-          "events": {
-            "onClick": "secondaryAction"
+          "children": [
+            { "type": "Image", "props": { "source": "images/img1.jpg", "cornerRadius": 10 } },
+            { "type": "Image", "props": { "source": "images/3d-design_9390515.png", "cornerRadius": 10 } },
+            { "type": "Image", "props": { "source": "images/ai_10439488.png", "cornerRadius": 10 } },
+            { "type": "Image", "props": { "source": "images/airplane_10521325.png", "cornerRadius": 10 } }
+          ]
+        },
+        {
+          "type": "Panel",
+          "props": {
+            "padding": [16, 16, 16, 16],
+            "spacing": 8,
+            "cornerRadius": 12,
+            "background": "#202A35",
+            "alignItems": "stretch"
+          },
+          "children": [
+            {
+              "type": "Label",
+              "props": {
+                "text": "Flex card",
+                "fontSize": 18,
+                "color": "#F5F5F5"
+              }
+            },
+            {
+              "type": "Label",
+              "props": {
+                "text": "This card keeps its intrinsic height and lets the spacer absorb the remaining vertical room.",
+                "fontSize": 14,
+                "color": "#C7D2E2"
+              }
+            },
+            {
+              "type": "TextInput",
+              "props": {
+                "text": "Focus the next milestone...",
+                "fontSize": 14,
+                "background": "#16202A",
+                "textColor": "#FFFFFF",
+                "cornerRadius": 8
+              }
+            }
+          ]
+        },
+        {
+          "type": "Panel",
+          "props": {
+            "direction": "row",
+            "padding": [14, 14, 14, 14],
+            "spacing": 12,
+            "cornerRadius": 12,
+            "background": "#1A2330",
+            "alignItems": "center"
+          },
+          "children": [
+            {
+              "type": "Label",
+              "props": {
+                "text": "Row toolbar:",
+                "fontSize": 15,
+                "color": "#F5F5F5"
+              }
+            },
+            {
+              "type": "Button",
+              "props": {
+                "text": "Preview",
+                "width": 120,
+                "height": 38,
+                "fontSize": 14,
+                "cornerRadius": 8
+              }
+            },
+            {
+              "type": "Button",
+              "props": {
+                "text": "Publish",
+                "width": 120,
+                "height": 38,
+                "fontSize": 14,
+                "background": "#2D6CDF",
+                "cornerRadius": 8
+              }
+            },
+            {
+              "type": "Spacer",
+              "props": {
+                "flexGrow": 1,
+                "flexBasis": 0
+              }
+            },
+            {
+              "type": "Label",
+              "props": {
+                "text": "3 tasks left",
+                "fontSize": 14,
+                "color": "#AFC3DA"
+              }
+            }
+          ]
+        },
+        {
+          "type": "Spacer",
+          "props": {
+            "flexGrow": 1,
+            "flexBasis": 0
           }
         },
         {
-          "type": "Checkbox",
+          "type": "Panel",
           "props": {
-            "text": "Remember me",
-            "checked": true,
-            "width": 260,
-            "margin": [0, 8, 0, 0]
-          }
-        },
-        {
-          "type": "RadioButton",
-          "props": {
-            "text": "Option A",
-            "group": "choices",
-            "checked": true,
-            "width": 260,
-            "margin": [0, 4, 0, 0]
-          }
-        },
-        {
-          "type": "RadioButton",
-          "props": {
-            "text": "Option B",
-            "group": "choices",
-            "width": 260,
-            "margin": [0, 4, 0, 0]
-          }
-        },
-        {
-          "type": "Slider",
-          "props": {
-            "label": "Volume",
-            "width": 900,
-            "min": 0,
-            "max": 100,
-            "value": 40,
-            "step": 5,
-            "margin": [0, 12, 0, 0]
-          }
+            "padding": [16, 16, 16, 16],
+            "spacing": 10,
+            "cornerRadius": 12,
+            "background": "#242424",
+            "alignItems": "stretch"
+          },
+          "children": [
+            {
+              "type": "Label",
+              "props": {
+                "text": "Pinned action tray",
+                "fontSize": 17,
+                "color": "#FFFFFF"
+              }
+            },
+            {
+              "type": "Button",
+              "props": {
+                "text": "Primary Action",
+                "height": 42,
+                "fontSize": 15,
+                "background": "#2D6CDF",
+                "cornerRadius": 8
+              },
+              "events": {
+                "onClick": "primaryAction"
+              }
+            },
+            {
+              "type": "Button",
+              "props": {
+                "text": "Secondary Action",
+                "height": 42,
+                "fontSize": 15,
+                "cornerRadius": 8
+              },
+              "events": {
+                "onClick": "secondaryAction"
+              }
+            }
+          ]
         }
       ]
     }
