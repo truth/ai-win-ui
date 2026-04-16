@@ -12,6 +12,7 @@
   - 添加 `FallbackResourceProvider`，支持 ZIP 资源缺失时回退到 `resource/` 目录
   - 扩展通用布局属性：支持 `width`、`height`、`margin`
   - 扩展 `Panel` 布局能力：支持 `alignItems`、`justifyContent`
+  - 增强 `Panel`/`Grid` 布局属性解析，支持 JSON/XML 别名与兼容属性
   - 完善鼠标状态处理：补充 `WM_MOUSELEAVE` 与控件级 hover/pressed 状态回收
   - 更新 JSON/XML 示例布局，覆盖新的布局属性与事件表现
   - 新增 `build.ps1` / `build.cmd` 编译脚本，统一 CMake 配置与构建入口

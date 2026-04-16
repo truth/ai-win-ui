@@ -557,9 +557,13 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
             if (props["alignItems"].IsString()) {
                 panel->alignItems = ParseAlignItems(props["alignItems"].stringValue);
+            } else if (props["align-items"].IsString()) {
+                panel->alignItems = ParseAlignItems(props["align-items"].stringValue);
             }
             if (props["justifyContent"].IsString()) {
                 panel->justifyContent = ParseJustifyContent(props["justifyContent"].stringValue);
+            } else if (props["justify-content"].IsString()) {
+                panel->justifyContent = ParseJustifyContent(props["justify-content"].stringValue);
             }
             ApplyCommonJsonProps(*panel, props);
         }
@@ -701,9 +705,13 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
             if (props["spacing"].IsNumber()) {
                 grid->cellSpacing = static_cast<float>(props["spacing"].numberValue);
+            } else if (props["cellSpacing"].IsNumber()) {
+                grid->cellSpacing = static_cast<float>(props["cellSpacing"].numberValue);
             }
             if (props["columns"].IsNumber()) {
                 grid->columns = static_cast<int>(props["columns"].numberValue);
+            } else if (props["cols"].IsNumber()) {
+                grid->columns = std::max(1, static_cast<int>(props["cols"].numberValue));
             }
             if (props["padding"].IsArray() && props["padding"].arrayValue.size() == 4) {
                 grid->padding = ParseThickness(props["padding"]);
@@ -785,9 +793,13 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         if (auto it = node.attributes.find("alignItems"); it != node.attributes.end()) {
             panel->alignItems = ParseAlignItems(it->second);
+        } else if (auto it2 = node.attributes.find("align-items"); it2 != node.attributes.end()) {
+            panel->alignItems = ParseAlignItems(it2->second);
         }
         if (auto it = node.attributes.find("justifyContent"); it != node.attributes.end()) {
             panel->justifyContent = ParseJustifyContent(it->second);
+        } else if (auto it2 = node.attributes.find("justify-content"); it2 != node.attributes.end()) {
+            panel->justifyContent = ParseJustifyContent(it2->second);
         }
         ApplyCommonXmlAttributes(*panel, node);
         element = std::move(panel);
@@ -908,9 +920,13 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         if (auto it = node.attributes.find("spacing"); it != node.attributes.end()) {
             grid->cellSpacing = std::stof(it->second);
+        } else if (auto it2 = node.attributes.find("cellSpacing"); it2 != node.attributes.end()) {
+            grid->cellSpacing = std::stof(it2->second);
         }
         if (auto it = node.attributes.find("columns"); it != node.attributes.end()) {
             grid->columns = std::max(1, std::stoi(it->second));
+        } else if (auto it2 = node.attributes.find("cols"); it2 != node.attributes.end()) {
+            grid->columns = std::max(1, std::stoi(it2->second));
         }
         if (auto it = node.attributes.find("padding"); it != node.attributes.end()) {
             const auto values = SplitString(it->second, ',');
