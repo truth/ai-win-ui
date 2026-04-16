@@ -24,6 +24,8 @@
   - 定义 UI 元素树与组件
   - 支持递归布局、渲染与事件命中
   - 支持通用 `width` / `height` / `margin` 与 `Panel` 的 `alignItems` / `justifyContent`
+  - 已开始渲染层抽象，便于未来支持 Skia 后端
+  - 支持 `TextInput` 文本编辑、选择与剪贴板交互，优化 `Panel`/`GridPanel` 测量与自动尺寸计算
 - `src/resource_provider.*`
   - 实现 `DirectoryResourceProvider`，从 `resource/` 目录读取文件
 - `src/layout_parser.*`

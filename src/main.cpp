@@ -161,6 +161,7 @@ private:
         const UINT h = static_cast<UINT>(rc.bottom - rc.top);
         m_renderer.Resize(w, h);
         if (m_root) {
+            m_root->Measure(static_cast<float>(w), static_cast<float>(h));
             m_root->Arrange(D2D1::RectF(0, 0, static_cast<float>(w), static_cast<float>(h)));
         }
         InvalidateRect(m_hwnd, nullptr, FALSE);
@@ -188,7 +189,13 @@ private:
         EnsureMouseLeaveTracking();
         const float x = static_cast<float>(GET_X_LPARAM(lParam));
         const float y = static_cast<float>(GET_Y_LPARAM(lParam));
-        if (m_root->OnMouseMove(x, y)) {
+        bool handled = false;
+        if (m_mouseCaptureTarget) {
+            handled = m_mouseCaptureTarget->OnMouseMove(x, y);
+        } else {
+            handled = m_root->OnMouseMove(x, y);
+        }
+        if (handled) {
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
     }
@@ -207,6 +214,7 @@ private:
             SetFocusedElement(focusTarget);
         }
 
+        m_mouseCaptureTarget = m_root->FindHitElementAt(x, y);
         if (m_root->OnMouseDown(x, y)) {
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
@@ -218,7 +226,16 @@ private:
         }
         const float x = static_cast<float>(GET_X_LPARAM(lParam));
         const float y = static_cast<float>(GET_Y_LPARAM(lParam));
-        if (m_root->OnMouseUp(x, y)) {
+
+        bool handled = false;
+        if (m_mouseCaptureTarget) {
+            handled = m_mouseCaptureTarget->OnMouseUp(x, y);
+            m_mouseCaptureTarget = nullptr;
+        } else {
+            handled = m_root->OnMouseUp(x, y);
+        }
+
+        if (handled) {
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
     }
@@ -391,6 +408,7 @@ private:
     Renderer m_renderer;
     std::unique_ptr<UIElement> m_root;
     UIElement* m_focusedElement = nullptr;
+    UIElement* m_mouseCaptureTarget = nullptr;
     bool m_isInitialized = false;
     bool m_isTrackingMouseLeave = false;
 };

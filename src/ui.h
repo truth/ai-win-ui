@@ -74,6 +74,7 @@ public:
 
     void SetBounds(const D2D1_RECT_F& rect) { m_bounds = rect; }
     D2D1_RECT_F Bounds() const { return m_bounds; }
+    D2D1_SIZE_F DesiredSize() const { return m_desiredSize; }
     void SetMargin(const Thickness& margin) { m_margin = margin; }
     const Thickness& Margin() const { return m_margin; }
     void SetFixedWidth(float width) { m_fixedWidth = width; }
@@ -101,7 +102,7 @@ public:
         m_desiredSize.height = GetPreferredHeight(m_desiredSize.width);
     }
     virtual void Arrange(const D2D1_RECT_F& finalRect) { m_bounds = finalRect; }
-    virtual void Render(Renderer& renderer) {
+    virtual void Render(IRenderer& renderer) {
         for (auto& child : m_children) {
             child->Render(renderer);
         }
@@ -151,6 +152,18 @@ public:
             }
         }
         return IsFocusable() && HitTest(x, y) ? const_cast<UIElement*>(this) : nullptr;
+    }
+
+    virtual UIElement* FindHitElementAt(float x, float y) {
+        for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+            if ((*it)->HitTest(x, y)) {
+                if (auto* hitChild = (*it)->FindHitElementAt(x, y)) {
+                    return hitChild;
+                }
+                return it->get();
+            }
+        }
+        return HitTest(x, y) ? const_cast<UIElement*>(this) : nullptr;
     }
 
     virtual void CollectFocusable(std::vector<UIElement*>& out) {
@@ -279,7 +292,8 @@ public:
             const float childWidth = (alignItems == AlignItems::Stretch && !child->HasFixedWidth())
                 ? availableChildWidth
                 : child->GetPreferredWidth(availableChildWidth);
-            const float childHeight = child->GetPreferredHeight(childWidth);
+            child->Measure(childWidth, contentHeight);
+            const float childHeight = child->DesiredSize().height;
             const float blockHeight = margin.top + childHeight + margin.bottom;
 
             if (!first) {
@@ -339,6 +353,31 @@ public:
         }
     }
 
+    void Measure(float availableWidth, float availableHeight) override {
+        const float contentWidth = std::max(0.0f, availableWidth - padding.left - padding.right);
+        float totalHeight = padding.top + padding.bottom;
+        bool first = true;
+
+        for (auto& child : m_children) {
+            const Thickness& margin = child->Margin();
+            const float availableChildWidth = std::max(0.0f, contentWidth - margin.left - margin.right);
+            const float childWidth = (alignItems == AlignItems::Stretch && !child->HasFixedWidth())
+                ? availableChildWidth
+                : child->GetPreferredWidth(availableChildWidth);
+            child->Measure(childWidth, availableHeight);
+            const float childHeight = child->DesiredSize().height;
+
+            if (!first) {
+                totalHeight += spacing;
+            }
+            totalHeight += margin.top + childHeight + margin.bottom;
+            first = false;
+        }
+
+        m_desiredSize.width = availableWidth;
+        m_desiredSize.height = totalHeight;
+    }
+
 protected:
     float MeasurePreferredHeight(float width) const override {
         float totalHeight = padding.top + padding.bottom;
@@ -360,7 +399,7 @@ protected:
     }
 
 public:
-    void Render(Renderer& renderer) override {
+    void Render(IRenderer& renderer) override {
         if (cornerRadius > 0.0f) {
             renderer.FillRoundedRect(m_bounds, background, cornerRadius);
             renderer.DrawRoundedRect(m_bounds, D2D1::ColorF(0x333333), 1.0f, cornerRadius);
@@ -416,6 +455,24 @@ public:
         }
     }
 
+    void Measure(float availableWidth, float availableHeight) override {
+        const float contentWidth = std::max(0.0f, availableWidth - padding.left - padding.right);
+        const int cols = std::max(1, columns);
+        const float cellWidth = (contentWidth - cellSpacing * (cols - 1)) / cols;
+        const int cellCount = static_cast<int>(m_children.size());
+        const int rows = (cellCount + cols - 1) / cols;
+
+        for (auto& child : m_children) {
+            const Thickness& margin = child->Margin();
+            const float availableCellWidth = std::max(0.0f, cellWidth - margin.left - margin.right);
+            const float childWidth = child->HasFixedWidth() ? child->GetPreferredWidth(availableCellWidth) : availableCellWidth;
+            child->Measure(childWidth, availableHeight);
+        }
+
+        m_desiredSize.width = availableWidth;
+        m_desiredSize.height = padding.top + padding.bottom + rows * rowHeight + std::max(0, rows - 1) * cellSpacing;
+    }
+
 protected:
     float MeasurePreferredHeight(float width) const override {
         (void)width;
@@ -431,7 +488,7 @@ protected:
     }
 
 public:
-    void Render(Renderer& renderer) override {
+    void Render(IRenderer& renderer) override {
         if (cornerRadius > 0.0f) {
             renderer.FillRoundedRect(m_bounds, background, cornerRadius);
             renderer.DrawRoundedRect(m_bounds, D2D1::ColorF(0x333333), 1.0f, cornerRadius);
@@ -462,7 +519,7 @@ protected:
     }
 
 public:
-    void Render(Renderer& renderer) override {
+    void Render(IRenderer& renderer) override {
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
@@ -503,7 +560,7 @@ protected:
     }
 
 public:
-    void Render(Renderer& renderer) override {
+    void Render(IRenderer& renderer) override {
         if (!m_bitmap && !m_imageData.empty()) {
             m_bitmap = renderer.CreateBitmapFromBytes(m_imageData.data(), m_imageData.size());
         }
@@ -622,7 +679,7 @@ protected:
     }
 
 public:
-    void Render(Renderer& renderer) override {
+    void Render(IRenderer& renderer) override {
         D2D1_COLOR_F bg = background;
         if (m_pressed && m_hovered) {
             bg = D2D1::ColorF(0x0E639C);
@@ -798,6 +855,15 @@ public:
                 }
                 ResetCaretBlink();
                 return true;
+            case 'A':
+                if (ctrlDown) {
+                    m_selectionStart = 0;
+                    m_selectionEnd = m_text.size();
+                    m_caretPosition = m_selectionEnd;
+                    ResetCaretBlink();
+                    return true;
+                }
+                break;
             case 'C':
                 if (ctrlDown && HasSelection()) {
                     const auto [start, end] = GetSelectionRange();
@@ -893,8 +959,65 @@ public:
         }
 
         const float localX = x - textRect.left;
-        size_t newCaret = 0;
-        float cursorX = 0.0f;
+        const size_t newCaret = ComputeCaretIndex(localX, textRect);
+        const bool shiftDown = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+
+        if (shiftDown) {
+            if (!HasSelection()) {
+                m_selectionStart = m_caretPosition;
+            }
+            m_caretPosition = newCaret;
+            m_selectionEnd = m_caretPosition;
+        } else {
+            m_caretPosition = newCaret;
+            ClearSelection();
+        }
+
+        m_dragAnchor = m_caretPosition;
+        m_isDragging = true;
+        ResetCaretBlink();
+        return true;
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        if (!m_isDragging) {
+            return false;
+        }
+
+        const D2D1_RECT_F textRect = D2D1::RectF(m_bounds.left + 8.0f, m_bounds.top + 6.0f, m_bounds.right - 8.0f, m_bounds.bottom - 6.0f);
+        const float localX = x - textRect.left;
+        const size_t newCaret = ComputeCaretIndex(localX, textRect);
+        if (newCaret == m_caretPosition) {
+            return false;
+        }
+
+        m_caretPosition = newCaret;
+        if (!HasSelection()) {
+            m_selectionStart = m_dragAnchor;
+        }
+        m_selectionEnd = m_caretPosition;
+        ResetCaretBlink();
+        return true;
+    }
+
+    bool OnMouseUp(float x, float y) override {
+        if (!m_isDragging) {
+            return false;
+        }
+        m_isDragging = false;
+        return true;
+    }
+
+    bool OnMouseLeave() override {
+        if (!m_isDragging) {
+            return false;
+        }
+        m_isDragging = false;
+        return true;
+    }
+
+    size_t ComputeCaretIndex(float localX, const D2D1_RECT_F& textRect) const {
+        size_t newCaret = m_text.size();
         for (size_t i = 0; i <= m_text.size(); ++i) {
             const std::wstring prefix = m_text.substr(0, i);
             const D2D1_SIZE_F metrics = MeasureTextLayout(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
@@ -902,12 +1025,8 @@ public:
                 newCaret = i;
                 break;
             }
-            cursorX = metrics.width;
         }
-        m_caretPosition = newCaret;
-        ClearSelection();
-        ResetCaretBlink();
-        return true;
+        return newCaret;
     }
 
     bool OnTimer(UINT_PTR /*timerId*/) override {
@@ -942,7 +1061,7 @@ protected:
     }
 
 public:
-    void Render(Renderer& renderer) override {
+    void Render(IRenderer& renderer) override {
         renderer.FillRoundedRect(m_bounds, background, cornerRadius);
         renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, cornerRadius);
         if (m_hasFocus) {
@@ -1022,6 +1141,9 @@ private:
         m_showCaret = true;
         m_lastBlink = GetTickCount();
     }
+
+    bool m_isDragging = false;
+    size_t m_dragAnchor = 0;
 };
 
 class Checkbox : public UIElement {
@@ -1064,7 +1186,7 @@ public:
         return textSize.height + 10.0f;
     }
 
-    void Render(Renderer& renderer) override {
+    void Render(IRenderer& renderer) override {
         const D2D1_RECT_F box = D2D1::RectF(m_bounds.left, m_bounds.top + 2.0f, m_bounds.left + 18.0f, m_bounds.top + 20.0f);
         renderer.FillRect(box, D2D1::ColorF(0x2D2D30));
         renderer.DrawRect(box, D2D1::ColorF(0x6A6A6A), 1.0f);
@@ -1166,7 +1288,7 @@ public:
         return textSize.height + 10.0f;
     }
 
-    void Render(Renderer& renderer) override {
+    void Render(IRenderer& renderer) override {
         const D2D1_RECT_F circle = D2D1::RectF(m_bounds.left, m_bounds.top + 2.0f, m_bounds.left + 18.0f, m_bounds.top + 20.0f);
         renderer.DrawRoundedRect(circle, D2D1::ColorF(0x6A6A6A), 1.0f, 9.0f);
         if (m_checked) {
@@ -1307,7 +1429,7 @@ public:
         return 42.0f;
     }
 
-    void Render(Renderer& renderer) override {
+    void Render(IRenderer& renderer) override {
         renderer.FillRoundedRect(m_bounds, background, cornerRadius);
         renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, cornerRadius);
         if (m_hasFocus) {

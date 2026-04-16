@@ -130,7 +130,7 @@
 
 ### Step 5：准备后续引擎升级
 
-- [ ] `IRenderer` 抽象接口设计
+- [x] `IRenderer` 抽象接口设计
 - [ ] `Yoga` 与 `Skia` 引入方案确认
 - [ ] `lib/` 中放置预编译依赖示例
 
@@ -165,7 +165,7 @@
 
 ### Week 4：工程化与后续预研
 
-- [ ] 设计 `IRenderer` 接口，抽象现有 Direct2D 实现
+- [x] 设计 `IRenderer` 接口，抽象现有 Direct2D 实现
 - [ ] 准备 `lib/` 中的预编译 Yoga/Skia 引入示例
 - [ ] 评估 Yoga 布局引擎与 Skia 渲染后端的最小切换点
 - [ ] 更新文档为可复用开发规范与工程模板

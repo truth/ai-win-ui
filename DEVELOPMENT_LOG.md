@@ -1,6 +1,6 @@
 # 开发日志
 
-## 2026-04-15
+## 2026-04-16
 
 - 当前工作分支：`feat/resource-layout-mvp`
 - 目标：完善资源驱动 UI 加载与文档支持
@@ -17,6 +17,9 @@
   - 新增 `build.ps1` / `build.cmd` 编译脚本，统一 CMake 配置与构建入口
   - 在 CMake 中增加构建后资源复制，确保 `build/<Config>/ai_win_ui.exe` 可直接运行
   - 成功通过 `cmake --build build --config Debug`
+  - 增强 `TextInput` 选择、Ctrl+A/C/V/X 剪贴板行为与光标定位
+  - 增加 `TextInput` 拖拽选择支持，优化鼠标交互体验
+  - 优化 `Panel`/`GridPanel` 测量流程，增加 `UIElement` 子元素测量结果稳定性
+  - 在窗口大小变化时先执行根测量再 Arrange，提升自动尺寸计算稳定性
 - 待办：
-  - 增强文本测量与自动尺寸精度
   - 继续补齐键盘、焦点与更多输入事件
