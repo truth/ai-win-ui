@@ -1,6 +1,7 @@
 #pragma once
 
 #include <functional>
+#include <Windows.h>
 #include <string>
 
 class IRenderer;
@@ -17,4 +18,6 @@ struct UIContext {
     IResourceProvider* resourceProvider = nullptr;
     ILayoutEngine* layoutEngine = nullptr;
     UIEventResolver eventResolver;
+    UINT dpi = 96;
+    float dpiScale = 1.0f;
 };

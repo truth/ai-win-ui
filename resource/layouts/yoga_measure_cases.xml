@@ -1,0 +1,18 @@
+<Panel padding="24,24,24,24" spacing="16" cornerRadius="16" background="#121212" alignItems="stretch">
+  <Label text="Yoga Measurement Cases" fontSize="28" color="#F5F5F5" />
+  <Panel padding="18,18,18,18" spacing="10" cornerRadius="12" background="#1F1F1F" alignItems="stretch">
+    <Label text="Wrapped label inside a constrained card. This sentence should reflow when the available width changes, which makes it useful for verifying Yoga at-most width measurement." fontSize="15" color="#D8D8D8" />
+    <Button text="A button with a longer title should keep its text padding stable" fontSize="14" cornerRadius="8" />
+  </Panel>
+  <Panel direction="row" padding="14,14,14,14" spacing="12" cornerRadius="12" background="#1B2430" alignItems="center">
+    <Label text="Row case:" fontSize="15" color="#F5F5F5" />
+    <Button text="Short" width="96" height="38" fontSize="14" cornerRadius="8" />
+    <Button text="Wider CTA" height="38" fontSize="14" background="#2D6CDF" cornerRadius="8" />
+    <Spacer flexGrow="1" flexBasis="0" />
+    <TextInput text="Measure me" width="180" fontSize="14" background="#16202A" textColor="#FFFFFF" cornerRadius="8" />
+  </Panel>
+  <Panel padding="16,16,16,16" spacing="10" cornerRadius="12" background="#242424" alignItems="stretch">
+    <Label text="Exact-height footer" fontSize="16" color="#FFFFFF" />
+    <Button text="Primary Action" height="42" fontSize="15" background="#2D6CDF" cornerRadius="8" />
+  </Panel>
+</Panel>

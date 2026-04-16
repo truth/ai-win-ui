@@ -10,6 +10,9 @@ The project has now completed the first practical Yoga integration milestone.
 - `Panel` supports both `column` and `row` direction.
 - Child layout metadata now supports `margin`, `flexGrow`, `flexShrink`, and `flexBasis`.
 - A dedicated `Spacer` element is available for elastic gaps.
+- Yoga leaf measurement callbacks are now wired for leaf controls through the layout backend.
+- The Yoga leaf path now keeps a lightweight per-node measurement cache during layout building.
+- The app can now switch layout samples through `AI_WIN_UI_LAYOUT` at runtime.
 - Layout examples in both XML and JSON have been refreshed to demonstrate:
   - vertical stacking
   - row toolbars
@@ -31,27 +34,31 @@ The project has now completed the first practical Yoga integration milestone.
 - Yoga-backed `Panel` layout in the normal app runtime path.
 - Row and column direction switching through layout files.
 - Flex-style spacing using `Spacer`.
+- Yoga-driven leaf measurement for leaf UI nodes.
+- Lightweight cached leaf measurements during Yoga layout passes.
 - Layout parsing from both XML and JSON.
 - Debug build generation through CMake.
 
 ## Known Limits
 
-The current bridge is intentionally conservative.
+The current bridge is still intentionally conservative.
 
-- Leaf controls still use the existing UI measurement path before values are mapped into Yoga nodes.
 - `GridPanel` is still independent from Yoga.
 - `justifyContent=space-between` is close to the previous behavior, but not yet fully normalized against the old handwritten implementation.
 - There is not yet a generalized flex container model beyond the current `Panel`.
+- The current Yoga measure path does not yet include dedicated caching or regression-oriented verification cases.
+- Dedicated measurement examples now exist, but automated regression checks still do not.
+- Sample switching is now easy for manual verification, but there is still no automated assertion layer.
 
 ## Recommended Next Tasks
 
 ### Priority 1
 
-Implement Yoga measure callbacks for leaf widgets.
+Normalize and harden the Yoga measure callback path.
 
 Goal:
-- remove the current "measure first, map later" transition layer
-- make Yoga the direct source of truth for intrinsic control sizing
+- validate the new Yoga-driven intrinsic sizing behavior
+- add confidence around wrapped text, exact sizing, and at-most constraints
 
 Suggested targets:
 - `Label`

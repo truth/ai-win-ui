@@ -358,6 +358,9 @@ private:
             return false;
         }
 
+        m_renderTarget->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
+        m_renderTarget->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
+
         ++m_renderTargetGeneration;
         return true;
     }

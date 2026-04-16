@@ -3,6 +3,7 @@
 #include "ui.h"
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <vector>
 
@@ -20,6 +21,80 @@ public:
 };
 
 using YogaTree = std::unique_ptr<std::remove_pointer_t<YGNodeRef>, YogaTreeDeleter>;
+
+constexpr float kUnboundedMeasure = 4096.0f;
+
+struct LeafMeasureContext {
+    UIElement* element = nullptr;
+    bool hasCache = false;
+    float width = 0.0f;
+    float height = 0.0f;
+    YGMeasureMode widthMode = YGMeasureModeUndefined;
+    YGMeasureMode heightMode = YGMeasureModeUndefined;
+    Size measured{};
+};
+
+float ResolveMeasureConstraint(float value, YGMeasureMode mode) {
+    if (mode == YGMeasureModeUndefined || std::isnan(value)) {
+        return kUnboundedMeasure;
+    }
+    return std::max(0.0f, value);
+}
+
+Size MeasureLeafWithContext(LeafMeasureContext& context,
+                            float width,
+                            YGMeasureMode widthMode,
+                            float height,
+                            YGMeasureMode heightMode) {
+    if (!context.element) {
+        return {};
+    }
+
+    if (context.hasCache &&
+        context.width == width &&
+        context.height == height &&
+        context.widthMode == widthMode &&
+        context.heightMode == heightMode) {
+        return context.measured;
+    }
+
+    const float availableWidth = ResolveMeasureConstraint(width, widthMode);
+    const float availableHeight = ResolveMeasureConstraint(height, heightMode);
+    context.measured = context.element->MeasureForLayout(availableWidth, availableHeight);
+    context.width = width;
+    context.height = height;
+    context.widthMode = widthMode;
+    context.heightMode = heightMode;
+    context.hasCache = true;
+    return context.measured;
+}
+
+YGSize MeasureLeafNode(YGNodeConstRef node,
+                       float width,
+                       YGMeasureMode widthMode,
+                       float height,
+                       YGMeasureMode heightMode) {
+    auto* context = static_cast<LeafMeasureContext*>(YGNodeGetContext(node));
+    if (!context || !context->element) {
+        return YGSize{0.0f, 0.0f};
+    }
+
+    Size measured = MeasureLeafWithContext(*context, width, widthMode, height, heightMode);
+
+    if (widthMode == YGMeasureModeExactly && !std::isnan(width)) {
+        measured.width = std::max(0.0f, width);
+    } else if (widthMode == YGMeasureModeAtMost && !std::isnan(width)) {
+        measured.width = std::min(measured.width, std::max(0.0f, width));
+    }
+
+    if (heightMode == YGMeasureModeExactly && !std::isnan(height)) {
+        measured.height = std::max(0.0f, height);
+    } else if (heightMode == YGMeasureModeAtMost && !std::isnan(height)) {
+        measured.height = std::min(measured.height, std::max(0.0f, height));
+    }
+
+    return YGSize{measured.width, measured.height};
+}
 
 YGAlign ToYogaAlign(StackAlignItems align) {
     switch (align) {
@@ -77,6 +152,7 @@ struct BuiltYogaLayout {
     YogaTree root;
     std::vector<YGNodeRef> childNodes;
     std::vector<UIElement*> elements;
+    std::vector<std::unique_ptr<LeafMeasureContext>> leafContexts;
 };
 
 BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
@@ -114,6 +190,7 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
 
     layout.childNodes.reserve(children.size());
     layout.elements.reserve(children.size());
+    layout.leafContexts.reserve(children.size());
 
     for (const auto& child : children) {
         if (!child.element) {
@@ -134,25 +211,59 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
         const bool stretchCrossAxis = style.alignItems == StackAlignItems::Stretch &&
             ((style.direction == StackDirection::Column && !child.element->HasFixedWidth()) ||
              (style.direction == StackDirection::Row && !child.element->HasFixedHeight()));
-        const float measuredWidth = style.direction == StackDirection::Column
-            ? (stretchCrossAxis ? availableChildWidth : child.element->GetPreferredWidth(availableChildWidth))
-            : child.element->GetPreferredWidth(availableChildWidth);
+        const bool useMeasureFunc = child.element->IsLayoutLeaf();
         const float flexGrow = child.element->FlexGrow();
         const float flexShrink = child.element->FlexShrink();
         const bool hasFlexBasis = child.element->HasFlexBasis();
+        float measuredWidth = 0.0f;
+        float measuredHeight = 0.0f;
 
-        child.element->Measure(measuredWidth, availableChildHeight);
-        const float measuredHeight = child.element->DesiredSize().height;
+        if (useMeasureFunc) {
+            auto context = std::make_unique<LeafMeasureContext>();
+            context->element = child.element;
+            LeafMeasureContext* contextPtr = context.get();
+            layout.leafContexts.push_back(std::move(context));
+
+            YGNodeSetContext(childNode, contextPtr);
+            YGNodeSetMeasureFunc(childNode, MeasureLeafNode);
+
+            if (child.element->HasFixedWidth()) {
+                YGNodeStyleSetWidth(childNode, child.element->GetPreferredWidth(availableChildWidth));
+            }
+            if (child.element->HasFixedHeight()) {
+                YGNodeStyleSetHeight(childNode, child.element->GetPreferredHeight(availableChildWidth));
+            }
+
+            if (!hasFlexBasis) {
+                const Size preview = MeasureLeafWithContext(
+                    *contextPtr,
+                    availableChildWidth,
+                    YGMeasureModeAtMost,
+                    availableChildHeight,
+                    YGMeasureModeAtMost);
+                measuredWidth = preview.width;
+                measuredHeight = preview.height;
+            }
+        } else {
+            measuredWidth = style.direction == StackDirection::Column
+                ? (stretchCrossAxis ? availableChildWidth : child.element->GetPreferredWidth(availableChildWidth))
+                : child.element->GetPreferredWidth(availableChildWidth);
+
+            child.element->Measure(measuredWidth, availableChildHeight);
+            measuredHeight = child.element->DesiredSize().height;
+        }
 
         if (style.direction == StackDirection::Column) {
-            if (!stretchCrossAxis) {
+            if (!useMeasureFunc && !stretchCrossAxis) {
                 YGNodeStyleSetWidth(childNode, measuredWidth);
             }
         } else {
-            YGNodeStyleSetWidth(childNode, measuredWidth);
-            if (stretchCrossAxis) {
+            if (!useMeasureFunc || child.element->HasFixedWidth()) {
+                YGNodeStyleSetWidth(childNode, measuredWidth);
+            }
+            if (!useMeasureFunc && stretchCrossAxis) {
                 YGNodeStyleSetHeight(childNode, availableChildHeight);
-            } else {
+            } else if (!useMeasureFunc) {
                 YGNodeStyleSetHeight(childNode, measuredHeight);
             }
         }
@@ -167,10 +278,10 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
             const float intrinsicMainAxis = style.direction == StackDirection::Column ? measuredHeight : measuredWidth;
             const float flexBasis = hasFlexBasis ? child.element->FlexBasis() : intrinsicMainAxis;
             YGNodeStyleSetFlexBasis(childNode, std::max(0.0f, flexBasis));
-            if (style.direction == StackDirection::Column) {
+            if (!useMeasureFunc && style.direction == StackDirection::Column) {
                 YGNodeStyleSetHeight(childNode, measuredHeight);
             }
-        } else if (style.direction == StackDirection::Column) {
+        } else if (!useMeasureFunc && style.direction == StackDirection::Column) {
             YGNodeStyleSetHeight(childNode, measuredHeight);
         }
 

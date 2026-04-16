@@ -39,7 +39,7 @@ public:
     float FlexGrow() const { return m_flexGrow; }
     float FlexShrink() const { return m_flexShrink; }
     bool HasFlexBasis() const { return m_flexBasis >= 0.0f; }
-    float FlexBasis() const { return m_flexBasis; }
+    float FlexBasis() const { return ScaleValue(m_flexBasis); }
     void SetContext(UIContext* context) {
         m_context = context;
         for (auto& child : m_children) {
@@ -50,14 +50,14 @@ public:
 
     float GetPreferredWidth(float availableWidth) const {
         const float clampedWidth = std::max(0.0f, availableWidth);
-        const float preferredWidth = HasFixedWidth() ? m_fixedWidth : MeasurePreferredWidth(clampedWidth);
+        const float preferredWidth = HasFixedWidth() ? ScaleValue(m_fixedWidth) : MeasurePreferredWidth(clampedWidth);
         return std::clamp(preferredWidth, 0.0f, clampedWidth);
     }
 
     float GetPreferredHeight(float width) const {
         const float clampedWidth = std::max(0.0f, width);
         if (HasFixedHeight()) {
-            return std::max(0.0f, m_fixedHeight);
+            return std::max(0.0f, ScaleValue(m_fixedHeight));
         }
         return std::max(0.0f, MeasurePreferredHeight(clampedWidth));
     }
@@ -67,6 +67,10 @@ public:
         const float width = GetPreferredWidth(availableWidth);
         m_desiredSize.width = width;
         m_desiredSize.height = GetPreferredHeight(width);
+    }
+    virtual Size MeasureForLayout(float availableWidth, float availableHeight) {
+        Measure(availableWidth, availableHeight);
+        return m_desiredSize;
     }
     virtual void Arrange(const Rect& finalRect) { m_bounds = finalRect; }
     virtual void Render(IRenderer& renderer) {
@@ -202,10 +206,29 @@ public:
         m_children.emplace_back(std::move(child));
     }
     std::vector<std::unique_ptr<UIElement>>& Children() { return m_children; }
+    bool IsLayoutLeaf() const { return m_children.empty(); }
+
+public:
+    float DpiScale() const {
+        return m_context ? std::max(1.0f / 96.0f, m_context->dpiScale) : 1.0f;
+    }
+
+    float ScaleValue(float value) const {
+        return value * DpiScale();
+    }
+
+    Thickness ScaleThickness(const Thickness& value) const {
+        return Thickness{
+            ScaleValue(value.left),
+            ScaleValue(value.top),
+            ScaleValue(value.right),
+            ScaleValue(value.bottom)
+        };
+    }
 
 protected:
     Size MeasureTextValue(const std::wstring& text, float fontSize, float maxWidth) const {
-        return MeasureTextLayout(m_context ? m_context->textMeasurer : nullptr, text, fontSize, maxWidth);
+        return MeasureTextLayout(m_context ? m_context->textMeasurer : nullptr, text, ScaleValue(fontSize), maxWidth);
     }
 
     Rect m_bounds{};
@@ -263,10 +286,12 @@ public:
             return;
         }
 
-        const float contentLeft = m_bounds.left + padding.left;
-        const float contentTop = m_bounds.top + padding.top;
-        const float contentWidth = std::max(0.0f, m_bounds.Width() - padding.left - padding.right);
-        const float contentHeight = std::max(0.0f, m_bounds.Height() - padding.top - padding.bottom);
+        const Thickness scaledPadding = ScaleThickness(padding);
+        const float scaledSpacing = ScaleValue(spacing);
+        const float contentLeft = m_bounds.left + scaledPadding.left;
+        const float contentTop = m_bounds.top + scaledPadding.top;
+        const float contentWidth = std::max(0.0f, m_bounds.Width() - scaledPadding.left - scaledPadding.right);
+        const float contentHeight = std::max(0.0f, m_bounds.Height() - scaledPadding.top - scaledPadding.bottom);
 
         struct ChildLayout {
             UIElement* element;
@@ -283,7 +308,7 @@ public:
         float totalChildHeight = 0.0f;
         bool first = true;
         for (auto& child : m_children) {
-            const Thickness margin = child->Margin();
+            const Thickness margin = child->ScaleThickness(child->Margin());
             const float availableChildWidth = std::max(0.0f, contentWidth - margin.left - margin.right);
             const float childWidth = (alignItems == AlignItems::Stretch && !child->HasFixedWidth())
                 ? availableChildWidth
@@ -293,7 +318,7 @@ public:
             const float blockHeight = margin.top + childHeight + margin.bottom;
 
             if (!first) {
-                totalHeight += spacing;
+                totalHeight += scaledSpacing;
             }
             totalHeight += blockHeight;
             totalChildHeight += blockHeight;
@@ -309,7 +334,7 @@ public:
         }
 
         float y = contentTop;
-        float spacingBetweenChildren = layouts.size() > 1 ? spacing : 0.0f;
+        float spacingBetweenChildren = layouts.size() > 1 ? scaledSpacing : 0.0f;
 
         switch (justifyContent) {
             case JustifyContent::Center:
@@ -321,7 +346,7 @@ public:
             case JustifyContent::SpaceBetween:
                 if (layouts.size() > 1) {
                     const float distributedSpacing = (contentHeight - totalChildHeight) / static_cast<float>(layouts.size() - 1);
-                    spacingBetweenChildren = std::max(spacing, distributedSpacing);
+                    spacingBetweenChildren = std::max(scaledSpacing, distributedSpacing);
                 }
                 break;
             case JustifyContent::Start:
@@ -364,12 +389,14 @@ public:
             return;
         }
 
-        const float contentWidth = std::max(0.0f, availableWidth - padding.left - padding.right);
-        float totalHeight = padding.top + padding.bottom;
+        const Thickness scaledPadding = ScaleThickness(padding);
+        const float scaledSpacing = ScaleValue(spacing);
+        const float contentWidth = std::max(0.0f, availableWidth - scaledPadding.left - scaledPadding.right);
+        float totalHeight = scaledPadding.top + scaledPadding.bottom;
         bool first = true;
 
         for (auto& child : m_children) {
-            const Thickness& margin = child->Margin();
+            const Thickness margin = child->ScaleThickness(child->Margin());
             const float availableChildWidth = std::max(0.0f, contentWidth - margin.left - margin.right);
             const float childWidth = (alignItems == AlignItems::Stretch && !child->HasFixedWidth())
                 ? availableChildWidth
@@ -378,7 +405,7 @@ public:
             const float childHeight = child->DesiredSize().height;
 
             if (!first) {
-                totalHeight += spacing;
+                totalHeight += scaledSpacing;
             }
             totalHeight += margin.top + childHeight + margin.bottom;
             first = false;
@@ -390,10 +417,11 @@ public:
 
 protected:
     StackLayoutStyle ToStackLayoutStyle() const {
+        const Thickness scaledPadding = ScaleThickness(padding);
         return StackLayoutStyle{
             direction == Direction::Row ? StackDirection::Row : StackDirection::Column,
-            LayoutSpacing{padding.left, padding.top, padding.right, padding.bottom},
-            spacing,
+            LayoutSpacing{scaledPadding.left, scaledPadding.top, scaledPadding.right, scaledPadding.bottom},
+            ScaleValue(spacing),
             static_cast<StackAlignItems>(alignItems),
             static_cast<StackJustifyContent>(justifyContent)
         };
@@ -403,7 +431,7 @@ protected:
         std::vector<StackLayoutChild> children;
         children.reserve(m_children.size());
         for (const auto& child : m_children) {
-            const Thickness margin = child->Margin();
+            const Thickness margin = child->ScaleThickness(child->Margin());
             children.push_back(StackLayoutChild{
                 child.get(),
                 LayoutSpacing{margin.left, margin.top, margin.right, margin.bottom}
@@ -416,13 +444,15 @@ protected:
         if (direction == Direction::Row) {
             float maxHeight = 0.0f;
             bool first = true;
-            float totalWidth = padding.left + padding.right;
+            const Thickness scaledPadding = ScaleThickness(padding);
+            const float scaledSpacing = ScaleValue(spacing);
+            float totalWidth = scaledPadding.left + scaledPadding.right;
             const float contentHeight = 4096.0f;
             for (const auto& child : m_children) {
                 if (!first) {
-                    totalWidth += spacing;
+                    totalWidth += scaledSpacing;
                 }
-                const Thickness& margin = child->Margin();
+                const Thickness margin = child->ScaleThickness(child->Margin());
                 const float preferredWidth = child->HasFixedWidth()
                     ? child->GetPreferredWidth(std::max(0.0f, width))
                     : child->GetPreferredWidth(std::max(0.0f, width));
@@ -432,17 +462,19 @@ protected:
                 first = false;
             }
             (void)contentHeight;
-            return padding.top + maxHeight + padding.bottom;
+            return scaledPadding.top + maxHeight + scaledPadding.bottom;
         }
 
-        float totalHeight = padding.top + padding.bottom;
-        const float contentWidth = std::max(0.0f, width - padding.left - padding.right);
+        const Thickness scaledPadding = ScaleThickness(padding);
+        const float scaledSpacing = ScaleValue(spacing);
+        float totalHeight = scaledPadding.top + scaledPadding.bottom;
+        const float contentWidth = std::max(0.0f, width - scaledPadding.left - scaledPadding.right);
         bool first = true;
         for (const auto& child : m_children) {
             if (!first) {
-                totalHeight += spacing;
+                totalHeight += scaledSpacing;
             }
-            const Thickness& margin = child->Margin();
+            const Thickness margin = child->ScaleThickness(child->Margin());
             const float availableChildWidth = std::max(0.0f, contentWidth - margin.left - margin.right);
             const float childWidth = (alignItems == AlignItems::Stretch && !child->HasFixedWidth())
                 ? availableChildWidth
@@ -455,9 +487,10 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
-        if (cornerRadius > 0.0f) {
-            renderer.FillRoundedRect(m_bounds, background, cornerRadius);
-            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x333333), 1.0f, cornerRadius);
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        if (scaledCornerRadius > 0.0f) {
+            renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x333333), 1.0f, scaledCornerRadius);
         } else {
             renderer.FillRect(m_bounds, background);
         }
@@ -468,20 +501,22 @@ public:
 
 private:
     void MeasureRowFallback(float availableWidth, float availableHeight) {
-        const float contentHeight = std::max(0.0f, availableHeight - padding.top - padding.bottom);
-        float totalWidth = padding.left + padding.right;
+        const Thickness scaledPadding = ScaleThickness(padding);
+        const float scaledSpacing = ScaleValue(spacing);
+        const float contentHeight = std::max(0.0f, availableHeight - scaledPadding.top - scaledPadding.bottom);
+        float totalWidth = scaledPadding.left + scaledPadding.right;
         float maxHeight = 0.0f;
         bool first = true;
 
         for (auto& child : m_children) {
-            const Thickness& margin = child->Margin();
+            const Thickness margin = child->ScaleThickness(child->Margin());
             const float availableChildHeight = std::max(0.0f, contentHeight - margin.top - margin.bottom);
             const float childWidth = child->GetPreferredWidth(std::max(0.0f, availableWidth));
             child->Measure(childWidth, availableChildHeight);
             const float childHeight = child->DesiredSize().height;
 
             if (!first) {
-                totalWidth += spacing;
+                totalWidth += scaledSpacing;
             }
             totalWidth += margin.left + childWidth + margin.right;
             maxHeight = std::max(maxHeight, margin.top + childHeight + margin.bottom);
@@ -489,14 +524,16 @@ private:
         }
 
         m_desiredSize.width = totalWidth;
-        m_desiredSize.height = padding.top + maxHeight + padding.bottom;
+        m_desiredSize.height = scaledPadding.top + maxHeight + scaledPadding.bottom;
     }
 
     void ArrangeRowFallback() {
-        const float contentLeft = m_bounds.left + padding.left;
-        const float contentTop = m_bounds.top + padding.top;
-        const float contentWidth = std::max(0.0f, m_bounds.Width() - padding.left - padding.right);
-        const float contentHeight = std::max(0.0f, m_bounds.Height() - padding.top - padding.bottom);
+        const Thickness scaledPadding = ScaleThickness(padding);
+        const float scaledSpacing = ScaleValue(spacing);
+        const float contentLeft = m_bounds.left + scaledPadding.left;
+        const float contentTop = m_bounds.top + scaledPadding.top;
+        const float contentWidth = std::max(0.0f, m_bounds.Width() - scaledPadding.left - scaledPadding.right);
+        const float contentHeight = std::max(0.0f, m_bounds.Height() - scaledPadding.top - scaledPadding.bottom);
 
         struct ChildLayout {
             UIElement* element = nullptr;
@@ -511,14 +548,14 @@ private:
         float totalWidth = 0.0f;
         bool first = true;
         for (auto& child : m_children) {
-            const Thickness margin = child->Margin();
+            const Thickness margin = child->ScaleThickness(child->Margin());
             const float availableChildHeight = std::max(0.0f, contentHeight - margin.top - margin.bottom);
             const float childWidth = child->GetPreferredWidth(contentWidth);
             child->Measure(childWidth, availableChildHeight);
             const float childHeight = child->DesiredSize().height;
 
             if (!first) {
-                totalWidth += spacing;
+                totalWidth += scaledSpacing;
             }
             totalWidth += margin.left + childWidth + margin.right;
             first = false;
@@ -548,7 +585,7 @@ private:
             layout.element->Arrange(Rect::Make(x, y, x + layout.width, y + layout.height));
             x += layout.width + layout.margin.right;
             if (i + 1 < layouts.size()) {
-                x += spacing;
+                x += scaledSpacing;
             }
         }
     }
@@ -566,20 +603,23 @@ public:
     void Arrange(const Rect& finalRect) override {
         UIElement::Arrange(finalRect);
 
-        const float x0 = m_bounds.left + padding.left;
-        float y = m_bounds.top + padding.top;
-        const float contentWidth = m_bounds.Width() - padding.left - padding.right;
+        const Thickness scaledPadding = ScaleThickness(padding);
+        const float scaledCellSpacing = ScaleValue(cellSpacing);
+        const float scaledRowHeight = ScaleValue(rowHeight);
+        const float x0 = m_bounds.left + scaledPadding.left;
+        float y = m_bounds.top + scaledPadding.top;
+        const float contentWidth = m_bounds.Width() - scaledPadding.left - scaledPadding.right;
         const int cols = std::max(1, columns);
-        const float cellWidth = (contentWidth - cellSpacing * (cols - 1)) / cols;
+        const float cellWidth = (contentWidth - scaledCellSpacing * (cols - 1)) / cols;
 
         float x = x0;
         int col = 0;
         for (auto& child : m_children) {
-            const Thickness& margin = child->Margin();
+            const Thickness margin = child->ScaleThickness(child->Margin());
             const float availableCellWidth = std::max(0.0f, cellWidth - margin.left - margin.right);
             const float childWidth = child->HasFixedWidth() ? child->GetPreferredWidth(availableCellWidth) : availableCellWidth;
             const float childHeight = std::min(
-                std::max(0.0f, rowHeight - margin.top - margin.bottom),
+                std::max(0.0f, scaledRowHeight - margin.top - margin.bottom),
                 child->GetPreferredHeight(childWidth));
             child->Arrange(Rect::Make(
                 x + margin.left,
@@ -590,50 +630,57 @@ public:
             if (col >= cols) {
                 col = 0;
                 x = x0;
-                y += rowHeight + cellSpacing;
+                y += scaledRowHeight + scaledCellSpacing;
             } else {
-                x += cellWidth + cellSpacing;
+                x += cellWidth + scaledCellSpacing;
             }
         }
     }
 
     void Measure(float availableWidth, float availableHeight) override {
-        const float contentWidth = std::max(0.0f, availableWidth - padding.left - padding.right);
+        const Thickness scaledPadding = ScaleThickness(padding);
+        const float scaledCellSpacing = ScaleValue(cellSpacing);
+        const float scaledRowHeight = ScaleValue(rowHeight);
+        const float contentWidth = std::max(0.0f, availableWidth - scaledPadding.left - scaledPadding.right);
         const int cols = std::max(1, columns);
-        const float cellWidth = (contentWidth - cellSpacing * (cols - 1)) / cols;
+        const float cellWidth = (contentWidth - scaledCellSpacing * (cols - 1)) / cols;
         const int cellCount = static_cast<int>(m_children.size());
         const int rows = (cellCount + cols - 1) / cols;
 
         for (auto& child : m_children) {
-            const Thickness& margin = child->Margin();
+            const Thickness margin = child->ScaleThickness(child->Margin());
             const float availableCellWidth = std::max(0.0f, cellWidth - margin.left - margin.right);
             const float childWidth = child->HasFixedWidth() ? child->GetPreferredWidth(availableCellWidth) : availableCellWidth;
             child->Measure(childWidth, availableHeight);
         }
 
         m_desiredSize.width = availableWidth;
-        m_desiredSize.height = padding.top + padding.bottom + rows * rowHeight + std::max(0, rows - 1) * cellSpacing;
+        m_desiredSize.height = scaledPadding.top + scaledPadding.bottom + rows * scaledRowHeight + std::max(0, rows - 1) * scaledCellSpacing;
     }
 
 protected:
     float MeasurePreferredHeight(float width) const override {
         (void)width;
+        const Thickness scaledPadding = ScaleThickness(padding);
+        const float scaledCellSpacing = ScaleValue(cellSpacing);
+        const float scaledRowHeight = ScaleValue(rowHeight);
         const int cols = std::max(1, columns);
         const int cellCount = static_cast<int>(m_children.size());
         const int rows = (cellCount + cols - 1) / cols;
-        float totalHeight = padding.top + padding.bottom;
+        float totalHeight = scaledPadding.top + scaledPadding.bottom;
         if (rows > 0) {
-            totalHeight += rows * rowHeight;
-            totalHeight += (rows - 1) * cellSpacing;
+            totalHeight += rows * scaledRowHeight;
+            totalHeight += (rows - 1) * scaledCellSpacing;
         }
         return totalHeight;
     }
 
 public:
     void Render(IRenderer& renderer) override {
-        if (cornerRadius > 0.0f) {
-            renderer.FillRoundedRect(m_bounds, background, cornerRadius);
-            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x333333), 1.0f, cornerRadius);
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        if (scaledCornerRadius > 0.0f) {
+            renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x333333), 1.0f, scaledCornerRadius);
         } else {
             renderer.FillRect(m_bounds, background);
         }
@@ -667,7 +714,7 @@ public:
             static_cast<UINT32>(m_text.size()),
             m_bounds,
             m_color,
-            m_fontSize
+            ScaleValue(m_fontSize)
         );
     }
 
@@ -826,12 +873,12 @@ public:
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
         const Size measured = MeasureTextValue(m_text, fontSize, availableWidth > 0.0f ? availableWidth : 4096.0f);
-        return std::min(availableWidth, measured.width + 24.0f);
+        return std::min(availableWidth, measured.width + ScaleValue(24.0f));
     }
 
     float MeasurePreferredHeight(float width) const override {
         const Size measured = MeasureTextValue(m_text, fontSize, width > 0.0f ? width : 4096.0f);
-        return measured.height + 14.0f;
+        return measured.height + ScaleValue(14.0f);
     }
 
 public:
@@ -843,11 +890,12 @@ public:
             bg = ColorFromHex(0x3E3E42);
         }
 
-        if (cornerRadius > 0.0f) {
-            renderer.FillRoundedRect(m_bounds, bg, cornerRadius);
-            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x6A6A6A), 1.0f, cornerRadius);
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        if (scaledCornerRadius > 0.0f) {
+            renderer.FillRoundedRect(m_bounds, bg, scaledCornerRadius);
+            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x6A6A6A), 1.0f, scaledCornerRadius);
             if (m_hasFocus) {
-                renderer.DrawRoundedRect(m_bounds, ColorFromHex(0xFFFFFF), 2.0f, cornerRadius);
+                renderer.DrawRoundedRect(m_bounds, ColorFromHex(0xFFFFFF), 2.0f, scaledCornerRadius);
             }
         } else {
             renderer.FillRect(m_bounds, bg);
@@ -858,13 +906,13 @@ public:
         }
 
         Rect textRect = m_bounds;
-        textRect.left += 10.0f;
+        textRect.left += ScaleValue(10.0f);
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
             textRect,
             foreground,
-            fontSize
+            ScaleValue(fontSize)
         );
     }
 
@@ -1109,7 +1157,9 @@ public:
     }
 
     bool OnMouseDown(float x, float y) override {
-        const Rect textRect = Rect::Make(m_bounds.left + 8.0f, m_bounds.top + 6.0f, m_bounds.right - 8.0f, m_bounds.bottom - 6.0f);
+        const float horizontalInset = ScaleValue(8.0f);
+        const float verticalInset = ScaleValue(6.0f);
+        const Rect textRect = Rect::Make(m_bounds.left + horizontalInset, m_bounds.top + verticalInset, m_bounds.right - horizontalInset, m_bounds.bottom - verticalInset);
         if (!HitTest(x, y)) {
             return false;
         }
@@ -1140,7 +1190,9 @@ public:
             return false;
         }
 
-        const Rect textRect = Rect::Make(m_bounds.left + 8.0f, m_bounds.top + 6.0f, m_bounds.right - 8.0f, m_bounds.bottom - 6.0f);
+        const float horizontalInset = ScaleValue(8.0f);
+        const float verticalInset = ScaleValue(6.0f);
+        const Rect textRect = Rect::Make(m_bounds.left + horizontalInset, m_bounds.top + verticalInset, m_bounds.right - horizontalInset, m_bounds.bottom - verticalInset);
         const float localX = x - textRect.left;
         const size_t newCaret = ComputeCaretIndex(localX, textRect);
         if (newCaret == m_caretPosition) {
@@ -1177,7 +1229,7 @@ public:
         for (size_t i = 0; i <= m_text.size(); ++i) {
             const std::wstring prefix = m_text.substr(0, i);
             const Size metrics = MeasureTextValue(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
-            if (localX < metrics.width + 4.0f) {
+            if (localX < metrics.width + ScaleValue(4.0f)) {
                 newCaret = i;
                 break;
             }
@@ -1206,27 +1258,30 @@ public:
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
         const std::wstring measureText = m_text.empty() ? L" " : m_text;
-        const Size measured = MeasureTextValue(measureText, fontSize, std::max(1.0f, availableWidth - 16.0f));
-        return std::min(availableWidth, measured.width + 16.0f);
+        const float inset = ScaleValue(16.0f);
+        const Size measured = MeasureTextValue(measureText, fontSize, std::max(1.0f, availableWidth - inset));
+        return std::min(availableWidth, measured.width + inset);
     }
 
     float MeasurePreferredHeight(float width) const override {
         const std::wstring measureText = m_text.empty() ? L" " : m_text;
-        const Size measured = MeasureTextValue(measureText, fontSize, std::max(1.0f, width - 16.0f));
-        return measured.height + 12.0f;
+        const float inset = ScaleValue(16.0f);
+        const Size measured = MeasureTextValue(measureText, fontSize, std::max(1.0f, width - inset));
+        return measured.height + ScaleValue(12.0f);
     }
 
 public:
     void Render(IRenderer& renderer) override {
-        renderer.FillRoundedRect(m_bounds, background, cornerRadius);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, cornerRadius);
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
         if (m_hasFocus) {
-            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, cornerRadius);
+            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
         }
 
         Rect textRect = m_bounds;
-        textRect.left += 8.0f;
-        textRect.top += 6.0f;
+        textRect.left += ScaleValue(8.0f);
+        textRect.top += ScaleValue(6.0f);
         if (HasSelection()) {
             const auto [selStart, selEnd] = GetSelectionRange();
             std::wstring prefix = m_text.substr(0, selStart);
@@ -1241,7 +1296,7 @@ public:
             );
             renderer.FillRect(selectionRect, ColorFromHex(0x3A86FF));
         }
-        renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, fontSize);
+        renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, ScaleValue(fontSize));
 
         if (m_hasFocus) {
             const std::wstring prefix = m_text.substr(0, m_caretPosition);
@@ -1250,7 +1305,7 @@ public:
             const float caretTop = textRect.top;
             const float caretBottom = textRect.top + MeasureTextValue(L"|", fontSize, std::max(1.0f, textRect.right - textRect.left)).height;
             if (m_showCaret) {
-                renderer.DrawRect(Rect::Make(caretX, caretTop, caretX + 1.0f, caretBottom), textColor, 1.0f);
+                renderer.DrawRect(Rect::Make(caretX, caretTop, caretX + ScaleValue(1.0f), caretBottom), textColor, 1.0f);
             }
         }
     }
@@ -1333,21 +1388,28 @@ public:
     }
 
     float MeasurePreferredWidth(float availableWidth) const override {
-        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, availableWidth - 30.0f));
-        return std::min(availableWidth, textSize.width + 30.0f);
+        const float reserve = ScaleValue(30.0f);
+        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, availableWidth - reserve));
+        return std::min(availableWidth, textSize.width + reserve);
     }
 
     float MeasurePreferredHeight(float width) const override {
-        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, width - 30.0f));
-        return textSize.height + 10.0f;
+        const float reserve = ScaleValue(30.0f);
+        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, width - reserve));
+        return textSize.height + ScaleValue(10.0f);
     }
 
     void Render(IRenderer& renderer) override {
-        const Rect box = Rect::Make(m_bounds.left, m_bounds.top + 2.0f, m_bounds.left + 18.0f, m_bounds.top + 20.0f);
+        const Rect box = Rect::Make(
+            m_bounds.left,
+            m_bounds.top + ScaleValue(2.0f),
+            m_bounds.left + ScaleValue(18.0f),
+            m_bounds.top + ScaleValue(20.0f));
         renderer.FillRect(box, ColorFromHex(0x2D2D30));
         renderer.DrawRect(box, ColorFromHex(0x6A6A6A), 1.0f);
         if (m_checked) {
-            const Rect mark = Rect::Make(box.left + 4.0f, box.top + 4.0f, box.right - 4.0f, box.bottom - 4.0f);
+            const float inset = ScaleValue(4.0f);
+            const Rect mark = Rect::Make(box.left + inset, box.top + inset, box.right - inset, box.bottom - inset);
             renderer.FillRect(mark, ColorFromHex(0x2D6CDF));
         }
         if (m_hasFocus) {
@@ -1355,8 +1417,8 @@ public:
         }
 
         Rect textRect = m_bounds;
-        textRect.left += 26.0f;
-        renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, fontSize);
+        textRect.left += ScaleValue(26.0f);
+        renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, ScaleValue(fontSize));
     }
 
     bool OnMouseDown(float x, float y) override {
@@ -1435,29 +1497,36 @@ public:
     }
 
     float MeasurePreferredWidth(float availableWidth) const override {
-        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, availableWidth - 28.0f));
-        return std::min(availableWidth, textSize.width + 28.0f);
+        const float reserve = ScaleValue(28.0f);
+        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, availableWidth - reserve));
+        return std::min(availableWidth, textSize.width + reserve);
     }
 
     float MeasurePreferredHeight(float width) const override {
-        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, width - 28.0f));
-        return textSize.height + 10.0f;
+        const float reserve = ScaleValue(28.0f);
+        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, width - reserve));
+        return textSize.height + ScaleValue(10.0f);
     }
 
     void Render(IRenderer& renderer) override {
-        const Rect circle = Rect::Make(m_bounds.left, m_bounds.top + 2.0f, m_bounds.left + 18.0f, m_bounds.top + 20.0f);
-        renderer.DrawRoundedRect(circle, ColorFromHex(0x6A6A6A), 1.0f, 9.0f);
+        const Rect circle = Rect::Make(
+            m_bounds.left,
+            m_bounds.top + ScaleValue(2.0f),
+            m_bounds.left + ScaleValue(18.0f),
+            m_bounds.top + ScaleValue(20.0f));
+        renderer.DrawRoundedRect(circle, ColorFromHex(0x6A6A6A), 1.0f, ScaleValue(9.0f));
         if (m_checked) {
-            const Rect dot = Rect::Make(circle.left + 5.0f, circle.top + 5.0f, circle.right - 5.0f, circle.bottom - 5.0f);
-            renderer.FillRoundedRect(dot, ColorFromHex(0x2D6CDF), 5.0f);
+            const float inset = ScaleValue(5.0f);
+            const Rect dot = Rect::Make(circle.left + inset, circle.top + inset, circle.right - inset, circle.bottom - inset);
+            renderer.FillRoundedRect(dot, ColorFromHex(0x2D6CDF), ScaleValue(5.0f));
         }
         if (m_hasFocus) {
-            renderer.DrawRoundedRect(circle, ColorFromHex(0xFFFFFF), 2.0f, 9.0f);
+            renderer.DrawRoundedRect(circle, ColorFromHex(0xFFFFFF), 2.0f, ScaleValue(9.0f));
         }
 
         Rect textRect = m_bounds;
-        textRect.left += 26.0f;
-        renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, fontSize);
+        textRect.left += ScaleValue(26.0f);
+        renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, ScaleValue(fontSize));
     }
 
     bool OnMouseDown(float x, float y) override {
@@ -1577,37 +1646,38 @@ public:
     }
 
     float MeasurePreferredWidth(float availableWidth) const override {
-        return std::min(availableWidth, 220.0f);
+        return std::min(availableWidth, ScaleValue(220.0f));
     }
 
     float MeasurePreferredHeight(float width) const override {
         (void)width;
-        return 42.0f;
+        return ScaleValue(42.0f);
     }
 
     void Render(IRenderer& renderer) override {
-        renderer.FillRoundedRect(m_bounds, background, cornerRadius);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, cornerRadius);
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
         if (m_hasFocus) {
-            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, cornerRadius);
+            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
         }
 
-        const float trackLeft = m_bounds.left + 14.0f;
-        const float trackRight = m_bounds.right - 14.0f;
-        const float trackTop = m_bounds.top + (m_bounds.bottom - m_bounds.top) * 0.5f - 4.0f;
-        const float trackBottom = trackTop + 8.0f;
+        const float trackLeft = m_bounds.left + ScaleValue(14.0f);
+        const float trackRight = m_bounds.right - ScaleValue(14.0f);
+        const float trackTop = m_bounds.top + (m_bounds.bottom - m_bounds.top) * 0.5f - ScaleValue(4.0f);
+        const float trackBottom = trackTop + ScaleValue(8.0f);
         const Rect trackRect = Rect::Make(trackLeft, trackTop, trackRight, trackBottom);
         renderer.FillRect(trackRect, ColorFromHex(0x333333));
 
         const float position = trackLeft + (trackRight - trackLeft) * ((m_value - m_min) / std::max(1.0f, m_max - m_min));
-        const Rect thumbRect = Rect::Make(position - 8.0f, trackTop - 6.0f, position + 8.0f, trackBottom + 6.0f);
-        renderer.FillRoundedRect(thumbRect, highlightColor, 8.0f);
-        renderer.DrawRoundedRect(thumbRect, ColorFromHex(0x6A6A6A), 1.0f, 8.0f);
+        const Rect thumbRect = Rect::Make(position - ScaleValue(8.0f), trackTop - ScaleValue(6.0f), position + ScaleValue(8.0f), trackBottom + ScaleValue(6.0f));
+        renderer.FillRoundedRect(thumbRect, highlightColor, ScaleValue(8.0f));
+        renderer.DrawRoundedRect(thumbRect, ColorFromHex(0x6A6A6A), 1.0f, ScaleValue(8.0f));
 
         if (!m_label.empty()) {
             Rect labelRect = m_bounds;
-            labelRect.right = trackLeft - 8.0f;
-            renderer.DrawTextW(m_label.c_str(), static_cast<UINT32>(m_label.size()), labelRect, textColor, fontSize);
+            labelRect.right = trackLeft - ScaleValue(8.0f);
+            renderer.DrawTextW(m_label.c_str(), static_cast<UINT32>(m_label.size()), labelRect, textColor, ScaleValue(fontSize));
         }
     }
 
@@ -1618,8 +1688,8 @@ public:
 
 private:
     void UpdateValueFromPoint(float x) {
-        const float trackLeft = m_bounds.left + 14.0f;
-        const float trackRight = m_bounds.right - 14.0f;
+        const float trackLeft = m_bounds.left + ScaleValue(14.0f);
+        const float trackRight = m_bounds.right - ScaleValue(14.0f);
         const float ratio = std::clamp((x - trackLeft) / (trackRight - trackLeft), 0.0f, 1.0f);
         SetValue(m_min + ratio * (m_max - m_min));
     }

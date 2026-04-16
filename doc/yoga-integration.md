@@ -131,13 +131,37 @@ Yoga 不直接进入 `UI` 公共接口，而是挂在：
 - `alignItems`
 - `justifyContent`
 - 子项 `margin`
+- 叶子控件的 Yoga `measure func` 回调接入
+- 叶子控件测量结果的轻量缓存
 
 当前还没有展开的内容：
 
 - `flex-grow`
 - `flex-shrink`
 - `flex-basis`
-- 叶子节点的 Yoga `measure func`
+- 更完整的测量缓存与行为对齐
+
+## 12. 测量验证样例
+
+为了专门验证 Yoga 的叶子测量行为，仓库里新增了两份样例布局：
+
+- `resource/layouts/yoga_measure_cases.xml`
+- `resource/layouts/yoga_measure_cases.json`
+
+这组样例主要覆盖：
+
+- 受限宽度下的标签换行
+- 横向 `row` 容器里的文本、按钮、输入框混排
+- 固定高度按钮与普通自适应文本的组合
+- `Spacer` 在测量回调接入后的主轴扩展行为
+
+运行时可以通过环境变量切换到这组样例，而不必改默认布局文件：
+
+```powershell
+$env:AI_WIN_UI_LAYOUT = "layouts/yoga_measure_cases.xml"
+```
+
+应用窗口标题会显示当前实际加载的布局路径，便于手动对照验证。
 
 一个需要明确记录的小差异是：
 
@@ -161,7 +185,7 @@ Yoga 不直接进入 `UI` 公共接口，而是挂在：
 推荐继续按下面顺序演进：
 
 1. 为 `SpaceBetween` 做行为校准，尽量对齐旧 `Panel` 语义。
-2. 为叶子节点接入 Yoga `measure func`，减少“先手工测量，再映射”的过渡层。
+2. 为 Yoga 布局补充更明确的测量缓存和边界验证。
 3. 把更多容器布局能力统一收进 `ILayoutEngine`。
 4. 等 Yoga 稳定后，再继续推进 `SkiaRenderer`，避免布局迁移和渲染迁移同时发生。
 

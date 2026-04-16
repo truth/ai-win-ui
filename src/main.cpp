@@ -7,10 +7,54 @@
 #include "ui.h"
 #include "zip_resource_provider.h"
 
+#include <shellscalingapi.h>
 #include <Windowsx.h>
 #include <memory>
 #include <string>
 #include <vector>
+
+namespace {
+
+void InitializeDpiAwareness() {
+    using SetProcessDpiAwarenessContextFn = BOOL(WINAPI*)(DPI_AWARENESS_CONTEXT);
+    using SetProcessDpiAwarenessFn = HRESULT(WINAPI*)(PROCESS_DPI_AWARENESS);
+
+    if (HMODULE user32 = GetModuleHandleW(L"user32.dll")) {
+        auto setDpiAwarenessContext = reinterpret_cast<SetProcessDpiAwarenessContextFn>(
+            GetProcAddress(user32, "SetProcessDpiAwarenessContext"));
+        if (setDpiAwarenessContext &&
+            setDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2)) {
+            return;
+        }
+    }
+
+    if (HMODULE shcore = LoadLibraryW(L"shcore.dll")) {
+        auto setProcessDpiAwareness = reinterpret_cast<SetProcessDpiAwarenessFn>(
+            GetProcAddress(shcore, "SetProcessDpiAwareness"));
+        if (setProcessDpiAwareness &&
+            SUCCEEDED(setProcessDpiAwareness(PROCESS_PER_MONITOR_DPI_AWARE))) {
+            FreeLibrary(shcore);
+            return;
+        }
+        FreeLibrary(shcore);
+    }
+
+    SetProcessDPIAware();
+}
+
+UINT GetWindowDpiWithFallback(HWND hwnd) {
+    using GetDpiForWindowFn = UINT(WINAPI*)(HWND);
+    if (HMODULE user32 = GetModuleHandleW(L"user32.dll")) {
+        auto getDpiForWindow = reinterpret_cast<GetDpiForWindowFn>(
+            GetProcAddress(user32, "GetDpiForWindow"));
+        if (getDpiForWindow) {
+            return getDpiForWindow(hwnd);
+        }
+    }
+    return 96;
+}
+
+} // namespace
 
 class App {
 public:
@@ -28,12 +72,19 @@ public:
             return false;
         }
 
+        const UINT initialDpi = GetDpiForSystem();
+        RECT initialRect{0, 0, 1000, 700};
+        AdjustWindowRectExForDpi(&initialRect, WS_OVERLAPPEDWINDOW, FALSE, 0, initialDpi);
+
         m_hwnd = CreateWindowExW(
             0,
             kClassName,
             L"AI WinUI Renderer (DirectUI-style)",
             WS_OVERLAPPEDWINDOW,
-            CW_USEDEFAULT, CW_USEDEFAULT, 1000, 700,
+            CW_USEDEFAULT,
+            CW_USEDEFAULT,
+            initialRect.right - initialRect.left,
+            initialRect.bottom - initialRect.top,
             nullptr,
             nullptr,
             instance,
@@ -43,6 +94,8 @@ public:
         if (!m_hwnd) {
             return false;
         }
+
+        UpdateDpiContext(GetWindowDpiWithFallback(m_hwnd));
 
         m_renderer = CreateRenderer();
         if (!m_renderer || !m_renderer->Initialize(m_hwnd)) {
@@ -84,6 +137,33 @@ public:
     }
 
 private:
+    void UpdateDpiContext(UINT dpi) {
+        m_uiContext.dpi = dpi > 0 ? dpi : 96;
+        m_uiContext.dpiScale = static_cast<float>(m_uiContext.dpi) / 96.0f;
+    }
+
+    std::wstring GetEnvironmentValue(const wchar_t* name) const {
+        wchar_t buffer[512] = {};
+        const DWORD length = GetEnvironmentVariableW(name, buffer, ARRAYSIZE(buffer));
+        if (length == 0 || length >= ARRAYSIZE(buffer)) {
+            return L"";
+        }
+        return std::wstring(buffer, buffer + length);
+    }
+
+    std::string Utf16ToUtf8(const std::wstring& value) const {
+        if (value.empty()) {
+            return {};
+        }
+        const int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, nullptr, 0, nullptr, nullptr);
+        if (size <= 1) {
+            return {};
+        }
+        std::string result(size - 1, '\0');
+        WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1, result.data(), size, nullptr, nullptr);
+        return result;
+    }
+
     std::wstring GetExecutableDirectory() const {
         wchar_t path[MAX_PATH] = {};
         if (GetModuleFileNameW(nullptr, path, ARRAYSIZE(path)) == 0) {
@@ -118,22 +198,57 @@ private:
             return UIEventHandler();
         };
 
-        const std::vector<std::string> layoutCandidates = {
-            "layouts/ui.json",
-            "layouts/ui.xml"
-        };
+        std::vector<std::string> layoutCandidates;
+        const std::wstring requestedLayout = GetEnvironmentValue(L"AI_WIN_UI_LAYOUT");
+        if (!requestedLayout.empty()) {
+            const std::string requestedUtf8 = Utf16ToUtf8(requestedLayout);
+            if (!requestedUtf8.empty()) {
+                layoutCandidates.push_back(requestedUtf8);
+
+                const bool endsWithJson =
+                    requestedUtf8.size() >= 5 && requestedUtf8.substr(requestedUtf8.size() - 5) == ".json";
+                const bool endsWithXml =
+                    requestedUtf8.size() >= 4 && requestedUtf8.substr(requestedUtf8.size() - 4) == ".xml";
+                if (endsWithJson) {
+                    layoutCandidates.push_back(requestedUtf8.substr(0, requestedUtf8.size() - 5) + ".xml");
+                } else if (endsWithXml) {
+                    layoutCandidates.push_back(requestedUtf8.substr(0, requestedUtf8.size() - 4) + ".json");
+                }
+            }
+        }
+
+        layoutCandidates.push_back("layouts/ui.json");
+        layoutCandidates.push_back("layouts/ui.xml");
 
         for (const auto& path : layoutCandidates) {
             m_root = LayoutParser::BuildFromFile(m_uiContext, path);
             if (m_root) {
+                m_activeLayoutPath = path;
                 break;
             }
         }
 
         if (!m_root) {
             BuildDefaultUI();
+            m_activeLayoutPath = "default-ui";
         }
+
+        UpdateWindowTitle();
         SetFocusedElement(GetFirstFocusable());
+    }
+
+    void UpdateWindowTitle() {
+        std::wstring title = L"AI WinUI Renderer";
+        if (!m_activeLayoutPath.empty()) {
+            const int size = MultiByteToWideChar(CP_UTF8, 0, m_activeLayoutPath.c_str(), -1, nullptr, 0);
+            if (size > 1) {
+                std::wstring layoutPath(size - 1, L'\0');
+                MultiByteToWideChar(CP_UTF8, 0, m_activeLayoutPath.c_str(), -1, layoutPath.data(), size);
+                title += L" - ";
+                title += layoutPath;
+            }
+        }
+        SetWindowTextW(m_hwnd, title.c_str());
     }
 
     UIElement* GetFirstFocusable() const {
@@ -365,6 +480,22 @@ private:
 
     LRESULT HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         switch (msg) {
+            case WM_DPICHANGED: {
+                UpdateDpiContext(HIWORD(wParam));
+                const auto* suggestedRect = reinterpret_cast<RECT*>(lParam);
+                if (suggestedRect) {
+                    SetWindowPos(
+                        hwnd,
+                        nullptr,
+                        suggestedRect->left,
+                        suggestedRect->top,
+                        suggestedRect->right - suggestedRect->left,
+                        suggestedRect->bottom - suggestedRect->top,
+                        SWP_NOZORDER | SWP_NOACTIVATE);
+                }
+                OnResize();
+                return 0;
+            }
             case WM_SIZE:
                 OnResize();
                 return 0;
@@ -433,6 +564,7 @@ private:
     std::unique_ptr<ITextMeasurer> m_textMeasurer;
     std::unique_ptr<ILayoutEngine> m_layoutEngine;
     std::unique_ptr<IResourceProvider> m_resourceProvider;
+    std::string m_activeLayoutPath;
     std::unique_ptr<UIElement> m_root;
     UIElement* m_focusedElement = nullptr;
     UIElement* m_mouseCaptureTarget = nullptr;
@@ -441,6 +573,8 @@ private:
 };
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {
+    InitializeDpiAwareness();
+
     App app;
     if (!app.Initialize(instance, cmdShow)) {
         MessageBoxW(nullptr, L"Failed to initialize app.", L"Error", MB_ICONERROR);
