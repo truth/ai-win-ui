@@ -3,8 +3,7 @@
 ## Purpose
 
 This document defines the current layout authoring conventions for the
-`ai-win-ui` retained UI demo. It is meant to help us build repeatable page
-layouts with the existing XML/JSON DSL, especially for dashboard-style screens.
+`ai-win-ui` retained UI demo.
 
 The goal is not pixel-perfect design tooling. The goal is a practical layout
 grammar that:
@@ -12,7 +11,7 @@ grammar that:
 - stays inside the current `UIElement` and `LayoutParser` feature set
 - produces stable Yoga-backed structures
 - is easy to read and maintain in source control
-- is expressive enough for card dashboards, tool panels, and image-driven pages
+- is expressive enough for cards, tool panels, image pages, and validation pages
 
 ## Supported Layout Model
 
@@ -45,6 +44,7 @@ Use it for:
 Supported layout properties:
 
 - `direction="row|column"`
+- `wrap="nowrap|wrap"`
 - `padding="l,t,r,b"`
 - `spacing="n"`
 - `background="#RRGGBB"`
@@ -53,10 +53,16 @@ Supported layout properties:
 - `justifyContent="start|center|end|space-between"`
 - `width`
 - `height`
+- `minWidth`
+- `maxWidth`
+- `minHeight`
+- `maxHeight`
 - `margin`
+- `flex="1"` or `flex="1 1 160"`
 - `flexGrow`
 - `flexShrink`
 - `flexBasis`
+- `alignSelf="auto|stretch|start|center|end"`
 
 ### `Grid`
 
@@ -117,20 +123,24 @@ Avoid one giant panel with too many mixed concerns.
 
 ### 3. Fixed Width for Landmarks, Flex for Fill Areas
 
-For dashboard layouts:
+For dashboard and tool layouts:
 
 - fix widths for sidebars, promo cards, and tool strips
 - use `flexGrow="1"` with `flexBasis="0"` for major content columns
+- use `flex="1"` when you want the common grow/shrink/fill pattern without spelling out three properties
 - use `Spacer` to push controls to the edge of a row
+- use `minWidth` and `minHeight` to keep flexible cards from collapsing too far
+- use `alignSelf` when one child needs to opt out of the container's cross-axis rule
+- use `wrap="wrap"` on narrow row containers when chips, pills, or fixed-width cards should flow onto the next line
 
 ### 4. Split Long Headlines Into Multiple Labels When Needed
 
-The current text system is still simpler than a full design tool.
+The text system is improving, but it is still not a full design tool.
 
 For hero headlines or tightly controlled wraps:
 
-- use multiple `Label` rows
-- avoid depending on automatic line wrapping for critical title composition
+- use multiple `Label` rows if exact composition matters
+- do not depend on automatic wrapping for critical art-direction decisions
 
 ### 5. Treat Cards as Reusable Surface Blocks
 
@@ -141,11 +151,11 @@ A dashboard card should usually define:
 - local `padding`
 - local `spacing`
 
-This keeps the outer page shell clean and makes card sections portable.
+This keeps the outer shell clean and makes card sections portable.
 
 ## Visual Tokens
 
-These are recommended defaults for dashboard pages in the current demo:
+Recommended defaults for dashboard-style pages:
 
 ### Surface Hierarchy
 
@@ -175,23 +185,6 @@ These are recommended defaults for dashboard pages in the current demo:
 - body copy: `13` to `15`
 - meta copy: `11` to `12`
 
-## Dashboard Composition Pattern
-
-The reference dashboard style works well with this structure:
-
-1. Root page panel
-2. Rounded white application shell
-3. Fixed-width left sidebar
-4. Flexible main content column
-5. Top navigation row
-6. Hero plus highlight row
-7. Three-card information row
-8. Bottom action and summary row
-
-This is exactly the structure used by:
-
-- `resource/layouts/dashboard_reference.xml`
-
 ## Limits To Keep In Mind
 
 The current DSL does not yet offer:
@@ -211,43 +204,14 @@ Because of that, screenshot recreation should prioritize:
 - proportions
 - color blocking
 
-Do not expect perfect iconography or shadow fidelity yet.
-
 ## Workflow
 
-To preview a layout file directly:
-
-```powershell
-$env:AI_WIN_UI_LAYOUT = "layouts/dashboard_reference.xml"
-Start-Process -FilePath ".\build\presets\dev-debug-skia-local-sdk\Debug\ai_win_ui.exe"
-```
-
-Or use the helper script:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_dashboard_reference.ps1
-```
-
-If the executable is missing and you want the script to build it first:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_dashboard_reference.ps1 -BuildIfMissing
-```
-
-Or compare the same layout on Direct2D:
-
-```powershell
-$env:AI_WIN_UI_RENDERER = "direct2d"
-$env:AI_WIN_UI_LAYOUT = "layouts/dashboard_reference.xml"
-Start-Process -FilePath ".\build\Debug\ai_win_ui.exe"
-```
-
-For a reusable launcher with explicit layout and backend parameters:
+To launch the core validation page:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
   -Renderer skia `
-  -Layout layouts/dashboard_reference.xml
+  -Layout layouts/core_validation.xml
 ```
 
 To validate the configuration without opening a window:
@@ -255,10 +219,27 @@ To validate the configuration without opening a window:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
   -Renderer skia `
-  -Layout layouts/dashboard_reference.xml `
+  -Layout layouts/core_validation.xml `
   -BuildIfMissing `
   -NoLaunch
 ```
+
+To launch the dashboard reference page:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_dashboard_reference.ps1
+```
+
+## Recommended Validation Layouts
+
+- `resource/layouts/yoga_measure_cases.xml`
+  - Yoga sizing and row/column checks
+- `resource/layouts/skia_image_cases.xml`
+  - image rendering and clipping checks
+- `resource/layouts/core_validation.xml`
+  - Skia text, Yoga flex, focus, and interaction checks
+- `resource/layouts/dashboard_reference.xml`
+  - reference-driven layout exploration, not the primary MVP gate
 
 ## Naming Guidance
 
@@ -268,5 +249,3 @@ Recommended naming patterns:
 - `*_cases.xml` for focused regression layouts
 - `*_reference.xml` for image/reference-driven recreations
 - `*_prototype.xml` for exploratory layouts
-
-This keeps intent clear when several demo screens live in the same repository.

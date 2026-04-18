@@ -1,79 +1,89 @@
-# AI WinUI 项目文档
+# AI WinUI Docs
 
-本目录为 `ai-win-ui` 的设计与集成说明文档。
+This directory contains the working documentation for `ai-win-ui`.
 
-## 目录结构
+The docs are intended to describe the repository as it exists today, not an
+older design snapshot.
+
+## Main Documents
 
 - `doc/README.md`
-  - 本文件，总览项目目标、当前实现、渲染方案与事件交互支持。
+  - high-level overview and document index
+- `doc/mvp-roadmap.md`
+  - current MVP definition, completed work, and remaining gaps
+- `doc/layout-spec.md`
+  - layout DSL authoring guidance
+- `doc/resource-packaging.md`
+  - resource loading and packaging model
+- `doc/yoga-integration.md`
+  - Yoga integration notes and current layout-engine boundaries
 - `doc/skia-integration.md`
-  - Skia 渲染库集成分析与落地方案。
+  - Skia backend integration notes and runtime workflow
+- `doc/skia-prebuilt-survey.md`
+  - comparison of prebuilt Skia package options
 
-## 项目概述
+## Current System Snapshot
 
-当前项目基于 Win32 + Direct2D + DirectWrite，构建了一个简单的 retained-mode UI 树：
+The project is now organized around a retained UI tree with explicit backend
+abstractions:
 
 - `src/ui.h`
-  - 定义了 `UIElement`、`Panel`、`Label`、`Button` 等组件。
-  - 使用 `Panel` 进行垂直布局，具备类似 Flex Layout 的 padding、spacing、自动宽度填充。
-- `src/renderer.h` / `src/renderer.cpp`
-  - 基于 Direct2D 提供基础绘制能力。
-  - 支持矩形填充、矩形描边、文本绘制。
-- `src/main.cpp`
-  - 初始化窗口，构建 UI 树，转发 `WM_SIZE`、`WM_PAINT` 与鼠标事件。
-  - 优先加载 `assets.zip` 中的布局与资源，若缺失则回退到 `resource/` 目录模式。
+  - retained controls and layout-facing primitives
+- `src/renderer.h`
+  - renderer abstraction consumed by the UI layer
+- `src/text_measurer.h`
+  - text measurement abstraction
+- `src/layout_engine.h`
+  - layout engine abstraction, currently backed by Yoga
+- `src/ui_context.h`
+  - runtime dependency container for UI construction
 
-## UI 设计规则
+The app currently supports:
 
-- 使用 `Panel` 作为容器，实现垂直排列与间距控制。
-- 子元素宽度自动扩展到布局区域，不需要手动指定每个子项宽度。
-- 组件支持背景、边距、间距，适合不规则窗口与无 title 模式的内部内容布局。
-- 事件交互执行顺序为“从顶层向下、从后到前”遍历，保证鼠标事件命中最前面的可见组件。
+- XML and JSON layout loading
+- resources from `resource/` and optional `assets.zip`
+- Direct2D and Skia renderer backends
+- Yoga-backed row and column layout
+- mouse, keyboard, focus, text input, and vertical scrolling
 
-## 当前事件交互支持
+## Recommended Validation Pages
 
-- `UIElement::OnMouseMove/OnMouseDown/OnMouseUp`
-  - 自动递归到子节点，并在命中子组件后停止传播。
-  - 鼠标移出控件或窗口时会触发 hover 状态回收。
-- `Button`
-  - 支持 hover、pressed、click 三种交互状态。
-  - 点击触发 `SetOnClick` 注册的回调。
+These layouts are the most useful when checking the current implementation:
 
-## 当前布局属性支持
+- `resource/layouts/ui.xml`
+  - default mixed demo page
+- `resource/layouts/yoga_measure_cases.xml`
+  - Yoga sizing and row/column checks
+- `resource/layouts/skia_image_cases.xml`
+  - image and clipping regression checks
+- `resource/layouts/core_validation.xml`
+  - core Skia text, Yoga flex, focus, and interaction checks
 
-- 通用属性
-  - `width`、`height`、`margin`
-- `Panel`
-  - `padding`、`spacing`、`alignItems`、`justifyContent`
-- `Grid`
-  - `columns`、`rowHeight`、`spacing`
+## Launcher Scripts
 
-## Skia 集成建议
+The repository includes helper scripts to launch layouts directly:
 
-详见 `doc/skia-integration.md`。
+- `scripts/run_layout_demo.ps1`
+  - generic launcher with backend and layout selection
+- `scripts/run_dashboard_reference.ps1`
+  - convenience wrapper for the dashboard sample
 
-## 进一步扩展建议
+Example:
 
-- 将当前 `Renderer` 抽象为统一接口，以便支持多种后端（Direct2D、Skia、Vulkan、Metal 等）。
-- 将 `Panel` 布局模型扩展为真正的 Flex 布局，增加 `flex-grow`、`flex-shrink`、对齐方式等属性。
-- 考虑使用 `Yoga` 布局引擎将现有容器体系升级为标准 Flexbox 布局。
-- 使用 XML/JSON 定义布局，建立数据驱动 UI 构建流程。
-- 支持 `Image` 组件，从 `resource/images/` 加载位图资源。
-- 支持将布局与资源打包为 `assets.zip`，同时兼容开发阶段的 `resource/` 目录模式。
-- 增加 `OnMouseLeave`、键盘事件、焦点管理、拖拽区域等事件能力。
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
+  -Renderer skia `
+  -Layout layouts/core_validation.xml
+```
 
-## 进一步文档
+## MVP Focus
 
-- `doc/resource-packaging.md`：资源加载、ZIP 打包与 XML/JSON 布局定义方案。
+The main remaining MVP gaps are now:
 
-## 目录约定
+- Skia text parity and stability
+- a more complete flex behavior surface
+- formalized acceptance criteria for interaction and layout validation
 
-- `lib/`：存放引用依赖包，例如预编译的 Yoga、Skia 或其它 native 库。
-- `resource/`：程序运行时使用的资源目录，包含布局文件、图片、字体、样式等静态资源。
-- `resource/layouts/`：布局定义文件（JSON / XML）。
-- `resource/images/`：图片资源。
-- 支持无 title 窗口的自定义拖拽区域与圆角/不规则形状窗口，不改变内部布局逻辑。
+For the detailed status, see:
 
-## MVP 与发展路线
-
-详见 `doc/mvp-roadmap.md`。
+- `doc/mvp-roadmap.md`

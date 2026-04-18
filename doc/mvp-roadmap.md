@@ -1,181 +1,209 @@
-# AI WinUI 项目 MVP 与发展路线
+# AI WinUI MVP Roadmap
 
-## 目标
+## Goal
 
-为当前项目制定最小可行产品（MVP）和后续发展路线，保障快速落地与可扩展性。
+This document tracks the practical MVP state of `ai-win-ui`.
 
----
+It is meant to answer two questions clearly:
 
-## 一、最小可行产品（MVP）
+1. What is already working in the repository today?
+2. What is still missing before the current MVP can be considered complete?
 
-### 1. 基础运行能力
+## MVP Definition
 
-- Win32 窗口与 Direct2D 渲染正常工作。
-- UI 树可渲染：`Panel`、`Label`、`Button`。
-- 鼠标事件可交互：hover、pressed、click。
-- `resource/` 目录加载布局文件与图片。
-- `lib/` 目录支持预编译依赖库引入。
+The current MVP is a retained-mode Win32 UI demo that can:
 
-### 2. 最低功能范围
+- create a Win32 window and render a retained UI tree
+- load layouts from `resource/layouts/` in XML or JSON form
+- load images and other resources from `resource/` or `assets.zip`
+- support a usable set of basic controls and interactions
+- run on the existing Direct2D backend and the in-progress Skia backend
+- use Yoga as the active layout engine without leaking backend types into the UI API
 
-- 支持 JSON 或 XML 布局定义文件。
-- 运行时从 `resource/layouts/` 加载布局，构建 UI 树。
-- `Button` 支持点击回调映射。
-- 支持基本布局：垂直排列、padding、spacing、自动宽度。
-- 支持 `assets.zip` 作为可选资源包形式。
+## Current MVP Status
 
-### 3. MVP 核心交付
+### Completed
 
-- `src/ui.h`：保留当前 UI 元素，并新增布局节点构建逻辑。
-- `src/renderer.h/cpp`：保持 Direct2D 渲染实现。
-- `src/main.cpp`：增加资源提供器与布局解析入口。
-- `resource/`：至少提供一个布局示例文件和一个图片资源。
-- `lib/`：支持后续放置预编译库。
+- Window creation, resize, paint, and DPI-awareness flow are working.
+- Public UI interfaces no longer leak Direct2D, DirectWrite, or WRL types.
+- `IRenderer` is in place and supports backend selection.
+- Direct2D renderer remains available as the stable baseline backend.
+- Skia renderer can build and launch through the local SDK path.
+- `UIContext` now carries renderer, text measurer, layout engine, resource provider, and event resolver.
+- Layout loading from `resource/layouts/*.xml` and `resource/layouts/*.json` works.
+- `DirectoryResourceProvider`, `ZipResourceProvider`, and fallback resource loading are in place.
+- `assets.zip` fallback behavior works.
+- Yoga is the active layout engine through `ILayoutEngine`.
+- `Panel` supports `row` and `column` layout, `alignItems`, `justifyContent`, spacing, padding, and child margin.
+- Flex-related child properties currently supported:
+  - `flex`
+  - `flexGrow`
+  - `flexShrink`
+  - `flexBasis`
+  - `alignSelf`
+  - `minWidth` / `maxWidth`
+  - `minHeight` / `maxHeight`
+- Container wrap support currently supported:
+  - `wrap="wrap"`
+- Core controls are present:
+  - `Label`
+  - `Button`
+  - `TextInput`
+  - `Image`
+  - `Checkbox`
+  - `RadioButton`
+  - `Slider`
+  - `Spacer`
+- Interaction chain is present for the basic control set:
+  - click
+  - hover
+  - pressed
+  - focus
+  - keyboard navigation
+  - text input
+- Vertical scrolling and focus-driven bring-into-view behavior are working at the app layer.
+- Launcher scripts exist for running layout demos directly.
+- Validation layouts now exist for focused regression checks:
+  - `resource/layouts/yoga_measure_cases.xml`
+  - `resource/layouts/skia_image_cases.xml`
+  - `resource/layouts/core_validation.xml`
 
----
+### In Progress
 
-## 二、阶段性开发路线
+- Skia text rendering has moved past the original single-line placeholder and now handles wrapped text more reliably, but it still does not yet match DirectWrite closely enough to be considered finished.
+- Yoga integration is active and useful, but the predictable-flex surface is still growing and still needs more behavior calibration around edge cases.
 
-### 阶段 0：准备与规范
+### Not Yet Complete
 
-1. 明确目录结构：
-   - `lib/`：依赖包与 native 库
-   - `resource/`：布局、图片、字体、样式
-2. 完成文档：
-   - `doc/README.md`
-   - `doc/resource-packaging.md`
-   - `doc/mvp-roadmap.md`
-3. 确定接口：
-   - 资源提供器 `IResourceProvider`
-   - 布局解析器 `LayoutParser`
-   - 渲染后端接口 `IRenderer`（可选）
+- Skia text measurement and Skia text rendering still use different engines.
+- There is no fully verified parity between Direct2D and Skia for text, wrapping, clipping, and DPI behavior.
+- There is still no stronger automated regression layer for layout and interaction; validation is mostly manual through sample pages.
+- DSL visual expression is still limited:
+  - no shadows
+  - no separators as first-class primitives
+  - no vector icon system
+  - no gradients
+  - no richer text layout controls
 
-### 阶段 1：MVP 实现
+## MVP Completion Checklist
 
-1. 实现 `DirectoryResourceProvider`。
-2. 实现 `JSON/XML` 布局解析到 `UIElement` 树。
-3. 完成 `resource/layouts/` 示例文件及运行验证。
-4. 保证 `Button` 点击、hover、pressed 状态正常。
-5. 做好 `assets.zip` 加载的可选实现骨架。
+### 1. Runtime Foundation
 
-### 阶段 2：扩展布局与资源
+- [x] Win32 window lifecycle is stable
+- [x] DPI awareness and resize path work
+- [x] UI tree can render through an abstract renderer
+- [x] Resource loading works from `resource/`
+- [x] `assets.zip` fallback path works
 
-1. 增强 `Panel` 为更灵活的容器，支持 `align-items`、`justify-content`。
-2. 增加 `Image` 组件，支持从 `resource/images/` 加载图片。
-3. 增加 `Font` / `Style` 配置支持。
-4. 实现 `ZipResourceProvider`，支持从 `assets.zip` 加载资源。
+### 2. Layout and UI Construction
 
-### 阶段 3：引入预编译依赖与后端抽象
+- [x] XML layout loading works
+- [x] JSON layout loading works
+- [x] Layout parser can build the retained UI tree
+- [x] Yoga is connected behind `ILayoutEngine`
+- [x] Row and column panel layouts are available
+- [x] Common spacing and alignment properties are available
+- [x] Flex wrap support is available
+- [x] Flex shorthand support is available
 
-1. 在 `lib/` 中加入预编译库示例。
-2. 抽象渲染接口 `IRenderer`，保留现有 Direct2D 后端。
-3. 设计并验证 `Skia` 后端切换方案（后续实现）。
-4. 设计并验证 `Yoga` 布局引擎替换方案（后续实现）。
+### 3. Rendering
 
----
+- [x] Direct2D backend is available
+- [x] Skia backend can build and launch
+- [x] Images render through both backends
+- [x] Rounded clipping exists in both backends
+- [ ] Skia text behavior is aligned closely enough with layout expectations
+- [ ] Skia and Direct2D rendering parity is manually verified for the main validation pages
 
-## 三、可选优化与规模化发展
+### 4. Controls and Interaction
 
-### 3.1 窗口与视觉
+- [x] `Label`, `Button`, and `TextInput` are usable
+- [x] `Checkbox`, `RadioButton`, and `Slider` are usable
+- [x] Click, hover, pressed, focus, keyboard navigation, and input all exist
+- [x] Vertical scrolling works
+- [x] Focus can bring controls back into view
+- [ ] Interaction regression coverage is documented as a stable acceptance checklist
 
-- 支持无 title 模式、窗口拖拽区、自定义边框。
-- 支持圆角、透明、不规则窗口区域。
-- 支持主题与样式切换。
+### 5. Developer Workflow
 
-### 3.2 事件与交互
+- [x] Layout demo launcher script exists
+- [x] Dashboard demo launcher script exists
+- [x] Core validation page exists
+- [ ] Docs are fully normalized and cross-linked
+- [ ] A repeatable acceptance flow is documented for MVP sign-off
 
-- 增加 `OnMouseEnter`、`OnMouseLeave`、键盘事件、焦点管理。
-- 支持拖拽、滑动、长按等手势交互。
+## What Is Still Missing For MVP Sign-Off
 
-### 3.3 资源与运行时
+If we stay strict about MVP completion, these are the remaining gaps that matter most:
 
-- 支持 `assets.zip` 与 `resource/` 的热加载模式。
-- 支持资源版本管理与热更新。
-- 支持远程资源加载与动态主题切换。
+1. Finish the Skia text path enough that `Label`, `Button`, and `TextInput` behave predictably under the Skia backend.
+2. Close the biggest Yoga calibration gaps, especially the remaining flex behavior and wrap edge cases that affect predictability.
+3. Turn the current manual validation pages into a documented acceptance checklist so we can say "this build passed MVP verification" with confidence.
 
-### 3.4 引擎与后端
+Everything else, including richer dashboard recreation and more expressive visuals, is useful but not blocking MVP sign-off.
 
-- 逐步将布局层替换为 `Yoga`。
-- 逐步将渲染层替换为 `Skia` 或通用后端抽象。
-- 形成可跨平台 UI 引擎骨架。
+## Recommended Next Milestones
 
----
+### Milestone A: Skia Text Stability
 
-## 四、按步骤执行计划
+Focus:
 
-### Step 1：整理现有基础
+- line wrapping
+- vertical alignment consistency
+- clipping correctness
+- text input readability
+- parity checks against Direct2D
 
-- [ ] 目录约定完成：`lib/`, `resource/`
-- [ ] 功能文档完善
-- [ ] 基础项目结构确认
+Exit criteria:
 
-### Step 2：实现资源加载与布局解析
+- `core_validation.xml` looks stable on Skia for wrapped labels, buttons, and text input
+- text no longer appears as the main blocker in everyday demo layouts
 
-- [ ] `DirectoryResourceProvider`
-- [ ] `LayoutParser`（JSON/XML）
-- [ ] `resource/layouts/` 示例布局
-- [ ] `UIElement` 树构建与渲染验证
+### Milestone B: Yoga Predictability
 
-### Step 3：完善 MVP 行为交互
+Focus:
 
-- [ ] `Button` 点击与状态
-- [ ] 运行时资源读取验证
-- [ ] `assets.zip` 优雅降级
+- `space-between`
+- `stretch`
+- `flexBasis`
+- `min/max` constraints
+- row sizing under pressure
+- wrap edge cases and shorthand semantics under pressure
 
-### Step 4：扩展布局与资源支持
+Exit criteria:
 
-- [ ] `Image` 组件
-- [ ] `Style` / `Font` 属性
-- [ ] `ZipResourceProvider`
+- `core_validation.xml` and `yoga_measure_cases.xml` behave consistently across repeated manual checks
 
-### Step 5：准备后续引擎升级
+### Milestone C: Interaction Acceptance
 
-- [x] `IRenderer` 抽象接口设计
-- [ ] `Yoga` 与 `Skia` 引入方案确认
-- [ ] `lib/` 中放置预编译依赖示例
+Focus:
 
----
+- finalize focus traversal expectations
+- verify bring-into-view behavior
+- document mouse and keyboard acceptance flow
+- define the MVP acceptance checklist
 
-## 六、迭代执行计划
+Exit criteria:
 
-建议按周执行，快速交付并逐步验证。每周结束后评估结果并调整下一周计划。
+- one documented pass over the validation pages can confirm MVP readiness
 
-### Week 1：MVP 骨架搭建
+## Non-MVP Work
 
-- [ ] 确认 `lib/`、`resource/`、`doc/` 目录结构
-- [ ] 完成 `DirectoryResourceProvider` 实现
-- [ ] 增加 `resource/layouts/` 示例布局文件
-- [ ] 基于现有 `UIElement` 构建 JSON/XML 解析器
-- [ ] 确保 `Panel/Label/Button` 可以从布局文件实例化并正确渲染
+These items are valuable, but they are not required to close the current MVP:
 
-### Week 2：运行时资源加载与交互
+- perfect dashboard screenshot recreation
+- richer visual DSL primitives
+- shadow system
+- separator primitives
+- icon packs
+- advanced theming
+- remote resources
+- hot reload
+- cross-platform renderer targets beyond the current Windows-first path
 
-- [ ] 实现 `Button` 点击、hover、pressed 行为
-- [ ] 完成 `resource/images/` 图片资源加载支持
-- [ ] 支持 `assets.zip` 资源包的加载骨架
-- [ ] 运行时从 `resource/` 目录加载布局并正常显示
-- [ ] 验证 `.gitignore`、`lib/` 与 `resource/` 保持版本控制一致性
+## Suggested Priority Order
 
-### Week 3：布局与资源扩展
-
-- [ ] 增强 `Panel` 布局属性，支持 `padding`、`spacing`、`align` 映射
-- [ ] 增加 `Image` 组件与 `Font`/`Style` 基础属性
-- [ ] 实现 `ZipResourceProvider` 并验证 `assets.zip` 加载
-- [ ] 产出一套可运行的布局示例，覆盖多层嵌套与基础样式
-
-### Week 4：工程化与后续预研
-
-- [x] 设计 `IRenderer` 接口，抽象现有 Direct2D 实现
-- [ ] 准备 `lib/` 中的预编译 Yoga/Skia 引入示例
-- [ ] 评估 Yoga 布局引擎与 Skia 渲染后端的最小切换点
-- [ ] 更新文档为可复用开发规范与工程模板
-
----
-
-## 五、最小 MVP 关键指标
-
-- ✅ 可以用 `resource/layouts/ui.json` 或 `ui.xml` 构建界面
-- ✅ 可以直接从 `resource/` 加载图片与布局
-- ✅ 可以使用 `lib/` 预置二进制依赖
-- ✅ UI 元素可以响应鼠标点击与 hover
-- ✅ 系统有清晰的扩展路径，不需要先行实现 Skia 与 Yoga
+1. Stabilize Skia text.
+2. Finish the most important Yoga flex behavior.
+3. Formalize interaction and acceptance validation.
+4. Only then return to richer DSL and visual expression.

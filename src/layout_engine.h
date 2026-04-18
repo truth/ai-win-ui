@@ -26,6 +26,11 @@ enum class StackDirection {
     Row
 };
 
+enum class StackWrap {
+    NoWrap,
+    Wrap
+};
+
 enum class StackJustifyContent {
     Start,
     Center,
@@ -35,6 +40,7 @@ enum class StackJustifyContent {
 
 struct StackLayoutStyle {
     StackDirection direction = StackDirection::Column;
+    StackWrap wrap = StackWrap::NoWrap;
     LayoutSpacing padding{};
     float spacing = 0.0f;
     StackAlignItems alignItems = StackAlignItems::Stretch;

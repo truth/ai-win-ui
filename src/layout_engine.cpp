@@ -150,6 +150,16 @@ YGFlexDirection ToYogaDirection(StackDirection direction) {
     }
 }
 
+YGWrap ToYogaWrap(StackWrap wrap) {
+    switch (wrap) {
+        case StackWrap::Wrap:
+            return YGWrapWrap;
+        case StackWrap::NoWrap:
+        default:
+            return YGWrapNoWrap;
+    }
+}
+
 void ApplyPadding(YGNodeRef node, const LayoutSpacing& padding) {
     YGNodeStyleSetPadding(node, YGEdgeLeft, padding.left);
     YGNodeStyleSetPadding(node, YGEdgeTop, padding.top);
@@ -185,6 +195,7 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
 
     YGNodeRef root = layout.root.get();
     YGNodeStyleSetFlexDirection(root, ToYogaDirection(style.direction));
+    YGNodeStyleSetFlexWrap(root, ToYogaWrap(style.wrap));
     YGNodeStyleSetAlignItems(root, ToYogaAlign(style.alignItems));
     YGNodeStyleSetJustifyContent(root, ToYogaJustify(style.justifyContent));
     YGNodeStyleSetGap(root, style.direction == StackDirection::Row ? YGGutterColumn : YGGutterRow, style.spacing);

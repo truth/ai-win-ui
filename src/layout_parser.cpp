@@ -385,6 +385,14 @@ UIElement::SelfAlign ParseSelfAlign(const std::string& value) {
     return UIElement::SelfAlign::Auto;
 }
 
+Panel::Wrap ParseWrap(const std::string& value) {
+    const std::string normalized = ToLowerAscii(TrimString(value));
+    if (normalized == "wrap") {
+        return Panel::Wrap::Wrap;
+    }
+    return Panel::Wrap::NoWrap;
+}
+
 Panel::Direction ParseDirection(const std::string& value) {
     const std::string normalized = ToLowerAscii(TrimString(value));
     if (normalized == "row" || normalized == "horizontal") {
@@ -407,9 +415,60 @@ Panel::JustifyContent ParseJustifyContent(const std::string& value) {
     return Panel::JustifyContent::Start;
 }
 
+void ApplyFlexShorthand(const std::string& rawValue, UIElement& element) {
+    const std::string normalized = ToLowerAscii(TrimString(rawValue));
+    if (normalized.empty()) {
+        return;
+    }
+
+    if (normalized == "none") {
+        element.SetFlexGrow(0.0f);
+        element.SetFlexShrink(0.0f);
+        return;
+    }
+    if (normalized == "auto") {
+        element.SetFlexGrow(1.0f);
+        element.SetFlexShrink(1.0f);
+        return;
+    }
+
+    const auto tokens = SplitString(normalized, ' ');
+    std::vector<std::string> parts;
+    parts.reserve(tokens.size());
+    for (const auto& token : tokens) {
+        const std::string trimmed = TrimString(token);
+        if (!trimmed.empty()) {
+            parts.push_back(trimmed);
+        }
+    }
+    if (parts.empty()) {
+        return;
+    }
+
+    element.SetFlexGrow(std::stof(parts[0]));
+    if (parts.size() == 1) {
+        element.SetFlexShrink(1.0f);
+        element.SetFlexBasis(0.0f);
+        return;
+    }
+
+    element.SetFlexShrink(std::stof(parts[1]));
+    if (parts.size() >= 3 && parts[2] != "auto") {
+        element.SetFlexBasis(std::stof(parts[2]));
+    }
+}
+
 void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
     if (!props.IsObject()) {
         return;
+    }
+
+    if (props["flex"].IsNumber()) {
+        element.SetFlexGrow(static_cast<float>(props["flex"].numberValue));
+        element.SetFlexShrink(1.0f);
+        element.SetFlexBasis(0.0f);
+    } else if (props["flex"].IsString()) {
+        ApplyFlexShorthand(props["flex"].stringValue, element);
     }
 
     if (props["width"].IsNumber()) {
@@ -464,6 +523,10 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
 }
 
 void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
+    if (auto it = node.attributes.find("flex"); it != node.attributes.end()) {
+        ApplyFlexShorthand(it->second, element);
+    }
+
     if (auto it = node.attributes.find("width"); it != node.attributes.end()) {
         element.SetFixedWidth(std::stof(TrimString(it->second)));
     }
@@ -675,6 +738,9 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
             if (props["direction"].IsString()) {
                 panel->direction = ParseDirection(props["direction"].stringValue);
+            }
+            if (props["wrap"].IsString()) {
+                panel->wrap = ParseWrap(props["wrap"].stringValue);
             }
             if (props["alignItems"].IsString()) {
                 panel->alignItems = ParseAlignItems(props["alignItems"].stringValue);
@@ -920,6 +986,9 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         if (auto it = node.attributes.find("direction"); it != node.attributes.end()) {
             panel->direction = ParseDirection(it->second);
+        }
+        if (auto it = node.attributes.find("wrap"); it != node.attributes.end()) {
+            panel->wrap = ParseWrap(it->second);
         }
         if (auto it = node.attributes.find("alignItems"); it != node.attributes.end()) {
             panel->alignItems = ParseAlignItems(it->second);

@@ -314,11 +314,17 @@ public:
         SpaceBetween
     };
 
+    enum class Wrap {
+        NoWrap,
+        Wrap
+    };
+
     Thickness padding{8, 8, 8, 8};
     float spacing = 6.0f;
     float cornerRadius = 0.0f;
     Color background = ColorFromHex(0x1E1E1E);
     Direction direction = Direction::Column;
+    Wrap wrap = Wrap::NoWrap;
     AlignItems alignItems = AlignItems::Stretch;
     JustifyContent justifyContent = JustifyContent::Start;
 
@@ -469,6 +475,7 @@ protected:
         const Thickness scaledPadding = ScaleThickness(padding);
         return StackLayoutStyle{
             direction == Direction::Row ? StackDirection::Row : StackDirection::Column,
+            wrap == Wrap::Wrap ? StackWrap::Wrap : StackWrap::NoWrap,
             LayoutSpacing{scaledPadding.left, scaledPadding.top, scaledPadding.right, scaledPadding.bottom},
             ScaleValue(spacing),
             static_cast<StackAlignItems>(alignItems),
