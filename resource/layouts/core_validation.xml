@@ -1,0 +1,91 @@
+<Panel padding="24,24,24,32" spacing="18" cornerRadius="18" background="#101418" alignItems="stretch">
+  <Label text="Core Validation Surface" fontSize="30" color="#F7FAFC" />
+  <Label text="This page is for stabilizing Skia text, Yoga sizing, focus movement, and input behavior. Use mouse wheel and Tab to move through the controls." fontSize="15" color="#B8C2CC" />
+
+  <Panel padding="18,18,18,18" spacing="12" cornerRadius="14" background="#18212A" alignItems="stretch">
+    <Label text="1. Wrapped text and clipping" fontSize="20" color="#FFFFFF" />
+    <Panel direction="row" padding="0,0,0,0" spacing="12" background="#18212A" alignItems="stretch">
+      <Panel padding="14,14,14,14" spacing="10" cornerRadius="12" background="#202C38" alignItems="stretch" width="300">
+        <Label text="Constrained card: this sentence should wrap across multiple lines without losing the first baseline, clipping the last line, or drawing outside the card." fontSize="14" color="#E7EEF6" />
+        <Button text="Primary action with longer text" height="40" fontSize="14" background="#4465F6" cornerRadius="8" />
+      </Panel>
+      <Panel padding="14,14,14,14" spacing="10" cornerRadius="12" background="#202C38" alignItems="stretch" width="220">
+        <Label text="Narrow column wrapping is the stress case for line breaks." fontSize="14" color="#E7EEF6" />
+        <TextInput text="Editing text should stay readable when focused." height="42" fontSize="14" background="#111827" textColor="#FFFFFF" cornerRadius="8" />
+      </Panel>
+      <Panel padding="14,14,14,14" spacing="10" cornerRadius="12" background="#202C38" alignItems="stretch">
+        <Label text="Tall host rect" fontSize="14" color="#FFFFFF" />
+        <Panel padding="12,24,12,24" spacing="8" cornerRadius="10" background="#111827" alignItems="stretch" height="120">
+          <Label text="This label sits in a taller box so we can catch vertical baseline drift and top-edge clipping in Skia." fontSize="15" color="#E7EEF6" />
+        </Panel>
+      </Panel>
+    </Panel>
+  </Panel>
+
+  <Panel padding="18,18,18,18" spacing="12" cornerRadius="14" background="#181E26" alignItems="stretch">
+    <Label text="2. Yoga row and column behavior" fontSize="20" color="#FFFFFF" />
+    <Panel direction="row" padding="14,14,14,14" spacing="12" cornerRadius="12" background="#0F1720" alignItems="center" justifyContent="spaceBetween">
+      <Label text="Row / space-between" fontSize="14" color="#D9E3EE" />
+      <Button text="Left CTA" width="120" height="38" fontSize="14" cornerRadius="8" />
+      <Spacer flexGrow="1" flexBasis="0" />
+      <Button text="Right CTA" width="120" height="38" fontSize="14" background="#4465F6" cornerRadius="8" />
+    </Panel>
+    <Panel direction="row" padding="14,14,14,14" spacing="12" cornerRadius="12" background="#0F1720" alignItems="stretch">
+      <Panel padding="12,12,12,12" spacing="8" cornerRadius="10" background="#24303B" width="180">
+        <Label text="Fixed width" fontSize="14" color="#FFFFFF" />
+        <Label text="Width should stay pinned." fontSize="13" color="#AEBBC8" />
+      </Panel>
+      <Panel padding="12,12,12,12" spacing="8" cornerRadius="10" background="#24303B" flexGrow="1" flexBasis="120" minWidth="160">
+        <Label text="Flex grow + basis" fontSize="14" color="#FFFFFF" />
+        <Label text="This card should absorb remaining width more predictably than the fixed card." fontSize="13" color="#AEBBC8" />
+      </Panel>
+      <Panel padding="12,12,12,12" spacing="8" cornerRadius="10" background="#24303B" width="180" alignSelf="center" minHeight="120">
+        <Label text="Stretch cross-axis" fontSize="14" color="#FFFFFF" />
+        <Button text="Height check" height="38" fontSize="14" cornerRadius="8" />
+        <Label text="alignSelf=center + minHeight" fontSize="13" color="#AEBBC8" />
+      </Panel>
+    </Panel>
+    <Panel padding="14,14,14,14" spacing="12" cornerRadius="12" background="#0F1720" alignItems="stretch">
+      <Label text="Column / fixed size / flexBasis" fontSize="14" color="#D9E3EE" />
+      <Panel direction="row" padding="0,0,0,0" spacing="10" background="#0F1720" alignItems="stretch">
+        <Button text="Fixed 96" width="96" height="44" fontSize="14" cornerRadius="8" />
+        <Button text="Basis 160" flexGrow="1" flexBasis="160" height="44" fontSize="14" background="#4465F6" cornerRadius="8" />
+        <Button text="Basis 120" flexGrow="1" flexBasis="120" height="44" fontSize="14" background="#273444" cornerRadius="8" />
+      </Panel>
+    </Panel>
+  </Panel>
+
+  <Panel padding="18,18,18,18" spacing="12" cornerRadius="14" background="#18212A" alignItems="stretch">
+    <Label text="3. Interaction and focus chain" fontSize="20" color="#FFFFFF" />
+    <Label text="Tab through the controls, type into the input, toggle the checkbox and radio button, then use the slider with arrow keys." fontSize="14" color="#B8C2CC" />
+    <TextInput text="Tab into me and type a few words to verify caret, focus, and clipping." height="44" fontSize="14" background="#111827" textColor="#FFFFFF" cornerRadius="8" />
+    <Panel direction="row" padding="0,0,0,0" spacing="16" background="#18212A" alignItems="center">
+      <Checkbox text="Checkbox focus and click" />
+      <RadioButton text="Radio A" group="validation" />
+      <RadioButton text="Radio B" group="validation" />
+    </Panel>
+    <Slider label="Keyboard slider" width="320" />
+    <Panel direction="row" padding="0,0,0,0" spacing="12" background="#18212A" alignItems="center">
+      <Button text="Focusable button one" width="190" height="40" fontSize="14" cornerRadius="8" />
+      <Button text="Focusable button two" width="190" height="40" fontSize="14" background="#4465F6" cornerRadius="8" />
+    </Panel>
+  </Panel>
+
+  <Panel padding="18,18,18,18" spacing="14" cornerRadius="14" background="#181E26" alignItems="stretch">
+    <Label text="4. Scroll and bring-into-view" fontSize="20" color="#FFFFFF" />
+    <Label text="Keep pressing Tab. Focus should continue into the cards below and the app should auto-scroll to keep the active control visible." fontSize="14" color="#B8C2CC" />
+    <Panel padding="14,14,14,14" spacing="10" cornerRadius="12" background="#0F1720" alignItems="stretch">
+      <Label text="Below-the-fold target A" fontSize="15" color="#FFFFFF" />
+      <TextInput text="This field exists mainly to validate focus-driven scrolling." height="44" fontSize="14" background="#111827" textColor="#FFFFFF" cornerRadius="8" />
+      <Button text="Scroll target action" height="42" fontSize="14" background="#4465F6" cornerRadius="8" />
+    </Panel>
+    <Panel padding="14,14,14,14" spacing="10" cornerRadius="12" background="#0F1720" alignItems="stretch">
+      <Label text="Below-the-fold target B" fontSize="15" color="#FFFFFF" />
+      <TextInput text="This second field helps catch bad scroll clamping near the bottom." height="44" fontSize="14" background="#111827" textColor="#FFFFFF" cornerRadius="8" />
+      <Panel direction="row" padding="0,0,0,0" spacing="12" background="#0F1720" alignItems="center">
+        <Checkbox text="Stay visible" />
+        <Button text="Final action" width="160" height="40" fontSize="14" cornerRadius="8" />
+      </Panel>
+    </Panel>
+  </Panel>
+</Panel>

@@ -110,6 +110,22 @@ YGAlign ToYogaAlign(StackAlignItems align) {
     }
 }
 
+YGAlign ToYogaSelfAlign(UIElement::SelfAlign align) {
+    switch (align) {
+        case UIElement::SelfAlign::Stretch:
+            return YGAlignStretch;
+        case UIElement::SelfAlign::Start:
+            return YGAlignFlexStart;
+        case UIElement::SelfAlign::Center:
+            return YGAlignCenter;
+        case UIElement::SelfAlign::End:
+            return YGAlignFlexEnd;
+        case UIElement::SelfAlign::Auto:
+        default:
+            return YGAlignAuto;
+    }
+}
+
 YGJustify ToYogaJustify(StackJustifyContent justify) {
     switch (justify) {
         case StackJustifyContent::Center:
@@ -203,6 +219,21 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
         }
 
         ApplyMargin(childNode, child.margin);
+        if (child.element->AlignSelf() != UIElement::SelfAlign::Auto) {
+            YGNodeStyleSetAlignSelf(childNode, ToYogaSelfAlign(child.element->AlignSelf()));
+        }
+        if (child.element->HasMinWidth()) {
+            YGNodeStyleSetMinWidth(childNode, child.element->MinWidth());
+        }
+        if (child.element->HasMaxWidth()) {
+            YGNodeStyleSetMaxWidth(childNode, child.element->MaxWidth());
+        }
+        if (child.element->HasMinHeight()) {
+            YGNodeStyleSetMinHeight(childNode, child.element->MinHeight());
+        }
+        if (child.element->HasMaxHeight()) {
+            YGNodeStyleSetMaxHeight(childNode, child.element->MaxHeight());
+        }
 
         const float availableChildWidth =
             std::max(0.0f, contentWidth - child.margin.left - child.margin.right);

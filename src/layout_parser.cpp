@@ -368,6 +368,23 @@ Panel::AlignItems ParseAlignItems(const std::string& value) {
     return Panel::AlignItems::Stretch;
 }
 
+UIElement::SelfAlign ParseSelfAlign(const std::string& value) {
+    const std::string normalized = ToLowerAscii(TrimString(value));
+    if (normalized == "stretch") {
+        return UIElement::SelfAlign::Stretch;
+    }
+    if (normalized == "start" || normalized == "flex-start") {
+        return UIElement::SelfAlign::Start;
+    }
+    if (normalized == "center") {
+        return UIElement::SelfAlign::Center;
+    }
+    if (normalized == "end" || normalized == "flex-end") {
+        return UIElement::SelfAlign::End;
+    }
+    return UIElement::SelfAlign::Auto;
+}
+
 Panel::Direction ParseDirection(const std::string& value) {
     const std::string normalized = ToLowerAscii(TrimString(value));
     if (normalized == "row" || normalized == "horizontal") {
@@ -401,6 +418,26 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
     if (props["height"].IsNumber()) {
         element.SetFixedHeight(static_cast<float>(props["height"].numberValue));
     }
+    if (props["minWidth"].IsNumber()) {
+        element.SetMinWidth(static_cast<float>(props["minWidth"].numberValue));
+    } else if (props["min-width"].IsNumber()) {
+        element.SetMinWidth(static_cast<float>(props["min-width"].numberValue));
+    }
+    if (props["maxWidth"].IsNumber()) {
+        element.SetMaxWidth(static_cast<float>(props["maxWidth"].numberValue));
+    } else if (props["max-width"].IsNumber()) {
+        element.SetMaxWidth(static_cast<float>(props["max-width"].numberValue));
+    }
+    if (props["minHeight"].IsNumber()) {
+        element.SetMinHeight(static_cast<float>(props["minHeight"].numberValue));
+    } else if (props["min-height"].IsNumber()) {
+        element.SetMinHeight(static_cast<float>(props["min-height"].numberValue));
+    }
+    if (props["maxHeight"].IsNumber()) {
+        element.SetMaxHeight(static_cast<float>(props["maxHeight"].numberValue));
+    } else if (props["max-height"].IsNumber()) {
+        element.SetMaxHeight(static_cast<float>(props["max-height"].numberValue));
+    }
     if (props["margin"].IsArray() && props["margin"].arrayValue.size() == 4) {
         element.SetMargin(ParseThickness(props["margin"]));
     }
@@ -419,6 +456,11 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
     } else if (props["flex-basis"].IsNumber()) {
         element.SetFlexBasis(static_cast<float>(props["flex-basis"].numberValue));
     }
+    if (props["alignSelf"].IsString()) {
+        element.SetAlignSelf(ParseSelfAlign(props["alignSelf"].stringValue));
+    } else if (props["align-self"].IsString()) {
+        element.SetAlignSelf(ParseSelfAlign(props["align-self"].stringValue));
+    }
 }
 
 void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
@@ -427,6 +469,26 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
     }
     if (auto it = node.attributes.find("height"); it != node.attributes.end()) {
         element.SetFixedHeight(std::stof(TrimString(it->second)));
+    }
+    if (auto it = node.attributes.find("minWidth"); it != node.attributes.end()) {
+        element.SetMinWidth(std::stof(TrimString(it->second)));
+    } else if (auto it2 = node.attributes.find("min-width"); it2 != node.attributes.end()) {
+        element.SetMinWidth(std::stof(TrimString(it2->second)));
+    }
+    if (auto it = node.attributes.find("maxWidth"); it != node.attributes.end()) {
+        element.SetMaxWidth(std::stof(TrimString(it->second)));
+    } else if (auto it2 = node.attributes.find("max-width"); it2 != node.attributes.end()) {
+        element.SetMaxWidth(std::stof(TrimString(it2->second)));
+    }
+    if (auto it = node.attributes.find("minHeight"); it != node.attributes.end()) {
+        element.SetMinHeight(std::stof(TrimString(it->second)));
+    } else if (auto it2 = node.attributes.find("min-height"); it2 != node.attributes.end()) {
+        element.SetMinHeight(std::stof(TrimString(it2->second)));
+    }
+    if (auto it = node.attributes.find("maxHeight"); it != node.attributes.end()) {
+        element.SetMaxHeight(std::stof(TrimString(it->second)));
+    } else if (auto it2 = node.attributes.find("max-height"); it2 != node.attributes.end()) {
+        element.SetMaxHeight(std::stof(TrimString(it2->second)));
     }
     if (auto it = node.attributes.find("margin"); it != node.attributes.end()) {
         const auto values = SplitString(it->second, ',');
@@ -448,6 +510,11 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
         element.SetFlexBasis(std::stof(TrimString(it->second)));
     } else if (auto it2 = node.attributes.find("flex-basis"); it2 != node.attributes.end()) {
         element.SetFlexBasis(std::stof(TrimString(it2->second)));
+    }
+    if (auto it = node.attributes.find("alignSelf"); it != node.attributes.end()) {
+        element.SetAlignSelf(ParseSelfAlign(TrimString(it->second)));
+    } else if (auto it2 = node.attributes.find("align-self"); it2 != node.attributes.end()) {
+        element.SetAlignSelf(ParseSelfAlign(TrimString(it2->second)));
     }
 }
 

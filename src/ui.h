@@ -22,6 +22,14 @@ struct Thickness {
 
 class UIElement {
 public:
+    enum class SelfAlign {
+        Auto,
+        Stretch,
+        Start,
+        Center,
+        End
+    };
+
     virtual ~UIElement() = default;
 
     void SetBounds(const Rect& rect) { m_bounds = rect; }
@@ -31,15 +39,29 @@ public:
     const Thickness& Margin() const { return m_margin; }
     void SetFixedWidth(float width) { m_fixedWidth = width; }
     void SetFixedHeight(float height) { m_fixedHeight = height; }
+    void SetMinWidth(float width) { m_minWidth = std::max(0.0f, width); }
+    void SetMaxWidth(float width) { m_maxWidth = std::max(0.0f, width); }
+    void SetMinHeight(float height) { m_minHeight = std::max(0.0f, height); }
+    void SetMaxHeight(float height) { m_maxHeight = std::max(0.0f, height); }
     void SetFlexGrow(float flexGrow) { m_flexGrow = std::max(0.0f, flexGrow); }
     void SetFlexShrink(float flexShrink) { m_flexShrink = std::max(0.0f, flexShrink); }
     void SetFlexBasis(float flexBasis) { m_flexBasis = std::max(0.0f, flexBasis); }
+    void SetAlignSelf(SelfAlign alignSelf) { m_alignSelf = alignSelf; }
     bool HasFixedWidth() const { return m_fixedWidth >= 0.0f; }
     bool HasFixedHeight() const { return m_fixedHeight >= 0.0f; }
+    bool HasMinWidth() const { return m_minWidth >= 0.0f; }
+    bool HasMaxWidth() const { return m_maxWidth >= 0.0f; }
+    bool HasMinHeight() const { return m_minHeight >= 0.0f; }
+    bool HasMaxHeight() const { return m_maxHeight >= 0.0f; }
     float FlexGrow() const { return m_flexGrow; }
     float FlexShrink() const { return m_flexShrink; }
     bool HasFlexBasis() const { return m_flexBasis >= 0.0f; }
     float FlexBasis() const { return ScaleValue(m_flexBasis); }
+    float MinWidth() const { return ScaleValue(m_minWidth); }
+    float MaxWidth() const { return ScaleValue(m_maxWidth); }
+    float MinHeight() const { return ScaleValue(m_minHeight); }
+    float MaxHeight() const { return ScaleValue(m_maxHeight); }
+    SelfAlign AlignSelf() const { return m_alignSelf; }
     void SetContext(UIContext* context) {
         m_context = context;
         for (auto& child : m_children) {
@@ -51,15 +73,15 @@ public:
     float GetPreferredWidth(float availableWidth) const {
         const float clampedWidth = std::max(0.0f, availableWidth);
         const float preferredWidth = HasFixedWidth() ? ScaleValue(m_fixedWidth) : MeasurePreferredWidth(clampedWidth);
-        return std::clamp(preferredWidth, 0.0f, clampedWidth);
+        return std::clamp(ClampWidth(preferredWidth), 0.0f, clampedWidth);
     }
 
     float GetPreferredHeight(float width) const {
-        const float clampedWidth = std::max(0.0f, width);
+        const float clampedWidth = ClampWidth(std::max(0.0f, width));
         if (HasFixedHeight()) {
-            return std::max(0.0f, ScaleValue(m_fixedHeight));
+            return ClampHeight(std::max(0.0f, ScaleValue(m_fixedHeight)));
         }
-        return std::max(0.0f, MeasurePreferredHeight(clampedWidth));
+        return ClampHeight(std::max(0.0f, MeasurePreferredHeight(clampedWidth)));
     }
 
     virtual void Measure(float availableWidth, float availableHeight) {
@@ -227,6 +249,28 @@ public:
     }
 
 protected:
+    float ClampWidth(float width) const {
+        float clamped = std::max(0.0f, width);
+        if (HasMinWidth()) {
+            clamped = std::max(clamped, MinWidth());
+        }
+        if (HasMaxWidth()) {
+            clamped = std::min(clamped, MaxWidth());
+        }
+        return clamped;
+    }
+
+    float ClampHeight(float height) const {
+        float clamped = std::max(0.0f, height);
+        if (HasMinHeight()) {
+            clamped = std::max(clamped, MinHeight());
+        }
+        if (HasMaxHeight()) {
+            clamped = std::min(clamped, MaxHeight());
+        }
+        return clamped;
+    }
+
     Size MeasureTextValue(const std::wstring& text, float fontSize, float maxWidth) const {
         return MeasureTextLayout(m_context ? m_context->textMeasurer : nullptr, text, ScaleValue(fontSize), maxWidth);
     }
@@ -237,9 +281,14 @@ protected:
     Thickness m_margin{};
     float m_fixedWidth = -1.0f;
     float m_fixedHeight = -1.0f;
+    float m_minWidth = -1.0f;
+    float m_maxWidth = -1.0f;
+    float m_minHeight = -1.0f;
+    float m_maxHeight = -1.0f;
     float m_flexGrow = 0.0f;
     float m_flexShrink = 0.0f;
     float m_flexBasis = -1.0f;
+    SelfAlign m_alignSelf = SelfAlign::Auto;
     bool m_hasFocus = false;
     UIContext* m_context = nullptr;
 };

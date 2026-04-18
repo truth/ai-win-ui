@@ -452,6 +452,23 @@ private:
         }
     }
 
+    void EnsureElementVisible(UIElement* element) {
+        if (!element) {
+            return;
+        }
+
+        const Rect bounds = element->Bounds();
+        float targetOffset = m_scrollOffset;
+
+        if (bounds.top < 0.0f) {
+            targetOffset += bounds.top;
+        } else if (bounds.bottom > m_viewportHeight) {
+            targetOffset += bounds.bottom - m_viewportHeight;
+        }
+
+        SetScrollOffset(targetOffset);
+    }
+
     void SetFocusedElement(UIElement* element) {
         if (m_focusedElement == element) {
             return;
@@ -462,6 +479,7 @@ private:
         m_focusedElement = element;
         if (m_focusedElement) {
             m_focusedElement->OnFocus();
+            EnsureElementVisible(m_focusedElement);
         }
         InvalidateRect(m_hwnd, nullptr, FALSE);
     }
