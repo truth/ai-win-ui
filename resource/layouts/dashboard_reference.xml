@@ -76,14 +76,25 @@
             <Spacer flexGrow="1" flexBasis="0" />
             <Label text="Clear" fontSize="10" color="#8E8E99" />
           </Panel>
-          <Panel padding="10,10,10,10" spacing="4" cornerRadius="15" background="#F7F7FC" alignItems="stretch">
-            <Label text="Upcoming event" fontSize="11" color="#1E1E1E" />
+          <Panel padding="10,10,10,10" spacing="5" cornerRadius="15" background="#F7F7FC" alignItems="stretch">
+            <Panel direction="row" spacing="6" alignItems="center">
+              <Label text="Upcoming event" fontSize="11" color="#1E1E1E" />
+              <Spacer flexGrow="1" flexBasis="0" />
+              <Label text="..." fontSize="10" color="#A2A2AE" />
+            </Panel>
             <Label text="Sat, 10:30 PM - 11:45 AM" fontSize="10" color="#8E8E99" />
+            <Panel height="6" cornerRadius="3" background="#E6E4F9" />
             <Label text="Sync with the remote product team." fontSize="10" color="#595965" />
           </Panel>
-          <Panel padding="10,10,10,10" spacing="4" cornerRadius="15" background="#FBFBFE" alignItems="stretch">
-            <Label text="Message: Product design" fontSize="11" color="#1E1E1E" />
+          <Panel padding="10,10,10,10" spacing="5" cornerRadius="15" background="#FBFBFE" alignItems="stretch">
+            <Panel direction="row" spacing="6" alignItems="center">
+              <Label text="Message: Product design" fontSize="11" color="#1E1E1E" />
+              <Spacer flexGrow="1" flexBasis="0" />
+              <Label text="..." fontSize="10" color="#A2A2AE" />
+            </Panel>
             <Label text="Review the latest task notes and comments." fontSize="10" color="#8E8E99" />
+            <Panel height="5" cornerRadius="3" background="#ECEAF9" />
+            <Panel width="120" height="5" cornerRadius="3" background="#F0EFFB" />
           </Panel>
         </Panel>
 
@@ -99,6 +110,12 @@
             <Button text="Package design" width="90" height="22" fontSize="9" background="#D0F2D7" foreground="#2D6B45" cornerRadius="7" />
             <Spacer flexGrow="1" flexBasis="0" />
             <Label text="High" fontSize="10" color="#F05D7B" />
+          </Panel>
+          <Panel direction="row" spacing="6" alignItems="center">
+            <Panel width="8" height="8" cornerRadius="4" background="#C7C4E8" />
+            <Label text="Rachel Lee" fontSize="10" color="#7D7D88" />
+            <Spacer flexGrow="1" flexBasis="0" />
+            <Label text="Due 09 PM" fontSize="10" color="#A0A0AB" />
           </Panel>
           <Button text="Add new assignment" height="30" fontSize="10" background="#F1EEFF" foreground="#5D54F4" cornerRadius="10" />
         </Panel>
@@ -123,10 +140,12 @@
           <Panel padding="10,10,10,10" spacing="4" cornerRadius="15" background="#FAFAFD" alignItems="stretch">
             <Label text="04:30-05:00 PM" fontSize="10" color="#666673" />
             <Label text="Team meeting" fontSize="12" color="#171717" />
+            <Panel height="3" cornerRadius="2" background="#ECEAFA" />
           </Panel>
           <Panel padding="10,10,10,10" spacing="4" cornerRadius="15" background="#FDFDFF" alignItems="stretch">
             <Label text="11:30-12:30 PM" fontSize="10" color="#666673" />
             <Label text="Meeting with new client" fontSize="12" color="#171717" />
+            <Panel width="96" height="3" cornerRadius="2" background="#EEEAF8" />
           </Panel>
         </Panel>
       </Panel>
@@ -140,23 +159,32 @@
             <Label text="Show" fontSize="10" color="#8E8E99" />
           </Panel>
 
-          <Panel direction="row" spacing="8" alignItems="center">
-            <Label text="Conduct research" fontSize="11" color="#181818" />
-            <Spacer flexGrow="1" flexBasis="0" />
-            <Label text="90%" fontSize="10" color="#666673" />
-            <Label text="02h 45m" fontSize="10" color="#666673" />
+          <Panel spacing="5" background="#FFFFFF" alignItems="stretch">
+            <Panel direction="row" spacing="8" alignItems="center">
+              <Label text="Conduct research" fontSize="11" color="#181818" />
+              <Spacer flexGrow="1" flexBasis="0" />
+              <Label text="90%" fontSize="10" color="#666673" />
+              <Label text="02h 45m" fontSize="10" color="#666673" />
+            </Panel>
+            <Panel height="4" cornerRadius="2" background="#E8E6FA" />
           </Panel>
-          <Panel direction="row" spacing="8" alignItems="center">
-            <Label text="Schedule a meeting" fontSize="11" color="#181818" />
-            <Spacer flexGrow="1" flexBasis="0" />
-            <Label text="50%" fontSize="10" color="#666673" />
-            <Label text="01h 55m" fontSize="10" color="#666673" />
+          <Panel spacing="5" background="#FFFFFF" alignItems="stretch">
+            <Panel direction="row" spacing="8" alignItems="center">
+              <Label text="Schedule a meeting" fontSize="11" color="#181818" />
+              <Spacer flexGrow="1" flexBasis="0" />
+              <Label text="50%" fontSize="10" color="#666673" />
+              <Label text="01h 55m" fontSize="10" color="#666673" />
+            </Panel>
+            <Panel width="128" height="4" cornerRadius="2" background="#ECEAFB" />
           </Panel>
-          <Panel direction="row" spacing="8" alignItems="center">
-            <Label text="Send out reminder" fontSize="11" color="#181818" />
-            <Spacer flexGrow="1" flexBasis="0" />
-            <Label text="10%" fontSize="10" color="#666673" />
-            <Label text="01h 30m" fontSize="10" color="#666673" />
+          <Panel spacing="5" background="#FFFFFF" alignItems="stretch">
+            <Panel direction="row" spacing="8" alignItems="center">
+              <Label text="Send out reminder" fontSize="11" color="#181818" />
+              <Spacer flexGrow="1" flexBasis="0" />
+              <Label text="10%" fontSize="10" color="#666673" />
+              <Label text="01h 30m" fontSize="10" color="#666673" />
+            </Panel>
+            <Panel width="92" height="4" cornerRadius="2" background="#F0EEFB" />
           </Panel>
         </Panel>
 
@@ -185,6 +213,7 @@
           </Panel>
           <Label text="Board meeting" fontSize="17" color="#171717" />
           <Label text="Meeting with John Smith, Ash Fox, team 19" fontSize="10" color="#80808D" />
+          <Panel height="4" cornerRadius="2" background="#EEEAF9" />
           <Spacer flexGrow="1" flexBasis="0" />
           <Panel direction="row" spacing="8" alignItems="center">
             <Button text="Reschedule" width="88" height="30" fontSize="10" background="#F1F0FA" foreground="#4B4960" cornerRadius="10" />
