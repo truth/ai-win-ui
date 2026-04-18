@@ -1,0 +1,279 @@
+{
+  "type": "Panel",
+  "props": {
+    "padding": [24, 24, 24, 24],
+    "spacing": 16,
+    "cornerRadius": 16,
+    "background": "#141414",
+    "alignItems": "stretch"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": {
+        "text": "Skia Image Regression Cases",
+        "fontSize": 28,
+        "color": "#F6F6F6"
+      }
+    },
+    {
+      "type": "Label",
+      "props": {
+        "text": "Use this page to compare stretch modes, rounded clipping, and horizontal image layout between Direct2D and Skia.",
+        "fontSize": 15,
+        "color": "#B8B8B8",
+        "margin": [0, 0, 0, 4]
+      }
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "padding": [18, 18, 18, 18],
+        "spacing": 12,
+        "cornerRadius": 14,
+        "background": "#1C1C1C",
+        "alignItems": "stretch"
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "Case 1: Stretch mode comparison",
+            "fontSize": 18,
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "All three tiles use the same source image and identical bounds. Only the stretch mode changes.",
+            "fontSize": 13,
+            "color": "#CFCFCF"
+          }
+        },
+        {
+          "type": "Panel",
+          "props": {
+            "direction": "row",
+            "spacing": 12,
+            "alignItems": "start"
+          },
+          "children": [
+            {
+              "type": "Panel",
+              "props": {
+                "width": 220,
+                "spacing": 8,
+                "padding": [10, 10, 10, 10],
+                "cornerRadius": 12,
+                "background": "#232323",
+                "alignItems": "stretch"
+              },
+              "children": [
+                { "type": "Label", "props": { "text": "uniform", "fontSize": 13, "color": "#E9E9E9" } },
+                { "type": "Image", "props": { "source": "images/img1.jpg", "width": 200, "height": 120, "stretch": "uniform", "cornerRadius": 8 } }
+              ]
+            },
+            {
+              "type": "Panel",
+              "props": {
+                "width": 220,
+                "spacing": 8,
+                "padding": [10, 10, 10, 10],
+                "cornerRadius": 12,
+                "background": "#232323",
+                "alignItems": "stretch"
+              },
+              "children": [
+                { "type": "Label", "props": { "text": "fill", "fontSize": 13, "color": "#E9E9E9" } },
+                { "type": "Image", "props": { "source": "images/img1.jpg", "width": 200, "height": 120, "stretch": "fill", "cornerRadius": 8 } }
+              ]
+            },
+            {
+              "type": "Panel",
+              "props": {
+                "width": 220,
+                "spacing": 8,
+                "padding": [10, 10, 10, 10],
+                "cornerRadius": 12,
+                "background": "#232323",
+                "alignItems": "stretch"
+              },
+              "children": [
+                { "type": "Label", "props": { "text": "uniformToFill", "fontSize": 13, "color": "#E9E9E9" } },
+                { "type": "Image", "props": { "source": "images/img1.jpg", "width": 200, "height": 120, "stretch": "uniformToFill", "cornerRadius": 8 } }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "padding": [18, 18, 18, 18],
+        "spacing": 12,
+        "cornerRadius": 14,
+        "background": "#1A2330",
+        "alignItems": "stretch"
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "Case 2: Rounded clip sweep",
+            "fontSize": 18,
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "This row checks whether rounded clipping stays clean as corner radius increases.",
+            "fontSize": 13,
+            "color": "#C7D2E2"
+          }
+        },
+        {
+          "type": "Panel",
+          "props": {
+            "direction": "row",
+            "spacing": 12,
+            "alignItems": "center"
+          },
+          "children": [
+            { "type": "Image", "props": { "source": "images/3d-design_9390515.png", "width": 170, "height": 110, "stretch": "uniformToFill", "cornerRadius": 0 } },
+            { "type": "Image", "props": { "source": "images/3d-design_9390515.png", "width": 170, "height": 110, "stretch": "uniformToFill", "cornerRadius": 12 } },
+            { "type": "Image", "props": { "source": "images/3d-design_9390515.png", "width": 170, "height": 110, "stretch": "uniformToFill", "cornerRadius": 24 } },
+            { "type": "Image", "props": { "source": "images/3d-design_9390515.png", "width": 170, "height": 110, "stretch": "uniformToFill", "cornerRadius": 40 } }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "padding": [18, 18, 18, 18],
+        "spacing": 12,
+        "cornerRadius": 14,
+        "background": "#1F2A20",
+        "alignItems": "stretch"
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "Case 3: Horizontal gallery layout",
+            "fontSize": 18,
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "A row layout that mixes image sources but keeps tile sizing fixed. Useful for checking spacing, crop consistency, and Yoga row behavior.",
+            "fontSize": 13,
+            "color": "#D0E0CF"
+          }
+        },
+        {
+          "type": "Panel",
+          "props": {
+            "direction": "row",
+            "spacing": 12,
+            "alignItems": "center"
+          },
+          "children": [
+            { "type": "Image", "props": { "source": "images/ai_10439488.png", "width": 150, "height": 110, "stretch": "uniformToFill", "cornerRadius": 12 } },
+            { "type": "Image", "props": { "source": "images/airplane_10521325.png", "width": 150, "height": 110, "stretch": "uniformToFill", "cornerRadius": 12 } },
+            { "type": "Image", "props": { "source": "images/3d-model_6982665.png", "width": 150, "height": 110, "stretch": "uniformToFill", "cornerRadius": 12 } },
+            { "type": "Image", "props": { "source": "images/acai_13333831.png", "width": 150, "height": 110, "stretch": "uniformToFill", "cornerRadius": 12 } }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "padding": [18, 18, 18, 18],
+        "spacing": 12,
+        "cornerRadius": 14,
+        "background": "#2A1F27",
+        "alignItems": "stretch"
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "Case 4: Mixed aspect stress",
+            "fontSize": 18,
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "These tiles intentionally mix different source shapes and size constraints to make scaling artifacts easier to spot.",
+            "fontSize": 13,
+            "color": "#E1CAD6"
+          }
+        },
+        {
+          "type": "Panel",
+          "props": {
+            "direction": "row",
+            "spacing": 12,
+            "alignItems": "start"
+          },
+          "children": [
+            {
+              "type": "Panel",
+              "props": {
+                "width": 180,
+                "spacing": 8,
+                "padding": [10, 10, 10, 10],
+                "cornerRadius": 12,
+                "background": "#34242E",
+                "alignItems": "stretch"
+              },
+              "children": [
+                { "type": "Label", "props": { "text": "Tall frame", "fontSize": 13, "color": "#F6E7EE" } },
+                { "type": "Image", "props": { "source": "images/airplane_1350172.png", "width": 160, "height": 180, "stretch": "uniformToFill", "cornerRadius": 12 } }
+              ]
+            },
+            {
+              "type": "Panel",
+              "props": {
+                "width": 260,
+                "spacing": 8,
+                "padding": [10, 10, 10, 10],
+                "cornerRadius": 12,
+                "background": "#34242E",
+                "alignItems": "stretch"
+              },
+              "children": [
+                { "type": "Label", "props": { "text": "Wide frame", "fontSize": 13, "color": "#F6E7EE" } },
+                { "type": "Image", "props": { "source": "images/alarm-clock_13370775.png", "width": 240, "height": 100, "stretch": "uniformToFill", "cornerRadius": 12 } }
+              ]
+            },
+            {
+              "type": "Panel",
+              "props": {
+                "width": 200,
+                "spacing": 8,
+                "padding": [10, 10, 10, 10],
+                "cornerRadius": 12,
+                "background": "#34242E",
+                "alignItems": "stretch"
+              },
+              "children": [
+                { "type": "Label", "props": { "text": "Fit without crop", "fontSize": 13, "color": "#F6E7EE" } },
+                { "type": "Image", "props": { "source": "images/agreement_3188314.png", "width": 180, "height": 140, "stretch": "uniform", "cornerRadius": 12 } }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,197 @@
+<Panel direction="column" flexGrow="1" alignItems="stretch" background="#EBEBF0" padding="28">
+
+  <Panel direction="row" flexGrow="1" alignItems="stretch" background="#F8F9FB" cornerRadius="32"
+    overflow="hidden">
+
+    <Panel direction="column" width="84" alignItems="center" background="#6458E5"
+      padding="24,32,24,32" spacing="24">
+      <Button text="■" background="#FFFFFF" color="#6458E5" cornerRadius="12" width="40" height="40" />
+      <Button text="8" background="#00000000" color="#FFFFFF" />
+      <Button text="C" background="#00000000" color="#FFFFFF" />
+      <Button text="A" background="#00000000" color="#FFFFFF" />
+      <Button text="U" background="#00000000" color="#FFFFFF" />
+
+      <Spacer flexGrow="1" />
+
+      <Button text="?" background="#00000000" color="#FFFFFF" />
+    </Panel>
+
+    <Panel direction="column" flexGrow="1" padding="32" spacing="24">
+
+      <Panel direction="row" alignItems="center" spacing="16">
+        <Label text="Dashboard" fontWeight="bold" />
+        <Label text="Workflows" color="#888888" />
+        <Label text="Integrations" color="#888888" />
+
+        <Spacer flexGrow="1" />
+
+        <TextInput text="Search or type command" width="240" padding="8,12,8,12" cornerRadius="12"
+          background="#FFFFFF" />
+        <Button text="Light / Dark" background="#EAEAF6" color="#6458E5" cornerRadius="12"
+          padding="8,12,8,12" />
+        <Button text="Export data" background="#EAEAF6" color="#6458E5" cornerRadius="12"
+          padding="8,12,8,12" />
+        <Button text="Add new board" background="#1C1A35" color="#FFFFFF" cornerRadius="12"
+          padding="8,16,8,16" />
+      </Panel>
+
+      <Panel direction="row" alignItems="start" spacing="24">
+
+        <Panel direction="column" width="300" spacing="8">
+          <Label text="Hi, James!" />
+          <Label text="What are your" />
+          <Label text="planes for today?" />
+          <Label
+            text="This platform is designed to revolutionize the way you organize and access your notes"
+            color="#666666" />
+        </Panel>
+
+        <Panel direction="row" flexGrow="1" spacing="16" alignItems="stretch">
+
+          <Panel flexGrow="1" background="#EFEFF4" cornerRadius="18" alignItems="center"
+            justifyContent="center">
+            <Button text="+" background="#6458E5" color="#FFFFFF" cornerRadius="8" width="32"
+              height="32" />
+          </Panel>
+
+          <Panel direction="column" flexGrow="1" background="#FFFFFF" cornerRadius="18" padding="16"
+            justifyContent="end">
+            <Spacer flexGrow="1" />
+            <Label text="Stay organized" fontWeight="bold" />
+            <Label text="A clear structure for your notes" color="#888888" />
+          </Panel>
+
+          <Panel direction="column" flexGrow="1" background="#FFFFFF" cornerRadius="18" padding="16"
+            justifyContent="end">
+            <Spacer flexGrow="1" />
+            <Label text="Sync your notes" fontWeight="bold" />
+            <Label text="Ensure that notes are synced" color="#888888" />
+          </Panel>
+
+          <Panel direction="column" flexGrow="1" background="#FFFFFF" cornerRadius="18" padding="16"
+            justifyContent="end">
+            <Spacer flexGrow="1" />
+            <Label text="Collaborate and share" fontWeight="bold" />
+            <Label text="Share notes with colleagues" color="#888888" />
+          </Panel>
+        </Panel>
+      </Panel>
+
+      <Panel direction="row" flexGrow="1" spacing="24">
+
+        <Panel direction="column" flexGrow="1" background="#FFFFFF" cornerRadius="22" padding="20"
+          spacing="16">
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="Notifications" fontWeight="bold" />
+            <Label text="Clear" color="#888888" />
+          </Panel>
+          <Panel direction="column" background="#FFFFFF" cornerRadius="12" padding="16" spacing="4">
+            <Label text="Upcoming event" fontWeight="bold" />
+            <Label text="Landing design meeting | Time: 120 min" color="#888888" />
+          </Panel>
+          <Panel direction="column" background="#F8F9FB" cornerRadius="12" padding="16" spacing="4">
+            <Label text="Message | Product design" fontWeight="bold" />
+            <Label text="Hey James, just wanted to check in..." color="#888888" />
+          </Panel>
+        </Panel>
+
+        <Panel direction="column" flexGrow="1" background="#FFFFFF" cornerRadius="22" padding="20"
+          spacing="16">
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="Assignments" fontWeight="bold" />
+            <Label text="Edit" color="#888888" />
+          </Panel>
+          <Spacer flexGrow="1" />
+          <Panel direction="column" spacing="4">
+            <Label text="Design a packaging concept" fontWeight="bold" />
+            <Label text="for a new product" fontWeight="bold" />
+          </Panel>
+          <Spacer flexGrow="1" />
+          <Button text="+ Add new assignment" background="#F0F0FF" color="#6458E5" cornerRadius="12"
+            width="200" alignSelf="center" />
+        </Panel>
+
+        <Panel direction="column" flexGrow="1.2" background="#FFFFFF" cornerRadius="22" padding="20"
+          spacing="12">
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="May 2021" fontWeight="bold" />
+          </Panel>
+          <Panel direction="row" justifyContent="space-between">
+            <Label text="14" />
+            <Label text="15" />
+            <Label text="16" />
+            <Label text="17" />
+            <Label text="18" color="#6458E5" />
+            <Label text="19" />
+            <Label text="20" />
+          </Panel>
+          <Spacer flexGrow="1" />
+          <Label text="04:30-05:00 PM" color="#888888" />
+          <Label text="Team meeting" fontWeight="bold" />
+          <Spacer flexGrow="1" />
+          <Label text="11:30-12:30 PM" color="#888888" />
+          <Label text="Meeting with new client" fontWeight="bold" />
+        </Panel>
+      </Panel>
+
+      <Panel direction="row" flexGrow="1" spacing="24">
+
+        <Panel direction="column" flexGrow="1.5" background="#FFFFFF" cornerRadius="22" padding="20"
+          spacing="16">
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="Today tasks" fontWeight="bold" />
+          </Panel>
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="Conduct research" fontWeight="bold" />
+            <Label text="90%" />
+          </Panel>
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="Schedule a meeting" fontWeight="bold" />
+            <Label text="50%" />
+          </Panel>
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="Send out reminders" fontWeight="bold" />
+            <Label text="10%" />
+          </Panel>
+        </Panel>
+
+        <Panel direction="column" width="200" background="#6458E5" cornerRadius="22" padding="20"
+          alignItems="center" justifyContent="end" spacing="12">
+          <Spacer flexGrow="1" />
+          <Label text="Go premium!" color="#FFFFFF" fontWeight="bold" />
+          <Label text="Gain access to a range of benefits designed to enhance your user experience"
+            color="#EAEAF6" />
+          <Button text="Find out more" background="#1C1A35" color="#FFFFFF" cornerRadius="12"
+            width="140" />
+        </Panel>
+
+        <Panel direction="column" flexGrow="1.2" spacing="24">
+
+          <Panel direction="row" flexGrow="1" spacing="16">
+            <Panel direction="column" flexGrow="1" background="#FFFFFF" cornerRadius="18"
+              padding="16" justifyContent="center">
+              <Label text="Marketing" fontWeight="bold" />
+              <Label text="You reached 3/5" color="#888888" />
+            </Panel>
+            <Panel direction="column" flexGrow="1" background="#FFFFFF" cornerRadius="18"
+              padding="16" justifyContent="center">
+              <Label text="Typography" fontWeight="bold" />
+              <Label text="You reached 3/5" color="#888888" />
+            </Panel>
+          </Panel>
+
+          <Panel direction="column" background="#FFFFFF" cornerRadius="20" padding="20" spacing="12">
+            <Label text="Board meeting" fontWeight="bold" />
+            <Label text="Meeting with John Smith, 4th floor, room 15B" color="#888888" />
+            <Panel direction="row" justifyContent="end" spacing="12">
+              <Button text="Reschedule" background="#F0F0FF" color="#6458E5" cornerRadius="10" />
+              <Button text="Accept invite" background="#6458E5" color="#FFFFFF" cornerRadius="10" />
+            </Panel>
+          </Panel>
+        </Panel>
+
+      </Panel>
+
+    </Panel>
+  </Panel>
+</Panel>

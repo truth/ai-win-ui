@@ -9,11 +9,15 @@
 
 #include <shellscalingapi.h>
 #include <Windowsx.h>
+#include <algorithm>
+#include <cmath>
 #include <memory>
 #include <string>
 #include <vector>
 
 namespace {
+
+constexpr float kUnboundedLayoutHeight = 100000.0f;
 
 std::wstring ToLowerAscii(std::wstring value) {
     for (auto& ch : value) {
@@ -97,7 +101,7 @@ public:
             0,
             kClassName,
             L"AI WinUI Renderer (DirectUI-style)",
-            WS_OVERLAPPEDWINDOW,
+            WS_OVERLAPPEDWINDOW | WS_VSCROLL,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             initialRect.right - initialRect.left,
@@ -335,16 +339,29 @@ private:
         }
         RECT rc{};
         GetClientRect(m_hwnd, &rc);
-        const UINT w = static_cast<UINT>(rc.right - rc.left);
-        const UINT h = static_cast<UINT>(rc.bottom - rc.top);
+        m_viewportWidth = static_cast<float>(std::max<LONG>(0, rc.right - rc.left));
+        m_viewportHeight = static_cast<float>(std::max<LONG>(0, rc.bottom - rc.top));
         if (m_renderer) {
-            m_renderer->Resize(w, h);
+            m_renderer->Resize(static_cast<UINT>(m_viewportWidth), static_cast<UINT>(m_viewportHeight));
         }
-        if (m_root) {
-            m_root->Measure(static_cast<float>(w), static_cast<float>(h));
-            m_root->Arrange(Rect::Make(0, 0, static_cast<float>(w), static_cast<float>(h)));
-        }
+        UpdateLayout();
         InvalidateRect(m_hwnd, nullptr, FALSE);
+    }
+
+    void UpdateLayout() {
+        if (m_root) {
+            m_root->Measure(m_viewportWidth, kUnboundedLayoutHeight);
+            m_contentHeight = std::max(m_viewportHeight, m_root->DesiredSize().height);
+            ClampScrollOffset();
+            m_root->Arrange(Rect::Make(
+                0.0f,
+                -m_scrollOffset,
+                m_viewportWidth,
+                m_contentHeight - m_scrollOffset));
+        } else {
+            m_contentHeight = m_viewportHeight;
+        }
+        UpdateScrollBar();
     }
 
     void OnPaint() {
@@ -427,6 +444,14 @@ private:
         }
     }
 
+    void OnMouseWheel(WPARAM wParam) {
+        const float wheelStep = std::max(24.0f, 56.0f * m_uiContext.dpiScale);
+        const float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / static_cast<float>(WHEEL_DELTA);
+        if (delta != 0.0f) {
+            ScrollBy(-delta * wheelStep);
+        }
+    }
+
     void SetFocusedElement(UIElement* element) {
         if (m_focusedElement == element) {
             return;
@@ -473,6 +498,18 @@ private:
     }
 
     bool OnKeyDown(WPARAM wParam, LPARAM lParam) {
+        switch (wParam) {
+            case VK_PRIOR:
+                return ScrollBy(-std::max(48.0f, m_viewportHeight * 0.85f));
+            case VK_NEXT:
+                return ScrollBy(std::max(48.0f, m_viewportHeight * 0.85f));
+            case VK_HOME:
+                return SetScrollOffset(0.0f);
+            case VK_END:
+                return SetScrollOffset(MaxScrollOffset());
+            default:
+                break;
+        }
         if (wParam == VK_TAB) {
             MoveFocus((GetKeyState(VK_SHIFT) & 0x8000) != 0);
             return true;
@@ -488,6 +525,88 @@ private:
             return true;
         }
         return false;
+    }
+
+    bool ScrollBy(float delta) {
+        return SetScrollOffset(m_scrollOffset + delta);
+    }
+
+    bool SetScrollOffset(float offset) {
+        const float previousOffset = m_scrollOffset;
+        m_scrollOffset = std::clamp(offset, 0.0f, MaxScrollOffset());
+        if (std::abs(m_scrollOffset - previousOffset) < 0.5f) {
+            return false;
+        }
+
+        if (m_root) {
+            m_root->Arrange(Rect::Make(
+                0.0f,
+                -m_scrollOffset,
+                m_viewportWidth,
+                m_contentHeight - m_scrollOffset));
+        }
+        UpdateScrollBar();
+        InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
+
+    float MaxScrollOffset() const {
+        return std::max(0.0f, m_contentHeight - m_viewportHeight);
+    }
+
+    void ClampScrollOffset() {
+        m_scrollOffset = std::clamp(m_scrollOffset, 0.0f, MaxScrollOffset());
+    }
+
+    void UpdateScrollBar() const {
+        SCROLLINFO si{};
+        si.cbSize = sizeof(si);
+        si.fMask = SIF_PAGE | SIF_POS | SIF_RANGE;
+        si.nMin = 0;
+        si.nMax = std::max(0, static_cast<int>(std::ceil(m_contentHeight)) - 1);
+        si.nPage = static_cast<UINT>(std::max(0.0f, m_viewportHeight));
+        si.nPos = static_cast<int>(std::lround(m_scrollOffset));
+        SetScrollInfo(m_hwnd, SB_VERT, &si, TRUE);
+    }
+
+    bool OnVerticalScroll(WPARAM wParam) {
+        SCROLLINFO si{};
+        si.cbSize = sizeof(si);
+        si.fMask = SIF_ALL;
+        GetScrollInfo(m_hwnd, SB_VERT, &si);
+
+        float targetOffset = m_scrollOffset;
+        const float lineStep = std::max(16.0f, 40.0f * m_uiContext.dpiScale);
+        const float pageStep = std::max(lineStep * 3.0f, m_viewportHeight * 0.85f);
+
+        switch (LOWORD(wParam)) {
+            case SB_LINEUP:
+                targetOffset -= lineStep;
+                break;
+            case SB_LINEDOWN:
+                targetOffset += lineStep;
+                break;
+            case SB_PAGEUP:
+                targetOffset -= pageStep;
+                break;
+            case SB_PAGEDOWN:
+                targetOffset += pageStep;
+                break;
+            case SB_THUMBTRACK:
+            case SB_THUMBPOSITION:
+                targetOffset = static_cast<float>(si.nTrackPos);
+                break;
+            case SB_TOP:
+                targetOffset = 0.0f;
+                break;
+            case SB_BOTTOM:
+                targetOffset = MaxScrollOffset();
+                break;
+            default:
+                return false;
+        }
+
+        return SetScrollOffset(targetOffset);
     }
 
     void EnsureMouseLeaveTracking() {
@@ -547,6 +666,14 @@ private:
             case WM_MOUSELEAVE:
                 OnMouseLeave();
                 return 0;
+            case WM_MOUSEWHEEL:
+                OnMouseWheel(wParam);
+                return 0;
+            case WM_VSCROLL:
+                if (OnVerticalScroll(wParam)) {
+                    return 0;
+                }
+                break;
             case WM_LBUTTONDOWN:
                 SetCapture(hwnd);
                 OnMouseDown(lParam);
@@ -612,6 +739,10 @@ private:
     std::unique_ptr<UIElement> m_root;
     UIElement* m_focusedElement = nullptr;
     UIElement* m_mouseCaptureTarget = nullptr;
+    float m_viewportWidth = 0.0f;
+    float m_viewportHeight = 0.0f;
+    float m_contentHeight = 0.0f;
+    float m_scrollOffset = 0.0f;
     bool m_isInitialized = false;
     bool m_isTrackingMouseLeave = false;
 };

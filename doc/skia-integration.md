@@ -277,7 +277,40 @@ This sample is useful when checking layout behavior first and image behavior
 second, because it puts row/column sizing and text measurement under more
 pressure than the default gallery layout.
 
-### Example 5: Compare Direct2D and Skia Quickly
+### Example 5: Run the Dedicated Image Regression Layout on Skia
+
+```powershell
+$env:AI_WIN_UI_RENDERER = "skia"
+$env:AI_WIN_UI_LAYOUT = "layouts/skia_image_cases.xml"
+Start-Process -FilePath ".\build\presets\dev-debug-skia-local-sdk\Debug\ai_win_ui.exe"
+```
+
+This page is designed specifically for image-path validation. It separates:
+
+- `uniform`, `fill`, and `uniformToFill`
+- rounded-corner clipping sweeps
+- fixed-size horizontal gallery rows
+- mixed aspect-ratio stress cases
+
+### Example 6: Run the Dashboard Reference Layout
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_dashboard_reference.ps1
+```
+
+If you want the same layout on Direct2D:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_dashboard_reference.ps1 -Renderer direct2d
+```
+
+If the build output is missing, let the script build it first:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_dashboard_reference.ps1 -BuildIfMissing
+```
+
+### Example 7: Compare Direct2D and Skia Quickly
 
 ```powershell
 $env:AI_WIN_UI_RENDERER = "direct2d"
@@ -363,6 +396,19 @@ Representative XML fragment:
 
 This is a good first manual verification target because it exercises both the
 Yoga integration and the Skia bitmap path without needing any new test assets.
+
+### Dedicated Regression Layouts
+
+The repo now includes these image-oriented layouts:
+
+- `resource/layouts/ui.xml` and `resource/layouts/ui.json`
+  - default mixed gallery page
+- `resource/layouts/skia_image_cases.xml` and
+  `resource/layouts/skia_image_cases.json`
+  - targeted image regression cases for stretch mode, clipping, and row layout
+- `resource/layouts/yoga_measure_cases.xml` and
+  `resource/layouts/yoga_measure_cases.json`
+  - layout and measurement focused checks
 
 ## Recommended Integration Sequence
 

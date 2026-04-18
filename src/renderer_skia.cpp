@@ -5,6 +5,8 @@
 #include "include/core/SkColor.h"
 #include "include/core/SkData.h"
 #include "include/core/SkFont.h"
+#include "include/core/SkFontMetrics.h"
+#include "include/core/SkFontMgr.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkPaint.h"
@@ -15,8 +17,10 @@
 #include "include/core/SkTextBlob.h"
 #include "include/core/SkTypeface.h"
 #include "include/core/SkTypes.h"
+#include "include/ports/SkTypeface_win.h"
 
 #include <algorithm>
+#include <cmath>
 #include <cstring>
 #include <memory>
 #include <string>
@@ -46,6 +50,31 @@ std::string WideToUtf8(const wchar_t* text, UINT32 len) {
     std::string utf8(static_cast<size_t>(size), '\0');
     WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(len), utf8.data(), size, nullptr, nullptr);
     return utf8;
+}
+
+sk_sp<SkTypeface> TryMatchFamily(SkFontMgr* fontMgr, const char* familyName) {
+    if (!fontMgr || !familyName || !familyName[0]) {
+        return nullptr;
+    }
+    return fontMgr->matchFamilyStyle(familyName, SkFontStyle());
+}
+
+sk_sp<SkTypeface> CreateDefaultTypeface(SkFontMgr* fontMgr) {
+    if (!fontMgr) {
+        return nullptr;
+    }
+
+    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Segoe UI")) {
+        return typeface;
+    }
+    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Arial")) {
+        return typeface;
+    }
+    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Tahoma")) {
+        return typeface;
+    }
+
+    return fontMgr->legacyMakeTypeface(nullptr, SkFontStyle());
 }
 
 class SkiaBitmapResource final : public BitmapResource {
@@ -81,6 +110,7 @@ public:
 
     bool Initialize(HWND hwnd) override {
         m_hwnd = hwnd;
+        EnsureFontManager();
         return RecreateSurface();
     }
 
@@ -204,21 +234,30 @@ public:
                 return;
             }
 
+            EnsureFontManager();
+
             canvas->save();
             canvas->clipRect(ToSkRect(rect), true);
 
             SkPaint paint;
             paint.setColor(ToSkColor(color));
+            paint.setStyle(SkPaint::kFill_Style);
             paint.setAntiAlias(true);
 
             SkFont font;
+            font.setTypeface(m_defaultTypeface);
             font.setSize(fontSize);
             font.setEdging(SkFont::Edging::kAntiAlias);
             font.setSubpixel(true);
+            font.setHinting(SkFontHinting::kSlight);
+
+            SkFontMetrics metrics{};
+            font.getMetrics(&metrics);
 
             // This first-pass backend draws single-line text and relies on the
             // existing text measurer for sizing until a fuller Skia text path lands.
-            const float baseline = rect.top + fontSize;
+            const float ascent = std::isfinite(metrics.fAscent) ? -metrics.fAscent : fontSize * 0.8f;
+            const float baseline = rect.top + ascent;
             canvas->drawSimpleText(
                 utf8.data(),
                 utf8.size(),
@@ -273,6 +312,15 @@ public:
     }
 
 private:
+    void EnsureFontManager() {
+        if (!m_fontMgr) {
+            m_fontMgr = SkFontMgr_New_DirectWrite();
+        }
+        if (!m_defaultTypeface) {
+            m_defaultTypeface = CreateDefaultTypeface(m_fontMgr.get());
+        }
+    }
+
     bool EnsureSurface() {
         return m_surface || RecreateSurface();
     }
@@ -313,6 +361,8 @@ private:
     std::vector<uint8_t> m_pixels;
     sk_sp<SkSurface> m_surface;
     SkSurfaceProps m_surfaceProps{0, kUnknown_SkPixelGeometry};
+    sk_sp<SkFontMgr> m_fontMgr;
+    sk_sp<SkTypeface> m_defaultTypeface;
 };
 
 } // namespace

@@ -1,0 +1,64 @@
+<Panel padding="24,24,24,24" spacing="16" cornerRadius="16" background="#141414" alignItems="stretch">
+  <Label text="Skia Image Regression Cases" fontSize="28" color="#F6F6F6" />
+  <Label text="Use this page to compare stretch modes, rounded clipping, and horizontal image layout between Direct2D and Skia." fontSize="15" color="#B8B8B8" margin="0,0,0,4" />
+
+  <Panel padding="18,18,18,18" spacing="12" cornerRadius="14" background="#1C1C1C" alignItems="stretch">
+    <Label text="Case 1: Stretch mode comparison" fontSize="18" color="#FFFFFF" />
+    <Label text="All three tiles use the same source image and identical bounds. Only the stretch mode changes." fontSize="13" color="#CFCFCF" />
+    <Panel direction="row" spacing="12" alignItems="start">
+      <Panel width="220" spacing="8" padding="10,10,10,10" cornerRadius="12" background="#232323" alignItems="stretch">
+        <Label text="uniform" fontSize="13" color="#E9E9E9" />
+        <Image source="images/img1.jpg" width="200" height="120" stretch="uniform" cornerRadius="8" />
+      </Panel>
+      <Panel width="220" spacing="8" padding="10,10,10,10" cornerRadius="12" background="#232323" alignItems="stretch">
+        <Label text="fill" fontSize="13" color="#E9E9E9" />
+        <Image source="images/img1.jpg" width="200" height="120" stretch="fill" cornerRadius="8" />
+      </Panel>
+      <Panel width="220" spacing="8" padding="10,10,10,10" cornerRadius="12" background="#232323" alignItems="stretch">
+        <Label text="uniformToFill" fontSize="13" color="#E9E9E9" />
+        <Image source="images/img1.jpg" width="200" height="120" stretch="uniformToFill" cornerRadius="8" />
+      </Panel>
+    </Panel>
+  </Panel>
+
+  <Panel padding="18,18,18,18" spacing="12" cornerRadius="14" background="#1A2330" alignItems="stretch">
+    <Label text="Case 2: Rounded clip sweep" fontSize="18" color="#FFFFFF" />
+    <Label text="This row checks whether rounded clipping stays clean as corner radius increases." fontSize="13" color="#C7D2E2" />
+    <Panel direction="row" spacing="12" alignItems="center">
+      <Image source="images/3d-design_9390515.png" width="170" height="110" stretch="uniformToFill" cornerRadius="0" />
+      <Image source="images/3d-design_9390515.png" width="170" height="110" stretch="uniformToFill" cornerRadius="12" />
+      <Image source="images/3d-design_9390515.png" width="170" height="110" stretch="uniformToFill" cornerRadius="24" />
+      <Image source="images/3d-design_9390515.png" width="170" height="110" stretch="uniformToFill" cornerRadius="40" />
+    </Panel>
+  </Panel>
+
+  <Panel padding="18,18,18,18" spacing="12" cornerRadius="14" background="#1F2A20" alignItems="stretch">
+    <Label text="Case 3: Horizontal gallery layout" fontSize="18" color="#FFFFFF" />
+    <Label text="A row layout that mixes image sources but keeps tile sizing fixed. Useful for checking spacing, crop consistency, and Yoga row behavior." fontSize="13" color="#D0E0CF" />
+    <Panel direction="row" spacing="12" alignItems="center">
+      <Image source="images/ai_10439488.png" width="150" height="110" stretch="uniformToFill" cornerRadius="12" />
+      <Image source="images/airplane_10521325.png" width="150" height="110" stretch="uniformToFill" cornerRadius="12" />
+      <Image source="images/3d-model_6982665.png" width="150" height="110" stretch="uniformToFill" cornerRadius="12" />
+      <Image source="images/acai_13333831.png" width="150" height="110" stretch="uniformToFill" cornerRadius="12" />
+    </Panel>
+  </Panel>
+
+  <Panel padding="18,18,18,18" spacing="12" cornerRadius="14" background="#2A1F27" alignItems="stretch">
+    <Label text="Case 4: Mixed aspect stress" fontSize="18" color="#FFFFFF" />
+    <Label text="These tiles intentionally mix different source shapes and size constraints to make scaling artifacts easier to spot." fontSize="13" color="#E1CAD6" />
+    <Panel direction="row" spacing="12" alignItems="start">
+      <Panel width="180" spacing="8" padding="10,10,10,10" cornerRadius="12" background="#34242E" alignItems="stretch">
+        <Label text="Tall frame" fontSize="13" color="#F6E7EE" />
+        <Image source="images/airplane_1350172.png" width="160" height="180" stretch="uniformToFill" cornerRadius="12" />
+      </Panel>
+      <Panel width="260" spacing="8" padding="10,10,10,10" cornerRadius="12" background="#34242E" alignItems="stretch">
+        <Label text="Wide frame" fontSize="13" color="#F6E7EE" />
+        <Image source="images/alarm-clock_13370775.png" width="240" height="100" stretch="uniformToFill" cornerRadius="12" />
+      </Panel>
+      <Panel width="200" spacing="8" padding="10,10,10,10" cornerRadius="12" background="#34242E" alignItems="stretch">
+        <Label text="Fit without crop" fontSize="13" color="#F6E7EE" />
+        <Image source="images/agreement_3188314.png" width="180" height="140" stretch="uniform" cornerRadius="12" />
+      </Panel>
+    </Panel>
+  </Panel>
+</Panel>
