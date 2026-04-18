@@ -1,0 +1,22 @@
+{
+  "name": "ai-win-ui",
+  "version-string": "0.1.0",
+  "description": "Experimental Windows retained-mode UI renderer with Yoga layout and optional Skia integration.",
+  "features": {
+    "skia": {
+      "description": "Installs Skia from vcpkg for the experimental Skia renderer backend.",
+      "dependencies": [
+        {
+          "name": "skia",
+          "default-features": false,
+          "features": [
+            "jpeg",
+            "png",
+            "webp"
+          ]
+        }
+      ]
+    }
+  },
+  "builtin-baseline": "b83a134447208c35f740e4b6faf1263b0d6e860e"
+}

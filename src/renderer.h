@@ -7,9 +7,18 @@
 #include <cstdint>
 #include <memory>
 
+enum class RendererBackend {
+    Direct2D,
+    Skia,
+};
+
+const char* RendererBackendId(RendererBackend backend);
+const wchar_t* RendererBackendDisplayName(RendererBackend backend);
+
 class IRenderer {
 public:
     virtual ~IRenderer() = default;
+    virtual RendererBackend Backend() const = 0;
     virtual bool Initialize(HWND hwnd) = 0;
     virtual void Resize(UINT width, UINT height) = 0;
     virtual void BeginFrame(const Color& clearColor) = 0;
@@ -27,4 +36,6 @@ public:
     virtual void DrawBitmap(BitmapHandle bitmap, const Rect& rect) = 0;
 };
 
-std::unique_ptr<IRenderer> CreateRenderer();
+std::unique_ptr<IRenderer> CreateDirect2DRenderer();
+std::unique_ptr<IRenderer> CreateSkiaRenderer();
+std::unique_ptr<IRenderer> CreateRenderer(RendererBackend backend = RendererBackend::Direct2D);

@@ -19,3 +19,10 @@ dist/
 
 # yoga 
 third_party/yoga-3.2.1
+
+# optional unpacked Skia prebuilt SDK
+third_party/skia-m124/
+third_party/skia-prebuilt/
+
+# vcpkg manifest-mode install tree
+vcpkg_installed/

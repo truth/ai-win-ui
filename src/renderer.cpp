@@ -78,6 +78,10 @@ public:
         }
     }
 
+    RendererBackend Backend() const override {
+        return RendererBackend::Direct2D;
+    }
+
     bool Initialize(HWND hwnd) override {
         m_hwnd = hwnd;
 
@@ -382,6 +386,35 @@ private:
 
 } // namespace
 
-std::unique_ptr<IRenderer> CreateRenderer() {
+const char* RendererBackendId(RendererBackend backend) {
+    switch (backend) {
+        case RendererBackend::Skia:
+            return "skia";
+        case RendererBackend::Direct2D:
+        default:
+            return "direct2d";
+    }
+}
+
+const wchar_t* RendererBackendDisplayName(RendererBackend backend) {
+    switch (backend) {
+        case RendererBackend::Skia:
+            return L"Skia";
+        case RendererBackend::Direct2D:
+        default:
+            return L"Direct2D";
+    }
+}
+
+std::unique_ptr<IRenderer> CreateDirect2DRenderer() {
     return std::make_unique<Direct2DRenderer>();
+}
+
+std::unique_ptr<IRenderer> CreateRenderer(RendererBackend backend) {
+    if (backend == RendererBackend::Skia) {
+        if (auto renderer = CreateSkiaRenderer()) {
+            return renderer;
+        }
+    }
+    return CreateDirect2DRenderer();
 }

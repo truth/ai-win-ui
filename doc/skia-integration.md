@@ -1,195 +1,498 @@
-# Skia 集成分析
+# Skia Integration Notes
 
-本项目当前使用 Direct2D 作为渲染后端。若希望引入 Skia 以增强渲染能力，可按以下思路整合：
+## Why This Exists
 
-## 1. 目标
+The project now has a stable Yoga-based layout path and a clean `IRenderer`
+abstraction. That makes it a good time to prepare the rendering layer for a
+second backend without destabilizing the current Direct2D runtime.
 
-- 使用 Skia 作为渲染层，替代或并行于现有 Direct2D。 
-- 保持现有 UI 树与事件系统不变。
-- 支持组件事件交互、文本渲染与 UI 形状绘制。
+This document records the current state, the integration seam that is already
+in place, and the next tasks required to keep growing the current
+`SkiaRenderer`.
 
-## 2. 为什么选择 Skia
+## Current Decision
 
-- Skia 提供跨平台 GPU/CPU 渲染支持。
-- 丰富的图形 API，可以实现圆角、不规则遮罩、渐变、阴影等效果。
-- 可以与 Windows 的 D3D11、ANGLE、Vulkan、CPU raster 等后端配合。
+As of 2026-04-17, the repository is choosing `aseprite/skia` prebuilt Windows
+packages as the near-term Skia integration path.
 
-## 3. 设计方案
+Why:
 
-### 3.1 抽象渲染接口
+- official Skia does not provide a ready-made Windows C++ release package
+- the local `vcpkg` path has not been reliable enough for this sprint
+- `aseprite/skia` publishes Windows prebuilt packages that are intended to be
+  unpacked and consumed as a local Skia directory
 
-建议先将当前 `Renderer` 封装成一个渲染接口：
+The supporting investigation is recorded in:
 
-- `IRenderer`
-  - `bool Initialize(HWND hwnd)`
-  - `void Resize(UINT width, UINT height)`
-  - `void BeginFrame(const Color& clearColor)`
-  - `void EndFrame()`
-  - `void FillRect(const Rect& rect, const Color& color)`
-  - `void DrawRect(const Rect& rect, const Color& color, float strokeWidth)`
-  - `void DrawTextW(...)`
+- `doc/skia-prebuilt-survey.md`
 
-然后保留 `D2DRenderer`，并新增 `SkiaRenderer`。
+## Current Status
 
-### 3.2 Skia 渲染后端实现路径
+The codebase is now ready for incremental Skia integration in these ways:
 
-#### 路径 A：GPU 后端（推荐）
+- `IRenderer` remains the only rendering interface consumed by the UI layer.
+- Renderer selection is now explicit through `RendererBackend`.
+- App startup can request a backend through `AI_WIN_UI_RENDERER`.
+- A first-pass `renderer_skia.cpp` now exists.
+- The current Skia implementation is CPU/raster based and presents pixels to the
+  window through Win32.
+- The `aseprite/skia` local-SDK path has been built successfully in this repo.
+- The app has been launched successfully with `AI_WIN_UI_RENDERER=skia`.
+- If Skia is not compiled into the build, requesting `skia` still falls back to
+  Direct2D.
+- Window title text shows the active backend and whether a fallback happened.
 
-1. 使用 D3D11 设备创建 `GrDirectContext`。
-2. 通过 `SkSurface::MakeFromBackendRenderTarget` 创建 Skia surface。
-3. 获得 `SkCanvas` 进行绘制。
-4. 绘制结束后执行 `SkSurface::flush()`。
+This means we can begin landing Skia work behind the renderer seam without
+rewiring the UI tree, Yoga layout flow, event dispatch, or resource parsing.
 
-优点：
-- 渲染性能高
-- 可利用硬件加速
+## Runtime Behavior
 
-缺点：
-- 依赖 D3D11/ANGLE/Vulkan 等后端，集成复杂度稍高。
+The app understands the environment variable below:
 
-#### 路径 B：CPU Raster 后端（更简单）
-
-1. 使用 Skia 提供的 raster 后端创建 `SkSurface`。
-2. 直接绘制到内存像素缓冲区。
-3. 使用 Win32 GDI/Direct2D 或 `UpdateLayeredWindow` 将结果提交到窗口。
-
-优点：
-- 集成简单，适合作为 PoC。
-- 可绕过 GPU 后端依赖。
-
-缺点：
-- 性能低于 GPU。
-
-## 4. CMake 集成示例
-
-可以在 `CMakeLists.txt` 中新增：
-
-```cmake
-find_package(Skia REQUIRED CONFIG)
-
-target_include_directories(ai_win_ui PRIVATE ${SKIA_INCLUDE_DIRS})
-
-target_link_libraries(ai_win_ui PRIVATE
-    d2d1
-    dwrite
-    windowscodecs
-    skia
-)
+```powershell
+$env:AI_WIN_UI_RENDERER = "direct2d"
 ```
 
-如果没有 `find_package(Skia)`，可直接指定 Skia 的 include 路径与库路径：
+or:
 
-```cmake
-target_include_directories(ai_win_ui PRIVATE "${SKIA_DIR}/include")
-link_directories("${SKIA_DIR}/lib")
-target_link_libraries(ai_win_ui PRIVATE skia)
+```powershell
+$env:AI_WIN_UI_RENDERER = "skia"
 ```
 
-## 5. SkiaRenderer 关键实现
+Today there are two runtime outcomes:
 
-### 5.1 初始化
+- if the build does not include Skia, the renderer factory falls back to
+  Direct2D and the title reflects that fallback
+- if the build includes Skia through a supported package path, the app can instantiate the
+  Skia renderer directly
 
-- `SkiaRenderer::Initialize(HWND hwnd)`
-  - 使用 `SkSurfaceProps`、`SkFontMgr`、`SkTypeface`。
-  - 若使用 GPU 后端，则创建 D3D11 设备/上下文并构建 `GrDirectContext`。
+There is also a safety fallback during startup: if the Skia renderer can be
+created but fails `Initialize(HWND)`, the app now retries Direct2D before
+giving up. That keeps backend experiments from turning into app-start failures.
 
-### 5.2 绘制方法对应关系
+One verified runtime example on this repository is:
 
-- `FillRect` -> `SkCanvas::drawRect`
-- `DrawRect` -> `SkCanvas::drawRect` + `SkPaint::setStyle(SkPaint::kStroke_Style)`
-- `DrawTextW` -> `SkTextBlob::MakeFromText` 或 `SkFont::measureText`
+- window title: `AI WinUI Renderer [Skia] - layouts/yoga_measure_cases.xml`
 
-### 5.3 字体与文本
+That confirms the app can launch through the Skia path directly rather than
+silently falling back to Direct2D.
 
-Skia 的文本绘制建议使用 `SkFont` + `SkTextBlob`：
+## Build Preparation
 
-- 支持 Unicode / Wide string。
-- 可将 `wchar_t*` 转换为 UTF-8，或者使用 `SkTextUtils::DrawString`。
-- 也可以配合 `SkFontMgr::matchFamilyStyle` 加载 `Segoe UI`。
+`CMakeLists.txt` now exposes two knobs for the future Skia work:
 
-## 6. 与当前 UI 结构整合
+- `AI_WIN_UI_ENABLE_SKIA`
+- `AI_WIN_UI_SKIA_PROVIDER`
+- `AI_WIN_UI_SKIA_DIR`
 
-### 6.1 保持 UI 逻辑不变
+The repository currently supports two conceptual ways to surface Skia into the
+build:
 
-当前 `src/ui.h` 的布局和事件分发已具备：
-- 绝对布局由 `Panel::Arrange` 计算。
-- 事件分发由 `OnMouseMove/Down/Up` 递归实现。
-- `Button` 已支持 hover/pressed/click。
+- `local-sdk`
+- `vcpkg`
 
-Skia 只需替换绘制实现，不需要改动事件系统。
+The chosen near-term path is `local-sdk`, specifically targeting the
+`aseprite/skia` package layout.
 
-### 6.2 可能需要进一步的适配
+### Chosen Path: `aseprite/skia` as Local SDK
 
-- 将 `D2D1_RECT_F`、`D2D1_COLOR_F` 抽象为项目级 `Rect` 和 `Color` 类型。
-- 在 `Renderer` 接口层统一坐标与颜色格式，避免依赖 Direct2D SDK。
+Current intent:
 
-## 7. Yoga 布局引擎
+- unpack an `aseprite/skia` Windows x64 package into a local directory
+- point `AI_WIN_UI_SKIA_DIR` at that directory
+- teach the CMake `local-sdk` branch how to consume the package layout
+- keep `vcpkg` as a later follow-up instead of the active delivery path
 
-若希望将当前的 UI 布局扩展为真正的 Flex 布局引擎，推荐引入 Facebook 的 `Yoga`：
+The `aseprite/skia` releases are useful here because they are published as
+prebuilt archives intended to be unpacked and reused like a local Skia build
+output.
 
-- `Yoga` 本身就是基于 Flexbox 的布局引擎，可以为 `Panel` 和其它容器提供 `flex-direction`、`justify-content`、`align-items`、`flex-grow`、`flex-shrink` 等属性。
-- 当前 `Panel::Arrange` 可替换为 `Yoga` 计算布局结果后再设置子元素边界。
-- 事件交互层无需改动，继续使用现有 `UIElement` 树的 hit test 与 mouse 事件分发。
+The local SDK branch now expects a package layout compatible with this shape:
 
-### 7.1 集成方式
+- `<SKIA_DIR>/include/...`
+- `<SKIA_DIR>/out/Debug-x64/skia.lib`
+- `<SKIA_DIR>/out/Release-x64/skia.lib`
 
-1. 在 CMake 中添加 Yoga 源码或库，推荐使用 `git submodule` 或通过包管理器获取。 
-2. 为每个 `UIElement` 保存一个 `YGNodeRef`：
-   - `YGNodeStyleSetFlexDirection(node, YGFlexDirectionColumn);`
-   - `YGNodeStyleSetJustifyContent(node, YGJustifyFlexStart);`
-   - `YGNodeStyleSetAlignItems(node, YGAlignStretch);`
-   - `YGNodeStyleSetFlexGrow(node, 1.0f);`
-3. 在布局阶段调用 `YGNodeCalculateLayout(rootNode, width, height, YGDirectionLTR);`
-4. 从 Yoga 的 `YGNodeLayoutGetLeft/Top/Width/Height` 读取最终位置并传给 `UIElement::SetBounds()`。
+If needed, the defaults can be overridden with:
 
-### 7.2 适配建议
+- `AI_WIN_UI_SKIA_INCLUDE_DIR`
+- `AI_WIN_UI_SKIA_LIBRARY_DIR`
 
-- 抽象现有 `Panel` 布局，使其仅负责“子元素容器逻辑”，并把实际布局委托给 Yoga。
-- 保持 `Panel` 的 padding/spacing 逻辑，可在 Yoga 的容器节点上使用 `YGNodeStyleSetPadding` 和额外的占位子节点实现间距。
-- 对于非容器元素（如 `Label`、`Button`），可继续使用固定高度或 `auto` 高度，Yoga 会根据 `YGNodeStyleSetFlexBasis` 自动计算。
+### vcpkg Manifest
 
-### 7.3 CMake 配置参考
+The repo now includes a `vcpkg.json` feature:
 
-```cmake
-add_subdirectory(external/yoga)
+- feature name: `skia`
+- package name: `skia`
+- CMake package expected from vcpkg: `unofficial-skia`
+- CMake target expected from vcpkg: `unofficial::skia::skia`
 
-target_link_libraries(ai_win_ui PRIVATE yoga)
+The enabled feature set is intentionally narrow and Windows-oriented:
+
+- `jpeg`
+- `png`
+- `webp`
+
+This remains in the repository as an alternative dependency path, but it is not
+the selected short-term integration route anymore.
+
+The manifest now includes a `builtin-baseline`, but this path is intentionally
+de-prioritized until the local SDK integration is complete.
+
+### Configure Examples
+
+To keep the current build path unchanged:
+
+```powershell
+cmake -S . -B build
 ```
 
-或通过预编译库：
+To enable the Skia scaffolding with a local SDK layout:
 
-```cmake
-find_package(Yoga REQUIRED)
-
-target_link_libraries(ai_win_ui PRIVATE Yoga::Yoga)
+```powershell
+cmake -S . -B build `
+  -DAI_WIN_UI_ENABLE_SKIA=ON `
+  -DAI_WIN_UI_SKIA_PROVIDER=local-sdk `
+  -DAI_WIN_UI_SKIA_DIR=F:/deps/skia-m124
 ```
 
-### 7.4 结合 Skia 的整体方案
+For the chosen `aseprite/skia` route, the expected next step is to point this
+directory at the unpacked Windows package root.
 
-- Yoga 负责布局，Skia 负责绘制。
-- 先执行 `Yoga` 布局计算，再在 `Render()` 中调用 `SkiaRenderer` 绘制最终边界。
-- 组件状态（hover/pressed）仍由事件系统驱动，布局与绘制分离。
+If the package uses a different include root or library directory, use:
 
-## 8. 不规则窗口与无 title 模式
+```powershell
+cmake -S . -B build `
+  -DAI_WIN_UI_ENABLE_SKIA=ON `
+  -DAI_WIN_UI_SKIA_PROVIDER=local-sdk `
+  -DAI_WIN_UI_SKIA_DIR=F:/deps/skia-m124 `
+  -DAI_WIN_UI_SKIA_INCLUDE_DIR=F:/deps/skia-m124 `
+  -DAI_WIN_UI_SKIA_LIBRARY_DIR=F:/deps/skia-m124/out
+```
 
-Skia 本身只负责内部绘制，窗口形状由 Win32 控制：
+To enable the vcpkg package path:
 
-- 无 title 模式：使用 `WS_POPUP` 或 `WS_OVERLAPPEDWINDOW` 并隐藏标题栏。
-- 自定义拖拽区：在顶部区域处理 `WM_LBUTTONDOWN`，并调用 `ReleaseCapture()` + `SendMessage(hwnd, WM_NCLBUTTONDOWN, HTCAPTION, 0)`。
-- 不规则窗口：使用 `SetWindowRgn` 或 `UpdateLayeredWindow` 创建圆角/复杂形状。
+```powershell
+cmake -S . -B build `
+  -DCMAKE_TOOLCHAIN_FILE=%VCPKG_ROOT%/scripts/buildsystems/vcpkg.cmake `
+  -DVCPKG_MANIFEST_FEATURES=skia `
+  -DAI_WIN_UI_ENABLE_SKIA=ON `
+  -DAI_WIN_UI_SKIA_PROVIDER=vcpkg
+```
 
-内部布局仍然可以用 `Panel` + flex 规则保持一致。
+When `AI_WIN_UI_SKIA_PROVIDER=vcpkg`, CMake now does:
 
-## 8. 组件事件交互扩展建议
+```cmake
+find_package(unofficial-skia CONFIG REQUIRED)
+target_link_libraries(ai_win_ui PRIVATE unofficial::skia::skia)
+```
 
-- 增加 `OnMouseLeave`、`OnMouseEnter`、`OnKeyDown`、`OnKeyUp`。
-- 支持 `Focusable` 元素与键盘焦点。
-- 引入 `Click`, `Hover`, `Press`, `Drag` 等通用事件回调。
-- 对于不规则窗口，补充可见性/遮罩命中测试，以避免透明区域误触。
+That means the repo still retains a `vcpkg` option, but the recommended next
+work should happen on the `local-sdk` side first.
 
----
+### CMake Presets
 
-创建本分析文档的目的是让 `ai-win-ui` 项目能够：
-- 清晰定义当前 Direct2D 渲染与事件处理能力；
-- 规划 Skia 作为后端替代的实现路径；
-- 保持组件交互与窗口布局的稳定性。
+The repo now also includes `CMakePresets.json` with useful starting points:
+
+- `dev-debug`
+- `dev-debug-skia-local-sdk`
+- `dev-debug-skia-vcpkg`
+- `dev-debug-skia-vs-vcpkg`
+
+Use them like this:
+
+```powershell
+cmake --preset dev-debug
+cmake --build --preset build-dev-debug
+```
+
+and, once `VCPKG_ROOT` is configured:
+
+```powershell
+cmake --preset dev-debug-skia-vcpkg
+cmake --build --preset build-dev-debug-skia-vcpkg
+```
+
+For the chosen prebuilt package path:
+
+```powershell
+cmake --preset dev-debug-skia-local-sdk
+cmake --build --preset build-dev-debug-skia-local-sdk
+```
+
+To fetch the selected `aseprite/skia` package into the repository's default
+location, use:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_skia_prebuilt.ps1
+```
+
+## Quick Start Examples
+
+### Example 1: Build the Default Direct2D Path
+
+```powershell
+cmake --preset dev-debug
+cmake --build --preset build-dev-debug
+```
+
+### Example 2: Build the Skia Local-SDK Path
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_skia_prebuilt.ps1
+cmake --preset dev-debug-skia-local-sdk
+cmake --build --preset build-dev-debug-skia-local-sdk
+```
+
+### Example 3: Run the App with the Default Gallery Layout on Skia
+
+The default `resource/layouts/ui.xml` and `resource/layouts/ui.json` already
+include a small image gallery with multiple `Image` controls. This is the
+easiest way to validate Skia bitmap decode, clipping, rounded corners, and
+Yoga-driven layout in one pass.
+
+```powershell
+$env:AI_WIN_UI_RENDERER = "skia"
+Remove-Item Env:AI_WIN_UI_LAYOUT -ErrorAction SilentlyContinue
+Start-Process -FilePath ".\build\presets\dev-debug-skia-local-sdk\Debug\ai_win_ui.exe"
+```
+
+What to look for:
+
+- the window title should say `AI WinUI Renderer [Skia]`
+- the image strip in the middle of the page should load from
+  `resource/images/`
+- rounded image corners should be clipped cleanly
+- the bottom action row should still be positioned by Yoga correctly
+
+### Example 4: Run the Yoga Measurement Sample on Skia
+
+```powershell
+$env:AI_WIN_UI_RENDERER = "skia"
+$env:AI_WIN_UI_LAYOUT = "layouts/yoga_measure_cases.xml"
+Start-Process -FilePath ".\build\presets\dev-debug-skia-local-sdk\Debug\ai_win_ui.exe"
+```
+
+This sample is useful when checking layout behavior first and image behavior
+second, because it puts row/column sizing and text measurement under more
+pressure than the default gallery layout.
+
+### Example 5: Compare Direct2D and Skia Quickly
+
+```powershell
+$env:AI_WIN_UI_RENDERER = "direct2d"
+Start-Process -FilePath ".\build\Debug\ai_win_ui.exe"
+
+$env:AI_WIN_UI_RENDERER = "skia"
+Start-Process -FilePath ".\build\presets\dev-debug-skia-local-sdk\Debug\ai_win_ui.exe"
+```
+
+This makes it easier to compare:
+
+- text sharpness
+- rounded clipping
+- bitmap scaling and aspect ratio
+- overall spacing under the same Yoga layout
+
+## Layout and Image Examples
+
+### Minimal XML Image Example
+
+```xml
+<Panel padding="24" spacing="12">
+  <Label text="Skia image sample" />
+  <Image source="images/img1.jpg" cornerRadius="14" />
+</Panel>
+```
+
+This exercises:
+
+- `LayoutParser` loading image bytes through `IResourceProvider`
+- `Image` creating a backend `BitmapHandle`
+- `SkiaRenderer::CreateBitmapFromBytes`
+- `SkiaRenderer::DrawBitmap`
+
+### Minimal JSON Image Example
+
+```json
+{
+  "type": "Panel",
+  "props": { "padding": 24, "spacing": 12 },
+  "children": [
+    { "type": "Label", "props": { "text": "Skia image sample" } },
+    {
+      "type": "Image",
+      "props": {
+        "source": "images/img1.jpg",
+        "cornerRadius": 14
+      }
+    }
+  ]
+}
+```
+
+### Mixed Yoga + Image Gallery Example
+
+The current default layout already demonstrates a more realistic mixed case:
+
+- a vertical page shell
+- a row-oriented toolbar
+- a multi-image content strip
+- rounded image clipping
+- bottom actions held in place by Yoga flex behavior
+
+Representative XML fragment:
+
+```xml
+<Panel spacing="16">
+  <Panel direction="row" spacing="12">
+    <Button text="Preview" />
+    <Button text="Publish" />
+    <Spacer flexGrow="1" flexBasis="0" />
+    <Label text="3 tasks left" />
+  </Panel>
+
+  <Panel direction="row" spacing="12">
+    <Image source="images/img1.jpg" cornerRadius="10" />
+    <Image source="images/3d-design_9390515.png" cornerRadius="10" />
+    <Image source="images/ai_10439488.png" cornerRadius="10" />
+    <Image source="images/airplane_10521325.png" cornerRadius="10" />
+  </Panel>
+</Panel>
+```
+
+This is a good first manual verification target because it exercises both the
+Yoga integration and the Skia bitmap path without needing any new test assets.
+
+## Recommended Integration Sequence
+
+### Step 1
+
+Keep Yoga work stable.
+
+- Do not mix major Yoga behavior changes with the first Skia renderer landing.
+- Use the existing `resource/layouts/yoga_measure_cases.xml` and
+  `resource/layouts/yoga_measure_cases.json` samples as a layout baseline.
+
+### Step 2
+
+Grow the dedicated `renderer_skia.cpp` in small slices.
+
+- Keep the current Direct2D renderer untouched as a fallback and comparison
+  backend.
+- Avoid changing the UI-facing renderer interface while closing feature gaps.
+
+### Step 3
+
+Choose the first Skia surface strategy.
+
+Two realistic options:
+
+- CPU raster first:
+  - easiest proof of concept
+  - simplest dependency shape
+  - slower, but good for correctness work
+- D3D11-backed Skia surface:
+  - better long-term path on Windows
+  - more integration work up front
+  - better aligned with a production renderer
+
+For this project, the steady path is:
+
+1. land CPU raster first if we need fast validation
+2. move to D3D11-backed Skia after API parity is stable
+
+### Step 4
+
+Port renderer features in small slices.
+
+Recommended order:
+
+1. `BeginFrame` / `EndFrame`
+2. solid rect and rounded rect drawing
+3. clipping
+4. bitmap upload and draw
+5. text draw
+
+This order gives visible progress while keeping regressions easier to isolate.
+
+## API Mapping Checklist
+
+The current `IRenderer` surface already gives a concrete checklist for the Skia
+backend:
+
+- `FillRect`
+- `FillRoundedRect`
+- `DrawRect`
+- `DrawRoundedRect`
+- `PushRoundedClip`
+- `PopLayer`
+- `DrawTextW`
+- `CreateBitmapFromBytes`
+- `GetBitmapSize`
+- `DrawBitmap`
+
+The remaining design question is not the UI API. It is the Windows surface and
+text strategy used inside the Skia implementation.
+
+## Text and Bitmap Notes
+
+Skia integration should respect the abstractions already in place:
+
+- UI code should keep using `BitmapHandle`, not Skia image objects directly.
+- UI code should keep using `ITextMeasurer`, not Skia text APIs directly.
+- If Skia eventually owns text measurement too, that should happen behind
+  `ITextMeasurer`, not by leaking Skia types into `ui.h`.
+
+This preserves the architecture work that already removed Direct2D,
+DirectWrite, and WRL details from the public UI layer.
+
+## Current Implementation Snapshot
+
+The current `renderer_skia.cpp` is intentionally small but real.
+
+Implemented behind `AI_WIN_UI_HAS_VCPKG_SKIA` or `AI_WIN_UI_HAS_LOCAL_SKIA`:
+
+- raster surface creation via `SkSurfaces::WrapPixels`
+- frame clear
+- filled and stroked rectangles
+- filled and stroked rounded rectangles
+- rounded clipping via save/clip/restore
+- encoded image decode via `SkImages::DeferredFromEncodedData`
+- image draw into destination rect
+- first-pass UTF-8 text draw using `SkFont` and `drawSimpleText`
+
+The current image path specifically looks like this:
+
+1. `LayoutParser` loads `resource/images/...` bytes through the active
+   `IResourceProvider`
+2. `Image` stores those bytes and lazily requests a `BitmapHandle`
+3. the renderer decodes the encoded payload into a backend bitmap resource
+4. `Image::Render` calls `DrawBitmap`
+5. Skia draws the image into the destination rect, optionally inside a rounded
+   clip
+
+Current limits:
+
+- text draw is single-line and does not yet match DirectWrite wrapping behavior
+- presentation is CPU/raster only
+- bitmap scaling and text fidelity still need a deeper side-by-side comparison
+  against the Direct2D backend
+- the current `vcpkg` manifest intentionally avoids `direct3d`, `freetype`,
+  `harfbuzz`, and `icu` for the first bring-up, so advanced text behavior is
+  not the target yet
+- the `vcpkg` Skia path has not been verified in this repository yet because it
+  still depends on local `VCPKG_ROOT` setup
+
+## Next Concrete Tasks
+
+1. Improve wrapped text rendering so it better matches the existing UI layout
+   expectations.
+2. Compare image presentation, clipping, and DPI behavior against Direct2D
+   using the default gallery layout.
+3. Decide whether image scaling should stay with the current simple
+   `drawImageRect` path or move to a more explicit sampling policy.
+4. Add one or two dedicated Skia-focused sample layouts if image-heavy scenarios
+   need clearer manual regression targets.
+5. Only after raster parity is acceptable, revisit either `vcpkg` or a
+   self-build workflow.

@@ -15,6 +15,23 @@
 
 namespace {
 
+std::wstring ToLowerAscii(std::wstring value) {
+    for (auto& ch : value) {
+        if (ch >= L'A' && ch <= L'Z') {
+            ch = static_cast<wchar_t>(ch - L'A' + L'a');
+        }
+    }
+    return value;
+}
+
+RendererBackend ParseRendererBackend(const std::wstring& value) {
+    const std::wstring normalized = ToLowerAscii(value);
+    if (normalized == L"skia") {
+        return RendererBackend::Skia;
+    }
+    return RendererBackend::Direct2D;
+}
+
 void InitializeDpiAwareness() {
     using SetProcessDpiAwarenessContextFn = BOOL(WINAPI*)(DPI_AWARENESS_CONTEXT);
     using SetProcessDpiAwarenessFn = HRESULT(WINAPI*)(PROCESS_DPI_AWARENESS);
@@ -97,8 +114,8 @@ public:
 
         UpdateDpiContext(GetWindowDpiWithFallback(m_hwnd));
 
-        m_renderer = CreateRenderer();
-        if (!m_renderer || !m_renderer->Initialize(m_hwnd)) {
+        m_requestedRendererBackend = ParseRendererBackend(GetEnvironmentValue(L"AI_WIN_UI_RENDERER"));
+        if (!InitializeRenderer()) {
             return false;
         }
         m_uiContext.renderer = m_renderer.get();
@@ -137,6 +154,25 @@ public:
     }
 
 private:
+    bool InitializeRenderer() {
+        m_renderer = CreateRenderer(m_requestedRendererBackend);
+        if (m_renderer && m_renderer->Initialize(m_hwnd)) {
+            m_activeRendererBackend = m_renderer->Backend();
+            return true;
+        }
+
+        if (m_requestedRendererBackend != RendererBackend::Direct2D) {
+            m_renderer = CreateDirect2DRenderer();
+            if (m_renderer && m_renderer->Initialize(m_hwnd)) {
+                m_activeRendererBackend = m_renderer->Backend();
+                return true;
+            }
+        }
+
+        m_renderer.reset();
+        return false;
+    }
+
     void UpdateDpiContext(UINT dpi) {
         m_uiContext.dpi = dpi > 0 ? dpi : 96;
         m_uiContext.dpiScale = static_cast<float>(m_uiContext.dpi) / 96.0f;
@@ -238,7 +274,13 @@ private:
     }
 
     void UpdateWindowTitle() {
-        std::wstring title = L"AI WinUI Renderer";
+        std::wstring title = L"AI WinUI Renderer [";
+        title += RendererBackendDisplayName(m_activeRendererBackend);
+        if (m_requestedRendererBackend != m_activeRendererBackend) {
+            title += L" fallback from ";
+            title += RendererBackendDisplayName(m_requestedRendererBackend);
+        }
+        title += L"]";
         if (!m_activeLayoutPath.empty()) {
             const int size = MultiByteToWideChar(CP_UTF8, 0, m_activeLayoutPath.c_str(), -1, nullptr, 0);
             if (size > 1) {
@@ -565,6 +607,8 @@ private:
     std::unique_ptr<ILayoutEngine> m_layoutEngine;
     std::unique_ptr<IResourceProvider> m_resourceProvider;
     std::string m_activeLayoutPath;
+    RendererBackend m_requestedRendererBackend = RendererBackend::Direct2D;
+    RendererBackend m_activeRendererBackend = RendererBackend::Direct2D;
     std::unique_ptr<UIElement> m_root;
     UIElement* m_focusedElement = nullptr;
     UIElement* m_mouseCaptureTarget = nullptr;

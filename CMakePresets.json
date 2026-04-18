@@ -1,0 +1,99 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": {
+    "major": 3,
+    "minor": 21,
+    "patch": 0
+  },
+  "configurePresets": [
+    {
+      "name": "dev-debug",
+      "displayName": "Dev Debug",
+      "generator": "Visual Studio 17 2022",
+      "binaryDir": "${sourceDir}/build/presets/dev-debug",
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug"
+      }
+    },
+    {
+      "name": "dev-debug-skia-vcpkg",
+      "displayName": "Dev Debug + Skia (vcpkg)",
+      "inherits": "dev-debug",
+      "binaryDir": "${sourceDir}/build/presets/dev-debug-skia-vcpkg",
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_MANIFEST_FEATURES": "skia",
+        "AI_WIN_UI_ENABLE_SKIA": "ON",
+        "AI_WIN_UI_SKIA_PROVIDER": "vcpkg"
+      }
+    },
+    {
+      "name": "dev-debug-skia-local-sdk",
+      "displayName": "Dev Debug + Skia (local SDK)",
+      "inherits": "dev-debug",
+      "binaryDir": "${sourceDir}/build/presets/dev-debug-skia-local-sdk",
+      "cacheVariables": {
+        "AI_WIN_UI_ENABLE_SKIA": "ON",
+        "AI_WIN_UI_SKIA_PROVIDER": "local-sdk",
+        "AI_WIN_UI_SKIA_DIR": "${sourceDir}/third_party/skia-m124"
+      }
+    },
+    {
+      "name": "dev-debug-skia-vs-vcpkg",
+      "displayName": "Dev Debug + Skia (VS bundled vcpkg)",
+      "inherits": "dev-debug",
+      "binaryDir": "${sourceDir}/build/presets/dev-debug-skia-vs-vcpkg-raster",
+      "environment": {
+        "VCPKG_ROOT": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/vcpkg"
+      },
+      "cacheVariables": {
+        "CMAKE_TOOLCHAIN_FILE": "C:/Program Files/Microsoft Visual Studio/2022/Community/VC/vcpkg/scripts/buildsystems/vcpkg.cmake",
+        "VCPKG_MANIFEST_FEATURES": "skia",
+        "AI_WIN_UI_ENABLE_SKIA": "ON",
+        "AI_WIN_UI_SKIA_PROVIDER": "vcpkg"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-dev-debug",
+      "displayName": "Build Dev Debug",
+      "configurePreset": "dev-debug",
+      "configuration": "Debug",
+      "targets": [
+        "ai_win_ui"
+      ]
+    },
+    {
+      "name": "build-dev-debug-skia-vcpkg",
+      "displayName": "Build Dev Debug + Skia (vcpkg)",
+      "configurePreset": "dev-debug-skia-vcpkg",
+      "configuration": "Debug",
+      "targets": [
+        "ai_win_ui"
+      ]
+    },
+    {
+      "name": "build-dev-debug-skia-local-sdk",
+      "displayName": "Build Dev Debug + Skia (local SDK)",
+      "configurePreset": "dev-debug-skia-local-sdk",
+      "configuration": "Debug",
+      "targets": [
+        "ai_win_ui"
+      ]
+    },
+    {
+      "name": "build-dev-debug-skia-vs-vcpkg",
+      "displayName": "Build Dev Debug + Skia (VS bundled vcpkg)",
+      "configurePreset": "dev-debug-skia-vs-vcpkg",
+      "configuration": "Debug",
+      "targets": [
+        "ai_win_ui"
+      ]
+    }
+  ]
+}
