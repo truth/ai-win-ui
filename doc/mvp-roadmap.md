@@ -187,6 +187,25 @@ Exit criteria:
 
 - one documented pass over the validation pages can confirm MVP readiness
 
+## Immediate Execution Plan
+
+The roadmap above defines what is left.
+
+The recommended execution order for the next work sessions is:
+
+1. Skia text parity
+   - close the gap between text measurement and Skia text drawing
+   - validate `Label`, `Button`, and `TextInput` first
+2. Yoga behavior calibration
+   - re-check `spaceBetween`, stretch behavior, `flexBasis`, `min/max`, and wrap pressure cases
+   - use `yoga_measure_cases.xml` and `core_validation.xml` as the primary repro surfaces
+3. MVP acceptance flow
+   - document the manual validation pass only after the main visual and layout issues are stable enough to describe
+
+For the detailed ordered task list, see:
+
+- `doc/mvp-execution-plan.md`
+
 ## Non-MVP Work
 
 These items are valuable, but they are not required to close the current MVP:

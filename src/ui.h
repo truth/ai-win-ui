@@ -271,8 +271,16 @@ protected:
         return clamped;
     }
 
-    Size MeasureTextValue(const std::wstring& text, float fontSize, float maxWidth) const {
-        return MeasureTextLayout(m_context ? m_context->textMeasurer : nullptr, text, ScaleValue(fontSize), maxWidth);
+    Size MeasureTextValue(const std::wstring& text,
+                          float fontSize,
+                          float maxWidth,
+                          TextWrapMode wrapMode = TextWrapMode::Wrap) const {
+        return MeasureTextLayout(
+            m_context ? m_context->textMeasurer : nullptr,
+            text,
+            ScaleValue(fontSize),
+            maxWidth,
+            wrapMode);
     }
 
     Rect m_bounds{};
@@ -934,12 +942,20 @@ public:
 
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
-        const Size measured = MeasureTextValue(m_text, fontSize, availableWidth > 0.0f ? availableWidth : 4096.0f);
+        const Size measured = MeasureTextValue(
+            m_text,
+            fontSize,
+            availableWidth > 0.0f ? availableWidth : 4096.0f,
+            TextWrapMode::NoWrap);
         return std::min(availableWidth, measured.width + ScaleValue(24.0f));
     }
 
     float MeasurePreferredHeight(float width) const override {
-        const Size measured = MeasureTextValue(m_text, fontSize, width > 0.0f ? width : 4096.0f);
+        const Size measured = MeasureTextValue(
+            m_text,
+            fontSize,
+            width > 0.0f ? width : 4096.0f,
+            TextWrapMode::NoWrap);
         return measured.height + ScaleValue(14.0f);
     }
 
@@ -1296,7 +1312,11 @@ public:
         size_t newCaret = m_text.size();
         for (size_t i = 0; i <= m_text.size(); ++i) {
             const std::wstring prefix = m_text.substr(0, i);
-            const Size metrics = MeasureTextValue(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
+            const Size metrics = MeasureTextValue(
+                prefix.empty() ? L" " : prefix,
+                fontSize,
+                std::max(1.0f, textRect.right - textRect.left),
+                TextWrapMode::NoWrap);
             if (localX < metrics.width + ScaleValue(4.0f)) {
                 newCaret = i;
                 break;
@@ -1327,14 +1347,22 @@ protected:
     float MeasurePreferredWidth(float availableWidth) const override {
         const std::wstring measureText = m_text.empty() ? L" " : m_text;
         const float inset = ScaleValue(16.0f);
-        const Size measured = MeasureTextValue(measureText, fontSize, std::max(1.0f, availableWidth - inset));
+        const Size measured = MeasureTextValue(
+            measureText,
+            fontSize,
+            std::max(1.0f, availableWidth - inset),
+            TextWrapMode::NoWrap);
         return std::min(availableWidth, measured.width + inset);
     }
 
     float MeasurePreferredHeight(float width) const override {
         const std::wstring measureText = m_text.empty() ? L" " : m_text;
         const float inset = ScaleValue(16.0f);
-        const Size measured = MeasureTextValue(measureText, fontSize, std::max(1.0f, width - inset));
+        const Size measured = MeasureTextValue(
+            measureText,
+            fontSize,
+            std::max(1.0f, width - inset),
+            TextWrapMode::NoWrap);
         return measured.height + ScaleValue(12.0f);
     }
 
@@ -1354,8 +1382,16 @@ public:
             const auto [selStart, selEnd] = GetSelectionRange();
             std::wstring prefix = m_text.substr(0, selStart);
             std::wstring selection = m_text.substr(selStart, selEnd - selStart);
-            const Size prefixMetrics = MeasureTextValue(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
-            const Size selectionMetrics = MeasureTextValue(selection.empty() ? L" " : selection, fontSize, std::max(1.0f, textRect.right - textRect.left));
+            const Size prefixMetrics = MeasureTextValue(
+                prefix.empty() ? L" " : prefix,
+                fontSize,
+                std::max(1.0f, textRect.right - textRect.left),
+                TextWrapMode::NoWrap);
+            const Size selectionMetrics = MeasureTextValue(
+                selection.empty() ? L" " : selection,
+                fontSize,
+                std::max(1.0f, textRect.right - textRect.left),
+                TextWrapMode::NoWrap);
             Rect selectionRect = Rect::Make(
                 textRect.left + prefixMetrics.width,
                 textRect.top,
@@ -1379,10 +1415,18 @@ public:
 
         if (m_hasFocus) {
             const std::wstring prefix = m_text.substr(0, m_caretPosition);
-            const Size caretMetrics = MeasureTextValue(prefix.empty() ? L" " : prefix, fontSize, std::max(1.0f, textRect.right - textRect.left));
+            const Size caretMetrics = MeasureTextValue(
+                prefix.empty() ? L" " : prefix,
+                fontSize,
+                std::max(1.0f, textRect.right - textRect.left),
+                TextWrapMode::NoWrap);
             const float caretX = textRect.left + caretMetrics.width;
             const float caretTop = textRect.top;
-            const float caretBottom = textRect.top + MeasureTextValue(L"|", fontSize, std::max(1.0f, textRect.right - textRect.left)).height;
+            const float caretBottom = textRect.top + MeasureTextValue(
+                L"|",
+                fontSize,
+                std::max(1.0f, textRect.right - textRect.left),
+                TextWrapMode::NoWrap).height;
             if (m_showCaret) {
                 renderer.DrawRect(Rect::Make(caretX, caretTop, caretX + ScaleValue(1.0f), caretBottom), textColor, 1.0f);
             }
@@ -1468,13 +1512,21 @@ public:
 
     float MeasurePreferredWidth(float availableWidth) const override {
         const float reserve = ScaleValue(30.0f);
-        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, availableWidth - reserve));
+        const Size textSize = MeasureTextValue(
+            m_text.empty() ? L" " : m_text,
+            fontSize,
+            std::max(1.0f, availableWidth - reserve),
+            TextWrapMode::NoWrap);
         return std::min(availableWidth, textSize.width + reserve);
     }
 
     float MeasurePreferredHeight(float width) const override {
         const float reserve = ScaleValue(30.0f);
-        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, width - reserve));
+        const Size textSize = MeasureTextValue(
+            m_text.empty() ? L" " : m_text,
+            fontSize,
+            std::max(1.0f, width - reserve),
+            TextWrapMode::NoWrap);
         return textSize.height + ScaleValue(10.0f);
     }
 
@@ -1588,13 +1640,21 @@ public:
 
     float MeasurePreferredWidth(float availableWidth) const override {
         const float reserve = ScaleValue(28.0f);
-        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, availableWidth - reserve));
+        const Size textSize = MeasureTextValue(
+            m_text.empty() ? L" " : m_text,
+            fontSize,
+            std::max(1.0f, availableWidth - reserve),
+            TextWrapMode::NoWrap);
         return std::min(availableWidth, textSize.width + reserve);
     }
 
     float MeasurePreferredHeight(float width) const override {
         const float reserve = ScaleValue(28.0f);
-        const Size textSize = MeasureTextValue(m_text.empty() ? L" " : m_text, fontSize, std::max(1.0f, width - reserve));
+        const Size textSize = MeasureTextValue(
+            m_text.empty() ? L" " : m_text,
+            fontSize,
+            std::max(1.0f, width - reserve),
+            TextWrapMode::NoWrap);
         return textSize.height + ScaleValue(10.0f);
     }
 

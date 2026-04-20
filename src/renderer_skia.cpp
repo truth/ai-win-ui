@@ -1,4 +1,5 @@
 #include "renderer.h"
+#include "skia_text_layout.h"
 
 #if defined(AI_WIN_UI_HAS_VCPKG_SKIA) || defined(AI_WIN_UI_HAS_LOCAL_SKIA)
 #include "include/core/SkCanvas.h"
@@ -22,10 +23,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <cwctype>
 #include <memory>
 #include <string>
-#include <vector>
 
 namespace {
 
@@ -51,144 +50,6 @@ std::string WideToUtf8(const wchar_t* text, UINT32 len) {
     std::string utf8(static_cast<size_t>(size), '\0');
     WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(len), utf8.data(), size, nullptr, nullptr);
     return utf8;
-}
-
-std::wstring TrimTrailingWhitespace(const std::wstring& value) {
-    size_t end = value.size();
-    while (end > 0 && std::iswspace(value[end - 1]) != 0) {
-        --end;
-    }
-    return value.substr(0, end);
-}
-
-float MeasureWideTextWidth(const SkFont& font, const std::wstring& text) {
-    const std::string utf8 = WideToUtf8(text.c_str(), static_cast<UINT32>(text.size()));
-    if (utf8.empty()) {
-        return 0.0f;
-    }
-    return font.measureText(utf8.data(), utf8.size(), SkTextEncoding::kUTF8);
-}
-
-std::vector<std::wstring> SplitWideLines(const wchar_t* text, UINT32 len) {
-    std::vector<std::wstring> lines;
-    if (!text || len == 0) {
-        lines.emplace_back();
-        return lines;
-    }
-
-    std::wstring current;
-    current.reserve(len);
-    for (UINT32 i = 0; i < len; ++i) {
-        const wchar_t ch = text[i];
-        if (ch == L'\r') {
-            if (i + 1 < len && text[i + 1] == L'\n') {
-                ++i;
-            }
-            lines.push_back(current);
-            current.clear();
-            continue;
-        }
-        if (ch == L'\n') {
-            lines.push_back(current);
-            current.clear();
-            continue;
-        }
-        current.push_back(ch);
-    }
-    lines.push_back(current);
-    return lines;
-}
-
-std::vector<std::wstring> WrapWideLine(const std::wstring& line, const SkFont& font, float maxWidth) {
-    if (line.empty()) {
-        return {L""};
-    }
-
-    if (maxWidth <= 1.0f || MeasureWideTextWidth(font, line) <= maxWidth) {
-        return {line};
-    }
-
-    std::vector<std::wstring> wrapped;
-    size_t lineStart = 0;
-    while (lineStart < line.size()) {
-        std::wstring candidate;
-        candidate.reserve(line.size() - lineStart);
-        size_t lastWhitespaceBreak = std::wstring::npos;
-        bool emitted = false;
-
-        for (size_t i = lineStart; i < line.size(); ++i) {
-            candidate.push_back(line[i]);
-            if (std::iswspace(line[i]) != 0) {
-                lastWhitespaceBreak = i;
-            }
-
-            if (MeasureWideTextWidth(font, candidate) <= maxWidth) {
-                continue;
-            }
-
-            if (candidate.size() == 1) {
-                wrapped.push_back(candidate);
-                lineStart = i + 1;
-                emitted = true;
-                break;
-            }
-
-            if (lastWhitespaceBreak != std::wstring::npos && lastWhitespaceBreak >= lineStart) {
-                std::wstring segment = TrimTrailingWhitespace(
-                    line.substr(lineStart, lastWhitespaceBreak - lineStart + 1));
-                if (segment.empty()) {
-                    segment = line.substr(lineStart, 1);
-                    lineStart += 1;
-                } else {
-                    lineStart = lastWhitespaceBreak + 1;
-                }
-                wrapped.push_back(segment);
-            } else {
-                wrapped.push_back(candidate.substr(0, candidate.size() - 1));
-                lineStart = i;
-            }
-
-            emitted = true;
-            break;
-        }
-
-        if (!emitted) {
-            wrapped.push_back(TrimTrailingWhitespace(line.substr(lineStart)));
-            break;
-        }
-    }
-
-    if (wrapped.empty()) {
-        wrapped.push_back(line);
-    }
-    return wrapped;
-}
-
-std::vector<std::wstring> LayoutWrappedText(const wchar_t* text, UINT32 len, const SkFont& font, float maxWidth) {
-    std::vector<std::wstring> wrappedLines;
-    for (const std::wstring& line : SplitWideLines(text, len)) {
-        const auto wrapped = WrapWideLine(line, font, maxWidth);
-        wrappedLines.insert(wrappedLines.end(), wrapped.begin(), wrapped.end());
-    }
-    if (wrappedLines.empty()) {
-        wrappedLines.emplace_back();
-    }
-    return wrappedLines;
-}
-
-std::vector<std::wstring> LayoutTextLines(const wchar_t* text,
-                                          UINT32 len,
-                                          const SkFont& font,
-                                          float maxWidth,
-                                          TextWrapMode wrapMode) {
-    if (wrapMode == TextWrapMode::NoWrap) {
-        const auto lines = SplitWideLines(text, len);
-        if (lines.empty()) {
-            return {L""};
-        }
-        return {lines.front()};
-    }
-    return LayoutWrappedText(text, len, font, maxWidth);
 }
 
 sk_sp<SkTypeface> TryMatchFamily(SkFontMgr* fontMgr, const char* familyName) {
@@ -386,29 +247,24 @@ public:
             font.setSubpixel(true);
             font.setHinting(SkFontHinting::kSlight);
 
-            const std::vector<std::wstring> lines = LayoutTextLines(
+            SkiaTextLayout layout;
+            if (!CreateSkiaTextLayout(
                 text,
                 len,
-                font,
+                fontSize,
                 std::max(1.0f, rect.Width()),
-                options.wrap);
-            if (lines.empty()) {
+                options.wrap,
+                &layout)) {
                 return;
             }
-
-            SkFontMetrics metrics{};
-            font.getMetrics(&metrics);
-
-            const float ascent = std::isfinite(metrics.fAscent) ? -metrics.fAscent : fontSize * 0.8f;
-            const float descent = std::isfinite(metrics.fDescent) ? metrics.fDescent : fontSize * 0.25f;
-            const float lineHeight = std::max(font.getSpacing(), ascent + descent);
-            const float textHeight = ascent + descent;
-            const float blockHeight = textHeight + std::max(0.0f, static_cast<float>(lines.size() - 1)) * lineHeight;
+            if (layout.lines.empty()) {
+                return;
+            }
             float startTop = rect.top;
             if (options.verticalAlign == TextVerticalAlign::Center) {
-                startTop = rect.top + std::max(0.0f, (rect.Height() - blockHeight) * 0.5f);
+                startTop = rect.top + std::max(0.0f, (rect.Height() - layout.blockHeight) * 0.5f);
             } else if (options.verticalAlign == TextVerticalAlign::End) {
-                startTop = rect.bottom - blockHeight;
+                startTop = rect.bottom - layout.blockHeight;
             }
 
             canvas->save();
@@ -419,23 +275,24 @@ public:
             paint.setStyle(SkPaint::kFill_Style);
             paint.setAntiAlias(true);
 
-            for (size_t i = 0; i < lines.size(); ++i) {
-                const float baseline = startTop + ascent + static_cast<float>(i) * lineHeight;
-                if (baseline - ascent > rect.bottom) {
+            for (size_t i = 0; i < layout.lines.size(); ++i) {
+                const float baseline = startTop + layout.ascent + static_cast<float>(i) * layout.lineHeight;
+                if (baseline - layout.ascent > rect.bottom) {
                     break;
                 }
 
-                const std::string utf8 = WideToUtf8(lines[i].c_str(), static_cast<UINT32>(lines[i].size()));
-                if (utf8.empty()) {
+                const std::string utf8 = WideToUtf8(
+                    layout.lines[i].text.c_str(),
+                    static_cast<UINT32>(layout.lines[i].text.size()));
+                if (utf8.empty() && !layout.lines[i].text.empty()) {
                     continue;
                 }
 
                 float drawX = rect.left;
-                const float lineWidth = MeasureWideTextWidth(font, lines[i]);
                 if (options.horizontalAlign == TextHorizontalAlign::Center) {
-                    drawX = rect.left + std::max(0.0f, (rect.Width() - lineWidth) * 0.5f);
+                    drawX = rect.left + std::max(0.0f, (rect.Width() - layout.lines[i].width) * 0.5f);
                 } else if (options.horizontalAlign == TextHorizontalAlign::End) {
-                    drawX = rect.right - lineWidth;
+                    drawX = rect.right - layout.lines[i].width;
                 }
 
                 canvas->drawSimpleText(

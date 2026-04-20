@@ -12,7 +12,11 @@ using Microsoft::WRL::ComPtr;
 
 class DirectWriteTextMeasurer final : public ITextMeasurer {
 public:
-    Size MeasureText(const wchar_t* text, uint32_t len, float fontSize, float maxWidth) override {
+    Size MeasureText(const wchar_t* text,
+                     uint32_t len,
+                     float fontSize,
+                     float maxWidth,
+                     TextWrapMode wrapMode) override {
         if (!text || len == 0 || fontSize <= 0.0f) {
             return Size{};
         }
@@ -36,6 +40,10 @@ public:
 
         textFormat->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
         textFormat->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+        textFormat->SetWordWrapping(
+            wrapMode == TextWrapMode::Wrap
+                ? DWRITE_WORD_WRAPPING_WRAP
+                : DWRITE_WORD_WRAPPING_NO_WRAP);
 
         ComPtr<IDWriteTextLayout> textLayout;
         if (FAILED(m_dwriteFactory->CreateTextLayout(
@@ -73,6 +81,6 @@ private:
 
 } // namespace
 
-std::unique_ptr<ITextMeasurer> CreateTextMeasurer() {
+std::unique_ptr<ITextMeasurer> CreateDirectWriteTextMeasurer() {
     return std::make_unique<DirectWriteTextMeasurer>();
 }

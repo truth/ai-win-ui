@@ -5,4 +5,8 @@
 
 #include <string>
 
-Size MeasureTextLayout(ITextMeasurer* measurer, const std::wstring& text, float fontSize, float maxWidth);
+Size MeasureTextLayout(ITextMeasurer* measurer,
+                       const std::wstring& text,
+                       float fontSize,
+                       float maxWidth,
+                       TextWrapMode wrapMode = TextWrapMode::Wrap);

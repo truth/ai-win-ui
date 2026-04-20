@@ -11,6 +11,8 @@ older design snapshot.
   - high-level overview and document index
 - `doc/mvp-roadmap.md`
   - current MVP definition, completed work, and remaining gaps
+- `doc/mvp-execution-plan.md`
+  - ordered next-step work plan with phase goals and exit criteria
 - `doc/layout-spec.md`
   - layout DSL authoring guidance
 - `doc/resource-packaging.md`
@@ -87,3 +89,4 @@ The main remaining MVP gaps are now:
 For the detailed status, see:
 
 - `doc/mvp-roadmap.md`
+- `doc/mvp-execution-plan.md`

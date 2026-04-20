@@ -16,7 +16,10 @@ add_executable(ai_win_ui WIN32
     src/layout_engine.cpp
     src/renderer.cpp
     src/renderer_skia.cpp
+    src/skia_text_layout.cpp
+    src/text_measurer.cpp
     src/text_measurer_dwrite.cpp
+    src/text_measurer_skia.cpp
     src/ui_text_metrics.cpp
     src/resource_provider.cpp
     src/zip_resource_provider.cpp

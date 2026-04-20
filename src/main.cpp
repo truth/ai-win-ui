@@ -124,7 +124,7 @@ public:
         }
         m_uiContext.renderer = m_renderer.get();
 
-        m_textMeasurer = CreateTextMeasurer();
+        m_textMeasurer = CreateTextMeasurer(m_activeRendererBackend);
         if (!m_textMeasurer) {
             return false;
         }
