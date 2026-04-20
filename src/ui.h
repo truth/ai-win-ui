@@ -765,12 +765,18 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const TextRenderOptions textOptions{
+            TextWrapMode::Wrap,
+            TextHorizontalAlign::Start,
+            TextVerticalAlign::Start
+        };
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
             m_bounds,
             m_color,
-            ScaleValue(m_fontSize)
+            ScaleValue(m_fontSize),
+            textOptions
         );
     }
 
@@ -963,12 +969,18 @@ public:
 
         Rect textRect = m_bounds;
         textRect.left += ScaleValue(10.0f);
+        const TextRenderOptions textOptions{
+            TextWrapMode::NoWrap,
+            TextHorizontalAlign::Center,
+            TextVerticalAlign::Center
+        };
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
             textRect,
             foreground,
-            ScaleValue(fontSize)
+            ScaleValue(fontSize),
+            textOptions
         );
     }
 
@@ -1352,7 +1364,18 @@ public:
             );
             renderer.FillRect(selectionRect, ColorFromHex(0x3A86FF));
         }
-        renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, ScaleValue(fontSize));
+        const TextRenderOptions textOptions{
+            TextWrapMode::NoWrap,
+            TextHorizontalAlign::Start,
+            TextVerticalAlign::Center
+        };
+        renderer.DrawTextW(
+            m_text.c_str(),
+            static_cast<UINT32>(m_text.size()),
+            textRect,
+            textColor,
+            ScaleValue(fontSize),
+            textOptions);
 
         if (m_hasFocus) {
             const std::wstring prefix = m_text.substr(0, m_caretPosition);
@@ -1474,7 +1497,18 @@ public:
 
         Rect textRect = m_bounds;
         textRect.left += ScaleValue(26.0f);
-        renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, ScaleValue(fontSize));
+        const TextRenderOptions textOptions{
+            TextWrapMode::NoWrap,
+            TextHorizontalAlign::Start,
+            TextVerticalAlign::Center
+        };
+        renderer.DrawTextW(
+            m_text.c_str(),
+            static_cast<UINT32>(m_text.size()),
+            textRect,
+            textColor,
+            ScaleValue(fontSize),
+            textOptions);
     }
 
     bool OnMouseDown(float x, float y) override {
@@ -1582,7 +1616,18 @@ public:
 
         Rect textRect = m_bounds;
         textRect.left += ScaleValue(26.0f);
-        renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, ScaleValue(fontSize));
+        const TextRenderOptions textOptions{
+            TextWrapMode::NoWrap,
+            TextHorizontalAlign::Start,
+            TextVerticalAlign::Center
+        };
+        renderer.DrawTextW(
+            m_text.c_str(),
+            static_cast<UINT32>(m_text.size()),
+            textRect,
+            textColor,
+            ScaleValue(fontSize),
+            textOptions);
     }
 
     bool OnMouseDown(float x, float y) override {
@@ -1733,7 +1778,18 @@ public:
         if (!m_label.empty()) {
             Rect labelRect = m_bounds;
             labelRect.right = trackLeft - ScaleValue(8.0f);
-            renderer.DrawTextW(m_label.c_str(), static_cast<UINT32>(m_label.size()), labelRect, textColor, ScaleValue(fontSize));
+            const TextRenderOptions textOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Start,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                m_label.c_str(),
+                static_cast<UINT32>(m_label.size()),
+                labelRect,
+                textColor,
+                ScaleValue(fontSize),
+                textOptions);
         }
     }
 

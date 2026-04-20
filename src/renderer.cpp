@@ -22,6 +22,30 @@ D2D1_RECT_F ToD2DRect(const Rect& rect) {
     return D2D1::RectF(rect.left, rect.top, rect.right, rect.bottom);
 }
 
+DWRITE_TEXT_ALIGNMENT ToDWriteTextAlignment(TextHorizontalAlign align) {
+    switch (align) {
+        case TextHorizontalAlign::Center:
+            return DWRITE_TEXT_ALIGNMENT_CENTER;
+        case TextHorizontalAlign::End:
+            return DWRITE_TEXT_ALIGNMENT_TRAILING;
+        case TextHorizontalAlign::Start:
+        default:
+            return DWRITE_TEXT_ALIGNMENT_LEADING;
+    }
+}
+
+DWRITE_PARAGRAPH_ALIGNMENT ToDWriteParagraphAlignment(TextVerticalAlign align) {
+    switch (align) {
+        case TextVerticalAlign::Center:
+            return DWRITE_PARAGRAPH_ALIGNMENT_CENTER;
+        case TextVerticalAlign::End:
+            return DWRITE_PARAGRAPH_ALIGNMENT_FAR;
+        case TextVerticalAlign::Start:
+        default:
+            return DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
+    }
+}
+
 class DecodedBitmapResource final : public BitmapResource {
 public:
     DecodedBitmapResource(UINT width, UINT height, UINT stride, std::vector<uint8_t> pixels)
@@ -217,7 +241,12 @@ public:
         m_layerStack.pop_back();
     }
 
-    void DrawTextW(const wchar_t* text, UINT32 len, const Rect& rect, const Color& color, float fontSize) override {
+    void DrawTextW(const wchar_t* text,
+                   UINT32 len,
+                   const Rect& rect,
+                   const Color& color,
+                   float fontSize,
+                   const TextRenderOptions& options) override {
         if (!m_renderTarget || !m_solidBrush || !m_dwriteFactory) {
             return;
         }
@@ -235,8 +264,12 @@ public:
             return;
         }
 
-        format->SetTextAlignment(DWRITE_TEXT_ALIGNMENT_LEADING);
-        format->SetParagraphAlignment(DWRITE_PARAGRAPH_ALIGNMENT_NEAR);
+        format->SetTextAlignment(ToDWriteTextAlignment(options.horizontalAlign));
+        format->SetParagraphAlignment(ToDWriteParagraphAlignment(options.verticalAlign));
+        format->SetWordWrapping(
+            options.wrap == TextWrapMode::Wrap
+                ? DWRITE_WORD_WRAPPING_WRAP
+                : DWRITE_WORD_WRAPPING_NO_WRAP);
 
         m_solidBrush->SetColor(ToD2DColor(color));
         m_renderTarget->DrawTextW(text, len, format.Get(), ToD2DRect(rect), m_solidBrush.Get());

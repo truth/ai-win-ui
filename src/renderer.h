@@ -12,6 +12,29 @@ enum class RendererBackend {
     Skia,
 };
 
+enum class TextWrapMode {
+    NoWrap,
+    Wrap,
+};
+
+enum class TextHorizontalAlign {
+    Start,
+    Center,
+    End,
+};
+
+enum class TextVerticalAlign {
+    Start,
+    Center,
+    End,
+};
+
+struct TextRenderOptions {
+    TextWrapMode wrap = TextWrapMode::Wrap;
+    TextHorizontalAlign horizontalAlign = TextHorizontalAlign::Start;
+    TextVerticalAlign verticalAlign = TextVerticalAlign::Start;
+};
+
 const char* RendererBackendId(RendererBackend backend);
 const wchar_t* RendererBackendDisplayName(RendererBackend backend);
 
@@ -30,7 +53,12 @@ public:
     virtual void DrawRoundedRect(const Rect& rect, const Color& color, float strokeWidth, float radius) = 0;
     virtual void PushRoundedClip(const Rect& rect, float radius) = 0;
     virtual void PopLayer() = 0;
-    virtual void DrawTextW(const wchar_t* text, UINT32 len, const Rect& rect, const Color& color, float fontSize = 16.0f) = 0;
+    virtual void DrawTextW(const wchar_t* text,
+                           UINT32 len,
+                           const Rect& rect,
+                           const Color& color,
+                           float fontSize = 16.0f,
+                           const TextRenderOptions& options = {}) = 0;
     virtual Size GetBitmapSize(BitmapHandle bitmap) = 0;
     virtual BitmapHandle CreateBitmapFromBytes(const uint8_t* data, size_t size) = 0;
     virtual void DrawBitmap(BitmapHandle bitmap, const Rect& rect) = 0;
