@@ -15,6 +15,8 @@ older design snapshot.
   - ordered next-step work plan with phase goals and exit criteria
 - `doc/mvp-acceptance.md`
   - repeatable manual validation checklist for MVP sign-off
+- `doc/advanced-rendering-workplan.md`
+  - phased plan for statistics components, table component, and seagull animation
 - `doc/layout-spec.md`
   - layout DSL authoring guidance
 - `doc/resource-packaging.md`
