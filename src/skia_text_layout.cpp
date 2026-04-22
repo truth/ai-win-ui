@@ -261,10 +261,11 @@ bool CreateSkiaTextLayout(const wchar_t* text,
     for (const auto& line : layout->lines) {
         layout->maxLineWidth = std::max(layout->maxLineWidth, line.width);
     }
+    // Reserve full line spacing for every line so measurement and centered draw
+    // positions stay closer to paragraph-style layout behavior.
     layout->blockHeight = layout->lines.empty()
         ? 0.0f
-        : layout->textHeight +
-            std::max(0.0f, static_cast<float>(layout->lines.size() - 1)) * layout->lineHeight;
+        : static_cast<float>(layout->lines.size()) * layout->lineHeight;
 
     return true;
 }

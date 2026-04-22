@@ -24,3 +24,9 @@
   - 在窗口大小变化时先执行根测量再 Arrange，提升自动尺寸计算稳定性
 - 待办：
   - 继续补齐键盘、焦点与更多输入事件
+
+## 2026-04-22
+
+- 继续推进 Skia 文本稳定性收尾。
+- 调整 `src/skia_text_layout.cpp` 的 `blockHeight` 计算，改为按每一行预留完整 `lineHeight`，减少 Skia 文本测量与实际绘制在垂直居中、控件高度和裁剪边界上的偏差。
+- 已重新通过 `cmake --build --preset build-dev-debug-skia-local-sdk`。
