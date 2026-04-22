@@ -253,6 +253,9 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
         const bool stretchCrossAxis = style.alignItems == StackAlignItems::Stretch &&
             ((style.direction == StackDirection::Column && !child.element->HasFixedWidth()) ||
              (style.direction == StackDirection::Row && !child.element->HasFixedHeight()));
+        const bool canStretchCrossAxis = stretchCrossAxis &&
+            ((style.direction == StackDirection::Column && exactWidth) ||
+             (style.direction == StackDirection::Row && exactHeight));
         const bool useMeasureFunc = child.element->IsLayoutLeaf();
         const float flexGrow = child.element->FlexGrow();
         const float flexShrink = child.element->FlexShrink();
@@ -288,7 +291,7 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
             }
         } else {
             measuredWidth = style.direction == StackDirection::Column
-                ? (stretchCrossAxis ? availableChildWidth : child.element->GetPreferredWidth(availableChildWidth))
+                ? (canStretchCrossAxis ? availableChildWidth : child.element->GetPreferredWidth(availableChildWidth))
                 : child.element->GetPreferredWidth(availableChildWidth);
 
             child.element->Measure(measuredWidth, availableChildHeight);
@@ -296,14 +299,14 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
         }
 
         if (style.direction == StackDirection::Column) {
-            if (!useMeasureFunc && !stretchCrossAxis) {
+            if (!useMeasureFunc && !canStretchCrossAxis) {
                 YGNodeStyleSetWidth(childNode, measuredWidth);
             }
         } else {
             if (!useMeasureFunc || child.element->HasFixedWidth()) {
                 YGNodeStyleSetWidth(childNode, measuredWidth);
             }
-            if (!useMeasureFunc && stretchCrossAxis) {
+            if (!useMeasureFunc && canStretchCrossAxis) {
                 YGNodeStyleSetHeight(childNode, availableChildHeight);
             } else if (!useMeasureFunc) {
                 YGNodeStyleSetHeight(childNode, measuredHeight);

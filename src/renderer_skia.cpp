@@ -243,8 +243,9 @@ public:
             SkFont font;
             font.setTypeface(m_defaultTypeface);
             font.setSize(fontSize);
-            font.setEdging(SkFont::Edging::kAntiAlias);
+            font.setEdging(SkFont::Edging::kSubpixelAntiAlias);
             font.setSubpixel(true);
+            font.setBaselineSnap(true);
             font.setHinting(SkFontHinting::kSlight);
 
             SkiaTextLayout layout;
@@ -345,7 +346,7 @@ public:
         canvas->drawImageRect(
             skiaBitmap->Image(),
             ToSkRect(rect),
-            SkSamplingOptions(),
+            m_bitmapSampling,
             nullptr);
     }
 
@@ -398,9 +399,13 @@ private:
     UINT m_height = 0;
     std::vector<uint8_t> m_pixels;
     sk_sp<SkSurface> m_surface;
-    SkSurfaceProps m_surfaceProps{0, kUnknown_SkPixelGeometry};
+    SkSurfaceProps m_surfaceProps{
+        SkSurfaceProps::kUseDeviceIndependentFonts_Flag,
+        kRGB_H_SkPixelGeometry
+    };
     sk_sp<SkFontMgr> m_fontMgr;
     sk_sp<SkTypeface> m_defaultTypeface;
+    SkSamplingOptions m_bitmapSampling{SkFilterMode::kLinear, SkMipmapMode::kLinear};
 };
 
 } // namespace

@@ -13,6 +13,8 @@ older design snapshot.
   - current MVP definition, completed work, and remaining gaps
 - `doc/mvp-execution-plan.md`
   - ordered next-step work plan with phase goals and exit criteria
+- `doc/mvp-acceptance.md`
+  - repeatable manual validation checklist for MVP sign-off
 - `doc/layout-spec.md`
   - layout DSL authoring guidance
 - `doc/resource-packaging.md`
@@ -67,6 +69,8 @@ The repository includes helper scripts to launch layouts directly:
 
 - `scripts/run_layout_demo.ps1`
   - generic launcher with backend and layout selection
+- `scripts/run_core_validation.ps1`
+  - convenience wrapper for the core MVP validation page
 - `scripts/run_dashboard_reference.ps1`
   - convenience wrapper for the dashboard sample
 
@@ -76,6 +80,13 @@ Example:
 powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
   -Renderer skia `
   -Layout layouts/core_validation.xml
+```
+
+Or use the dedicated wrapper:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_core_validation.ps1 `
+  -Renderer skia
 ```
 
 ## MVP Focus
@@ -90,3 +101,4 @@ For the detailed status, see:
 
 - `doc/mvp-roadmap.md`
 - `doc/mvp-execution-plan.md`
+- `doc/mvp-acceptance.md`

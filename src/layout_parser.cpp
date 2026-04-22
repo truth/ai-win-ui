@@ -356,13 +356,13 @@ Thickness ParseThickness(const JsonValue& value) {
 
 Panel::AlignItems ParseAlignItems(const std::string& value) {
     const std::string normalized = ToLowerAscii(TrimString(value));
-    if (normalized == "start" || normalized == "left") {
+    if (normalized == "start" || normalized == "left" || normalized == "flex-start" || normalized == "flexstart") {
         return Panel::AlignItems::Start;
     }
     if (normalized == "center") {
         return Panel::AlignItems::Center;
     }
-    if (normalized == "end" || normalized == "right") {
+    if (normalized == "end" || normalized == "right" || normalized == "flex-end" || normalized == "flexend") {
         return Panel::AlignItems::End;
     }
     return Panel::AlignItems::Stretch;
@@ -373,13 +373,13 @@ UIElement::SelfAlign ParseSelfAlign(const std::string& value) {
     if (normalized == "stretch") {
         return UIElement::SelfAlign::Stretch;
     }
-    if (normalized == "start" || normalized == "flex-start") {
+    if (normalized == "start" || normalized == "flex-start" || normalized == "flexstart") {
         return UIElement::SelfAlign::Start;
     }
     if (normalized == "center") {
         return UIElement::SelfAlign::Center;
     }
-    if (normalized == "end" || normalized == "flex-end") {
+    if (normalized == "end" || normalized == "flex-end" || normalized == "flexend") {
         return UIElement::SelfAlign::End;
     }
     return UIElement::SelfAlign::Auto;
@@ -406,10 +406,10 @@ Panel::JustifyContent ParseJustifyContent(const std::string& value) {
     if (normalized == "center") {
         return Panel::JustifyContent::Center;
     }
-    if (normalized == "end") {
+    if (normalized == "end" || normalized == "flex-end" || normalized == "flexend") {
         return Panel::JustifyContent::End;
     }
-    if (normalized == "space-between") {
+    if (normalized == "space-between" || normalized == "spacebetween") {
         return Panel::JustifyContent::SpaceBetween;
     }
     return Panel::JustifyContent::Start;

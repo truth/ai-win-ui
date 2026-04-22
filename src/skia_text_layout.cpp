@@ -219,8 +219,9 @@ SkFont CreateDefaultFont(float fontSize) {
     SkFont font;
     font.setTypeface(s_typeface);
     font.setSize(fontSize);
-    font.setEdging(SkFont::Edging::kAntiAlias);
+    font.setEdging(SkFont::Edging::kSubpixelAntiAlias);
     font.setSubpixel(true);
+    font.setBaselineSnap(true);
     font.setHinting(SkFontHinting::kSlight);
     return font;
 }

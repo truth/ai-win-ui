@@ -67,15 +67,24 @@ The current MVP is a retained-mode Win32 UI demo that can:
   - `resource/layouts/yoga_measure_cases.xml`
   - `resource/layouts/skia_image_cases.xml`
   - `resource/layouts/core_validation.xml`
+- Text measurement now follows the active renderer backend instead of always
+  assuming the DirectWrite path.
+- Single-line controls now measure against `NoWrap` expectations so layout and
+  rendering are more closely aligned.
 
 ### In Progress
 
-- Skia text rendering has moved past the original single-line placeholder and now handles wrapped text more reliably, but it still does not yet match DirectWrite closely enough to be considered finished.
-- Yoga integration is active and useful, but the predictable-flex surface is still growing and still needs more behavior calibration around edge cases.
+- Skia text rendering has moved past the original single-line placeholder and
+  now shares layout rules with the active Skia text measurement path, but it
+  still does not yet match DirectWrite closely enough to be considered
+  finished.
+- Yoga integration is active and useful, and the recent `row + stretch`
+  unbounded-height regression now has a dedicated validation case, but the
+  predictable-flex surface is still growing and still needs more behavior
+  calibration around edge cases.
 
 ### Not Yet Complete
 
-- Skia text measurement and Skia text rendering still use different engines.
 - There is no fully verified parity between Direct2D and Skia for text, wrapping, clipping, and DPI behavior.
 - There is still no stronger automated regression layer for layout and interaction; validation is mostly manual through sample pages.
 - DSL visual expression is still limited:
@@ -122,7 +131,7 @@ The current MVP is a retained-mode Win32 UI demo that can:
 - [x] Click, hover, pressed, focus, keyboard navigation, and input all exist
 - [x] Vertical scrolling works
 - [x] Focus can bring controls back into view
-- [ ] Interaction regression coverage is documented as a stable acceptance checklist
+- [x] Interaction regression coverage is documented as a stable acceptance checklist
 
 ### 5. Developer Workflow
 
@@ -130,7 +139,7 @@ The current MVP is a retained-mode Win32 UI demo that can:
 - [x] Dashboard demo launcher script exists
 - [x] Core validation page exists
 - [ ] Docs are fully normalized and cross-linked
-- [ ] A repeatable acceptance flow is documented for MVP sign-off
+- [x] A repeatable acceptance flow is documented for MVP sign-off
 
 ## What Is Still Missing For MVP Sign-Off
 
@@ -138,9 +147,18 @@ If we stay strict about MVP completion, these are the remaining gaps that matter
 
 1. Finish the Skia text path enough that `Label`, `Button`, and `TextInput` behave predictably under the Skia backend.
 2. Close the biggest Yoga calibration gaps, especially the remaining flex behavior and wrap edge cases that affect predictability.
-3. Turn the current manual validation pages into a documented acceptance checklist so we can say "this build passed MVP verification" with confidence.
+3. Run the documented acceptance checklist consistently so we can say "this build passed MVP verification" with confidence.
 
 Everything else, including richer dashboard recreation and more expressive visuals, is useful but not blocking MVP sign-off.
+
+Recent validation improvements that help close those gaps:
+
+- `justifyContent="spaceBetween"` is now parsed the same way as
+  `space-between`, so the shared validation page matches the authored DSL more
+  reliably.
+- `resource/layouts/yoga_measure_cases.xml` now includes a regression block for
+  row-stretch cards and fixed inner host heights so the "infinite height"
+  failure mode is easier to catch during manual verification.
 
 ## Recommended Next Milestones
 
@@ -205,6 +223,7 @@ The recommended execution order for the next work sessions is:
 For the detailed ordered task list, see:
 
 - `doc/mvp-execution-plan.md`
+- `doc/mvp-acceptance.md`
 
 ## Non-MVP Work
 

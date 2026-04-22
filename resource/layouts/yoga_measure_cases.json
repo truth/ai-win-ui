@@ -109,6 +109,144 @@
         "padding": [16, 16, 16, 16],
         "spacing": 10,
         "cornerRadius": 12,
+        "background": "#242B33",
+        "alignItems": "stretch"
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "Row stretch should not create infinite-height cards",
+            "fontSize": 16,
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "Panel",
+          "props": {
+            "direction": "row",
+            "padding": [0, 0, 0, 0],
+            "spacing": 12,
+            "background": "#242B33",
+            "alignItems": "stretch"
+          },
+          "children": [
+            {
+              "type": "Panel",
+              "props": {
+                "padding": [12, 12, 12, 12],
+                "spacing": 8,
+                "cornerRadius": 10,
+                "background": "#32414D",
+                "width": 180
+              },
+              "children": [
+                {
+                  "type": "Label",
+                  "props": {
+                    "text": "Card A",
+                    "fontSize": 14,
+                    "color": "#FFFFFF"
+                  }
+                },
+                {
+                  "type": "Label",
+                  "props": {
+                    "text": "This card should size to its content height.",
+                    "fontSize": 13,
+                    "color": "#D0D8E0"
+                  }
+                }
+              ]
+            },
+            {
+              "type": "Panel",
+              "props": {
+                "padding": [12, 12, 12, 12],
+                "spacing": 8,
+                "cornerRadius": 10,
+                "background": "#32414D",
+                "width": 180
+              },
+              "children": [
+                {
+                  "type": "Label",
+                  "props": {
+                    "text": "Card B",
+                    "fontSize": 14,
+                    "color": "#FFFFFF"
+                  }
+                },
+                {
+                  "type": "Panel",
+                  "props": {
+                    "padding": [10, 16, 10, 16],
+                    "spacing": 6,
+                    "cornerRadius": 8,
+                    "background": "#16202A",
+                    "alignItems": "stretch",
+                    "height": 96
+                  },
+                  "children": [
+                    {
+                      "type": "Label",
+                      "props": {
+                        "text": "Fixed inner host height should stay 96.",
+                        "fontSize": 13,
+                        "color": "#EAF2FA"
+                      }
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "Panel",
+              "props": {
+                "padding": [12, 12, 12, 12],
+                "spacing": 8,
+                "cornerRadius": 10,
+                "background": "#32414D",
+                "width": 180
+              },
+              "children": [
+                {
+                  "type": "Label",
+                  "props": {
+                    "text": "Card C",
+                    "fontSize": 14,
+                    "color": "#FFFFFF"
+                  }
+                },
+                {
+                  "type": "Button",
+                  "props": {
+                    "text": "Height 38",
+                    "height": 38,
+                    "fontSize": 13,
+                    "cornerRadius": 8
+                  }
+                },
+                {
+                  "type": "Label",
+                  "props": {
+                    "text": "Cards should not expand to an unbounded row height during measure.",
+                    "fontSize": 13,
+                    "color": "#D0D8E0"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "padding": [16, 16, 16, 16],
+        "spacing": 10,
+        "cornerRadius": 12,
         "background": "#242424",
         "alignItems": "stretch"
       },

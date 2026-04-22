@@ -77,3 +77,155 @@
 - `.\build.ps1 -Configuration Debug`
 - `.\build.ps1 -Configuration Release -Clean`
 - `.\build.ps1 -Run`
+
+## Script Usage
+
+The repository includes a few helper scripts for building the app, preparing
+the local Skia SDK, and launching validation layouts.
+
+### `build.ps1`
+
+Build the default local project output with CMake.
+
+Common usage:
+
+```powershell
+.\build.ps1
+.\build.ps1 -Configuration Release
+.\build.ps1 -Clean
+.\build.ps1 -Run
+```
+
+Parameters:
+
+- `-Configuration`
+  - build configuration such as `Debug` or `Release`
+- `-BuildDir`
+  - custom build output directory
+- `-Generator`
+  - optional CMake generator override
+- `-Clean`
+  - delete the selected build directory before configuring
+- `-Run`
+  - launch the built executable after the build succeeds
+
+### `build.cmd`
+
+Windows command prompt wrapper for `build.ps1`.
+
+Example:
+
+```cmd
+build.cmd
+build.cmd -Configuration Release
+```
+
+### `scripts/setup_skia_prebuilt.ps1`
+
+Download and extract the local Skia SDK package used by the Skia preset.
+
+Example:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_skia_prebuilt.ps1
+```
+
+Optional usage:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_skia_prebuilt.ps1 `
+  -VersionTag m124-08a5439a6b `
+  -Destination third_party/skia-m124
+```
+
+Parameters:
+
+- `-VersionTag`
+  - release tag used to download the prebuilt package
+- `-Destination`
+  - target directory under the repository
+- `-IncludeDebug`
+  - include the Debug package
+- `-IncludeRelease`
+  - include the Release package
+
+### `scripts/run_layout_demo.ps1`
+
+Launch any layout under `resource/layouts/` with either backend.
+
+Example:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
+  -Renderer skia `
+  -Layout layouts/core_validation.xml
+```
+
+Useful variants:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
+  -Renderer direct2d `
+  -Layout layouts/yoga_measure_cases.xml
+
+powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
+  -Renderer skia `
+  -Layout layouts/skia_image_cases.xml `
+  -BuildIfMissing
+```
+
+Parameters:
+
+- `-Layout`
+  - relative path under `resource/` or an absolute layout path
+- `-Renderer`
+  - `skia` or `direct2d`
+- `-BuildIfMissing`
+  - configure and build automatically when the target executable is missing
+- `-NoLaunch`
+  - validate inputs and prepare the launch without starting the app
+
+### `scripts/run_core_validation.ps1`
+
+Convenience wrapper for the main MVP validation page:
+`resource/layouts/core_validation.xml`.
+
+Example:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_core_validation.ps1 `
+  -Renderer skia
+
+powershell -ExecutionPolicy Bypass -File .\scripts\run_core_validation.ps1 `
+  -Renderer direct2d `
+  -NoLaunch
+```
+
+Supported parameters:
+
+- `-Renderer`
+  - `skia` or `direct2d`
+- `-BuildIfMissing`
+  - build the selected runtime if needed
+- `-NoLaunch`
+  - skip starting the executable
+
+### `scripts/run_dashboard_reference.ps1`
+
+Convenience wrapper for `resource/layouts/dashboard_reference.xml`.
+
+Example:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_dashboard_reference.ps1 `
+  -Renderer skia
+```
+
+Supported parameters:
+
+- `-Renderer`
+  - `skia` or `direct2d`
+- `-BuildIfMissing`
+  - build the selected runtime if needed
+- `-NoLaunch`
+  - skip starting the executable

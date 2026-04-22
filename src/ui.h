@@ -438,23 +438,29 @@ public:
     }
 
     void Measure(float availableWidth, float availableHeight) override {
+        const float resolvedWidth = GetPreferredWidth(availableWidth);
+
         if (m_context && m_context->layoutEngine) {
-            m_desiredSize = m_context->layoutEngine->MeasureStack(
+            const Size measured = m_context->layoutEngine->MeasureStack(
                 ToStackLayoutStyle(),
                 BuildLayoutChildren(),
-                availableWidth,
+                resolvedWidth,
                 availableHeight);
+            m_desiredSize.width = resolvedWidth;
+            m_desiredSize.height = HasFixedHeight()
+                ? GetPreferredHeight(resolvedWidth)
+                : ClampHeight(std::max(0.0f, measured.height));
             return;
         }
 
         if (direction == Direction::Row) {
-            MeasureRowFallback(availableWidth, availableHeight);
+            MeasureRowFallback(resolvedWidth, availableHeight);
             return;
         }
 
         const Thickness scaledPadding = ScaleThickness(padding);
         const float scaledSpacing = ScaleValue(spacing);
-        const float contentWidth = std::max(0.0f, availableWidth - scaledPadding.left - scaledPadding.right);
+        const float contentWidth = std::max(0.0f, resolvedWidth - scaledPadding.left - scaledPadding.right);
         float totalHeight = scaledPadding.top + scaledPadding.bottom;
         bool first = true;
 
@@ -474,8 +480,10 @@ public:
             first = false;
         }
 
-        m_desiredSize.width = availableWidth;
-        m_desiredSize.height = totalHeight;
+        m_desiredSize.width = resolvedWidth;
+        m_desiredSize.height = HasFixedHeight()
+            ? GetPreferredHeight(resolvedWidth)
+            : ClampHeight(totalHeight);
     }
 
 protected:
@@ -702,10 +710,11 @@ public:
     }
 
     void Measure(float availableWidth, float availableHeight) override {
+        const float resolvedWidth = GetPreferredWidth(availableWidth);
         const Thickness scaledPadding = ScaleThickness(padding);
         const float scaledCellSpacing = ScaleValue(cellSpacing);
         const float scaledRowHeight = ScaleValue(rowHeight);
-        const float contentWidth = std::max(0.0f, availableWidth - scaledPadding.left - scaledPadding.right);
+        const float contentWidth = std::max(0.0f, resolvedWidth - scaledPadding.left - scaledPadding.right);
         const int cols = std::max(1, columns);
         const float cellWidth = (contentWidth - scaledCellSpacing * (cols - 1)) / cols;
         const int cellCount = static_cast<int>(m_children.size());
@@ -718,8 +727,12 @@ public:
             child->Measure(childWidth, availableHeight);
         }
 
-        m_desiredSize.width = availableWidth;
-        m_desiredSize.height = scaledPadding.top + scaledPadding.bottom + rows * scaledRowHeight + std::max(0, rows - 1) * scaledCellSpacing;
+        const float measuredHeight =
+            scaledPadding.top + scaledPadding.bottom + rows * scaledRowHeight + std::max(0, rows - 1) * scaledCellSpacing;
+        m_desiredSize.width = resolvedWidth;
+        m_desiredSize.height = HasFixedHeight()
+            ? GetPreferredHeight(resolvedWidth)
+            : ClampHeight(measuredHeight);
     }
 
 protected:

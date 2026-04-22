@@ -152,9 +152,9 @@ Implemented today:
 - filled and stroked rounded rectangles
 - rounded clipping via save/clip/restore
 - encoded image decode via `SkImages::DeferredFromEncodedData`
-- image draw into destination rect
-- wrapped UTF-8 text draw using `SkFont`, manual line breaking, clipping, and
-  baseline calculation
+- image draw into destination rect with explicit linear sampling
+- wrapped UTF-8 text draw using `SkFont`, subpixel/LCD-oriented font settings,
+  manual line breaking, clipping, and baseline calculation
 
 ## Current Limits
 
@@ -171,5 +171,5 @@ Implemented today:
 1. Continue improving Skia text so it is closer to the existing text measurement path.
 2. Compare image presentation, clipping, DPI behavior, and text layout against Direct2D.
 3. Use `resource/layouts/core_validation.xml` as the shared manual acceptance page while growing parity.
-4. Decide whether image scaling should stay with the current `drawImageRect` path or move to a more explicit sampling policy.
+4. Continue tuning image scaling quality and compare the current explicit linear sampling policy against Direct2D.
 5. Only after raster parity is acceptable, revisit either `vcpkg` or a self-build workflow.
