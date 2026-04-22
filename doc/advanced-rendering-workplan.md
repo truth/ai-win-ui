@@ -38,6 +38,54 @@ Important constraint:
 6. Keep both XML and JSON authoring paths supported.
 7. Add validation layouts and acceptance checks for each new capability.
 
+## Implementation Progress
+
+As of 2026-04-22 on branch `feat/advanced-rendering-components`:
+
+- Phase 1 is implemented:
+  - `IRenderer` now includes line and polyline primitives.
+  - Direct2D and Skia backends implement those primitives.
+  - timer dispatch now supports global UI tree ticks instead of only focused controls.
+- Phase 2 is implemented:
+  - `StatCard` and `SparklineChart` exist in `src/ui.h`.
+  - parser support exists for XML and JSON.
+  - validation layouts added:
+    - `resource/layouts/stats_components.xml`
+    - `resource/layouts/stats_components.json`
+- Phase 3 is implemented:
+  - `DataTable` static v1 component is added.
+  - parser support exists for XML and JSON.
+  - validation layouts added:
+    - `resource/layouts/table_components.xml`
+    - `resource/layouts/table_components.json`
+- Phase 4 is implemented:
+  - `SeagullAnimation` component is added with timer-driven flight and wing swing.
+  - parser support exists for XML and JSON.
+  - validation layouts added:
+    - `resource/layouts/seagull_animation.xml`
+    - `resource/layouts/seagull_animation.json`
+- Phase 5 is implemented:
+  - `scripts/run_layout_demo.ps1` supports layout aliases for validation pages.
+  - `scripts/run_validation_suite.ps1` adds one-command smoke/full validation runs.
+  - `doc/README.md` and `doc/mvp-acceptance.md` include advanced validation paths.
+- Phase 6 is implemented (v1):
+  - added `ProgressBar`, `ListBox`, `ComboBox`, and `TabControl` in `src/ui.h`.
+  - parser support exists for XML and JSON.
+  - validation layouts added:
+    - `resource/layouts/core_controls_v2.xml`
+    - `resource/layouts/core_controls_v2.json`
+- Phase 7 is in progress:
+  - added `ListView` and `TreeView` in `src/ui.h`.
+  - parser support exists for XML and JSON.
+  - validation layouts added:
+    - `resource/layouts/navigation_components.xml`
+    - `resource/layouts/navigation_components.json`
+  - shell strips are pending:
+    - `MenuStrip`
+    - `ToolStrip`
+    - `StatusStrip`
+    - `ContextMenu`
+
 ## WinForms Component Gap Analysis
 
 Current custom component set in this repository:
@@ -52,6 +100,12 @@ Current custom component set in this repository:
 - `RadioButton`
 - `Slider`
 - `Spacer`
+- `ProgressBar`
+- `ListBox`
+- `ComboBox`
+- `TabControl`
+- `ListView`
+- `TreeView`
 
 Common WinForms components not yet available:
 
@@ -61,24 +115,16 @@ Common WinForms components not yet available:
   - status strip
   - context menu
 - data presentation:
-  - list view
-  - tree view
-  - tab control
   - data grid view style table features beyond static table v1
 - input controls:
-  - combo box
-  - list box
-  - progress bar
   - numeric up-down
   - date time picker
   - rich text box
 
 Suggested delivery priority:
 
-1. ProgressBar, ComboBox, ListBox, TabControl
-2. ListView and TreeView
-3. MenuStrip, ToolStrip, StatusStrip, ContextMenu
-4. NumericUpDown, DateTimePicker, RichTextBox
+1. MenuStrip, ToolStrip, StatusStrip, ContextMenu
+2. NumericUpDown, DateTimePicker, RichTextBox
 
 ## Execution Plan
 

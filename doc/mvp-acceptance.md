@@ -18,6 +18,16 @@ Use these pages as the shared acceptance surface:
   - focused Yoga sizing, row/column, and wrap behavior checks
 - `layouts/skia_image_cases.xml`
   - focused image, clipping, and rounded-corner checks
+- `layouts/stats_components.xml`
+  - advanced statistics controls (`StatCard`, `SparklineChart`)
+- `layouts/table_components.xml`
+  - advanced table control (`DataTable`)
+- `layouts/seagull_animation.xml`
+  - timer-driven animation control (`SeagullAnimation`)
+- `layouts/core_controls_v2.xml`
+  - core WinForms-like control set (`ProgressBar`, `ListBox`, `ComboBox`, `TabControl`)
+- `layouts/navigation_components.xml`
+  - navigation controls (`ListView`, `TreeView`)
 
 ## Recommended Run Commands
 
@@ -41,6 +51,19 @@ Repeat the same pattern for:
 
 - `layouts/yoga_measure_cases.xml`
 - `layouts/skia_image_cases.xml`
+- `layouts/stats_components.xml`
+- `layouts/table_components.xml`
+- `layouts/seagull_animation.xml`
+- `layouts/core_controls_v2.xml`
+- `layouts/navigation_components.xml`
+
+Suite option:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\run_validation_suite.ps1 `
+  -Renderer both `
+  -Profile full
+```
 
 ## Acceptance Pass Order
 
@@ -115,6 +138,32 @@ Pass if all of the following are true:
 - rounded clipping stays aligned with the visual container
 - image scaling does not show obvious backend-specific breakage
 - clipping boundaries do not leak outside rounded shapes
+
+## Advanced Component Checklist
+
+Run the advanced layouts in this order:
+
+1. `layouts/stats_components.xml`
+2. `layouts/table_components.xml`
+3. `layouts/seagull_animation.xml`
+4. `layouts/core_controls_v2.xml`
+5. `layouts/navigation_components.xml`
+
+Pass if all of the following are true:
+
+- `StatCard` and `SparklineChart` render without clipping or overlap
+- `DataTable` header/row boundaries stay readable and stable
+- `SeagullAnimation` updates continuously without visible artifacts
+- `ProgressBar`, `ListBox`, `ComboBox`, and `TabControl` respond to mouse and keyboard input
+- `ListView` and `TreeView` support stable selection and keyboard traversal
+
+Shortcut: `run_layout_demo.ps1` also accepts aliases:
+
+- `stats-components`
+- `table-components`
+- `seagull-animation`
+- `core-controls-v2`
+- `navigation-components`
 
 ## Backend Comparison Notes
 

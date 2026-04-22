@@ -354,6 +354,91 @@ Thickness ParseThickness(const JsonValue& value) {
     return thickness;
 }
 
+std::vector<float> ParseNumberList(const std::string& value, char separator = ',') {
+    std::vector<float> numbers;
+    const auto pieces = SplitString(value, separator);
+    numbers.reserve(pieces.size());
+    for (const auto& piece : pieces) {
+        const std::string trimmed = TrimString(piece);
+        if (!trimmed.empty()) {
+            numbers.push_back(std::stof(trimmed));
+        }
+    }
+    return numbers;
+}
+
+std::vector<float> ParseNumberArray(const JsonValue& value) {
+    std::vector<float> numbers;
+    if (!value.IsArray()) {
+        return numbers;
+    }
+    numbers.reserve(value.arrayValue.size());
+    for (const auto& item : value.arrayValue) {
+        if (item.IsNumber()) {
+            numbers.push_back(static_cast<float>(item.numberValue));
+        }
+    }
+    return numbers;
+}
+
+std::wstring JsonCellToWide(const JsonValue& value) {
+    if (value.IsString()) {
+        return LayoutParser::Utf8ToUtf16(value.stringValue);
+    }
+    if (value.IsNumber()) {
+        std::ostringstream oss;
+        oss << value.numberValue;
+        return LayoutParser::Utf8ToUtf16(oss.str());
+    }
+    if (value.IsBool()) {
+        return value.boolValue ? L"true" : L"false";
+    }
+    return L"";
+}
+
+std::vector<std::wstring> ParseWideStringList(const std::string& value, char separator = '|') {
+    std::vector<std::wstring> result;
+    for (const auto& piece : SplitString(value, separator)) {
+        result.push_back(LayoutParser::Utf8ToUtf16(TrimString(piece)));
+    }
+    return result;
+}
+
+std::vector<std::vector<std::wstring>> ParseWideStringRows(const std::string& value) {
+    std::vector<std::vector<std::wstring>> rows;
+    for (const auto& rowText : SplitString(value, ';')) {
+        const std::string trimmedRow = TrimString(rowText);
+        if (trimmedRow.empty()) {
+            continue;
+        }
+        rows.push_back(ParseWideStringList(trimmedRow, '|'));
+    }
+    return rows;
+}
+
+std::vector<std::wstring> ParseWideStringPaths(const std::string& value) {
+    std::vector<std::wstring> paths;
+    for (const auto& piece : SplitString(value, ';')) {
+        const std::string trimmed = TrimString(piece);
+        if (!trimmed.empty()) {
+            paths.push_back(LayoutParser::Utf8ToUtf16(trimmed));
+        }
+    }
+    return paths;
+}
+
+std::vector<std::wstring> ParseWideStringArray(const JsonValue& value) {
+    std::vector<std::wstring> result;
+    if (!value.IsArray()) {
+        return result;
+    }
+    result.reserve(value.arrayValue.size());
+    for (const auto& item : value.arrayValue) {
+        result.push_back(JsonCellToWide(item));
+    }
+    return result;
+}
+
 Panel::AlignItems ParseAlignItems(const std::string& value) {
     const std::string normalized = ToLowerAscii(TrimString(value));
     if (normalized == "start" || normalized == "left" || normalized == "flex-start" || normalized == "flexstart") {
@@ -772,6 +857,590 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*label, props);
         }
         element = std::move(label);
+    } else if (type == "StatCard") {
+        auto statCard = std::make_unique<StatCard>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["title"].IsString()) {
+                statCard->SetTitle(LayoutParser::Utf8ToUtf16(props["title"].stringValue));
+            }
+            if (props["value"].IsString()) {
+                statCard->SetValue(LayoutParser::Utf8ToUtf16(props["value"].stringValue));
+            }
+            if (props["deltaText"].IsString()) {
+                statCard->SetDeltaText(LayoutParser::Utf8ToUtf16(props["deltaText"].stringValue));
+            } else if (props["delta"].IsString()) {
+                statCard->SetDeltaText(LayoutParser::Utf8ToUtf16(props["delta"].stringValue));
+            }
+            if (props["background"].IsString()) {
+                statCard->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                statCard->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["accentColor"].IsString()) {
+                statCard->accentColor = LayoutParser::ColorFromString(props["accentColor"].stringValue);
+            }
+            if (props["titleColor"].IsString()) {
+                statCard->titleColor = LayoutParser::ColorFromString(props["titleColor"].stringValue);
+            }
+            if (props["valueColor"].IsString()) {
+                statCard->valueColor = LayoutParser::ColorFromString(props["valueColor"].stringValue);
+            }
+            if (props["deltaColor"].IsString()) {
+                statCard->deltaColor = LayoutParser::ColorFromString(props["deltaColor"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                statCard->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            ApplyCommonJsonProps(*statCard, props);
+        }
+        element = std::move(statCard);
+    } else if (type == "SparklineChart") {
+        auto chart = std::make_unique<SparklineChart>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["points"].IsArray()) {
+                chart->SetPoints(ParseNumberArray(props["points"]));
+            } else if (props["points"].IsString()) {
+                chart->SetPoints(ParseNumberList(props["points"].stringValue));
+            }
+            if (props["lineColor"].IsString()) {
+                chart->lineColor = LayoutParser::ColorFromString(props["lineColor"].stringValue);
+            }
+            if (props["baselineColor"].IsString()) {
+                chart->baselineColor = LayoutParser::ColorFromString(props["baselineColor"].stringValue);
+            }
+            if (props["background"].IsString()) {
+                chart->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                chart->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["strokeWidth"].IsNumber()) {
+                chart->strokeWidth = static_cast<float>(props["strokeWidth"].numberValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                chart->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            if (props["minValue"].IsNumber() && props["maxValue"].IsNumber()) {
+                chart->SetRange(
+                    static_cast<float>(props["minValue"].numberValue),
+                    static_cast<float>(props["maxValue"].numberValue));
+            }
+            ApplyCommonJsonProps(*chart, props);
+        }
+        element = std::move(chart);
+    } else if (type == "DataTable") {
+        auto table = std::make_unique<DataTable>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+
+            if (props["columns"].IsArray()) {
+                std::vector<DataTable::Column> columns;
+                for (const auto& colNode : props["columns"].arrayValue) {
+                    DataTable::Column column;
+                    if (colNode.IsString()) {
+                        column.title = LayoutParser::Utf8ToUtf16(colNode.stringValue);
+                    } else if (colNode.IsObject()) {
+                        if (colNode["title"].IsString()) {
+                            column.title = LayoutParser::Utf8ToUtf16(colNode["title"].stringValue);
+                        } else if (colNode["name"].IsString()) {
+                            column.title = LayoutParser::Utf8ToUtf16(colNode["name"].stringValue);
+                        }
+                        if (colNode["width"].IsNumber()) {
+                            column.width = static_cast<float>(colNode["width"].numberValue);
+                        }
+                    }
+                    if (column.title.empty()) {
+                        column.title = L"Column";
+                    }
+                    columns.push_back(std::move(column));
+                }
+                table->SetColumns(std::move(columns));
+            } else if (props["columns"].IsString()) {
+                std::vector<DataTable::Column> columns;
+                for (const auto& title : ParseWideStringList(props["columns"].stringValue, '|')) {
+                    columns.push_back(DataTable::Column{title, -1.0f});
+                }
+                table->SetColumns(std::move(columns));
+            }
+
+            if (props["columnWidths"].IsArray()) {
+                std::vector<float> widths;
+                for (const auto& widthNode : props["columnWidths"].arrayValue) {
+                    if (widthNode.IsNumber()) {
+                        widths.push_back(static_cast<float>(widthNode.numberValue));
+                    }
+                }
+                table->SetColumnWidths(std::move(widths));
+            } else if (props["columnWidths"].IsString()) {
+                table->SetColumnWidths(ParseNumberList(props["columnWidths"].stringValue, '|'));
+            }
+
+            if (props["rows"].IsArray()) {
+                std::vector<std::vector<std::wstring>> rows;
+                for (const auto& rowNode : props["rows"].arrayValue) {
+                    if (!rowNode.IsArray()) {
+                        continue;
+                    }
+                    std::vector<std::wstring> row;
+                    row.reserve(rowNode.arrayValue.size());
+                    for (const auto& cellNode : rowNode.arrayValue) {
+                        row.push_back(JsonCellToWide(cellNode));
+                    }
+                    rows.push_back(std::move(row));
+                }
+                table->SetRows(std::move(rows));
+            } else if (props["rows"].IsString()) {
+                table->SetRows(ParseWideStringRows(props["rows"].stringValue));
+            }
+
+            if (props["background"].IsString()) {
+                table->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                table->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["headerBackground"].IsString()) {
+                table->headerBackground = LayoutParser::ColorFromString(props["headerBackground"].stringValue);
+            }
+            if (props["rowBackgroundA"].IsString()) {
+                table->rowBackgroundA = LayoutParser::ColorFromString(props["rowBackgroundA"].stringValue);
+            }
+            if (props["rowBackgroundB"].IsString()) {
+                table->rowBackgroundB = LayoutParser::ColorFromString(props["rowBackgroundB"].stringValue);
+            }
+            if (props["gridLineColor"].IsString()) {
+                table->gridLineColor = LayoutParser::ColorFromString(props["gridLineColor"].stringValue);
+            }
+            if (props["headerTextColor"].IsString()) {
+                table->headerTextColor = LayoutParser::ColorFromString(props["headerTextColor"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                table->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                table->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            if (props["headerHeight"].IsNumber()) {
+                table->headerHeight = static_cast<float>(props["headerHeight"].numberValue);
+            }
+            if (props["rowHeight"].IsNumber()) {
+                table->rowHeight = static_cast<float>(props["rowHeight"].numberValue);
+            }
+            if (props["fontSize"].IsNumber()) {
+                table->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            }
+            if (props["headerFontSize"].IsNumber()) {
+                table->headerFontSize = static_cast<float>(props["headerFontSize"].numberValue);
+            }
+            if (props["cellPadding"].IsArray() && props["cellPadding"].arrayValue.size() == 4) {
+                table->cellPadding = ParseThickness(props["cellPadding"]);
+            }
+            ApplyCommonJsonProps(*table, props);
+        }
+        element = std::move(table);
+    } else if (type == "SeagullAnimation") {
+        auto animation = std::make_unique<SeagullAnimation>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["count"].IsNumber()) {
+                animation->SetCount(static_cast<int>(props["count"].numberValue));
+            }
+            if (props["speed"].IsNumber()) {
+                animation->SetSpeed(static_cast<float>(props["speed"].numberValue));
+            }
+            if (props["wingAmplitude"].IsNumber()) {
+                animation->SetWingAmplitude(static_cast<float>(props["wingAmplitude"].numberValue));
+            }
+            if (props["pathHeight"].IsNumber()) {
+                animation->SetPathHeight(static_cast<float>(props["pathHeight"].numberValue));
+            }
+            if (props["scale"].IsNumber()) {
+                animation->SetScale(static_cast<float>(props["scale"].numberValue));
+            }
+            if (props["opacity"].IsNumber()) {
+                animation->SetOpacity(static_cast<float>(props["opacity"].numberValue));
+            }
+            if (props["background"].IsString()) {
+                animation->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                animation->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["birdColor"].IsString()) {
+                animation->birdColor = LayoutParser::ColorFromString(props["birdColor"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                animation->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            ApplyCommonJsonProps(*animation, props);
+        }
+        element = std::move(animation);
+    } else if (type == "ProgressBar") {
+        auto progressBar = std::make_unique<ProgressBar>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["label"].IsString()) {
+                progressBar->SetLabel(LayoutParser::Utf8ToUtf16(props["label"].stringValue));
+            }
+            if (props["min"].IsNumber()) {
+                const float minValue = static_cast<float>(props["min"].numberValue);
+                const float maxValue = props["max"].IsNumber()
+                    ? static_cast<float>(props["max"].numberValue)
+                    : 100.0f;
+                progressBar->SetRange(minValue, maxValue);
+            } else if (props["max"].IsNumber()) {
+                progressBar->SetRange(0.0f, static_cast<float>(props["max"].numberValue));
+            }
+            if (props["value"].IsNumber()) {
+                progressBar->SetValue(static_cast<float>(props["value"].numberValue));
+            }
+            if (props["step"].IsNumber()) {
+                progressBar->SetStep(static_cast<float>(props["step"].numberValue));
+            }
+            if (props["showValueText"].IsBool()) {
+                progressBar->SetShowValueText(props["showValueText"].boolValue);
+            }
+            if (props["background"].IsString()) {
+                progressBar->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                progressBar->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["trackColor"].IsString()) {
+                progressBar->trackColor = LayoutParser::ColorFromString(props["trackColor"].stringValue);
+            }
+            if (props["fillColor"].IsString()) {
+                progressBar->fillColor = LayoutParser::ColorFromString(props["fillColor"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                progressBar->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                progressBar->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            if (props["fontSize"].IsNumber()) {
+                progressBar->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            }
+            if (props["barHeight"].IsNumber()) {
+                progressBar->barHeight = static_cast<float>(props["barHeight"].numberValue);
+            }
+            ApplyCommonJsonProps(*progressBar, props);
+        }
+        element = std::move(progressBar);
+    } else if (type == "ListBox") {
+        auto listBox = std::make_unique<ListBox>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["items"].IsArray()) {
+                listBox->SetItems(ParseWideStringArray(props["items"]));
+            } else if (props["items"].IsString()) {
+                listBox->SetItems(ParseWideStringList(props["items"].stringValue, '|'));
+            }
+            if (props["selectedIndex"].IsNumber()) {
+                listBox->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
+            }
+            if (props["background"].IsString()) {
+                listBox->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                listBox->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["selectedBackground"].IsString()) {
+                listBox->selectedBackground = LayoutParser::ColorFromString(props["selectedBackground"].stringValue);
+            }
+            if (props["hoverBackground"].IsString()) {
+                listBox->hoverBackground = LayoutParser::ColorFromString(props["hoverBackground"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                listBox->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                listBox->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            if (props["fontSize"].IsNumber()) {
+                listBox->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            }
+            if (props["itemHeight"].IsNumber()) {
+                listBox->itemHeight = static_cast<float>(props["itemHeight"].numberValue);
+            }
+            ApplyCommonJsonProps(*listBox, props);
+        }
+        element = std::move(listBox);
+    } else if (type == "ComboBox") {
+        auto comboBox = std::make_unique<ComboBox>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["items"].IsArray()) {
+                comboBox->SetItems(ParseWideStringArray(props["items"]));
+            } else if (props["items"].IsString()) {
+                comboBox->SetItems(ParseWideStringList(props["items"].stringValue, '|'));
+            }
+            if (props["selectedIndex"].IsNumber()) {
+                comboBox->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
+            }
+            if (props["expanded"].IsBool()) {
+                comboBox->SetExpanded(props["expanded"].boolValue);
+            }
+            if (props["background"].IsString()) {
+                comboBox->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["headerBackground"].IsString()) {
+                comboBox->headerBackground = LayoutParser::ColorFromString(props["headerBackground"].stringValue);
+            }
+            if (props["dropdownBackground"].IsString()) {
+                comboBox->dropdownBackground = LayoutParser::ColorFromString(props["dropdownBackground"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                comboBox->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["selectedBackground"].IsString()) {
+                comboBox->selectedBackground = LayoutParser::ColorFromString(props["selectedBackground"].stringValue);
+            }
+            if (props["hoverBackground"].IsString()) {
+                comboBox->hoverBackground = LayoutParser::ColorFromString(props["hoverBackground"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                comboBox->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                comboBox->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            if (props["fontSize"].IsNumber()) {
+                comboBox->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            }
+            if (props["headerHeight"].IsNumber()) {
+                comboBox->headerHeight = static_cast<float>(props["headerHeight"].numberValue);
+            }
+            if (props["itemHeight"].IsNumber()) {
+                comboBox->itemHeight = static_cast<float>(props["itemHeight"].numberValue);
+            }
+            if (props["maxVisibleItems"].IsNumber()) {
+                comboBox->maxVisibleItems = std::max(1, static_cast<int>(props["maxVisibleItems"].numberValue));
+            }
+            ApplyCommonJsonProps(*comboBox, props);
+        }
+        element = std::move(comboBox);
+    } else if (type == "TabControl") {
+        auto tabControl = std::make_unique<TabControl>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["tabs"].IsArray()) {
+                tabControl->SetTabs(ParseWideStringArray(props["tabs"]));
+            } else if (props["tabs"].IsString()) {
+                tabControl->SetTabs(ParseWideStringList(props["tabs"].stringValue, '|'));
+            }
+            if (props["selectedIndex"].IsNumber()) {
+                tabControl->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
+            }
+            if (props["background"].IsString()) {
+                tabControl->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["headerBackground"].IsString()) {
+                tabControl->headerBackground = LayoutParser::ColorFromString(props["headerBackground"].stringValue);
+            }
+            if (props["contentBackground"].IsString()) {
+                tabControl->contentBackground = LayoutParser::ColorFromString(props["contentBackground"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                tabControl->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["tabBackground"].IsString()) {
+                tabControl->tabBackground = LayoutParser::ColorFromString(props["tabBackground"].stringValue);
+            }
+            if (props["hoverTabBackground"].IsString()) {
+                tabControl->hoverTabBackground = LayoutParser::ColorFromString(props["hoverTabBackground"].stringValue);
+            }
+            if (props["selectedTabBackground"].IsString()) {
+                tabControl->selectedTabBackground = LayoutParser::ColorFromString(props["selectedTabBackground"].stringValue);
+            }
+            if (props["tabTextColor"].IsString()) {
+                tabControl->tabTextColor = LayoutParser::ColorFromString(props["tabTextColor"].stringValue);
+            }
+            if (props["selectedTabTextColor"].IsString()) {
+                tabControl->selectedTabTextColor = LayoutParser::ColorFromString(props["selectedTabTextColor"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                tabControl->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            if (props["fontSize"].IsNumber()) {
+                tabControl->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            }
+            if (props["headerHeight"].IsNumber()) {
+                tabControl->headerHeight = static_cast<float>(props["headerHeight"].numberValue);
+            }
+            ApplyCommonJsonProps(*tabControl, props);
+        }
+        element = std::move(tabControl);
+    } else if (type == "ListView") {
+        auto listView = std::make_unique<ListView>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+
+            if (props["columns"].IsArray()) {
+                std::vector<ListView::Column> columns;
+                for (const auto& colNode : props["columns"].arrayValue) {
+                    ListView::Column column;
+                    if (colNode.IsString()) {
+                        column.title = LayoutParser::Utf8ToUtf16(colNode.stringValue);
+                    } else if (colNode.IsObject()) {
+                        if (colNode["title"].IsString()) {
+                            column.title = LayoutParser::Utf8ToUtf16(colNode["title"].stringValue);
+                        } else if (colNode["name"].IsString()) {
+                            column.title = LayoutParser::Utf8ToUtf16(colNode["name"].stringValue);
+                        }
+                        if (colNode["width"].IsNumber()) {
+                            column.width = static_cast<float>(colNode["width"].numberValue);
+                        }
+                    }
+                    if (column.title.empty()) {
+                        column.title = L"Column";
+                    }
+                    columns.push_back(std::move(column));
+                }
+                listView->SetColumns(std::move(columns));
+            } else if (props["columns"].IsString()) {
+                std::vector<ListView::Column> columns;
+                for (const auto& title : ParseWideStringList(props["columns"].stringValue, '|')) {
+                    columns.push_back(ListView::Column{title, -1.0f});
+                }
+                listView->SetColumns(std::move(columns));
+            }
+
+            if (props["columnWidths"].IsArray()) {
+                std::vector<float> widths;
+                for (const auto& widthNode : props["columnWidths"].arrayValue) {
+                    if (widthNode.IsNumber()) {
+                        widths.push_back(static_cast<float>(widthNode.numberValue));
+                    }
+                }
+                listView->SetColumnWidths(std::move(widths));
+            } else if (props["columnWidths"].IsString()) {
+                listView->SetColumnWidths(ParseNumberList(props["columnWidths"].stringValue, '|'));
+            }
+
+            if (props["rows"].IsArray()) {
+                std::vector<std::vector<std::wstring>> rows;
+                for (const auto& rowNode : props["rows"].arrayValue) {
+                    if (!rowNode.IsArray()) {
+                        continue;
+                    }
+                    std::vector<std::wstring> row;
+                    row.reserve(rowNode.arrayValue.size());
+                    for (const auto& cellNode : rowNode.arrayValue) {
+                        row.push_back(JsonCellToWide(cellNode));
+                    }
+                    rows.push_back(std::move(row));
+                }
+                listView->SetRows(std::move(rows));
+            } else if (props["rows"].IsString()) {
+                listView->SetRows(ParseWideStringRows(props["rows"].stringValue));
+            }
+
+            if (props["selectedIndex"].IsNumber()) {
+                listView->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
+            }
+            if (props["background"].IsString()) {
+                listView->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                listView->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["headerBackground"].IsString()) {
+                listView->headerBackground = LayoutParser::ColorFromString(props["headerBackground"].stringValue);
+            }
+            if (props["rowBackgroundA"].IsString()) {
+                listView->rowBackgroundA = LayoutParser::ColorFromString(props["rowBackgroundA"].stringValue);
+            }
+            if (props["rowBackgroundB"].IsString()) {
+                listView->rowBackgroundB = LayoutParser::ColorFromString(props["rowBackgroundB"].stringValue);
+            }
+            if (props["hoverRowBackground"].IsString()) {
+                listView->hoverRowBackground = LayoutParser::ColorFromString(props["hoverRowBackground"].stringValue);
+            }
+            if (props["selectedRowBackground"].IsString()) {
+                listView->selectedRowBackground = LayoutParser::ColorFromString(props["selectedRowBackground"].stringValue);
+            }
+            if (props["gridLineColor"].IsString()) {
+                listView->gridLineColor = LayoutParser::ColorFromString(props["gridLineColor"].stringValue);
+            }
+            if (props["headerTextColor"].IsString()) {
+                listView->headerTextColor = LayoutParser::ColorFromString(props["headerTextColor"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                listView->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                listView->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            if (props["headerHeight"].IsNumber()) {
+                listView->headerHeight = static_cast<float>(props["headerHeight"].numberValue);
+            }
+            if (props["rowHeight"].IsNumber()) {
+                listView->rowHeight = static_cast<float>(props["rowHeight"].numberValue);
+            }
+            if (props["fontSize"].IsNumber()) {
+                listView->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            }
+            if (props["headerFontSize"].IsNumber()) {
+                listView->headerFontSize = static_cast<float>(props["headerFontSize"].numberValue);
+            }
+            if (props["cellPadding"].IsArray() && props["cellPadding"].arrayValue.size() == 4) {
+                listView->cellPadding = ParseThickness(props["cellPadding"]);
+            }
+            ApplyCommonJsonProps(*listView, props);
+        }
+        element = std::move(listView);
+    } else if (type == "TreeView") {
+        auto treeView = std::make_unique<TreeView>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["items"].IsArray()) {
+                treeView->SetPaths(ParseWideStringArray(props["items"]));
+            } else if (props["items"].IsString()) {
+                treeView->SetPaths(ParseWideStringPaths(props["items"].stringValue));
+            }
+            if (props["expandedAll"].IsBool()) {
+                treeView->SetExpandedAll(props["expandedAll"].boolValue);
+            }
+            if (props["background"].IsString()) {
+                treeView->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                treeView->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["selectedBackground"].IsString()) {
+                treeView->selectedBackground = LayoutParser::ColorFromString(props["selectedBackground"].stringValue);
+            }
+            if (props["hoverBackground"].IsString()) {
+                treeView->hoverBackground = LayoutParser::ColorFromString(props["hoverBackground"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                treeView->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["mutedTextColor"].IsString()) {
+                treeView->mutedTextColor = LayoutParser::ColorFromString(props["mutedTextColor"].stringValue);
+            }
+            if (props["glyphColor"].IsString()) {
+                treeView->glyphColor = LayoutParser::ColorFromString(props["glyphColor"].stringValue);
+            }
+            if (props["cornerRadius"].IsNumber()) {
+                treeView->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            }
+            if (props["fontSize"].IsNumber()) {
+                treeView->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            }
+            if (props["itemHeight"].IsNumber()) {
+                treeView->itemHeight = static_cast<float>(props["itemHeight"].numberValue);
+            }
+            if (props["indentWidth"].IsNumber()) {
+                treeView->indentWidth = static_cast<float>(props["indentWidth"].numberValue);
+            }
+            ApplyCommonJsonProps(*treeView, props);
+        }
+        element = std::move(treeView);
     } else if (type == "Button") {
         std::wstring text = L"Button";
         auto button = std::make_unique<Button>(std::move(text));
@@ -1016,6 +1685,461 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*label, node);
         element = std::move(label);
+    } else if (node.name == "StatCard") {
+        auto statCard = std::make_unique<StatCard>();
+        if (auto it = node.attributes.find("title"); it != node.attributes.end()) {
+            statCard->SetTitle(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("value"); it != node.attributes.end()) {
+            statCard->SetValue(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("deltaText"); it != node.attributes.end()) {
+            statCard->SetDeltaText(LayoutParser::Utf8ToUtf16(it->second));
+        } else if (auto it2 = node.attributes.find("delta"); it2 != node.attributes.end()) {
+            statCard->SetDeltaText(LayoutParser::Utf8ToUtf16(it2->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            statCard->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            statCard->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("accentColor"); it != node.attributes.end()) {
+            statCard->accentColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("titleColor"); it != node.attributes.end()) {
+            statCard->titleColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("valueColor"); it != node.attributes.end()) {
+            statCard->valueColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("deltaColor"); it != node.attributes.end()) {
+            statCard->deltaColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            statCard->cornerRadius = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*statCard, node);
+        element = std::move(statCard);
+    } else if (node.name == "SparklineChart") {
+        auto chart = std::make_unique<SparklineChart>();
+        if (auto it = node.attributes.find("points"); it != node.attributes.end()) {
+            chart->SetPoints(ParseNumberList(it->second));
+        }
+        if (auto it = node.attributes.find("lineColor"); it != node.attributes.end()) {
+            chart->lineColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("baselineColor"); it != node.attributes.end()) {
+            chart->baselineColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            chart->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            chart->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("strokeWidth"); it != node.attributes.end()) {
+            chart->strokeWidth = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            chart->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("minValue"); it != node.attributes.end()) {
+            if (auto it2 = node.attributes.find("maxValue"); it2 != node.attributes.end()) {
+                chart->SetRange(std::stof(it->second), std::stof(it2->second));
+            }
+        }
+        ApplyCommonXmlAttributes(*chart, node);
+        element = std::move(chart);
+    } else if (node.name == "DataTable") {
+        auto table = std::make_unique<DataTable>();
+        if (auto it = node.attributes.find("columns"); it != node.attributes.end()) {
+            std::vector<DataTable::Column> columns;
+            for (const auto& title : ParseWideStringList(it->second, '|')) {
+                columns.push_back(DataTable::Column{title, -1.0f});
+            }
+            table->SetColumns(std::move(columns));
+        }
+        if (auto it = node.attributes.find("columnWidths"); it != node.attributes.end()) {
+            table->SetColumnWidths(ParseNumberList(it->second, '|'));
+        }
+        if (auto it = node.attributes.find("rows"); it != node.attributes.end()) {
+            table->SetRows(ParseWideStringRows(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            table->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            table->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("headerBackground"); it != node.attributes.end()) {
+            table->headerBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("rowBackgroundA"); it != node.attributes.end()) {
+            table->rowBackgroundA = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("rowBackgroundB"); it != node.attributes.end()) {
+            table->rowBackgroundB = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("gridLineColor"); it != node.attributes.end()) {
+            table->gridLineColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("headerTextColor"); it != node.attributes.end()) {
+            table->headerTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            table->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            table->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("headerHeight"); it != node.attributes.end()) {
+            table->headerHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("rowHeight"); it != node.attributes.end()) {
+            table->rowHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            table->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("headerFontSize"); it != node.attributes.end()) {
+            table->headerFontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("cellPadding"); it != node.attributes.end()) {
+            const auto values = SplitString(it->second, ',');
+            if (values.size() == 4) {
+                table->cellPadding = ParseThickness(values);
+            }
+        }
+        ApplyCommonXmlAttributes(*table, node);
+        element = std::move(table);
+    } else if (node.name == "SeagullAnimation") {
+        auto animation = std::make_unique<SeagullAnimation>();
+        if (auto it = node.attributes.find("count"); it != node.attributes.end()) {
+            animation->SetCount(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("speed"); it != node.attributes.end()) {
+            animation->SetSpeed(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("wingAmplitude"); it != node.attributes.end()) {
+            animation->SetWingAmplitude(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("pathHeight"); it != node.attributes.end()) {
+            animation->SetPathHeight(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("scale"); it != node.attributes.end()) {
+            animation->SetScale(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("opacity"); it != node.attributes.end()) {
+            animation->SetOpacity(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            animation->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            animation->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("birdColor"); it != node.attributes.end()) {
+            animation->birdColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            animation->cornerRadius = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*animation, node);
+        element = std::move(animation);
+    } else if (node.name == "ProgressBar") {
+        auto progressBar = std::make_unique<ProgressBar>();
+        if (auto it = node.attributes.find("label"); it != node.attributes.end()) {
+            progressBar->SetLabel(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("min"); it != node.attributes.end()) {
+            const float minValue = std::stof(it->second);
+            if (auto it2 = node.attributes.find("max"); it2 != node.attributes.end()) {
+                progressBar->SetRange(minValue, std::stof(it2->second));
+            } else {
+                progressBar->SetRange(minValue, 100.0f);
+            }
+        } else if (auto it = node.attributes.find("max"); it != node.attributes.end()) {
+            progressBar->SetRange(0.0f, std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("value"); it != node.attributes.end()) {
+            progressBar->SetValue(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("step"); it != node.attributes.end()) {
+            progressBar->SetStep(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("showValueText"); it != node.attributes.end()) {
+            progressBar->SetShowValueText(ToLowerAscii(it->second) == "true");
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            progressBar->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            progressBar->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("trackColor"); it != node.attributes.end()) {
+            progressBar->trackColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("fillColor"); it != node.attributes.end()) {
+            progressBar->fillColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            progressBar->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            progressBar->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            progressBar->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("barHeight"); it != node.attributes.end()) {
+            progressBar->barHeight = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*progressBar, node);
+        element = std::move(progressBar);
+    } else if (node.name == "ListBox") {
+        auto listBox = std::make_unique<ListBox>();
+        if (auto it = node.attributes.find("items"); it != node.attributes.end()) {
+            listBox->SetItems(ParseWideStringList(it->second, '|'));
+        }
+        if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
+            listBox->SetSelectedIndex(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            listBox->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            listBox->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedBackground"); it != node.attributes.end()) {
+            listBox->selectedBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("hoverBackground"); it != node.attributes.end()) {
+            listBox->hoverBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            listBox->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            listBox->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            listBox->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("itemHeight"); it != node.attributes.end()) {
+            listBox->itemHeight = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*listBox, node);
+        element = std::move(listBox);
+    } else if (node.name == "ComboBox") {
+        auto comboBox = std::make_unique<ComboBox>();
+        if (auto it = node.attributes.find("items"); it != node.attributes.end()) {
+            comboBox->SetItems(ParseWideStringList(it->second, '|'));
+        }
+        if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
+            comboBox->SetSelectedIndex(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("expanded"); it != node.attributes.end()) {
+            comboBox->SetExpanded(ToLowerAscii(it->second) == "true");
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            comboBox->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("headerBackground"); it != node.attributes.end()) {
+            comboBox->headerBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("dropdownBackground"); it != node.attributes.end()) {
+            comboBox->dropdownBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            comboBox->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedBackground"); it != node.attributes.end()) {
+            comboBox->selectedBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("hoverBackground"); it != node.attributes.end()) {
+            comboBox->hoverBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            comboBox->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            comboBox->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            comboBox->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("headerHeight"); it != node.attributes.end()) {
+            comboBox->headerHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("itemHeight"); it != node.attributes.end()) {
+            comboBox->itemHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("maxVisibleItems"); it != node.attributes.end()) {
+            comboBox->maxVisibleItems = std::max(1, std::stoi(it->second));
+        }
+        ApplyCommonXmlAttributes(*comboBox, node);
+        element = std::move(comboBox);
+    } else if (node.name == "TabControl") {
+        auto tabControl = std::make_unique<TabControl>();
+        if (auto it = node.attributes.find("tabs"); it != node.attributes.end()) {
+            tabControl->SetTabs(ParseWideStringList(it->second, '|'));
+        }
+        if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
+            tabControl->SetSelectedIndex(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            tabControl->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("headerBackground"); it != node.attributes.end()) {
+            tabControl->headerBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("contentBackground"); it != node.attributes.end()) {
+            tabControl->contentBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            tabControl->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("tabBackground"); it != node.attributes.end()) {
+            tabControl->tabBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("hoverTabBackground"); it != node.attributes.end()) {
+            tabControl->hoverTabBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedTabBackground"); it != node.attributes.end()) {
+            tabControl->selectedTabBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("tabTextColor"); it != node.attributes.end()) {
+            tabControl->tabTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedTabTextColor"); it != node.attributes.end()) {
+            tabControl->selectedTabTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            tabControl->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            tabControl->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("headerHeight"); it != node.attributes.end()) {
+            tabControl->headerHeight = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*tabControl, node);
+        element = std::move(tabControl);
+    } else if (node.name == "ListView") {
+        auto listView = std::make_unique<ListView>();
+        if (auto it = node.attributes.find("columns"); it != node.attributes.end()) {
+            std::vector<ListView::Column> columns;
+            for (const auto& title : ParseWideStringList(it->second, '|')) {
+                columns.push_back(ListView::Column{title, -1.0f});
+            }
+            listView->SetColumns(std::move(columns));
+        }
+        if (auto it = node.attributes.find("columnWidths"); it != node.attributes.end()) {
+            listView->SetColumnWidths(ParseNumberList(it->second, '|'));
+        }
+        if (auto it = node.attributes.find("rows"); it != node.attributes.end()) {
+            listView->SetRows(ParseWideStringRows(it->second));
+        }
+        if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
+            listView->SetSelectedIndex(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            listView->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            listView->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("headerBackground"); it != node.attributes.end()) {
+            listView->headerBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("rowBackgroundA"); it != node.attributes.end()) {
+            listView->rowBackgroundA = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("rowBackgroundB"); it != node.attributes.end()) {
+            listView->rowBackgroundB = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("hoverRowBackground"); it != node.attributes.end()) {
+            listView->hoverRowBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedRowBackground"); it != node.attributes.end()) {
+            listView->selectedRowBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("gridLineColor"); it != node.attributes.end()) {
+            listView->gridLineColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("headerTextColor"); it != node.attributes.end()) {
+            listView->headerTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            listView->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            listView->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("headerHeight"); it != node.attributes.end()) {
+            listView->headerHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("rowHeight"); it != node.attributes.end()) {
+            listView->rowHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            listView->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("headerFontSize"); it != node.attributes.end()) {
+            listView->headerFontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("cellPadding"); it != node.attributes.end()) {
+            const auto values = SplitString(it->second, ',');
+            if (values.size() == 4) {
+                listView->cellPadding = ParseThickness(values);
+            }
+        }
+        ApplyCommonXmlAttributes(*listView, node);
+        element = std::move(listView);
+    } else if (node.name == "TreeView") {
+        auto treeView = std::make_unique<TreeView>();
+        if (auto it = node.attributes.find("items"); it != node.attributes.end()) {
+            treeView->SetPaths(ParseWideStringPaths(it->second));
+        }
+        if (auto it = node.attributes.find("expandedAll"); it != node.attributes.end()) {
+            treeView->SetExpandedAll(ToLowerAscii(it->second) == "true");
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            treeView->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            treeView->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedBackground"); it != node.attributes.end()) {
+            treeView->selectedBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("hoverBackground"); it != node.attributes.end()) {
+            treeView->hoverBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            treeView->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("mutedTextColor"); it != node.attributes.end()) {
+            treeView->mutedTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("glyphColor"); it != node.attributes.end()) {
+            treeView->glyphColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            treeView->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            treeView->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("itemHeight"); it != node.attributes.end()) {
+            treeView->itemHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("indentWidth"); it != node.attributes.end()) {
+            treeView->indentWidth = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*treeView, node);
+        element = std::move(treeView);
     } else if (node.name == "Button") {
         std::wstring text = L"Button";
         auto button = std::make_unique<Button>(std::move(text));

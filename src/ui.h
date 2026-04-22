@@ -7,7 +7,9 @@
 #include "ui_text_metrics.h"
 
 #include <algorithm>
+#include <cmath>
 #include <functional>
+#include <limits>
 #include <memory>
 #include <map>
 #include <string>
@@ -132,8 +134,12 @@ public:
         return false;
     }
 
-    virtual bool OnTimer(UINT_PTR /*timerId*/) {
-        return false;
+    virtual bool OnTimer(UINT_PTR timerId) {
+        bool changed = false;
+        for (auto& child : m_children) {
+            changed = child->OnTimer(timerId) || changed;
+        }
+        return changed;
     }
 
     virtual UIElement* FindFocusableAt(float x, float y) {
@@ -806,6 +812,551 @@ public:
 
 private:
     std::wstring m_text;
+};
+
+class StatCard : public UIElement {
+public:
+    void SetTitle(std::wstring text) { m_title = std::move(text); }
+    void SetValue(std::wstring text) { m_value = std::move(text); }
+    void SetDeltaText(std::wstring text) { m_deltaText = std::move(text); }
+
+    Color background = ColorFromHex(0x1E2630);
+    Color borderColor = ColorFromHex(0x2F3A46);
+    Color accentColor = ColorFromHex(0x4E7BFF);
+    Color titleColor = ColorFromHex(0xBFD1E3);
+    Color valueColor = ColorFromHex(0xFFFFFF);
+    Color deltaColor = ColorFromHex(0x8ED1A5);
+    float cornerRadius = 10.0f;
+    float titleFontSize = 12.0f;
+    float valueFontSize = 24.0f;
+    float deltaFontSize = 12.0f;
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        const float contentLimit = std::max(1.0f, availableWidth - ScaleValue(24.0f));
+        const Size titleSize = MeasureTextValue(m_title.empty() ? L"Title" : m_title, titleFontSize, contentLimit, TextWrapMode::NoWrap);
+        const Size valueSize = MeasureTextValue(m_value.empty() ? L"0" : m_value, valueFontSize, contentLimit, TextWrapMode::NoWrap);
+        const Size deltaSize = MeasureTextValue(m_deltaText.empty() ? L"+0%" : m_deltaText, deltaFontSize, contentLimit, TextWrapMode::NoWrap);
+        const float contentWidth = std::max(titleSize.width, std::max(valueSize.width, deltaSize.width));
+        return std::min(availableWidth, contentWidth + ScaleValue(24.0f));
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        const float contentWidth = std::max(1.0f, width - ScaleValue(24.0f));
+        const Size titleSize = MeasureTextValue(m_title.empty() ? L"Title" : m_title, titleFontSize, contentWidth, TextWrapMode::NoWrap);
+        const Size valueSize = MeasureTextValue(m_value.empty() ? L"0" : m_value, valueFontSize, contentWidth, TextWrapMode::NoWrap);
+        const Size deltaSize = MeasureTextValue(m_deltaText.empty() ? L"+0%" : m_deltaText, deltaFontSize, contentWidth, TextWrapMode::NoWrap);
+        return ScaleValue(16.0f) + titleSize.height + ScaleValue(6.0f) + valueSize.height + ScaleValue(6.0f) + deltaSize.height + ScaleValue(12.0f);
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+
+        const float accentHeight = ScaleValue(3.0f);
+        const Rect accentRect = Rect::Make(m_bounds.left, m_bounds.top, m_bounds.right, m_bounds.top + accentHeight);
+        renderer.FillRect(accentRect, accentColor);
+
+        const float horizontalPadding = ScaleValue(12.0f);
+        const float topPadding = ScaleValue(10.0f);
+        const float lineGap = ScaleValue(6.0f);
+
+        Rect titleRect = Rect::Make(
+            m_bounds.left + horizontalPadding,
+            m_bounds.top + topPadding,
+            m_bounds.right - horizontalPadding,
+            m_bounds.top + topPadding + ScaleValue(22.0f));
+        const TextRenderOptions titleTextOptions{
+            TextWrapMode::NoWrap,
+            TextHorizontalAlign::Start,
+            TextVerticalAlign::Start
+        };
+        renderer.DrawTextW(
+            m_title.c_str(),
+            static_cast<UINT32>(m_title.size()),
+            titleRect,
+            titleColor,
+            ScaleValue(titleFontSize),
+            titleTextOptions);
+
+        const Size titleSize = MeasureTextValue(
+            m_title.empty() ? L"Title" : m_title,
+            titleFontSize,
+            std::max(1.0f, titleRect.Width()),
+            TextWrapMode::NoWrap);
+        const float valueTop = titleRect.top + titleSize.height + lineGap;
+        Rect valueRect = Rect::Make(
+            m_bounds.left + horizontalPadding,
+            valueTop,
+            m_bounds.right - horizontalPadding,
+            valueTop + ScaleValue(38.0f));
+        renderer.DrawTextW(
+            m_value.c_str(),
+            static_cast<UINT32>(m_value.size()),
+            valueRect,
+            valueColor,
+            ScaleValue(valueFontSize),
+            titleTextOptions);
+
+        const Size valueSize = MeasureTextValue(
+            m_value.empty() ? L"0" : m_value,
+            valueFontSize,
+            std::max(1.0f, valueRect.Width()),
+            TextWrapMode::NoWrap);
+        const float deltaTop = valueRect.top + valueSize.height + lineGap;
+        Rect deltaRect = Rect::Make(
+            m_bounds.left + horizontalPadding,
+            deltaTop,
+            m_bounds.right - horizontalPadding,
+            deltaTop + ScaleValue(20.0f));
+        renderer.DrawTextW(
+            m_deltaText.c_str(),
+            static_cast<UINT32>(m_deltaText.size()),
+            deltaRect,
+            deltaColor,
+            ScaleValue(deltaFontSize),
+            titleTextOptions);
+    }
+
+private:
+    std::wstring m_title = L"Metric";
+    std::wstring m_value = L"0";
+    std::wstring m_deltaText = L"+0%";
+};
+
+class SparklineChart : public UIElement {
+public:
+    void SetPoints(std::vector<float> points) { m_points = std::move(points); }
+    void SetRange(float minValue, float maxValue) {
+        m_manualRange = true;
+        m_minValue = minValue;
+        m_maxValue = maxValue;
+    }
+    void ClearRange() {
+        m_manualRange = false;
+        m_minValue = 0.0f;
+        m_maxValue = 1.0f;
+    }
+
+    Color background = ColorFromHex(0x121B25);
+    Color borderColor = ColorFromHex(0x2C3A47);
+    Color lineColor = ColorFromHex(0x53B3FF);
+    Color baselineColor = ColorFromHex(0x314252);
+    float cornerRadius = 10.0f;
+    float strokeWidth = 2.0f;
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        return std::min(availableWidth, ScaleValue(240.0f));
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        return ScaleValue(108.0f);
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+
+        const float insetX = ScaleValue(10.0f);
+        const float insetY = ScaleValue(10.0f);
+        const Rect chartRect = Rect::Make(
+            m_bounds.left + insetX,
+            m_bounds.top + insetY,
+            m_bounds.right - insetX,
+            m_bounds.bottom - insetY);
+
+        renderer.DrawLine(
+            PointF{chartRect.left, chartRect.bottom},
+            PointF{chartRect.right, chartRect.bottom},
+            baselineColor,
+            1.0f);
+
+        if (m_points.size() < 2 || chartRect.Width() <= 1.0f || chartRect.Height() <= 1.0f) {
+            return;
+        }
+
+        float minValue = m_manualRange ? m_minValue : std::numeric_limits<float>::max();
+        float maxValue = m_manualRange ? m_maxValue : std::numeric_limits<float>::lowest();
+        if (!m_manualRange) {
+            for (float point : m_points) {
+                minValue = std::min(minValue, point);
+                maxValue = std::max(maxValue, point);
+            }
+        }
+        if (!std::isfinite(minValue) || !std::isfinite(maxValue)) {
+            return;
+        }
+        if (maxValue < minValue) {
+            std::swap(maxValue, minValue);
+        }
+
+        const float range = std::max(0.001f, maxValue - minValue);
+        const float stepX = m_points.size() > 1
+            ? chartRect.Width() / static_cast<float>(m_points.size() - 1)
+            : 0.0f;
+
+        std::vector<PointF> polyline;
+        polyline.reserve(m_points.size());
+        for (size_t i = 0; i < m_points.size(); ++i) {
+            const float normalized = std::clamp((m_points[i] - minValue) / range, 0.0f, 1.0f);
+            const float x = chartRect.left + static_cast<float>(i) * stepX;
+            const float y = chartRect.bottom - normalized * chartRect.Height();
+            polyline.push_back(PointF{x, y});
+        }
+
+        renderer.DrawPolyline(polyline, lineColor, ScaleValue(strokeWidth));
+    }
+
+private:
+    std::vector<float> m_points;
+    bool m_manualRange = false;
+    float m_minValue = 0.0f;
+    float m_maxValue = 1.0f;
+};
+
+class DataTable : public UIElement {
+public:
+    struct Column {
+        std::wstring title;
+        float width = -1.0f;
+    };
+
+    void SetColumns(std::vector<Column> columns) { m_columns = std::move(columns); }
+    void SetRows(std::vector<std::vector<std::wstring>> rows) { m_rows = std::move(rows); }
+    void SetColumnWidths(std::vector<float> widths) {
+        const size_t count = std::min(widths.size(), m_columns.size());
+        for (size_t i = 0; i < count; ++i) {
+            m_columns[i].width = widths[i];
+        }
+    }
+
+    Color background = ColorFromHex(0x121A24);
+    Color borderColor = ColorFromHex(0x304053);
+    Color headerBackground = ColorFromHex(0x1F2C3A);
+    Color rowBackgroundA = ColorFromHex(0x182330);
+    Color rowBackgroundB = ColorFromHex(0x14202B);
+    Color gridLineColor = ColorFromHex(0x2B3A4A);
+    Color headerTextColor = ColorFromHex(0xEAF2FB);
+    Color textColor = ColorFromHex(0xC7D4E2);
+    float cornerRadius = 10.0f;
+    float headerHeight = 34.0f;
+    float rowHeight = 30.0f;
+    float fontSize = 13.0f;
+    float headerFontSize = 13.0f;
+    Thickness cellPadding{8, 5, 8, 5};
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        const float fallbackWidth = std::min(availableWidth, ScaleValue(360.0f));
+        if (m_columns.empty()) {
+            return fallbackWidth;
+        }
+
+        const Thickness scaledCellPadding = ScaleThickness(cellPadding);
+        float totalWidth = 0.0f;
+        for (size_t col = 0; col < m_columns.size(); ++col) {
+            float columnWidth = 0.0f;
+            if (m_columns[col].width > 0.0f) {
+                columnWidth = ScaleValue(m_columns[col].width);
+            } else {
+                const Size headerSize = MeasureTextValue(
+                    m_columns[col].title.empty() ? L"Column" : m_columns[col].title,
+                    headerFontSize,
+                    4096.0f,
+                    TextWrapMode::NoWrap);
+                columnWidth = headerSize.width + scaledCellPadding.left + scaledCellPadding.right + ScaleValue(10.0f);
+
+                const size_t inspectRows = std::min<size_t>(m_rows.size(), 50);
+                for (size_t row = 0; row < inspectRows; ++row) {
+                    if (col >= m_rows[row].size()) {
+                        continue;
+                    }
+                    const Size cellSize = MeasureTextValue(
+                        m_rows[row][col],
+                        fontSize,
+                        4096.0f,
+                        TextWrapMode::NoWrap);
+                    columnWidth = std::max(columnWidth, cellSize.width + scaledCellPadding.left + scaledCellPadding.right + ScaleValue(10.0f));
+                }
+            }
+            totalWidth += std::max(ScaleValue(36.0f), columnWidth);
+        }
+        return std::min(availableWidth, totalWidth + ScaleValue(2.0f));
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        const float scaledHeaderHeight = ScaleValue(headerHeight);
+        const float scaledRowHeight = ScaleValue(rowHeight);
+        const float rowsHeight = scaledRowHeight * static_cast<float>(m_rows.size());
+        return scaledHeaderHeight + rowsHeight + ScaleValue(2.0f);
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+
+        if (m_columns.empty()) {
+            const TextRenderOptions textOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Center,
+                TextVerticalAlign::Center
+            };
+            const std::wstring message = L"No columns";
+            renderer.DrawTextW(
+                message.c_str(),
+                static_cast<UINT32>(message.size()),
+                m_bounds,
+                textColor,
+                ScaleValue(fontSize),
+                textOptions);
+            return;
+        }
+
+        const std::vector<float> columnWidths = ResolveColumnWidths();
+        if (columnWidths.empty()) {
+            return;
+        }
+
+        renderer.PushRoundedClip(m_bounds, scaledCornerRadius);
+
+        const float scaledHeaderHeight = ScaleValue(headerHeight);
+        const float scaledRowHeight = ScaleValue(rowHeight);
+        const Thickness scaledCellPadding = ScaleThickness(cellPadding);
+        const float tableTop = m_bounds.top;
+        const float tableBottom = m_bounds.bottom;
+        const float contentHeight = std::max(0.0f, tableBottom - tableTop);
+        const float bodyTop = tableTop + scaledHeaderHeight;
+
+        const Rect headerRect = Rect::Make(m_bounds.left, tableTop, m_bounds.right, std::min(tableBottom, tableTop + scaledHeaderHeight));
+        renderer.FillRect(headerRect, headerBackground);
+        renderer.DrawLine(
+            PointF{m_bounds.left, bodyTop},
+            PointF{m_bounds.right, bodyTop},
+            gridLineColor,
+            1.0f);
+
+        float currentX = m_bounds.left;
+        for (size_t col = 0; col < m_columns.size(); ++col) {
+            const float cellWidth = columnWidths[col];
+            const Rect headerCellRect = Rect::Make(
+                currentX + scaledCellPadding.left,
+                tableTop + scaledCellPadding.top,
+                currentX + cellWidth - scaledCellPadding.right,
+                tableTop + scaledHeaderHeight - scaledCellPadding.bottom);
+            const TextRenderOptions headerTextOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Start,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                m_columns[col].title.c_str(),
+                static_cast<UINT32>(m_columns[col].title.size()),
+                headerCellRect,
+                headerTextColor,
+                ScaleValue(headerFontSize),
+                headerTextOptions);
+
+            if (col + 1 < m_columns.size()) {
+                const float x = currentX + cellWidth;
+                renderer.DrawLine(
+                    PointF{x, tableTop},
+                    PointF{x, tableBottom},
+                    gridLineColor,
+                    1.0f);
+            }
+            currentX += cellWidth;
+        }
+
+        if (contentHeight > scaledHeaderHeight + 1.0f && !m_rows.empty()) {
+            const float availableBodyHeight = std::max(0.0f, contentHeight - scaledHeaderHeight);
+            const size_t visibleRows = static_cast<size_t>(std::floor(availableBodyHeight / std::max(1.0f, scaledRowHeight)));
+            const size_t rowCount = std::min(m_rows.size(), visibleRows);
+
+            for (size_t row = 0; row < rowCount; ++row) {
+                const float rowTop = bodyTop + static_cast<float>(row) * scaledRowHeight;
+                const float rowBottom = std::min(tableBottom, rowTop + scaledRowHeight);
+                if (rowTop >= tableBottom) {
+                    break;
+                }
+                const Rect rowRect = Rect::Make(m_bounds.left, rowTop, m_bounds.right, rowBottom);
+                renderer.FillRect(rowRect, (row % 2 == 0) ? rowBackgroundA : rowBackgroundB);
+
+                float rowX = m_bounds.left;
+                for (size_t col = 0; col < m_columns.size(); ++col) {
+                    const float cellWidth = columnWidths[col];
+                    const std::wstring cellText =
+                        (col < m_rows[row].size()) ? m_rows[row][col] : L"";
+                    const Rect textRect = Rect::Make(
+                        rowX + scaledCellPadding.left,
+                        rowTop + scaledCellPadding.top,
+                        rowX + cellWidth - scaledCellPadding.right,
+                        rowBottom - scaledCellPadding.bottom);
+                    const TextRenderOptions cellTextOptions{
+                        TextWrapMode::NoWrap,
+                        TextHorizontalAlign::Start,
+                        TextVerticalAlign::Center
+                    };
+                    renderer.DrawTextW(
+                        cellText.c_str(),
+                        static_cast<UINT32>(cellText.size()),
+                        textRect,
+                        textColor,
+                        ScaleValue(fontSize),
+                        cellTextOptions);
+                    rowX += cellWidth;
+                }
+
+                renderer.DrawLine(
+                    PointF{m_bounds.left, rowBottom},
+                    PointF{m_bounds.right, rowBottom},
+                    gridLineColor,
+                    1.0f);
+            }
+        }
+
+        renderer.PopLayer();
+    }
+
+private:
+    std::vector<float> ResolveColumnWidths() const {
+        std::vector<float> widths;
+        if (m_columns.empty()) {
+            return widths;
+        }
+        widths.resize(m_columns.size(), 0.0f);
+
+        const float tableWidth = std::max(1.0f, m_bounds.Width());
+        float fixedTotal = 0.0f;
+        size_t autoCount = 0;
+        for (size_t i = 0; i < m_columns.size(); ++i) {
+            if (m_columns[i].width > 0.0f) {
+                widths[i] = ScaleValue(m_columns[i].width);
+                fixedTotal += widths[i];
+            } else {
+                ++autoCount;
+            }
+        }
+
+        float autoWidth = 0.0f;
+        if (autoCount > 0) {
+            const float remaining = std::max(0.0f, tableWidth - fixedTotal);
+            autoWidth = (remaining > 0.0f ? remaining : tableWidth) / static_cast<float>(autoCount);
+        }
+
+        float totalWidth = 0.0f;
+        for (size_t i = 0; i < widths.size(); ++i) {
+            if (widths[i] <= 0.0f) {
+                widths[i] = autoWidth;
+            }
+            widths[i] = std::max(ScaleValue(36.0f), widths[i]);
+            totalWidth += widths[i];
+        }
+
+        if (totalWidth > tableWidth && totalWidth > 0.0f) {
+            const float ratio = tableWidth / totalWidth;
+            for (float& width : widths) {
+                width = std::max(ScaleValue(28.0f), width * ratio);
+            }
+        }
+
+        return widths;
+    }
+
+    std::vector<Column> m_columns;
+    std::vector<std::vector<std::wstring>> m_rows;
+};
+
+class SeagullAnimation : public UIElement {
+public:
+    void SetCount(int count) { m_count = std::max(1, count); }
+    void SetSpeed(float speed) { m_speed = std::max(0.05f, speed); }
+    void SetWingAmplitude(float amplitude) { m_wingAmplitude = std::max(0.0f, amplitude); }
+    void SetPathHeight(float pathHeight) { m_pathHeight = std::max(0.0f, pathHeight); }
+    void SetScale(float scale) { m_scale = std::max(0.1f, scale); }
+    void SetOpacity(float opacity) { m_opacity = std::clamp(opacity, 0.05f, 1.0f); }
+
+    Color background = ColorFromHex(0x0F1A26);
+    Color borderColor = ColorFromHex(0x2B3C4D);
+    Color birdColor = ColorFromHex(0xDDEFFF);
+    float cornerRadius = 12.0f;
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        return std::min(availableWidth, ScaleValue(340.0f));
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        return ScaleValue(180.0f);
+    }
+
+public:
+    bool OnTimer(UINT_PTR timerId) override {
+        const bool childChanged = UIElement::OnTimer(timerId);
+        m_elapsed += 0.016f;
+        return childChanged || true;
+    }
+
+    void Render(IRenderer& renderer) override {
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+
+        renderer.PushRoundedClip(m_bounds, scaledCornerRadius);
+
+        const float width = std::max(1.0f, m_bounds.Width());
+        const float height = std::max(1.0f, m_bounds.Height());
+        const float left = m_bounds.left + ScaleValue(10.0f);
+        const float right = m_bounds.right - ScaleValue(10.0f);
+        const float top = m_bounds.top + ScaleValue(14.0f);
+        const float usableWidth = std::max(1.0f, right - left);
+        const float amplitudeY = std::min(ScaleValue(m_pathHeight), height * 0.35f);
+        const float wingAmplitudePx = ScaleValue(m_wingAmplitude);
+
+        for (int i = 0; i < std::max(1, m_count); ++i) {
+            const float phase = m_elapsed * m_speed + static_cast<float>(i) * 0.85f;
+            const float t = phase - std::floor(phase);
+            const float x = left + t * usableWidth;
+            const float centerY = top + height * 0.35f + std::sin(phase * 2.0f + static_cast<float>(i) * 0.7f) * amplitudeY;
+
+            const float scale = ScaleValue(m_scale) * (0.9f + 0.15f * std::sin(phase * 1.7f + static_cast<float>(i)));
+            const float wingSpan = 16.0f * scale;
+            const float wingLift = (4.0f + std::sin(phase * 12.0f) * wingAmplitudePx) * scale;
+
+            Color color = birdColor;
+            color.a *= m_opacity * (0.68f + 0.32f * std::clamp(t, 0.0f, 1.0f));
+
+            const PointF center{x, centerY};
+            const PointF leftWing{x - wingSpan, centerY - wingLift};
+            const PointF rightWing{x + wingSpan, centerY - wingLift};
+            const PointF tailLeft{x - ScaleValue(2.0f), centerY + ScaleValue(1.0f)};
+            const PointF tailRight{x + ScaleValue(2.0f), centerY + ScaleValue(1.0f)};
+
+            renderer.DrawLine(center, leftWing, color, ScaleValue(2.0f));
+            renderer.DrawLine(center, rightWing, color, ScaleValue(2.0f));
+            renderer.DrawLine(tailLeft, tailRight, color, ScaleValue(1.5f));
+        }
+
+        renderer.PopLayer();
+    }
+
+private:
+    int m_count = 5;
+    float m_speed = 0.8f;
+    float m_wingAmplitude = 3.5f;
+    float m_pathHeight = 20.0f;
+    float m_scale = 1.0f;
+    float m_opacity = 0.85f;
+    float m_elapsed = 0.0f;
 };
 
 class Spacer : public UIElement {
@@ -1892,4 +2443,2119 @@ private:
     Color textColor = ColorFromHex(0xEDEDED);
     Color highlightColor = ColorFromHex(0x2D6CDF);
     float cornerRadius = 8.0f;
+};
+
+class ProgressBar : public UIElement {
+public:
+    explicit ProgressBar(std::wstring label = L"") : m_label(std::move(label)) {}
+
+    bool IsFocusable() const override { return true; }
+
+    bool OnFocus() override {
+        if (!m_hasFocus) {
+            m_hasFocus = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnBlur() override {
+        if (m_hasFocus) {
+            m_hasFocus = false;
+            m_dragging = false;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
+        if (keyCode == VK_LEFT || keyCode == VK_DOWN) {
+            return SetValueInternal(m_value - m_step);
+        }
+        if (keyCode == VK_RIGHT || keyCode == VK_UP) {
+            return SetValueInternal(m_value + m_step);
+        }
+        if (keyCode == VK_HOME) {
+            return SetValueInternal(m_min);
+        }
+        if (keyCode == VK_END) {
+            return SetValueInternal(m_max);
+        }
+        return false;
+    }
+
+    bool OnMouseDown(float x, float y) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+        m_dragging = true;
+        return UpdateValueFromPoint(x);
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        if (!m_dragging) {
+            return false;
+        }
+        return UpdateValueFromPoint(x);
+    }
+
+    bool OnMouseUp(float x, float y) override {
+        if (!m_dragging) {
+            return false;
+        }
+        m_dragging = false;
+        return HitTest(x, y);
+    }
+
+    bool OnMouseLeave() override {
+        if (!m_dragging) {
+            return false;
+        }
+        m_dragging = false;
+        return true;
+    }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        return std::min(availableWidth, ScaleValue(260.0f));
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        return ScaleValue(42.0f);
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+        if (m_hasFocus) {
+            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
+        }
+
+        const float insetX = ScaleValue(12.0f);
+        const float insetY = ScaleValue(8.0f);
+        const float barHeightPx = std::max(ScaleValue(4.0f), ScaleValue(barHeight));
+        const float trackTop = m_bounds.top + insetY + std::max(0.0f, (m_bounds.Height() - insetY * 2.0f - barHeightPx) * 0.5f);
+        const Rect trackRect = Rect::Make(
+            m_bounds.left + insetX,
+            trackTop,
+            m_bounds.right - insetX,
+            trackTop + barHeightPx);
+        renderer.FillRoundedRect(trackRect, trackColor, barHeightPx * 0.5f);
+
+        const float progress = GetNormalizedValue();
+        const float filledWidth = trackRect.Width() * progress;
+        const Rect fillRect = Rect::Make(trackRect.left, trackRect.top, trackRect.left + filledWidth, trackRect.bottom);
+        if (filledWidth > 0.5f) {
+            renderer.FillRoundedRect(fillRect, fillColor, barHeightPx * 0.5f);
+        }
+
+        std::wstring overlayText = m_label;
+        if (m_showValueText) {
+            const int percent = static_cast<int>(std::round(progress * 100.0f));
+            const std::wstring percentText = std::to_wstring(percent) + L"%";
+            overlayText = overlayText.empty() ? percentText : (overlayText + L" " + percentText);
+        }
+        if (!overlayText.empty()) {
+            const TextRenderOptions textOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Center,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                overlayText.c_str(),
+                static_cast<UINT32>(overlayText.size()),
+                m_bounds,
+                textColor,
+                ScaleValue(fontSize),
+                textOptions);
+        }
+    }
+
+    void SetLabel(std::wstring label) { m_label = std::move(label); }
+    void SetRange(float minValue, float maxValue) {
+        m_min = minValue;
+        m_max = std::max(minValue + 0.001f, maxValue);
+        SetValue(m_value);
+    }
+    void SetValue(float value) { m_value = std::clamp(value, m_min, m_max); }
+    void SetStep(float step) { m_step = std::max(0.001f, step); }
+    void SetShowValueText(bool showValueText) { m_showValueText = showValueText; }
+
+    Color background = ColorFromHex(0x1A2431);
+    Color borderColor = ColorFromHex(0x3A4B5D);
+    Color focusBorderColor = ColorFromHex(0xFFFFFF);
+    Color trackColor = ColorFromHex(0x2A3747);
+    Color fillColor = ColorFromHex(0x4E7BFF);
+    Color textColor = ColorFromHex(0xEAF3FF);
+    float cornerRadius = 8.0f;
+    float fontSize = 12.0f;
+    float barHeight = 10.0f;
+
+private:
+    bool SetValueInternal(float value) {
+        const float clamped = std::clamp(value, m_min, m_max);
+        if (std::abs(clamped - m_value) <= 0.0001f) {
+            return false;
+        }
+        m_value = clamped;
+        return true;
+    }
+
+    bool UpdateValueFromPoint(float x) {
+        const float insetX = ScaleValue(12.0f);
+        const float left = m_bounds.left + insetX;
+        const float right = m_bounds.right - insetX;
+        const float width = std::max(1.0f, right - left);
+        const float ratio = std::clamp((x - left) / width, 0.0f, 1.0f);
+        return SetValueInternal(m_min + ratio * (m_max - m_min));
+    }
+
+    float GetNormalizedValue() const {
+        return std::clamp((m_value - m_min) / std::max(0.001f, m_max - m_min), 0.0f, 1.0f);
+    }
+
+    std::wstring m_label;
+    float m_min = 0.0f;
+    float m_max = 100.0f;
+    float m_value = 42.0f;
+    float m_step = 1.0f;
+    bool m_showValueText = true;
+    bool m_dragging = false;
+};
+
+class ListBox : public UIElement {
+public:
+    bool IsFocusable() const override { return true; }
+
+    bool OnFocus() override {
+        if (!m_hasFocus) {
+            m_hasFocus = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnBlur() override {
+        if (m_hasFocus) {
+            m_hasFocus = false;
+            m_hoveredIndex = -1;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
+        if (m_items.empty()) {
+            return false;
+        }
+
+        switch (keyCode) {
+            case VK_UP:
+                return MoveSelectionBy(-1);
+            case VK_DOWN:
+                return MoveSelectionBy(1);
+            case VK_HOME:
+                return SetSelectedIndex(0);
+            case VK_END:
+                return SetSelectedIndex(static_cast<int>(m_items.size()) - 1);
+            case VK_PRIOR:
+                return MoveSelectionBy(-VisibleRowCount());
+            case VK_NEXT:
+                return MoveSelectionBy(VisibleRowCount());
+            default:
+                break;
+        }
+        return false;
+    }
+
+    bool OnMouseDown(float x, float y) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+        const int index = IndexFromPoint(y);
+        if (index >= 0) {
+            return SetSelectedIndex(index);
+        }
+        return true;
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        if (!HitTest(x, y)) {
+            if (m_hoveredIndex == -1) {
+                return false;
+            }
+            m_hoveredIndex = -1;
+            return true;
+        }
+        const int nextHovered = IndexFromPoint(y);
+        if (nextHovered == m_hoveredIndex) {
+            return false;
+        }
+        m_hoveredIndex = nextHovered;
+        return true;
+    }
+
+    bool OnMouseLeave() override {
+        if (m_hoveredIndex == -1) {
+            return false;
+        }
+        m_hoveredIndex = -1;
+        return true;
+    }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        float preferred = ScaleValue(240.0f);
+        if (!m_items.empty()) {
+            const float horizontalPadding = ScaleValue(16.0f);
+            float widest = 0.0f;
+            for (size_t i = 0; i < std::min<size_t>(m_items.size(), 24); ++i) {
+                const Size measured = MeasureTextValue(
+                    m_items[i],
+                    fontSize,
+                    4096.0f,
+                    TextWrapMode::NoWrap);
+                widest = std::max(widest, measured.width);
+            }
+            preferred = std::max(preferred, widest + horizontalPadding);
+        }
+        return std::min(availableWidth, preferred);
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        const int rowCount = std::clamp(static_cast<int>(m_items.size()), 4, 8);
+        return ScaleValue(8.0f) + ScaleValue(itemHeight) * static_cast<float>(rowCount) + ScaleValue(8.0f);
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+        if (m_hasFocus) {
+            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
+        }
+
+        if (m_items.empty()) {
+            const std::wstring message = L"(empty)";
+            const TextRenderOptions textOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Center,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                message.c_str(),
+                static_cast<UINT32>(message.size()),
+                m_bounds,
+                mutedTextColor,
+                ScaleValue(fontSize),
+                textOptions);
+            return;
+        }
+
+        const float inset = ScaleValue(4.0f);
+        const float rowHeight = ScaleValue(itemHeight);
+        const Rect contentRect = Rect::Make(
+            m_bounds.left + inset,
+            m_bounds.top + inset,
+            m_bounds.right - inset,
+            m_bounds.bottom - inset);
+
+        const int visibleRows = std::max(1, static_cast<int>(std::floor(contentRect.Height() / std::max(1.0f, rowHeight))));
+        const int maxStart = std::max(0, static_cast<int>(m_items.size()) - visibleRows);
+        m_scrollOffset = std::clamp(m_scrollOffset, 0, maxStart);
+        const int endIndex = std::min(static_cast<int>(m_items.size()), m_scrollOffset + visibleRows);
+
+        for (int i = m_scrollOffset; i < endIndex; ++i) {
+            const float rowTop = contentRect.top + static_cast<float>(i - m_scrollOffset) * rowHeight;
+            const float rowBottom = std::min(contentRect.bottom, rowTop + rowHeight);
+            const Rect rowRect = Rect::Make(contentRect.left, rowTop, contentRect.right, rowBottom);
+
+            if (i == m_selectedIndex) {
+                renderer.FillRoundedRect(rowRect, selectedBackground, ScaleValue(4.0f));
+            } else if (i == m_hoveredIndex) {
+                renderer.FillRoundedRect(rowRect, hoverBackground, ScaleValue(4.0f));
+            }
+
+            const Rect textRect = Rect::Make(
+                rowRect.left + ScaleValue(8.0f),
+                rowRect.top,
+                rowRect.right - ScaleValue(8.0f),
+                rowRect.bottom);
+            const TextRenderOptions textOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Start,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                m_items[i].c_str(),
+                static_cast<UINT32>(m_items[i].size()),
+                textRect,
+                textColor,
+                ScaleValue(fontSize),
+                textOptions);
+        }
+
+        if (visibleRows < static_cast<int>(m_items.size())) {
+            const float barWidth = ScaleValue(4.0f);
+            const float barRight = m_bounds.right - ScaleValue(3.0f);
+            const float barLeft = barRight - barWidth;
+            const float ratio = static_cast<float>(visibleRows) / static_cast<float>(m_items.size());
+            const float thumbHeight = std::max(ScaleValue(14.0f), contentRect.Height() * ratio);
+            const float trackTop = contentRect.top;
+            const float trackBottom = contentRect.bottom;
+            const float maxOffset = static_cast<float>(std::max(1, static_cast<int>(m_items.size()) - visibleRows));
+            const float offsetRatio = static_cast<float>(m_scrollOffset) / maxOffset;
+            const float thumbTop = trackTop + (contentRect.Height() - thumbHeight) * offsetRatio;
+            const Rect thumbRect = Rect::Make(barLeft, thumbTop, barRight, thumbTop + thumbHeight);
+            renderer.FillRoundedRect(thumbRect, scrollThumbColor, ScaleValue(2.0f));
+        }
+    }
+
+    void SetItems(std::vector<std::wstring> items) {
+        m_items = std::move(items);
+        if (m_items.empty()) {
+            m_selectedIndex = -1;
+            m_hoveredIndex = -1;
+            m_scrollOffset = 0;
+            return;
+        }
+        m_selectedIndex = std::clamp(m_selectedIndex, 0, static_cast<int>(m_items.size()) - 1);
+        EnsureSelectionVisible();
+    }
+
+    bool SetSelectedIndex(int index) {
+        if (m_items.empty()) {
+            if (m_selectedIndex == -1) {
+                return false;
+            }
+            m_selectedIndex = -1;
+            return true;
+        }
+        const int clamped = std::clamp(index, 0, static_cast<int>(m_items.size()) - 1);
+        if (clamped == m_selectedIndex) {
+            return false;
+        }
+        m_selectedIndex = clamped;
+        EnsureSelectionVisible();
+        return true;
+    }
+
+    int SelectedIndex() const { return m_selectedIndex; }
+    const std::vector<std::wstring>& Items() const { return m_items; }
+
+    Color background = ColorFromHex(0x14202D);
+    Color borderColor = ColorFromHex(0x34485C);
+    Color focusBorderColor = ColorFromHex(0xFFFFFF);
+    Color selectedBackground = ColorFromHex(0x2F4F77);
+    Color hoverBackground = ColorFromHex(0x1F3247);
+    Color scrollThumbColor = ColorFromHex(0x536A82);
+    Color textColor = ColorFromHex(0xE7EFFA);
+    Color mutedTextColor = ColorFromHex(0x95A7BA);
+    float cornerRadius = 8.0f;
+    float fontSize = 13.0f;
+    float itemHeight = 28.0f;
+
+private:
+    int VisibleRowCount() const {
+        const float innerHeight = std::max(1.0f, m_bounds.Height() - ScaleValue(8.0f));
+        const float rowHeight = std::max(1.0f, ScaleValue(itemHeight));
+        return std::max(1, static_cast<int>(std::floor(innerHeight / rowHeight)));
+    }
+
+    int IndexFromPoint(float y) const {
+        if (m_items.empty()) {
+            return -1;
+        }
+        const float inset = ScaleValue(4.0f);
+        const float rowHeight = std::max(1.0f, ScaleValue(itemHeight));
+        const float localY = y - (m_bounds.top + inset);
+        if (localY < 0.0f) {
+            return -1;
+        }
+        const int row = static_cast<int>(std::floor(localY / rowHeight));
+        if (row < 0 || row >= VisibleRowCount()) {
+            return -1;
+        }
+        const int index = m_scrollOffset + row;
+        return index < static_cast<int>(m_items.size()) ? index : -1;
+    }
+
+    bool MoveSelectionBy(int delta) {
+        if (m_items.empty()) {
+            return false;
+        }
+        if (m_selectedIndex < 0) {
+            return SetSelectedIndex(0);
+        }
+        return SetSelectedIndex(m_selectedIndex + delta);
+    }
+
+    void EnsureSelectionVisible() {
+        if (m_selectedIndex < 0 || m_items.empty()) {
+            m_scrollOffset = 0;
+            return;
+        }
+        const int visibleRows = VisibleRowCount();
+        if (m_selectedIndex < m_scrollOffset) {
+            m_scrollOffset = m_selectedIndex;
+        } else if (m_selectedIndex >= m_scrollOffset + visibleRows) {
+            m_scrollOffset = m_selectedIndex - visibleRows + 1;
+        }
+        const int maxStart = std::max(0, static_cast<int>(m_items.size()) - visibleRows);
+        m_scrollOffset = std::clamp(m_scrollOffset, 0, maxStart);
+    }
+
+    std::vector<std::wstring> m_items;
+    int m_selectedIndex = -1;
+    int m_hoveredIndex = -1;
+    int m_scrollOffset = 0;
+};
+
+class ComboBox : public UIElement {
+public:
+    bool IsFocusable() const override { return true; }
+
+    bool OnFocus() override {
+        if (!m_hasFocus) {
+            m_hasFocus = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnBlur() override {
+        bool changed = false;
+        if (m_hasFocus) {
+            m_hasFocus = false;
+            changed = true;
+        }
+        if (m_expanded) {
+            m_expanded = false;
+            changed = true;
+        }
+        m_hoveredIndex = -1;
+        return changed;
+    }
+
+    bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
+        if (m_items.empty()) {
+            return false;
+        }
+
+        if (keyCode == VK_ESCAPE && m_expanded) {
+            m_expanded = false;
+            m_hoveredIndex = -1;
+            return true;
+        }
+
+        if (keyCode == VK_RETURN || keyCode == VK_SPACE || keyCode == VK_F4) {
+            if (m_expanded) {
+                if (m_hoveredIndex >= 0) {
+                    SetSelectedIndex(m_hoveredIndex);
+                }
+                m_expanded = false;
+                m_hoveredIndex = -1;
+            } else {
+                m_expanded = true;
+                m_hoveredIndex = std::max(0, m_selectedIndex);
+            }
+            return true;
+        }
+
+        if (keyCode == VK_UP || keyCode == VK_LEFT) {
+            if (m_expanded) {
+                return MoveHoverBy(-1);
+            }
+            return MoveSelectionBy(-1);
+        }
+        if (keyCode == VK_DOWN || keyCode == VK_RIGHT) {
+            if (m_expanded) {
+                return MoveHoverBy(1);
+            }
+            return MoveSelectionBy(1);
+        }
+        if (keyCode == VK_HOME) {
+            return m_expanded ? SetHoverIndex(0) : SetSelectedIndex(0);
+        }
+        if (keyCode == VK_END) {
+            const int last = static_cast<int>(m_items.size()) - 1;
+            return m_expanded ? SetHoverIndex(last) : SetSelectedIndex(last);
+        }
+        return false;
+    }
+
+    bool OnMouseDown(float x, float y) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+
+        if (HeaderRect().Contains(x, y)) {
+            m_expanded = !m_expanded;
+            m_hoveredIndex = m_expanded ? std::max(0, m_selectedIndex) : -1;
+            return true;
+        }
+
+        if (m_expanded) {
+            const int index = DropdownIndexFromPoint(y);
+            if (index >= 0) {
+                SetSelectedIndex(index);
+                m_expanded = false;
+                m_hoveredIndex = -1;
+                return true;
+            }
+            m_expanded = false;
+            m_hoveredIndex = -1;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        if (!m_expanded) {
+            if (m_hoveredIndex == -1) {
+                return false;
+            }
+            m_hoveredIndex = -1;
+            return true;
+        }
+        if (!HitTest(x, y)) {
+            if (m_hoveredIndex == -1) {
+                return false;
+            }
+            m_hoveredIndex = -1;
+            return true;
+        }
+
+        const int nextHover = DropdownIndexFromPoint(y);
+        if (nextHover == m_hoveredIndex) {
+            return false;
+        }
+        m_hoveredIndex = nextHover;
+        return true;
+    }
+
+    bool OnMouseLeave() override {
+        if (m_hoveredIndex == -1) {
+            return false;
+        }
+        m_hoveredIndex = -1;
+        return true;
+    }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        float preferred = ScaleValue(230.0f);
+        if (!m_items.empty()) {
+            float widest = 0.0f;
+            for (const auto& item : m_items) {
+                const Size measured = MeasureTextValue(item, fontSize, 4096.0f, TextWrapMode::NoWrap);
+                widest = std::max(widest, measured.width);
+            }
+            preferred = std::max(preferred, widest + ScaleValue(40.0f));
+        }
+        return std::min(availableWidth, preferred);
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        return ScaleValue(headerHeight) + ScaleValue(itemHeight) * static_cast<float>(std::max(2, maxVisibleItems));
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+        if (m_hasFocus) {
+            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
+        }
+
+        const Rect header = HeaderRect();
+        renderer.FillRoundedRect(header, headerBackground, ScaleValue(std::max(2.0f, cornerRadius - 1.0f)));
+
+        const std::wstring selectedText = (m_selectedIndex >= 0 && m_selectedIndex < static_cast<int>(m_items.size()))
+            ? m_items[m_selectedIndex]
+            : std::wstring(L"(none)");
+        const Rect textRect = Rect::Make(
+            header.left + ScaleValue(10.0f),
+            header.top,
+            header.right - ScaleValue(28.0f),
+            header.bottom);
+        const TextRenderOptions textOptions{
+            TextWrapMode::NoWrap,
+            TextHorizontalAlign::Start,
+            TextVerticalAlign::Center
+        };
+        renderer.DrawTextW(
+            selectedText.c_str(),
+            static_cast<UINT32>(selectedText.size()),
+            textRect,
+            textColor,
+            ScaleValue(fontSize),
+            textOptions);
+
+        const float arrowCenterX = header.right - ScaleValue(14.0f);
+        const float arrowCenterY = header.top + header.Height() * 0.5f;
+        const float arrowSize = ScaleValue(4.0f);
+        if (m_expanded) {
+            renderer.DrawLine(
+                PointF{arrowCenterX - arrowSize, arrowCenterY + arrowSize * 0.5f},
+                PointF{arrowCenterX, arrowCenterY - arrowSize * 0.5f},
+                arrowColor,
+                1.5f);
+            renderer.DrawLine(
+                PointF{arrowCenterX, arrowCenterY - arrowSize * 0.5f},
+                PointF{arrowCenterX + arrowSize, arrowCenterY + arrowSize * 0.5f},
+                arrowColor,
+                1.5f);
+        } else {
+            renderer.DrawLine(
+                PointF{arrowCenterX - arrowSize, arrowCenterY - arrowSize * 0.5f},
+                PointF{arrowCenterX, arrowCenterY + arrowSize * 0.5f},
+                arrowColor,
+                1.5f);
+            renderer.DrawLine(
+                PointF{arrowCenterX, arrowCenterY + arrowSize * 0.5f},
+                PointF{arrowCenterX + arrowSize, arrowCenterY - arrowSize * 0.5f},
+                arrowColor,
+                1.5f);
+        }
+
+        if (!m_expanded) {
+            return;
+        }
+
+        const Rect dropdownRect = DropdownRect();
+        if (dropdownRect.Height() <= 1.0f) {
+            return;
+        }
+
+        renderer.FillRect(dropdownRect, dropdownBackground);
+        renderer.DrawRect(dropdownRect, borderColor, 1.0f);
+
+        const float rowHeight = std::max(1.0f, ScaleValue(itemHeight));
+        const int visibleRows = std::max(1, static_cast<int>(std::floor(dropdownRect.Height() / rowHeight)));
+        const int count = std::min(static_cast<int>(m_items.size()), visibleRows);
+        for (int i = 0; i < count; ++i) {
+            const float top = dropdownRect.top + static_cast<float>(i) * rowHeight;
+            const float bottom = std::min(dropdownRect.bottom, top + rowHeight);
+            const Rect rowRect = Rect::Make(dropdownRect.left, top, dropdownRect.right, bottom);
+
+            if (i == m_selectedIndex) {
+                renderer.FillRect(rowRect, selectedBackground);
+            } else if (i == m_hoveredIndex) {
+                renderer.FillRect(rowRect, hoverBackground);
+            }
+
+            const Rect rowTextRect = Rect::Make(
+                rowRect.left + ScaleValue(10.0f),
+                rowRect.top,
+                rowRect.right - ScaleValue(10.0f),
+                rowRect.bottom);
+            renderer.DrawTextW(
+                m_items[i].c_str(),
+                static_cast<UINT32>(m_items[i].size()),
+                rowTextRect,
+                textColor,
+                ScaleValue(fontSize),
+                textOptions);
+        }
+    }
+
+    void SetItems(std::vector<std::wstring> items) {
+        m_items = std::move(items);
+        if (m_items.empty()) {
+            m_selectedIndex = -1;
+            m_hoveredIndex = -1;
+            m_expanded = false;
+            return;
+        }
+        m_selectedIndex = std::clamp(m_selectedIndex, 0, static_cast<int>(m_items.size()) - 1);
+    }
+
+    bool SetSelectedIndex(int index) {
+        if (m_items.empty()) {
+            if (m_selectedIndex == -1) {
+                return false;
+            }
+            m_selectedIndex = -1;
+            return true;
+        }
+        const int clamped = std::clamp(index, 0, static_cast<int>(m_items.size()) - 1);
+        if (clamped == m_selectedIndex) {
+            return false;
+        }
+        m_selectedIndex = clamped;
+        return true;
+    }
+
+    void SetExpanded(bool expanded) {
+        m_expanded = expanded && !m_items.empty();
+        if (!m_expanded) {
+            m_hoveredIndex = -1;
+        }
+    }
+
+    int SelectedIndex() const { return m_selectedIndex; }
+
+    Color background = ColorFromHex(0x13202D);
+    Color headerBackground = ColorFromHex(0x1B2C3D);
+    Color dropdownBackground = ColorFromHex(0x112130);
+    Color borderColor = ColorFromHex(0x36506A);
+    Color focusBorderColor = ColorFromHex(0xFFFFFF);
+    Color selectedBackground = ColorFromHex(0x2F4F77);
+    Color hoverBackground = ColorFromHex(0x20374F);
+    Color textColor = ColorFromHex(0xE9F2FD);
+    Color arrowColor = ColorFromHex(0xC8D9EC);
+    float cornerRadius = 8.0f;
+    float fontSize = 13.0f;
+    float headerHeight = 34.0f;
+    float itemHeight = 28.0f;
+    int maxVisibleItems = 5;
+
+private:
+    Rect HeaderRect() const {
+        const float height = std::min(m_bounds.Height(), ScaleValue(headerHeight));
+        return Rect::Make(m_bounds.left, m_bounds.top, m_bounds.right, m_bounds.top + height);
+    }
+
+    Rect DropdownRect() const {
+        const Rect header = HeaderRect();
+        return Rect::Make(m_bounds.left, header.bottom, m_bounds.right, m_bounds.bottom);
+    }
+
+    int DropdownIndexFromPoint(float y) const {
+        if (!m_expanded || m_items.empty()) {
+            return -1;
+        }
+        const Rect dropdown = DropdownRect();
+        if (!dropdown.Contains(m_bounds.left + 1.0f, y)) {
+            return -1;
+        }
+        const float rowHeight = std::max(1.0f, ScaleValue(itemHeight));
+        const int row = static_cast<int>(std::floor((y - dropdown.top) / rowHeight));
+        if (row < 0 || row >= std::min(static_cast<int>(m_items.size()), maxVisibleItems)) {
+            return -1;
+        }
+        return row;
+    }
+
+    bool MoveSelectionBy(int delta) {
+        if (m_items.empty()) {
+            return false;
+        }
+        if (m_selectedIndex < 0) {
+            return SetSelectedIndex(0);
+        }
+        return SetSelectedIndex(m_selectedIndex + delta);
+    }
+
+    bool SetHoverIndex(int index) {
+        if (m_items.empty()) {
+            return false;
+        }
+        const int clamped = std::clamp(index, 0, static_cast<int>(m_items.size()) - 1);
+        if (clamped == m_hoveredIndex) {
+            return false;
+        }
+        m_hoveredIndex = clamped;
+        return true;
+    }
+
+    bool MoveHoverBy(int delta) {
+        if (m_items.empty()) {
+            return false;
+        }
+        if (m_hoveredIndex < 0) {
+            return SetHoverIndex(std::max(0, m_selectedIndex));
+        }
+        return SetHoverIndex(m_hoveredIndex + delta);
+    }
+
+    std::vector<std::wstring> m_items;
+    int m_selectedIndex = -1;
+    int m_hoveredIndex = -1;
+    bool m_expanded = false;
+};
+
+class TabControl : public UIElement {
+public:
+    bool IsFocusable() const override { return true; }
+
+    bool OnFocus() override {
+        if (!m_hasFocus) {
+            m_hasFocus = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnBlur() override {
+        if (m_hasFocus) {
+            m_hasFocus = false;
+            m_hoveredTab = -1;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
+        if (TabCount() <= 0) {
+            return false;
+        }
+        if (keyCode == VK_LEFT || keyCode == VK_UP) {
+            return SetSelectedIndex(m_selectedIndex - 1);
+        }
+        if (keyCode == VK_RIGHT || keyCode == VK_DOWN) {
+            return SetSelectedIndex(m_selectedIndex + 1);
+        }
+        if (keyCode == VK_HOME) {
+            return SetSelectedIndex(0);
+        }
+        if (keyCode == VK_END) {
+            return SetSelectedIndex(TabCount() - 1);
+        }
+        if (UIElement* child = SelectedChild()) {
+            return child->OnKeyDown(keyCode, 0);
+        }
+        return false;
+    }
+
+    bool OnMouseDown(float x, float y) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+        const int tabIndex = TabIndexFromPoint(x, y);
+        if (tabIndex >= 0) {
+            SetSelectedIndex(tabIndex);
+            return true;
+        }
+        if (UIElement* child = SelectedChild()) {
+            if (child->HitTest(x, y)) {
+                return child->OnMouseDown(x, y);
+            }
+        }
+        return true;
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        bool changed = false;
+        const int nextHovered = TabIndexFromPoint(x, y);
+        if (nextHovered != m_hoveredTab) {
+            m_hoveredTab = nextHovered;
+            changed = true;
+        }
+
+        if (UIElement* child = SelectedChild()) {
+            if (child->HitTest(x, y)) {
+                changed = child->OnMouseMove(x, y) || changed;
+            } else {
+                changed = child->OnMouseLeave() || changed;
+            }
+        }
+        return changed;
+    }
+
+    bool OnMouseUp(float x, float y) override {
+        if (UIElement* child = SelectedChild()) {
+            return child->OnMouseUp(x, y);
+        }
+        return false;
+    }
+
+    bool OnMouseLeave() override {
+        bool changed = false;
+        if (m_hoveredTab != -1) {
+            m_hoveredTab = -1;
+            changed = true;
+        }
+        if (UIElement* child = SelectedChild()) {
+            changed = child->OnMouseLeave() || changed;
+        }
+        return changed;
+    }
+
+    UIElement* FindFocusableAt(float x, float y) override {
+        if (!HitTest(x, y)) {
+            return nullptr;
+        }
+        if (UIElement* child = SelectedChild()) {
+            if (child->HitTest(x, y)) {
+                if (auto* focusable = child->FindFocusableAt(x, y)) {
+                    return focusable;
+                }
+            }
+        }
+        return const_cast<TabControl*>(this);
+    }
+
+    UIElement* FindHitElementAt(float x, float y) override {
+        if (!HitTest(x, y)) {
+            return nullptr;
+        }
+        if (TabIndexFromPoint(x, y) >= 0) {
+            return this;
+        }
+        if (UIElement* child = SelectedChild()) {
+            if (child->HitTest(x, y)) {
+                if (auto* nested = child->FindHitElementAt(x, y)) {
+                    return nested;
+                }
+                return child;
+            }
+        }
+        return this;
+    }
+
+    void CollectFocusable(std::vector<UIElement*>& out) override {
+        out.push_back(this);
+        if (UIElement* child = SelectedChild()) {
+            child->CollectFocusable(out);
+        }
+    }
+
+    void Arrange(const Rect& finalRect) override {
+        UIElement::Arrange(finalRect);
+
+        const Rect content = ContentRect();
+        const Rect hidden = Rect::Make(-10000.0f, -10000.0f, -9990.0f, -9990.0f);
+        NormalizeSelectedIndex();
+        for (size_t i = 0; i < m_children.size(); ++i) {
+            if (static_cast<int>(i) == m_selectedIndex) {
+                m_children[i]->Arrange(content);
+            } else {
+                m_children[i]->Arrange(hidden);
+            }
+        }
+    }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        return std::min(availableWidth, ScaleValue(480.0f));
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        return ScaleValue(300.0f);
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+        if (m_hasFocus) {
+            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
+        }
+
+        const Rect header = HeaderRect();
+        renderer.FillRect(header, headerBackground);
+        renderer.DrawLine(
+            PointF{header.left, header.bottom},
+            PointF{header.right, header.bottom},
+            borderColor,
+            1.0f);
+
+        const std::vector<Rect> tabs = BuildTabRects();
+        for (size_t i = 0; i < tabs.size(); ++i) {
+            const bool selected = static_cast<int>(i) == m_selectedIndex;
+            const bool hovered = static_cast<int>(i) == m_hoveredTab;
+
+            Color tabBg = tabBackground;
+            if (selected) {
+                tabBg = selectedTabBackground;
+            } else if (hovered) {
+                tabBg = hoverTabBackground;
+            }
+
+            renderer.FillRect(tabs[i], tabBg);
+            renderer.DrawRect(tabs[i], borderColor, 1.0f);
+
+            const std::wstring title = TabTitle(i);
+            const TextRenderOptions tabTextOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Center,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                title.c_str(),
+                static_cast<UINT32>(title.size()),
+                tabs[i],
+                selected ? selectedTabTextColor : tabTextColor,
+                ScaleValue(fontSize),
+                tabTextOptions);
+        }
+
+        const Rect content = ContentRect();
+        renderer.FillRect(content, contentBackground);
+        renderer.DrawRect(content, borderColor, 1.0f);
+
+        if (UIElement* child = SelectedChild()) {
+            child->Render(renderer);
+        }
+    }
+
+    void SetTabs(std::vector<std::wstring> tabs) {
+        m_tabs = std::move(tabs);
+        NormalizeSelectedIndex();
+    }
+
+    bool SetSelectedIndex(int index) {
+        const int count = TabCount();
+        if (count <= 0) {
+            if (m_selectedIndex == -1) {
+                return false;
+            }
+            m_selectedIndex = -1;
+            return true;
+        }
+        const int clamped = std::clamp(index, 0, count - 1);
+        if (clamped == m_selectedIndex) {
+            return false;
+        }
+        m_selectedIndex = clamped;
+        return true;
+    }
+
+    int SelectedIndex() const { return m_selectedIndex; }
+
+    Color background = ColorFromHex(0x121F2E);
+    Color headerBackground = ColorFromHex(0x1A2A3B);
+    Color contentBackground = ColorFromHex(0x0F1A26);
+    Color borderColor = ColorFromHex(0x3B536B);
+    Color focusBorderColor = ColorFromHex(0xFFFFFF);
+    Color tabBackground = ColorFromHex(0x1F3247);
+    Color hoverTabBackground = ColorFromHex(0x2A415A);
+    Color selectedTabBackground = ColorFromHex(0x355A82);
+    Color tabTextColor = ColorFromHex(0xD6E4F2);
+    Color selectedTabTextColor = ColorFromHex(0xFFFFFF);
+    float cornerRadius = 10.0f;
+    float fontSize = 13.0f;
+    float headerHeight = 34.0f;
+
+private:
+    int TabCount() const {
+        return static_cast<int>(std::max(m_tabs.size(), m_children.size()));
+    }
+
+    std::wstring TabTitle(size_t index) const {
+        if (index < m_tabs.size() && !m_tabs[index].empty()) {
+            return m_tabs[index];
+        }
+        return L"Tab " + std::to_wstring(index + 1);
+    }
+
+    Rect HeaderRect() const {
+        const float height = std::min(m_bounds.Height(), ScaleValue(headerHeight));
+        return Rect::Make(m_bounds.left, m_bounds.top, m_bounds.right, m_bounds.top + height);
+    }
+
+    Rect ContentRect() const {
+        const Rect header = HeaderRect();
+        const float inset = ScaleValue(1.0f);
+        return Rect::Make(
+            m_bounds.left + inset,
+            std::min(m_bounds.bottom, header.bottom + inset),
+            m_bounds.right - inset,
+            m_bounds.bottom - inset);
+    }
+
+    std::vector<Rect> BuildTabRects() const {
+        std::vector<Rect> rects;
+        const int count = TabCount();
+        if (count <= 0) {
+            return rects;
+        }
+
+        const Rect header = HeaderRect();
+        const float width = std::max(1.0f, header.Width());
+        const float tabWidth = width / static_cast<float>(count);
+        rects.reserve(static_cast<size_t>(count));
+        float x = header.left;
+        for (int i = 0; i < count; ++i) {
+            const float right = (i == count - 1) ? header.right : x + tabWidth;
+            rects.push_back(Rect::Make(x, header.top, right, header.bottom));
+            x = right;
+        }
+        return rects;
+    }
+
+    int TabIndexFromPoint(float x, float y) const {
+        const std::vector<Rect> rects = BuildTabRects();
+        for (size_t i = 0; i < rects.size(); ++i) {
+            if (rects[i].Contains(x, y)) {
+                return static_cast<int>(i);
+            }
+        }
+        return -1;
+    }
+
+    UIElement* SelectedChild() {
+        NormalizeSelectedIndex();
+        if (m_selectedIndex < 0 || m_selectedIndex >= static_cast<int>(m_children.size())) {
+            return nullptr;
+        }
+        return m_children[static_cast<size_t>(m_selectedIndex)].get();
+    }
+
+    void NormalizeSelectedIndex() {
+        const int count = TabCount();
+        if (count <= 0) {
+            m_selectedIndex = -1;
+            return;
+        }
+        m_selectedIndex = std::clamp(m_selectedIndex < 0 ? 0 : m_selectedIndex, 0, count - 1);
+    }
+
+    std::vector<std::wstring> m_tabs;
+    int m_selectedIndex = 0;
+    int m_hoveredTab = -1;
+};
+
+class ListView : public UIElement {
+public:
+    struct Column {
+        std::wstring title;
+        float width = -1.0f;
+    };
+
+    bool IsFocusable() const override { return true; }
+
+    bool OnFocus() override {
+        if (!m_hasFocus) {
+            m_hasFocus = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnBlur() override {
+        if (m_hasFocus) {
+            m_hasFocus = false;
+            m_hoveredRow = -1;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
+        if (m_rows.empty()) {
+            return false;
+        }
+        switch (keyCode) {
+            case VK_UP:
+                return SetSelectedIndex(m_selectedRow - 1);
+            case VK_DOWN:
+                return SetSelectedIndex(m_selectedRow + 1);
+            case VK_HOME:
+                return SetSelectedIndex(0);
+            case VK_END:
+                return SetSelectedIndex(static_cast<int>(m_rows.size()) - 1);
+            case VK_PRIOR:
+                return SetSelectedIndex(m_selectedRow - VisibleRowCount());
+            case VK_NEXT:
+                return SetSelectedIndex(m_selectedRow + VisibleRowCount());
+            default:
+                return false;
+        }
+    }
+
+    bool OnMouseDown(float x, float y) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+        const int rowIndex = RowIndexFromPoint(y);
+        if (rowIndex >= 0) {
+            SetSelectedIndex(rowIndex);
+            return true;
+        }
+        return true;
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        if (!HitTest(x, y)) {
+            if (m_hoveredRow == -1) {
+                return false;
+            }
+            m_hoveredRow = -1;
+            return true;
+        }
+        const int nextHovered = RowIndexFromPoint(y);
+        if (nextHovered == m_hoveredRow) {
+            return false;
+        }
+        m_hoveredRow = nextHovered;
+        return true;
+    }
+
+    bool OnMouseLeave() override {
+        if (m_hoveredRow == -1) {
+            return false;
+        }
+        m_hoveredRow = -1;
+        return true;
+    }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        if (m_columns.empty()) {
+            return std::min(availableWidth, ScaleValue(420.0f));
+        }
+
+        const Thickness scaledCellPadding = ScaleThickness(cellPadding);
+        float total = 0.0f;
+        for (size_t col = 0; col < m_columns.size(); ++col) {
+            if (m_columns[col].width > 0.0f) {
+                total += ScaleValue(m_columns[col].width);
+                continue;
+            }
+
+            float width = 0.0f;
+            const Size header = MeasureTextValue(
+                m_columns[col].title.empty() ? L"Column" : m_columns[col].title,
+                headerFontSize,
+                4096.0f,
+                TextWrapMode::NoWrap);
+            width = std::max(width, header.width);
+
+            const size_t inspectRows = std::min<size_t>(m_rows.size(), 30);
+            for (size_t row = 0; row < inspectRows; ++row) {
+                if (col >= m_rows[row].size()) {
+                    continue;
+                }
+                const Size cell = MeasureTextValue(
+                    m_rows[row][col],
+                    fontSize,
+                    4096.0f,
+                    TextWrapMode::NoWrap);
+                width = std::max(width, cell.width);
+            }
+            total += width + scaledCellPadding.left + scaledCellPadding.right + ScaleValue(10.0f);
+        }
+        return std::min(availableWidth, total + ScaleValue(2.0f));
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        const float header = ScaleValue(headerHeight);
+        const float row = ScaleValue(rowHeight);
+        const int rows = std::clamp(static_cast<int>(m_rows.size()), 5, 10);
+        return header + row * static_cast<float>(rows) + ScaleValue(2.0f);
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+        if (m_hasFocus) {
+            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
+        }
+
+        if (m_columns.empty()) {
+            const std::wstring message = L"No columns";
+            const TextRenderOptions textOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Center,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                message.c_str(),
+                static_cast<UINT32>(message.size()),
+                m_bounds,
+                textColor,
+                ScaleValue(fontSize),
+                textOptions);
+            return;
+        }
+
+        const std::vector<float> widths = ResolveColumnWidths();
+        if (widths.empty()) {
+            return;
+        }
+
+        const Rect headerRect = HeaderRect();
+        const Rect bodyRect = BodyRect();
+        const float scaledHeaderHeight = ScaleValue(headerHeight);
+        const float scaledRowHeight = std::max(1.0f, ScaleValue(rowHeight));
+        const Thickness scaledCellPadding = ScaleThickness(cellPadding);
+
+        renderer.PushRoundedClip(m_bounds, scaledCornerRadius);
+        renderer.FillRect(headerRect, headerBackground);
+        renderer.DrawLine(
+            PointF{m_bounds.left, headerRect.bottom},
+            PointF{m_bounds.right, headerRect.bottom},
+            gridLineColor,
+            1.0f);
+
+        float x = m_bounds.left;
+        for (size_t col = 0; col < m_columns.size(); ++col) {
+            const Rect cellRect = Rect::Make(
+                x + scaledCellPadding.left,
+                headerRect.top + scaledCellPadding.top,
+                x + widths[col] - scaledCellPadding.right,
+                headerRect.bottom - scaledCellPadding.bottom);
+            const TextRenderOptions textOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Start,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                m_columns[col].title.c_str(),
+                static_cast<UINT32>(m_columns[col].title.size()),
+                cellRect,
+                headerTextColor,
+                ScaleValue(headerFontSize),
+                textOptions);
+
+            if (col + 1 < m_columns.size()) {
+                renderer.DrawLine(
+                    PointF{x + widths[col], m_bounds.top},
+                    PointF{x + widths[col], m_bounds.bottom},
+                    gridLineColor,
+                    1.0f);
+            }
+            x += widths[col];
+        }
+
+        const int visibleRows = std::max(1, static_cast<int>(std::floor(bodyRect.Height() / scaledRowHeight)));
+        const int maxStart = std::max(0, static_cast<int>(m_rows.size()) - visibleRows);
+        m_scrollOffset = std::clamp(m_scrollOffset, 0, maxStart);
+        const int endIndex = std::min(static_cast<int>(m_rows.size()), m_scrollOffset + visibleRows);
+
+        for (int row = m_scrollOffset; row < endIndex; ++row) {
+            const float rowTop = bodyRect.top + static_cast<float>(row - m_scrollOffset) * scaledRowHeight;
+            const float rowBottom = std::min(bodyRect.bottom, rowTop + scaledRowHeight);
+            const Rect rowRect = Rect::Make(m_bounds.left, rowTop, m_bounds.right, rowBottom);
+
+            if (row == m_selectedRow) {
+                renderer.FillRect(rowRect, selectedRowBackground);
+            } else if (row == m_hoveredRow) {
+                renderer.FillRect(rowRect, hoverRowBackground);
+            } else {
+                renderer.FillRect(rowRect, (row % 2 == 0) ? rowBackgroundA : rowBackgroundB);
+            }
+
+            float rowX = m_bounds.left;
+            for (size_t col = 0; col < m_columns.size(); ++col) {
+                const std::wstring value = (col < m_rows[row].size()) ? m_rows[row][col] : L"";
+                const Rect textRect = Rect::Make(
+                    rowX + scaledCellPadding.left,
+                    rowTop + scaledCellPadding.top,
+                    rowX + widths[col] - scaledCellPadding.right,
+                    rowBottom - scaledCellPadding.bottom);
+                const TextRenderOptions textOptions{
+                    TextWrapMode::NoWrap,
+                    TextHorizontalAlign::Start,
+                    TextVerticalAlign::Center
+                };
+                renderer.DrawTextW(
+                    value.c_str(),
+                    static_cast<UINT32>(value.size()),
+                    textRect,
+                    textColor,
+                    ScaleValue(fontSize),
+                    textOptions);
+                rowX += widths[col];
+            }
+
+            renderer.DrawLine(
+                PointF{m_bounds.left, rowBottom},
+                PointF{m_bounds.right, rowBottom},
+                gridLineColor,
+                1.0f);
+        }
+
+        if (visibleRows < static_cast<int>(m_rows.size())) {
+            const float thumbWidth = ScaleValue(4.0f);
+            const float thumbRight = m_bounds.right - ScaleValue(3.0f);
+            const float thumbLeft = thumbRight - thumbWidth;
+            const float ratio = static_cast<float>(visibleRows) / static_cast<float>(m_rows.size());
+            const float thumbHeight = std::max(ScaleValue(16.0f), bodyRect.Height() * ratio);
+            const float maxOffset = static_cast<float>(std::max(1, static_cast<int>(m_rows.size()) - visibleRows));
+            const float offsetRatio = static_cast<float>(m_scrollOffset) / maxOffset;
+            const float thumbTop = bodyRect.top + (bodyRect.Height() - thumbHeight) * offsetRatio;
+            const Rect thumbRect = Rect::Make(thumbLeft, thumbTop, thumbRight, thumbTop + thumbHeight);
+            renderer.FillRoundedRect(thumbRect, scrollThumbColor, ScaleValue(2.0f));
+        }
+
+        renderer.PopLayer();
+        (void)scaledHeaderHeight;
+    }
+
+    void SetColumns(std::vector<Column> columns) { m_columns = std::move(columns); }
+    void SetRows(std::vector<std::vector<std::wstring>> rows) {
+        m_rows = std::move(rows);
+        if (m_rows.empty()) {
+            m_selectedRow = -1;
+            m_scrollOffset = 0;
+        } else if (m_selectedRow < 0) {
+            m_selectedRow = 0;
+        } else {
+            m_selectedRow = std::clamp(m_selectedRow, 0, static_cast<int>(m_rows.size()) - 1);
+        }
+        EnsureSelectionVisible();
+    }
+
+    void SetColumnWidths(std::vector<float> widths) {
+        const size_t count = std::min(widths.size(), m_columns.size());
+        for (size_t i = 0; i < count; ++i) {
+            m_columns[i].width = widths[i];
+        }
+    }
+
+    bool SetSelectedIndex(int index) {
+        if (m_rows.empty()) {
+            if (m_selectedRow == -1) {
+                return false;
+            }
+            m_selectedRow = -1;
+            return true;
+        }
+        const int clamped = std::clamp(index, 0, static_cast<int>(m_rows.size()) - 1);
+        if (clamped == m_selectedRow) {
+            return false;
+        }
+        m_selectedRow = clamped;
+        EnsureSelectionVisible();
+        return true;
+    }
+
+    int SelectedIndex() const { return m_selectedRow; }
+
+    Color background = ColorFromHex(0x101C29);
+    Color borderColor = ColorFromHex(0x35506A);
+    Color focusBorderColor = ColorFromHex(0xFFFFFF);
+    Color headerBackground = ColorFromHex(0x1D3247);
+    Color rowBackgroundA = ColorFromHex(0x142536);
+    Color rowBackgroundB = ColorFromHex(0x102132);
+    Color hoverRowBackground = ColorFromHex(0x203B56);
+    Color selectedRowBackground = ColorFromHex(0x2D567C);
+    Color gridLineColor = ColorFromHex(0x2D445A);
+    Color headerTextColor = ColorFromHex(0xEAF4FF);
+    Color textColor = ColorFromHex(0xD0DDEC);
+    Color scrollThumbColor = ColorFromHex(0x58718C);
+    float cornerRadius = 10.0f;
+    float headerHeight = 34.0f;
+    float rowHeight = 30.0f;
+    float fontSize = 13.0f;
+    float headerFontSize = 13.0f;
+    Thickness cellPadding{8, 5, 8, 5};
+
+private:
+    Rect HeaderRect() const {
+        const float h = std::min(m_bounds.Height(), ScaleValue(headerHeight));
+        return Rect::Make(m_bounds.left, m_bounds.top, m_bounds.right, m_bounds.top + h);
+    }
+
+    Rect BodyRect() const {
+        const Rect header = HeaderRect();
+        return Rect::Make(m_bounds.left, header.bottom, m_bounds.right, m_bounds.bottom);
+    }
+
+    int VisibleRowCount() const {
+        const Rect body = BodyRect();
+        const float row = std::max(1.0f, ScaleValue(rowHeight));
+        return std::max(1, static_cast<int>(std::floor(body.Height() / row)));
+    }
+
+    void EnsureSelectionVisible() {
+        if (m_selectedRow < 0 || m_rows.empty()) {
+            m_scrollOffset = 0;
+            return;
+        }
+        const int visible = VisibleRowCount();
+        if (m_selectedRow < m_scrollOffset) {
+            m_scrollOffset = m_selectedRow;
+        } else if (m_selectedRow >= m_scrollOffset + visible) {
+            m_scrollOffset = m_selectedRow - visible + 1;
+        }
+        const int maxStart = std::max(0, static_cast<int>(m_rows.size()) - visible);
+        m_scrollOffset = std::clamp(m_scrollOffset, 0, maxStart);
+    }
+
+    int RowIndexFromPoint(float y) const {
+        if (m_rows.empty()) {
+            return -1;
+        }
+        const Rect body = BodyRect();
+        if (y < body.top || y > body.bottom) {
+            return -1;
+        }
+        const float row = std::max(1.0f, ScaleValue(rowHeight));
+        const int displayRow = static_cast<int>(std::floor((y - body.top) / row));
+        const int index = m_scrollOffset + displayRow;
+        return (index >= 0 && index < static_cast<int>(m_rows.size())) ? index : -1;
+    }
+
+    std::vector<float> ResolveColumnWidths() const {
+        std::vector<float> widths;
+        if (m_columns.empty()) {
+            return widths;
+        }
+        widths.resize(m_columns.size(), 0.0f);
+        const float totalWidth = std::max(1.0f, m_bounds.Width());
+
+        float fixed = 0.0f;
+        size_t autoCount = 0;
+        for (size_t i = 0; i < m_columns.size(); ++i) {
+            if (m_columns[i].width > 0.0f) {
+                widths[i] = ScaleValue(m_columns[i].width);
+                fixed += widths[i];
+            } else {
+                ++autoCount;
+            }
+        }
+
+        const float autoWidth = autoCount > 0
+            ? std::max(ScaleValue(52.0f), (std::max(0.0f, totalWidth - fixed) / static_cast<float>(autoCount)))
+            : 0.0f;
+        float sum = 0.0f;
+        for (size_t i = 0; i < widths.size(); ++i) {
+            if (widths[i] <= 0.0f) {
+                widths[i] = autoWidth;
+            }
+            widths[i] = std::max(ScaleValue(36.0f), widths[i]);
+            sum += widths[i];
+        }
+
+        if (sum > totalWidth && sum > 0.0f) {
+            const float ratio = totalWidth / sum;
+            for (float& w : widths) {
+                w = std::max(ScaleValue(28.0f), w * ratio);
+            }
+        }
+        return widths;
+    }
+
+    std::vector<Column> m_columns;
+    std::vector<std::vector<std::wstring>> m_rows;
+    int m_selectedRow = -1;
+    int m_hoveredRow = -1;
+    int m_scrollOffset = 0;
+};
+
+class TreeView : public UIElement {
+public:
+    bool IsFocusable() const override { return true; }
+
+    bool OnFocus() override {
+        if (!m_hasFocus) {
+            m_hasFocus = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnBlur() override {
+        bool changed = false;
+        if (m_hasFocus) {
+            m_hasFocus = false;
+            changed = true;
+        }
+        if (m_hasHoveredPath) {
+            m_hasHoveredPath = false;
+            m_hoveredPath.clear();
+            changed = true;
+        }
+        return changed;
+    }
+
+    bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
+        auto visible = BuildVisibleNodes();
+        if (visible.empty()) {
+            return false;
+        }
+
+        int selectedIndex = SelectedVisibleIndex(visible);
+        if (selectedIndex < 0) {
+            selectedIndex = 0;
+            SetSelectedPath(visible[0].path);
+        }
+
+        if (keyCode == VK_UP) {
+            if (selectedIndex > 0) {
+                SetSelectedPath(visible[static_cast<size_t>(selectedIndex - 1)].path);
+                EnsureSelectedVisible(visible);
+                return true;
+            }
+            return false;
+        }
+        if (keyCode == VK_DOWN) {
+            if (selectedIndex + 1 < static_cast<int>(visible.size())) {
+                SetSelectedPath(visible[static_cast<size_t>(selectedIndex + 1)].path);
+                EnsureSelectedVisible(visible);
+                return true;
+            }
+            return false;
+        }
+        if (keyCode == VK_HOME) {
+            SetSelectedPath(visible.front().path);
+            EnsureSelectedVisible(visible);
+            return true;
+        }
+        if (keyCode == VK_END) {
+            SetSelectedPath(visible.back().path);
+            EnsureSelectedVisible(visible);
+            return true;
+        }
+
+        Node* selected = GetNode(m_selectedPath);
+        if (!selected) {
+            return false;
+        }
+
+        if (keyCode == VK_LEFT) {
+            if (!selected->children.empty() && selected->expanded) {
+                selected->expanded = false;
+                return true;
+            }
+            if (m_selectedPath.size() > 1) {
+                auto parentPath = m_selectedPath;
+                parentPath.pop_back();
+                SetSelectedPath(parentPath);
+                EnsureSelectedVisible(BuildVisibleNodes());
+                return true;
+            }
+            return false;
+        }
+
+        if (keyCode == VK_RIGHT) {
+            if (!selected->children.empty() && !selected->expanded) {
+                selected->expanded = true;
+                return true;
+            }
+            if (!selected->children.empty()) {
+                auto childPath = m_selectedPath;
+                childPath.push_back(0);
+                SetSelectedPath(childPath);
+                EnsureSelectedVisible(BuildVisibleNodes());
+                return true;
+            }
+            return false;
+        }
+
+        if (keyCode == VK_SPACE || keyCode == VK_RETURN) {
+            if (!selected->children.empty()) {
+                selected->expanded = !selected->expanded;
+                return true;
+            }
+            return false;
+        }
+
+        return false;
+    }
+
+    bool OnMouseDown(float x, float y) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+
+        auto visible = BuildVisibleNodes();
+        if (visible.empty()) {
+            return true;
+        }
+        const int visibleIndex = VisibleIndexFromPoint(y, static_cast<int>(visible.size()));
+        if (visibleIndex < 0 || visibleIndex >= static_cast<int>(visible.size())) {
+            return true;
+        }
+
+        const auto& entry = visible[static_cast<size_t>(visibleIndex)];
+        const int rowIndex = m_scrollOffset + visibleIndex;
+        SetSelectedPath(entry.path);
+        EnsureSelectedVisible(visible);
+
+        if (entry.node && !entry.node->children.empty() && ToggleGlyphRect(entry.depth, rowIndex).Contains(x, y)) {
+            entry.node->expanded = !entry.node->expanded;
+        }
+        return true;
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        auto visible = BuildVisibleNodes();
+        if (!HitTest(x, y) || visible.empty()) {
+            if (!m_hasHoveredPath) {
+                return false;
+            }
+            m_hasHoveredPath = false;
+            m_hoveredPath.clear();
+            return true;
+        }
+
+        const int visibleIndex = VisibleIndexFromPoint(y, static_cast<int>(visible.size()));
+        if (visibleIndex < 0 || visibleIndex >= static_cast<int>(visible.size())) {
+            if (!m_hasHoveredPath) {
+                return false;
+            }
+            m_hasHoveredPath = false;
+            m_hoveredPath.clear();
+            return true;
+        }
+
+        const auto& path = visible[static_cast<size_t>(visibleIndex)].path;
+        if (m_hasHoveredPath && path == m_hoveredPath) {
+            return false;
+        }
+        m_hoveredPath = path;
+        m_hasHoveredPath = true;
+        return true;
+    }
+
+    bool OnMouseLeave() override {
+        if (!m_hasHoveredPath) {
+            return false;
+        }
+        m_hasHoveredPath = false;
+        m_hoveredPath.clear();
+        return true;
+    }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        float preferred = ScaleValue(320.0f);
+        const float maxWidth = std::max(availableWidth, preferred);
+        return std::min(availableWidth, maxWidth);
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        return ScaleValue(280.0f);
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+        if (m_hasFocus) {
+            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
+        }
+
+        auto visible = BuildVisibleNodes();
+        if (visible.empty()) {
+            const std::wstring message = L"(empty tree)";
+            const TextRenderOptions textOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Center,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                message.c_str(),
+                static_cast<UINT32>(message.size()),
+                m_bounds,
+                mutedTextColor,
+                ScaleValue(fontSize),
+                textOptions);
+            return;
+        }
+
+        const Rect content = ContentRect();
+        const float row = std::max(1.0f, ScaleValue(itemHeight));
+        const int visibleRows = std::max(1, static_cast<int>(std::floor(content.Height() / row)));
+        const int maxStart = std::max(0, static_cast<int>(visible.size()) - visibleRows);
+        m_scrollOffset = std::clamp(m_scrollOffset, 0, maxStart);
+        const int count = std::min(visibleRows, static_cast<int>(visible.size()) - m_scrollOffset);
+
+        renderer.PushRoundedClip(m_bounds, scaledCornerRadius);
+        for (int i = 0; i < count; ++i) {
+            const int globalIndex = m_scrollOffset + i;
+            const auto& entry = visible[static_cast<size_t>(globalIndex)];
+            const float top = content.top + static_cast<float>(i) * row;
+            const float bottom = std::min(content.bottom, top + row);
+            const Rect rowRect = Rect::Make(content.left, top, content.right, bottom);
+
+            const bool selected = entry.path == m_selectedPath;
+            const bool hovered = m_hasHoveredPath && entry.path == m_hoveredPath;
+            if (selected) {
+                renderer.FillRoundedRect(rowRect, selectedBackground, ScaleValue(4.0f));
+            } else if (hovered) {
+                renderer.FillRoundedRect(rowRect, hoverBackground, ScaleValue(4.0f));
+            }
+
+            const float indent = ScaleValue(indentWidth) * static_cast<float>(entry.depth);
+            const float glyphLeft = content.left + ScaleValue(4.0f) + indent;
+            const float glyphCenterY = top + row * 0.5f;
+
+            if (!entry.node->children.empty()) {
+                const Rect glyphRect = ToggleGlyphRect(entry.depth, globalIndex);
+                renderer.DrawRect(glyphRect, glyphColor, 1.0f);
+                renderer.DrawLine(
+                    PointF{glyphRect.left + ScaleValue(2.0f), glyphCenterY},
+                    PointF{glyphRect.right - ScaleValue(2.0f), glyphCenterY},
+                    glyphColor,
+                    1.0f);
+                if (!entry.node->expanded) {
+                    renderer.DrawLine(
+                        PointF{glyphRect.left + glyphRect.Width() * 0.5f, glyphRect.top + ScaleValue(2.0f)},
+                        PointF{glyphRect.left + glyphRect.Width() * 0.5f, glyphRect.bottom - ScaleValue(2.0f)},
+                        glyphColor,
+                        1.0f);
+                }
+            }
+
+            const float textLeft = glyphLeft + ScaleValue(16.0f);
+            const Rect textRect = Rect::Make(textLeft, top, content.right - ScaleValue(6.0f), bottom);
+            const TextRenderOptions textOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Start,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                entry.node->label.c_str(),
+                static_cast<UINT32>(entry.node->label.size()),
+                textRect,
+                textColor,
+                ScaleValue(fontSize),
+                textOptions);
+        }
+
+        if (visibleRows < static_cast<int>(visible.size())) {
+            const float thumbWidth = ScaleValue(4.0f);
+            const float thumbRight = m_bounds.right - ScaleValue(3.0f);
+            const float thumbLeft = thumbRight - thumbWidth;
+            const float ratio = static_cast<float>(visibleRows) / static_cast<float>(visible.size());
+            const float thumbHeight = std::max(ScaleValue(16.0f), content.Height() * ratio);
+            const float maxOffset = static_cast<float>(std::max(1, static_cast<int>(visible.size()) - visibleRows));
+            const float offsetRatio = static_cast<float>(m_scrollOffset) / maxOffset;
+            const float thumbTop = content.top + (content.Height() - thumbHeight) * offsetRatio;
+            const Rect thumbRect = Rect::Make(thumbLeft, thumbTop, thumbRight, thumbTop + thumbHeight);
+            renderer.FillRoundedRect(thumbRect, scrollThumbColor, ScaleValue(2.0f));
+        }
+
+        renderer.PopLayer();
+    }
+
+    void SetPaths(std::vector<std::wstring> paths) {
+        m_roots.clear();
+        for (const auto& path : paths) {
+            AddPath(path);
+        }
+        if (!m_roots.empty()) {
+            m_selectedPath = std::vector<int>{0};
+        } else {
+            m_selectedPath.clear();
+        }
+        m_scrollOffset = 0;
+    }
+
+    void SetExpandedAll(bool expanded) {
+        for (auto& root : m_roots) {
+            SetExpandedAllRecursive(root, expanded);
+        }
+    }
+
+    Color background = ColorFromHex(0x101B28);
+    Color borderColor = ColorFromHex(0x35506A);
+    Color focusBorderColor = ColorFromHex(0xFFFFFF);
+    Color selectedBackground = ColorFromHex(0x2E577D);
+    Color hoverBackground = ColorFromHex(0x1F3B55);
+    Color textColor = ColorFromHex(0xDCE8F5);
+    Color mutedTextColor = ColorFromHex(0x96A9BC);
+    Color glyphColor = ColorFromHex(0xAFC3D9);
+    Color scrollThumbColor = ColorFromHex(0x59728C);
+    float cornerRadius = 10.0f;
+    float fontSize = 13.0f;
+    float itemHeight = 28.0f;
+    float indentWidth = 18.0f;
+
+private:
+    struct Node {
+        std::wstring label;
+        std::vector<Node> children;
+        bool expanded = true;
+    };
+
+    struct VisibleNode {
+        Node* node = nullptr;
+        int depth = 0;
+        std::vector<int> path;
+    };
+
+    static std::wstring TrimWide(const std::wstring& value) {
+        size_t start = 0;
+        while (start < value.size() && (value[start] == L' ' || value[start] == L'\t' || value[start] == L'\r' || value[start] == L'\n')) {
+            ++start;
+        }
+        size_t end = value.size();
+        while (end > start && (value[end - 1] == L' ' || value[end - 1] == L'\t' || value[end - 1] == L'\r' || value[end - 1] == L'\n')) {
+            --end;
+        }
+        return value.substr(start, end - start);
+    }
+
+    static std::vector<std::wstring> SplitPath(const std::wstring& path) {
+        std::vector<std::wstring> segments;
+        std::wstring current;
+        for (wchar_t ch : path) {
+            if (ch == L'/' || ch == L'>' || ch == L'\\') {
+                const std::wstring trimmed = TrimWide(current);
+                if (!trimmed.empty()) {
+                    segments.push_back(trimmed);
+                }
+                current.clear();
+            } else {
+                current.push_back(ch);
+            }
+        }
+        const std::wstring trimmed = TrimWide(current);
+        if (!trimmed.empty()) {
+            segments.push_back(trimmed);
+        }
+        return segments;
+    }
+
+    void AddPath(const std::wstring& path) {
+        const auto segments = SplitPath(path);
+        if (segments.empty()) {
+            return;
+        }
+
+        std::vector<Node>* level = &m_roots;
+        for (const auto& segment : segments) {
+            auto it = std::find_if(level->begin(), level->end(), [&](const Node& node) {
+                return node.label == segment;
+            });
+            if (it == level->end()) {
+                level->push_back(Node{segment, {}, true});
+                it = level->end() - 1;
+            }
+            level = &it->children;
+        }
+    }
+
+    void SetExpandedAllRecursive(Node& node, bool expanded) {
+        node.expanded = expanded;
+        for (auto& child : node.children) {
+            SetExpandedAllRecursive(child, expanded);
+        }
+    }
+
+    Rect ContentRect() const {
+        const float inset = ScaleValue(4.0f);
+        return Rect::Make(
+            m_bounds.left + inset,
+            m_bounds.top + inset,
+            m_bounds.right - inset,
+            m_bounds.bottom - inset);
+    }
+
+    Rect ToggleGlyphRect(int depth, int globalIndex) const {
+        const Rect content = ContentRect();
+        const float row = std::max(1.0f, ScaleValue(itemHeight));
+        const int localIndex = globalIndex - m_scrollOffset;
+        const float rowTop = content.top + static_cast<float>(localIndex) * row;
+        const float centerY = rowTop + row * 0.5f;
+        const float left = content.left + ScaleValue(4.0f) + ScaleValue(indentWidth) * static_cast<float>(depth);
+        return Rect::Make(left, centerY - ScaleValue(5.0f), left + ScaleValue(10.0f), centerY + ScaleValue(5.0f));
+    }
+
+    std::vector<VisibleNode> BuildVisibleNodes() {
+        std::vector<VisibleNode> result;
+        std::vector<int> path;
+        for (size_t i = 0; i < m_roots.size(); ++i) {
+            path.clear();
+            path.push_back(static_cast<int>(i));
+            AppendVisibleNode(m_roots[i], 0, path, result);
+        }
+        return result;
+    }
+
+    void AppendVisibleNode(Node& node, int depth, std::vector<int>& path, std::vector<VisibleNode>& out) {
+        out.push_back(VisibleNode{&node, depth, path});
+        if (!node.expanded) {
+            return;
+        }
+        for (size_t i = 0; i < node.children.size(); ++i) {
+            path.push_back(static_cast<int>(i));
+            AppendVisibleNode(node.children[i], depth + 1, path, out);
+            path.pop_back();
+        }
+    }
+
+    Node* GetNode(const std::vector<int>& path) {
+        if (path.empty()) {
+            return nullptr;
+        }
+        if (path[0] < 0 || path[0] >= static_cast<int>(m_roots.size())) {
+            return nullptr;
+        }
+
+        Node* node = &m_roots[static_cast<size_t>(path[0])];
+        for (size_t i = 1; i < path.size(); ++i) {
+            const int idx = path[i];
+            if (idx < 0 || idx >= static_cast<int>(node->children.size())) {
+                return nullptr;
+            }
+            node = &node->children[static_cast<size_t>(idx)];
+        }
+        return node;
+    }
+
+    int SelectedVisibleIndex(const std::vector<VisibleNode>& visible) const {
+        for (size_t i = 0; i < visible.size(); ++i) {
+            if (visible[i].path == m_selectedPath) {
+                return static_cast<int>(i);
+            }
+        }
+        return -1;
+    }
+
+    int VisibleRowCount(int totalVisible) const {
+        const Rect content = ContentRect();
+        const float row = std::max(1.0f, ScaleValue(itemHeight));
+        const int count = std::max(1, static_cast<int>(std::floor(content.Height() / row)));
+        return std::min(count, std::max(1, totalVisible));
+    }
+
+    void EnsureSelectedVisible(const std::vector<VisibleNode>& visible) {
+        if (visible.empty()) {
+            m_scrollOffset = 0;
+            return;
+        }
+        const int index = SelectedVisibleIndex(visible);
+        if (index < 0) {
+            return;
+        }
+        const int visibleRows = VisibleRowCount(static_cast<int>(visible.size()));
+        if (index < m_scrollOffset) {
+            m_scrollOffset = index;
+        } else if (index >= m_scrollOffset + visibleRows) {
+            m_scrollOffset = index - visibleRows + 1;
+        }
+        const int maxStart = std::max(0, static_cast<int>(visible.size()) - visibleRows);
+        m_scrollOffset = std::clamp(m_scrollOffset, 0, maxStart);
+    }
+
+    int VisibleIndexFromPoint(float y, int totalVisible) const {
+        const Rect content = ContentRect();
+        if (y < content.top || y > content.bottom) {
+            return -1;
+        }
+        const float row = std::max(1.0f, ScaleValue(itemHeight));
+        const int local = static_cast<int>(std::floor((y - content.top) / row));
+        const int visibleRows = VisibleRowCount(totalVisible);
+        if (local < 0 || local >= visibleRows) {
+            return -1;
+        }
+        return local;
+    }
+
+    bool SetSelectedPath(std::vector<int> path) {
+        if (path == m_selectedPath) {
+            return false;
+        }
+        m_selectedPath = std::move(path);
+        return true;
+    }
+
+    std::vector<Node> m_roots;
+    std::vector<int> m_selectedPath;
+    std::vector<int> m_hoveredPath;
+    bool m_hasHoveredPath = false;
+    int m_scrollOffset = 0;
 };

@@ -18,6 +18,8 @@
 namespace {
 
 constexpr float kUnboundedLayoutHeight = 100000.0f;
+constexpr UINT_PTR kUiTimerId = 1;
+constexpr UINT kUiTimerIntervalMs = 16;
 
 std::wstring ToLowerAscii(std::wstring value) {
     for (auto& ch : value) {
@@ -144,7 +146,7 @@ public:
         OnResize();
         ShowWindow(m_hwnd, cmdShow);
         UpdateWindow(m_hwnd);
-        SetTimer(m_hwnd, 1, 500, nullptr);
+        SetTimer(m_hwnd, kUiTimerId, kUiTimerIntervalMs, nullptr);
         return true;
     }
 
@@ -725,8 +727,10 @@ private:
                 }
                 break;
             case WM_TIMER:
-                if (m_focusedElement && m_focusedElement->OnTimer(wParam)) {
-                    InvalidateRect(m_hwnd, nullptr, FALSE);
+                if (wParam == kUiTimerId) {
+                    if (m_root && m_root->OnTimer(wParam)) {
+                        InvalidateRect(m_hwnd, nullptr, FALSE);
+                    }
                     return 0;
                 }
                 break;
@@ -736,7 +740,7 @@ private:
             case WM_ERASEBKGND:
                 return 1;
             case WM_DESTROY:
-                KillTimer(hwnd, 1);
+                KillTimer(hwnd, kUiTimerId);
                 PostQuitMessage(0);
                 return 0;
             default:

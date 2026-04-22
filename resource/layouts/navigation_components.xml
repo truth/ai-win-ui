@@ -1,0 +1,26 @@
+<Panel padding="22,22,22,22" spacing="14" cornerRadius="16" background="#0D1521" alignItems="stretch">
+  <Label text="Navigation Components Validation" fontSize="28" color="#F2F7FF" />
+  <Label text="Phase 7 v1: ListView and TreeView with keyboard and mouse navigation." fontSize="14" color="#B8C8D9" />
+
+  <Panel direction="column" spacing="12" background="#0D1521" alignItems="stretch" flexGrow="1">
+    <Panel background="#122032" cornerRadius="12" padding="12,12,12,12" spacing="10" flexGrow="1" minHeight="260">
+      <Label text="ListView" fontSize="16" color="#E9F2FD" />
+      <ListView
+        columns="Name|Role|Region|Status"
+        columnWidths="160|180|140|120"
+        rows="Ava Carter|Product Designer|APAC|Online;Noah Kim|Frontend Engineer|NA|In Review;Mia Chen|Data Analyst|EMEA|Online;Liam Patel|QA Engineer|APAC|Blocked;Emma Garcia|PM|NA|Online;Ethan Rossi|Backend Engineer|EMEA|Offline;Sophia Diaz|UX Researcher|LATAM|Online;Lucas Brown|DevOps Engineer|NA|Online;Olivia Park|Tech Writer|APAC|Drafting;Mason Hill|Support Lead|NA|Escalated"
+        selectedIndex="2"
+        flexGrow="1"
+        minHeight="220" />
+    </Panel>
+
+    <Panel background="#122032" cornerRadius="12" padding="12,12,12,12" spacing="10" flexGrow="1" minHeight="260">
+      <Label text="TreeView" fontSize="16" color="#E9F2FD" />
+      <TreeView
+        items="Workspace/Design System/Typography;Workspace/Design System/Color Tokens;Workspace/Design System/Icon Set;Workspace/Frontend/Dashboard;Workspace/Frontend/Settings;Workspace/Backend/Auth Service;Workspace/Backend/Telemetry;Workspace/Backend/Reporting;Workspace/Docs/Architecture;Workspace/Docs/Release Notes;Workspace/QA/Regression Pack;Workspace/QA/Accessibility"
+        expandedAll="true"
+        flexGrow="1"
+        minHeight="220" />
+    </Panel>
+  </Panel>
+</Panel>

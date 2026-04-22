@@ -11,6 +11,7 @@
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkPaint.h"
+#include "include/core/SkPath.h"
 #include "include/core/SkRRect.h"
 #include "include/core/SkSamplingOptions.h"
 #include "include/core/SkSurface.h"
@@ -209,6 +210,37 @@ public:
             paint.setStrokeWidth(strokeWidth);
             paint.setAntiAlias(true);
             canvas->drawRoundRect(ToSkRect(rect), radius, radius, paint);
+        }
+    }
+
+    void DrawLine(const PointF& start, const PointF& end, const Color& color, float strokeWidth) override {
+        if (SkCanvas* canvas = Canvas()) {
+            SkPaint paint;
+            paint.setColor(ToSkColor(color));
+            paint.setStyle(SkPaint::kStroke_Style);
+            paint.setStrokeWidth(strokeWidth);
+            paint.setAntiAlias(true);
+            canvas->drawLine(start.x, start.y, end.x, end.y, paint);
+        }
+    }
+
+    void DrawPolyline(const std::vector<PointF>& points, const Color& color, float strokeWidth) override {
+        if (points.size() < 2) {
+            return;
+        }
+        if (SkCanvas* canvas = Canvas()) {
+            SkPaint paint;
+            paint.setColor(ToSkColor(color));
+            paint.setStyle(SkPaint::kStroke_Style);
+            paint.setStrokeWidth(strokeWidth);
+            paint.setAntiAlias(true);
+
+            SkPath path;
+            path.moveTo(points.front().x, points.front().y);
+            for (size_t i = 1; i < points.size(); ++i) {
+                path.lineTo(points[i].x, points[i].y);
+            }
+            canvas->drawPath(path, paint);
         }
     }
 

@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 enum class RendererBackend {
     Direct2D,
@@ -51,6 +52,8 @@ public:
     virtual void FillRoundedRect(const Rect& rect, const Color& color, float radius) = 0;
     virtual void DrawRect(const Rect& rect, const Color& color, float strokeWidth = 1.0f) = 0;
     virtual void DrawRoundedRect(const Rect& rect, const Color& color, float strokeWidth, float radius) = 0;
+    virtual void DrawLine(const PointF& start, const PointF& end, const Color& color, float strokeWidth = 1.0f) = 0;
+    virtual void DrawPolyline(const std::vector<PointF>& points, const Color& color, float strokeWidth = 1.0f) = 0;
     virtual void PushRoundedClip(const Rect& rect, float radius) = 0;
     virtual void PopLayer() = 0;
     virtual void DrawTextW(const wchar_t* text,

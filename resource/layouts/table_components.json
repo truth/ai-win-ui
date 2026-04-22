@@ -1,0 +1,62 @@
+{
+  "type": "Panel",
+  "props": {
+    "padding": [24, 24, 24, 24],
+    "spacing": 14,
+    "cornerRadius": 16,
+    "background": "#0D1520",
+    "alignItems": "stretch"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": {
+        "text": "DataTable Component Validation",
+        "fontSize": 28,
+        "color": "#F5F9FF"
+      }
+    },
+    {
+      "type": "Label",
+      "props": {
+        "text": "Static table v1: header, column widths, zebra rows, grid lines, and cell padding.",
+        "fontSize": 14,
+        "color": "#B6C4D5"
+      }
+    },
+    {
+      "type": "DataTable",
+      "props": {
+        "columns": [
+          { "title": "Name", "width": 170 },
+          { "title": "Role", "width": 180 },
+          { "title": "Region", "width": 150 },
+          { "title": "Score", "width": 110 }
+        ],
+        "rows": [
+          ["Ava Carter", "Product Designer", "APAC", "91"],
+          ["Noah Kim", "Frontend Engineer", "NA", "88"],
+          ["Mia Chen", "Data Analyst", "EMEA", "94"],
+          ["Liam Patel", "QA Engineer", "APAC", "86"],
+          ["Emma Garcia", "PM", "NA", "90"],
+          ["Ethan Rossi", "Backend Engineer", "EMEA", "89"],
+          ["Sophia Diaz", "UX Researcher", "LATAM", "87"],
+          ["Lucas Brown", "DevOps Engineer", "NA", "92"]
+        ],
+        "headerBackground": "#203143",
+        "rowBackgroundA": "#152232",
+        "rowBackgroundB": "#11202F",
+        "gridLineColor": "#2A3F53",
+        "headerTextColor": "#EAF4FF",
+        "textColor": "#C5D5E5",
+        "borderColor": "#30485E",
+        "background": "#101B28",
+        "cornerRadius": 10,
+        "headerHeight": 36,
+        "rowHeight": 32,
+        "cellPadding": [10, 6, 10, 6],
+        "height": 340
+      }
+    }
+  ]
+}

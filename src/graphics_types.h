@@ -9,6 +9,11 @@ struct Size {
     float height = 0.0f;
 };
 
+struct PointF {
+    float x = 0.0f;
+    float y = 0.0f;
+};
+
 struct Rect {
     float left = 0.0f;
     float top = 0.0f;

@@ -1,0 +1,116 @@
+{
+  "type": "Panel",
+  "props": {
+    "padding": [24, 24, 24, 24],
+    "spacing": 16,
+    "cornerRadius": 16,
+    "background": "#0F1720",
+    "alignItems": "stretch"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": {
+        "text": "Statistics Components Validation",
+        "fontSize": 28,
+        "color": "#F8FAFC"
+      }
+    },
+    {
+      "type": "Label",
+      "props": {
+        "text": "StatCard and SparklineChart are used here as the first advanced dashboard component pass.",
+        "fontSize": 14,
+        "color": "#B6C2CF"
+      }
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "row",
+        "spacing": 12,
+        "background": "#0F1720",
+        "alignItems": "stretch",
+        "wrap": "wrap"
+      },
+      "children": [
+        {
+          "type": "StatCard",
+          "props": {
+            "title": "Revenue",
+            "value": "$128.6K",
+            "deltaText": "+12.4% vs last week",
+            "accentColor": "#4E7BFF",
+            "background": "#1B2530",
+            "borderColor": "#2E3D4C",
+            "width": 250
+          }
+        },
+        {
+          "type": "StatCard",
+          "props": {
+            "title": "Active Users",
+            "value": "24,819",
+            "deltaText": "+6.1% today",
+            "accentColor": "#55C09A",
+            "background": "#1B2530",
+            "borderColor": "#2E3D4C",
+            "deltaColor": "#81D8B7",
+            "width": 250
+          }
+        },
+        {
+          "type": "StatCard",
+          "props": {
+            "title": "Conversion",
+            "value": "3.82%",
+            "deltaText": "-0.3% today",
+            "accentColor": "#FF8A4D",
+            "background": "#1B2530",
+            "borderColor": "#2E3D4C",
+            "deltaColor": "#FFC29E",
+            "width": 250
+          }
+        }
+      ]
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "row",
+        "spacing": 12,
+        "background": "#0F1720",
+        "alignItems": "stretch",
+        "wrap": "wrap"
+      },
+      "children": [
+        {
+          "type": "SparklineChart",
+          "props": {
+            "points": [12, 16, 18, 15, 24, 28, 26, 31, 35, 33, 40, 44],
+            "lineColor": "#53B3FF",
+            "baselineColor": "#2E4358",
+            "background": "#121B25",
+            "borderColor": "#2C3A47",
+            "height": 130,
+            "flexGrow": 1,
+            "minWidth": 300
+          }
+        },
+        {
+          "type": "SparklineChart",
+          "props": {
+            "points": [44, 42, 39, 38, 40, 36, 35, 34, 33, 31, 30, 28],
+            "lineColor": "#F28F7B",
+            "baselineColor": "#4C3A37",
+            "background": "#211919",
+            "borderColor": "#4A302C",
+            "height": 130,
+            "flexGrow": 1,
+            "minWidth": 300
+          }
+        }
+      ]
+    }
+  ]
+}

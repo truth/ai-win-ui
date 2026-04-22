@@ -46,6 +46,21 @@ function Resolve-LayoutPath {
         throw "Layout path cannot be empty."
     }
 
+    $layoutAliases = @{
+        "core-validation" = "layouts/core_validation.xml"
+        "yoga-measure" = "layouts/yoga_measure_cases.xml"
+        "skia-image" = "layouts/skia_image_cases.xml"
+        "stats-components" = "layouts/stats_components.xml"
+        "table-components" = "layouts/table_components.xml"
+        "seagull-animation" = "layouts/seagull_animation.xml"
+        "core-controls-v2" = "layouts/core_controls_v2.xml"
+        "navigation-components" = "layouts/navigation_components.xml"
+    }
+    $aliasKey = $layoutPath.ToLowerInvariant()
+    if ($layoutAliases.ContainsKey($aliasKey)) {
+        $layoutPath = $layoutAliases[$aliasKey]
+    }
+
     if ([System.IO.Path]::IsPathRooted($layoutPath)) {
         if (-not (Test-Path $layoutPath)) {
             throw "Layout file not found: $layoutPath"

@@ -1,0 +1,318 @@
+{
+  "type": "Panel",
+  "props": {
+    "padding": [22, 22, 22, 22],
+    "spacing": 14,
+    "cornerRadius": 16,
+    "background": "#0C1522",
+    "alignItems": "stretch"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": {
+        "text": "Core Controls V2 Validation",
+        "fontSize": 28,
+        "color": "#F3F8FF"
+      }
+    },
+    {
+      "type": "Label",
+      "props": {
+        "text": "ProgressBar, ListBox, ComboBox, and TabControl interaction checks.",
+        "fontSize": 14,
+        "color": "#B8C8D9"
+      }
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "row",
+        "spacing": 12,
+        "background": "#0C1522",
+        "alignItems": "stretch",
+        "wrap": "wrap"
+      },
+      "children": [
+        {
+          "type": "Panel",
+          "props": {
+            "background": "#122032",
+            "cornerRadius": 12,
+            "padding": [12, 12, 12, 12],
+            "spacing": 10,
+            "width": 360
+          },
+          "children": [
+            {
+              "type": "Label",
+              "props": {
+                "text": "ProgressBar",
+                "fontSize": 16,
+                "color": "#E9F2FD"
+              }
+            },
+            {
+              "type": "ProgressBar",
+              "props": {
+                "label": "CPU",
+                "min": 0,
+                "max": 100,
+                "value": 62,
+                "step": 2,
+                "fillColor": "#4E7BFF"
+              }
+            },
+            {
+              "type": "ProgressBar",
+              "props": {
+                "label": "Memory",
+                "min": 0,
+                "max": 100,
+                "value": 44,
+                "step": 2,
+                "fillColor": "#59C297"
+              }
+            },
+            {
+              "type": "ProgressBar",
+              "props": {
+                "label": "Disk",
+                "min": 0,
+                "max": 100,
+                "value": 78,
+                "step": 2,
+                "fillColor": "#FF9B5A"
+              }
+            },
+            {
+              "type": "Label",
+              "props": {
+                "text": "ListBox (Up/Down, mouse click)",
+                "fontSize": 16,
+                "color": "#E9F2FD"
+              }
+            },
+            {
+              "type": "ListBox",
+              "props": {
+                "items": [
+                  "Inbox",
+                  "Backlog",
+                  "In Progress",
+                  "Ready For QA",
+                  "Blocked",
+                  "Done",
+                  "Archived"
+                ],
+                "selectedIndex": 2,
+                "height": 188
+              }
+            },
+            {
+              "type": "Label",
+              "props": {
+                "text": "ComboBox (Enter/Space to expand)",
+                "fontSize": 16,
+                "color": "#E9F2FD"
+              }
+            },
+            {
+              "type": "ComboBox",
+              "props": {
+                "items": [
+                  "North America",
+                  "Europe",
+                  "Asia Pacific",
+                  "Latin America",
+                  "Middle East"
+                ],
+                "selectedIndex": 1,
+                "maxVisibleItems": 5,
+                "height": 178
+              }
+            }
+          ]
+        },
+        {
+          "type": "Panel",
+          "props": {
+            "background": "#122032",
+            "cornerRadius": 12,
+            "padding": [12, 12, 12, 12],
+            "spacing": 10,
+            "flexGrow": 1,
+            "minWidth": 380
+          },
+          "children": [
+            {
+              "type": "Label",
+              "props": {
+                "text": "TabControl (Left/Right to switch tabs)",
+                "fontSize": 16,
+                "color": "#E9F2FD"
+              }
+            },
+            {
+              "type": "TabControl",
+              "props": {
+                "tabs": [
+                  "Overview",
+                  "Metrics",
+                  "Tasks"
+                ],
+                "selectedIndex": 0,
+                "height": 430
+              },
+              "children": [
+                {
+                  "type": "Panel",
+                  "props": {
+                    "padding": [12, 12, 12, 12],
+                    "spacing": 8,
+                    "background": "#0F1A26",
+                    "alignItems": "stretch"
+                  },
+                  "children": [
+                    {
+                      "type": "Label",
+                      "props": {
+                        "text": "Overview tab: basic status and input controls.",
+                        "fontSize": 14,
+                        "color": "#D7E4F1"
+                      }
+                    },
+                    {
+                      "type": "TextInput",
+                      "props": {
+                        "text": "Release Candidate 1"
+                      }
+                    },
+                    {
+                      "type": "Checkbox",
+                      "props": {
+                        "text": "Enable notifications",
+                        "checked": true
+                      }
+                    },
+                    {
+                      "type": "RadioButton",
+                      "props": {
+                        "text": "Stable Channel",
+                        "group": "release-track",
+                        "checked": true
+                      }
+                    },
+                    {
+                      "type": "RadioButton",
+                      "props": {
+                        "text": "Preview Channel",
+                        "group": "release-track"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "Panel",
+                  "props": {
+                    "padding": [12, 12, 12, 12],
+                    "spacing": 8,
+                    "background": "#0F1A26",
+                    "alignItems": "stretch"
+                  },
+                  "children": [
+                    {
+                      "type": "Label",
+                      "props": {
+                        "text": "Metrics tab: Slider and ProgressBar stay keyboard-usable.",
+                        "fontSize": 14,
+                        "color": "#D7E4F1"
+                      }
+                    },
+                    {
+                      "type": "Slider",
+                      "props": {
+                        "label": "Satisfaction",
+                        "min": 0,
+                        "max": 10,
+                        "value": 7,
+                        "step": 1
+                      }
+                    },
+                    {
+                      "type": "ProgressBar",
+                      "props": {
+                        "label": "Completion",
+                        "min": 0,
+                        "max": 100,
+                        "value": 81,
+                        "fillColor": "#4C8DF8"
+                      }
+                    },
+                    {
+                      "type": "ProgressBar",
+                      "props": {
+                        "label": "Accuracy",
+                        "min": 0,
+                        "max": 100,
+                        "value": 93,
+                        "fillColor": "#59C297"
+                      }
+                    }
+                  ]
+                },
+                {
+                  "type": "Panel",
+                  "props": {
+                    "padding": [12, 12, 12, 12],
+                    "spacing": 8,
+                    "background": "#0F1A26",
+                    "alignItems": "stretch"
+                  },
+                  "children": [
+                    {
+                      "type": "Label",
+                      "props": {
+                        "text": "Tasks tab: list and combo can be tested in nested containers.",
+                        "fontSize": 14,
+                        "color": "#D7E4F1"
+                      }
+                    },
+                    {
+                      "type": "ListBox",
+                      "props": {
+                        "items": [
+                          "Design review",
+                          "Implement parser",
+                          "Write docs",
+                          "Run validation",
+                          "Create release tag"
+                        ],
+                        "selectedIndex": 1,
+                        "height": 190
+                      }
+                    },
+                    {
+                      "type": "ComboBox",
+                      "props": {
+                        "items": [
+                          "Low",
+                          "Medium",
+                          "High",
+                          "Critical"
+                        ],
+                        "selectedIndex": 2,
+                        "maxVisibleItems": 4,
+                        "height": 150
+                      }
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

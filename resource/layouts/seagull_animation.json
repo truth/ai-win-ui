@@ -1,0 +1,88 @@
+{
+  "type": "Panel",
+  "props": {
+    "padding": [24, 24, 24, 24],
+    "spacing": 14,
+    "cornerRadius": 16,
+    "background": "#0B1320",
+    "alignItems": "stretch"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": {
+        "text": "Seagull Animation Validation",
+        "fontSize": 28,
+        "color": "#EFF6FF"
+      }
+    },
+    {
+      "type": "Label",
+      "props": {
+        "text": "Global UI timer drives this component even when focus is on other controls.",
+        "fontSize": 14,
+        "color": "#B3C2D5"
+      }
+    },
+    {
+      "type": "SeagullAnimation",
+      "props": {
+        "count": 6,
+        "speed": 0.9,
+        "wingAmplitude": 4.0,
+        "pathHeight": 24,
+        "scale": 1.0,
+        "opacity": 0.85,
+        "birdColor": "#E3F2FF",
+        "background": "#0F1B2A",
+        "borderColor": "#2A3E55",
+        "cornerRadius": 12,
+        "height": 210
+      }
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "row",
+        "spacing": 12,
+        "background": "#0B1320",
+        "alignItems": "stretch",
+        "wrap": "wrap"
+      },
+      "children": [
+        {
+          "type": "SeagullAnimation",
+          "props": {
+            "count": 4,
+            "speed": 0.6,
+            "wingAmplitude": 2.8,
+            "pathHeight": 14,
+            "scale": 0.85,
+            "opacity": 0.78,
+            "background": "#122030",
+            "borderColor": "#30465D",
+            "height": 140,
+            "flexGrow": 1,
+            "minWidth": 280
+          }
+        },
+        {
+          "type": "SeagullAnimation",
+          "props": {
+            "count": 8,
+            "speed": 1.2,
+            "wingAmplitude": 5.0,
+            "pathHeight": 28,
+            "scale": 1.1,
+            "opacity": 0.9,
+            "background": "#0F1C2C",
+            "borderColor": "#2D4258",
+            "height": 140,
+            "flexGrow": 1,
+            "minWidth": 280
+          }
+        }
+      ]
+    }
+  ]
+}
