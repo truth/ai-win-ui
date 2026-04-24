@@ -260,6 +260,7 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
         const float flexGrow = child.element->FlexGrow();
         const float flexShrink = child.element->FlexShrink();
         const bool hasFlexBasis = child.element->HasFlexBasis();
+        const bool hasFlex = (flexGrow > 0.0f || flexShrink > 0.0f || hasFlexBasis);
         float measuredWidth = 0.0f;
         float measuredHeight = 0.0f;
 
@@ -298,36 +299,55 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
             measuredHeight = child.element->DesiredSize().height;
         }
 
-        if (style.direction == StackDirection::Column) {
-            if (!useMeasureFunc && !canStretchCrossAxis) {
-                YGNodeStyleSetWidth(childNode, measuredWidth);
-            }
-        } else {
-            if (!useMeasureFunc || child.element->HasFixedWidth()) {
-                YGNodeStyleSetWidth(childNode, measuredWidth);
-            }
-            if (!useMeasureFunc && canStretchCrossAxis) {
-                YGNodeStyleSetHeight(childNode, availableChildHeight);
-            } else if (!useMeasureFunc) {
-                YGNodeStyleSetHeight(childNode, measuredHeight);
-            }
-        }
+        // Set flex grow / shrink / basis before size-setting so that Yoga
+        // knows which children are flexible when it resolves the layout.
         if (flexGrow > 0.0f) {
             YGNodeStyleSetFlexGrow(childNode, flexGrow);
         }
         if (flexShrink > 0.0f) {
             YGNodeStyleSetFlexShrink(childNode, flexShrink);
+        } else if (style.direction == StackDirection::Row && !hasFlex) {
+            // Row children with no explicit flex attrs default to shrink=1
+            // so total width fits the container. Aligns with CSS flexbox.
+            YGNodeStyleSetFlexShrink(childNode, 1.0f);
+        }
+        if (hasFlex) {
+            const float intrinsicMainAxis = style.direction == StackDirection::Column
+                ? measuredHeight : measuredWidth;
+            const float flexBasisVal = hasFlexBasis
+                ? child.element->FlexBasis() : intrinsicMainAxis;
+            YGNodeStyleSetFlexBasis(childNode, std::max(0.0f, flexBasisVal));
         }
 
-        if (flexGrow > 0.0f || flexShrink > 0.0f || hasFlexBasis) {
-            const float intrinsicMainAxis = style.direction == StackDirection::Column ? measuredHeight : measuredWidth;
-            const float flexBasis = hasFlexBasis ? child.element->FlexBasis() : intrinsicMainAxis;
-            YGNodeStyleSetFlexBasis(childNode, std::max(0.0f, flexBasis));
-            if (!useMeasureFunc && style.direction == StackDirection::Column) {
-                YGNodeStyleSetHeight(childNode, measuredHeight);
+        // Set explicit Yoga node sizes.
+        //
+        // When flex is active, do NOT set the main-axis size explicitly —
+        // Yoga computes it from flexBasis + flexGrow/flexShrink.
+        // Cross-axis size is always set when the item is not stretched.
+        if (style.direction == StackDirection::Column) {
+            // Column: main axis = height, cross axis = width
+            if (!useMeasureFunc) {
+                if (!canStretchCrossAxis) {
+                    YGNodeStyleSetWidth(childNode, measuredWidth);
+                }
+                if (!hasFlex) {
+                    YGNodeStyleSetHeight(childNode, measuredHeight);
+                }
             }
-        } else if (!useMeasureFunc && style.direction == StackDirection::Column) {
-            YGNodeStyleSetHeight(childNode, measuredHeight);
+        } else {
+            // Row: main axis = width, cross axis = height
+            if (!useMeasureFunc || child.element->HasFixedWidth()) {
+                if (!hasFlex) {
+                    YGNodeStyleSetWidth(childNode, measuredWidth);
+                }
+            }
+            if (!useMeasureFunc) {
+                if (canStretchCrossAxis) {
+                    YGNodeStyleSetHeight(childNode, availableChildHeight);
+                } else {
+                    YGNodeStyleSetHeight(childNode, measuredHeight);
+                }
+            }
         }
 
         YGNodeInsertChild(root, childNode, YGNodeGetChildCount(root));

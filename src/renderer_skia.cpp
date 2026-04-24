@@ -1,13 +1,12 @@
 #include "renderer.h"
 #include "skia_text_layout.h"
+#include "skia_font_shared.h"
 
 #if defined(AI_WIN_UI_HAS_VCPKG_SKIA) || defined(AI_WIN_UI_HAS_LOCAL_SKIA)
 #include "include/core/SkCanvas.h"
 #include "include/core/SkColor.h"
 #include "include/core/SkData.h"
-#include "include/core/SkFont.h"
 #include "include/core/SkFontMetrics.h"
-#include "include/core/SkFontMgr.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkPaint.h"
@@ -17,9 +16,7 @@
 #include "include/core/SkSurface.h"
 #include "include/core/SkSurfaceProps.h"
 #include "include/core/SkTextBlob.h"
-#include "include/core/SkTypeface.h"
 #include "include/core/SkTypes.h"
-#include "include/ports/SkTypeface_win.h"
 
 #include <algorithm>
 #include <cmath>
@@ -38,44 +35,6 @@ SkColor ToSkColor(const Color& color) {
 
 SkRect ToSkRect(const Rect& rect) {
     return SkRect::MakeLTRB(rect.left, rect.top, rect.right, rect.bottom);
-}
-
-std::string WideToUtf8(const wchar_t* text, UINT32 len) {
-    if (!text || len == 0) {
-        return {};
-    }
-    const int size = WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(len), nullptr, 0, nullptr, nullptr);
-    if (size <= 0) {
-        return {};
-    }
-    std::string utf8(static_cast<size_t>(size), '\0');
-    WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(len), utf8.data(), size, nullptr, nullptr);
-    return utf8;
-}
-
-sk_sp<SkTypeface> TryMatchFamily(SkFontMgr* fontMgr, const char* familyName) {
-    if (!fontMgr || !familyName || !familyName[0]) {
-        return nullptr;
-    }
-    return fontMgr->matchFamilyStyle(familyName, SkFontStyle());
-}
-
-sk_sp<SkTypeface> CreateDefaultTypeface(SkFontMgr* fontMgr) {
-    if (!fontMgr) {
-        return nullptr;
-    }
-
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Segoe UI")) {
-        return typeface;
-    }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Arial")) {
-        return typeface;
-    }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Tahoma")) {
-        return typeface;
-    }
-
-    return fontMgr->legacyMakeTypeface(nullptr, SkFontStyle());
 }
 
 class SkiaBitmapResource final : public BitmapResource {
@@ -272,13 +231,7 @@ public:
 
             EnsureFontManager();
 
-            SkFont font;
-            font.setTypeface(m_defaultTypeface);
-            font.setSize(fontSize);
-            font.setEdging(SkFont::Edging::kSubpixelAntiAlias);
-            font.setSubpixel(true);
-            font.setBaselineSnap(true);
-            font.setHinting(SkFontHinting::kSlight);
+            SkFont font = skia_font::CreateSkiaFont(fontSize, m_defaultTypeface.get());
 
             SkiaTextLayout layout;
             if (!CreateSkiaTextLayout(
@@ -314,7 +267,7 @@ public:
                     break;
                 }
 
-                const std::string utf8 = WideToUtf8(
+                const std::string utf8 = skia_font::WideToUtf8(
                     layout.lines[i].text.c_str(),
                     static_cast<UINT32>(layout.lines[i].text.size()));
                 if (utf8.empty() && !layout.lines[i].text.empty()) {
@@ -385,10 +338,10 @@ public:
 private:
     void EnsureFontManager() {
         if (!m_fontMgr) {
-            m_fontMgr = SkFontMgr_New_DirectWrite();
+            m_fontMgr = skia_font::CreateDefaultFontManager();
         }
         if (!m_defaultTypeface) {
-            m_defaultTypeface = CreateDefaultTypeface(m_fontMgr.get());
+            m_defaultTypeface = skia_font::CreateDefaultTypeface(m_fontMgr.get());
         }
     }
 

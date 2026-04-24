@@ -1,12 +1,10 @@
 #include "skia_text_layout.h"
+#include "skia_font_shared.h"
 
 #if defined(AI_WIN_UI_HAS_VCPKG_SKIA) || defined(AI_WIN_UI_HAS_LOCAL_SKIA)
 #include "include/core/SkFont.h"
 #include "include/core/SkFontMetrics.h"
-#include "include/core/SkFontMgr.h"
 #include "include/core/SkFontTypes.h"
-#include "include/core/SkTypeface.h"
-#include "include/ports/SkTypeface_win.h"
 
 #include <algorithm>
 #include <cmath>
@@ -17,37 +15,6 @@
 
 namespace {
 
-std::string WideToUtf8(const wchar_t* text, uint32_t len) {
-    if (!text || len == 0) {
-        return {};
-    }
-
-    const int size = WideCharToMultiByte(
-        CP_UTF8,
-        0,
-        text,
-        static_cast<int>(len),
-        nullptr,
-        0,
-        nullptr,
-        nullptr);
-    if (size <= 0) {
-        return {};
-    }
-
-    std::string utf8(static_cast<size_t>(size), '\0');
-    WideCharToMultiByte(
-        CP_UTF8,
-        0,
-        text,
-        static_cast<int>(len),
-        utf8.data(),
-        size,
-        nullptr,
-        nullptr);
-    return utf8;
-}
-
 std::wstring TrimTrailingWhitespace(const std::wstring& value) {
     size_t end = value.size();
     while (end > 0 && std::iswspace(value[end - 1]) != 0) {
@@ -57,7 +24,7 @@ std::wstring TrimTrailingWhitespace(const std::wstring& value) {
 }
 
 float MeasureWideTextWidth(const SkFont& font, const std::wstring& text) {
-    const std::string utf8 = WideToUtf8(text.c_str(), static_cast<uint32_t>(text.size()));
+    const std::string utf8 = skia_font::WideToUtf8(text.c_str(), static_cast<uint32_t>(text.size()));
     if (utf8.empty()) {
         return 0.0f;
     }
@@ -110,6 +77,15 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
     std::vector<SkiaTextLayoutLine> wrapped;
     size_t lineStart = 0;
     while (lineStart < line.size()) {
+        // Skip leading whitespace at the start of each wrapped segment
+        // to avoid empty or whitespace-only lines.
+        while (lineStart < line.size() && std::iswspace(line[lineStart]) != 0) {
+            ++lineStart;
+        }
+        if (lineStart >= line.size()) {
+            break;
+        }
+
         std::wstring candidate;
         candidate.reserve(line.size() - lineStart);
         size_t lastWhitespaceBreak = std::wstring::npos;
@@ -125,6 +101,7 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
                 continue;
             }
 
+            // Single character exceeds maxWidth — emit it anyway and move on.
             if (candidate.size() == 1) {
                 wrapped.push_back(SkiaTextLayoutLine{candidate, MeasureWideTextWidth(font, candidate)});
                 lineStart = i + 1;
@@ -133,16 +110,19 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
             }
 
             if (lastWhitespaceBreak != std::wstring::npos && lastWhitespaceBreak >= lineStart) {
+                // Break at the last whitespace boundary within the line.
                 std::wstring segment = TrimTrailingWhitespace(
                     line.substr(lineStart, lastWhitespaceBreak - lineStart + 1));
+                // After trimming, if segment is empty it means only whitespace
+                // was found. Skip to the next non-whitespace character.
                 if (segment.empty()) {
-                    segment = line.substr(lineStart, 1);
-                    lineStart += 1;
+                    lineStart = lastWhitespaceBreak + 1;
                 } else {
                     lineStart = lastWhitespaceBreak + 1;
                 }
                 wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(font, segment)});
             } else {
+                // No whitespace boundary found — break the word at the overflow point.
                 const std::wstring segment = candidate.substr(0, candidate.size() - 1);
                 wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(font, segment)});
                 lineStart = i;
@@ -153,6 +133,7 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
         }
 
         if (!emitted) {
+            // Remaining text fits within maxWidth.
             std::wstring segment = TrimTrailingWhitespace(line.substr(lineStart));
             wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(font, segment)});
             break;
@@ -187,43 +168,10 @@ std::vector<SkiaTextLayoutLine> LayoutTextLines(const wchar_t* text,
     return wrappedLines;
 }
 
-sk_sp<SkTypeface> TryMatchFamily(SkFontMgr* fontMgr, const char* familyName) {
-    if (!fontMgr || !familyName || !familyName[0]) {
-        return nullptr;
-    }
-    return fontMgr->matchFamilyStyle(familyName, SkFontStyle());
-}
-
-sk_sp<SkTypeface> CreateDefaultTypeface(SkFontMgr* fontMgr) {
-    if (!fontMgr) {
-        return nullptr;
-    }
-
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Segoe UI")) {
-        return typeface;
-    }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Arial")) {
-        return typeface;
-    }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Tahoma")) {
-        return typeface;
-    }
-
-    return fontMgr->legacyMakeTypeface(nullptr, SkFontStyle());
-}
-
 SkFont CreateDefaultFont(float fontSize) {
-    static sk_sp<SkFontMgr> s_fontMgr = SkFontMgr_New_DirectWrite();
-    static sk_sp<SkTypeface> s_typeface = CreateDefaultTypeface(s_fontMgr.get());
-
-    SkFont font;
-    font.setTypeface(s_typeface);
-    font.setSize(fontSize);
-    font.setEdging(SkFont::Edging::kSubpixelAntiAlias);
-    font.setSubpixel(true);
-    font.setBaselineSnap(true);
-    font.setHinting(SkFontHinting::kSlight);
-    return font;
+    static sk_sp<SkFontMgr> s_fontMgr = skia_font::CreateDefaultFontManager();
+    static sk_sp<SkTypeface> s_typeface = skia_font::CreateDefaultTypeface(s_fontMgr.get());
+    return skia_font::CreateSkiaFont(fontSize, s_typeface.get());
 }
 
 } // namespace
@@ -261,11 +209,17 @@ bool CreateSkiaTextLayout(const wchar_t* text,
     for (const auto& line : layout->lines) {
         layout->maxLineWidth = std::max(layout->maxLineWidth, line.width);
     }
-    // Reserve full line spacing for every line so measurement and centered draw
-    // positions stay closer to paragraph-style layout behavior.
+
+    // blockHeight uses (lines - 1) * lineHeight + textHeight so that:
+    //   - Single-line text reports textHeight (ascent + descent), matching
+    //     DirectWrite's DWRITE_TEXT_METRICS.height for one line.
+    //   - Multi-line text reserves full line spacing between baselines
+    //     (lineHeight) but only needs textHeight from the last baseline to
+    //     the bottom. This keeps vertical centering and End alignment
+    //     closer to DirectWrite's paragraph layout.
     layout->blockHeight = layout->lines.empty()
         ? 0.0f
-        : static_cast<float>(layout->lines.size()) * layout->lineHeight;
+        : static_cast<float>(layout->lines.size() - 1) * layout->lineHeight + layout->textHeight;
 
     return true;
 }
