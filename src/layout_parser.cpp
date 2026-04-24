@@ -1,6 +1,8 @@
 #include "layout_parser.h"
 #include "resource_provider.h"
 
+#include <algorithm>
+#include <cctype>
 #include <stdexcept>
 #include <sstream>
 #include <windows.h>
@@ -671,14 +673,27 @@ Color ParseHexColor(const std::string& value) {
     if (!hex.empty() && hex[0] == '#') {
         hex.erase(0, 1);
     }
+    // Case-insensitive sentinel for "no fill" / transparent background.
+    std::string lowered = hex;
+    std::transform(lowered.begin(), lowered.end(), lowered.begin(),
+        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    if (lowered == "transparent" || lowered == "none") {
+        return ColorFromHex(0x000000, 0.0f);
+    }
+    if (hex.size() == 8) {
+        unsigned int rgba = 0;
+        std::stringstream ss;
+        ss << std::hex << hex;
+        ss >> rgba;
+        const uint32_t rgb = (rgba >> 8) & 0xFFFFFFu;
+        const float alpha = static_cast<float>(rgba & 0xFFu) / 255.0f;
+        return ColorFromHex(rgb, alpha);
+    }
     if (hex.size() == 6) {
         unsigned int rgb = 0;
         std::stringstream ss;
         ss << std::hex << hex;
         ss >> rgb;
-        float r = ((rgb >> 16) & 0xFF) / 255.0f;
-        float g = ((rgb >> 8) & 0xFF) / 255.0f;
-        float b = (rgb & 0xFF) / 255.0f;
         return ColorFromHex(rgb);
     }
     return ColorFromHex(0xFFFFFF);

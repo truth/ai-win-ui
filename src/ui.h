@@ -336,7 +336,9 @@ public:
     Thickness padding{8, 8, 8, 8};
     float spacing = 6.0f;
     float cornerRadius = 0.0f;
-    Color background = ColorFromHex(0x1E1E1E);
+    // Default transparent: Render skips fill when alpha<=0 so Panels without
+    // an explicit background let the parent color show through.
+    Color background = ColorFromHex(0x000000, 0.0f);
     Direction direction = Direction::Column;
     Wrap wrap = Wrap::NoWrap;
     AlignItems alignItems = AlignItems::Stretch;
@@ -565,12 +567,15 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
-        const float scaledCornerRadius = ScaleValue(cornerRadius);
-        if (scaledCornerRadius > 0.0f) {
-            renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
-            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x333333), 1.0f, scaledCornerRadius);
-        } else {
-            renderer.FillRect(m_bounds, background);
+        // Skip background/border entirely when the color is transparent
+        // (alpha<=0). Lets XML authors opt-out via background="transparent".
+        if (background.a > 0.0f) {
+            const float scaledCornerRadius = ScaleValue(cornerRadius);
+            if (scaledCornerRadius > 0.0f) {
+                renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
+            } else {
+                renderer.FillRect(m_bounds, background);
+            }
         }
         for (auto& child : m_children) {
             child->Render(renderer);

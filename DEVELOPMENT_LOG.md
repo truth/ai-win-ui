@@ -71,3 +71,34 @@
   - `core_validation.xml` Section 2 Row：`flexGrow` 分配行为保持正确
   - 窗口拉回宽时固定宽元素恢复原尺寸
 - 待办：完善 MVP 验收流程文档化
+
+## 2026-04-25（浅色主题还原 & Panel 背景语义）
+
+- 问题：按 `resource/dashboard.jpg`（浅色主题设计稿）还原 dashboard 布局时，程序渲染出大面积黑块，白卡被深色 Row 遮盖，所有卡片带 `#333333` 硬灰边框。
+- 根因：
+  - `Panel::background` 默认 `#1E1E1E`（近黑），且 `Panel::Render` 无条件 `FillRect`——没显式写 `background=` 的 Panel 全被填成深色
+  - `Panel::Render` 还无条件 `DrawRoundedRect` 画 `#333333` 1px 边框——浅色背景上非常突兀
+- 修复（`src/ui.h`）：
+  - `Panel::background` 默认改为 `alpha=0`（透明）
+  - `Panel::Render` 跳过 `alpha<=0` 的背景和边框绘制
+  - 移除无条件的 `#333333` 1px 边框（未来需要可通过显式 `borderColor` 属性补回）
+- 修复（`src/layout_parser.cpp::ParseHexColor`）：
+  - 支持 `background="transparent"` / `"none"` → `alpha=0`
+  - 支持 `#RRGGBBAA` 8 位十六进制色
+  - 新增 `<algorithm>` / `<cctype>` 头文件 include
+- 兼容性论证：grep 过全部 11 个现有 XML，`Panel` 没有任何一个依赖"不写 background 就显示 #1E1E1E"——多数都显式写了 background，少数省略的场景本来就期望透出父色。改默认值安全。
+- 新增布局：`resource/layouts/dashboard_responsive.xml`
+  - 按 `dashboard.jpg` 还原的响应式版本（不动原 `dashboard_reference.xml`）
+  - 所有固定 `width="xxx"` 替换为 `flexGrow + flexBasis + minWidth` 组合，侧栏保留 60 固定宽
+  - 窗口 800-1600px 范围内能正确同比压缩/伸展
+- 构建验证通过：
+  - `cmake --build build --config Debug` 0 error
+  - `cmake --build --preset build-dev-debug-skia-local-sdk` 0 error
+- 已知未还原项（待后续补齐）：
+  - 任务**填充**进度条（目前是空白背景条，设计稿是 90%/50%/10% 紫色填充）
+  - Stats 卡**圆形进度环**（目前是方块 + 数字）
+  - 小圆头像（Today tasks 旁的 avatar group）
+  - 虚线边框（"+" 加号卡片）
+  - 卡片阴影（引擎不支持 DropShadow）
+  - 胶囊标签（"Motion design" / "Logo" 等小 Tag）
+  - 插图资源主题不对（Go premium 误用大脑图，4 功能卡插图与设计稿不一致）
