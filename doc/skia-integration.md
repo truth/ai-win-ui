@@ -56,6 +56,25 @@ Supported integration routes in the repo:
 The chosen short-term path is `local-sdk`, targeting the `aseprite/skia`
 package layout.
 
+### Auto-detection (Default Path)
+
+CMake now probes for the bundled SDK at the start of configuration. When
+all three of the following exist:
+
+- `third_party/skia-m124/out/Debug-x64/skia.lib`
+- `third_party/skia-m124/out/Release-x64/skia.lib`
+- `third_party/skia-m124/modules/svg/include/SkSVGDOM.h`
+
+it flips:
+
+- `AI_WIN_UI_ENABLE_SKIA` → `ON`
+- `AI_WIN_UI_SKIA_PROVIDER` → `local-sdk`
+- `AI_WIN_UI_SKIA_DIR` → `${CMAKE_SOURCE_DIR}/third_party/skia-m124`
+
+Repos without the bundled SDK fall back to the historical defaults
+(Skia OFF, Direct2D-only). Look for `Auto-detected Skia SDK at ...` in
+the CMake configure log to confirm the path is taken.
+
 ### Expected Local SDK Layout
 
 The repository expects a shape compatible with:
@@ -155,6 +174,44 @@ Implemented today:
 - image draw into destination rect with explicit linear sampling
 - wrapped UTF-8 text draw using `SkFont`, subpixel/LCD-oriented font settings,
   manual line breaking, clipping, and baseline calculation
+- **SVG rendering via `SkSVGDOM`** (see below)
+
+### SVG via SkSVGDOM
+
+`IRenderer` exposes three SVG primitives:
+
+- `CreateSvgFromBytes(data, size) → SvgHandle`
+- `GetSvgSize(SvgHandle) → Size`
+- `DrawSvg(SvgHandle, Rect)`
+
+The Skia implementation (`renderer_skia.cpp`):
+
+- wraps the bytes in `SkMemoryStream::MakeCopy`
+- builds the DOM with `SkSVGDOM::Builder().setFontManager(...).make(stream)`
+  (font manager is the same one used for text rendering — no extra font
+  infra needed)
+- on draw, `save / translate(rect.left, top) / setContainerSize(rect.size)
+  / dom->render(canvas) / restore`
+
+The Direct2D implementation paints a placeholder ("SVG" label inside a
+gray box) so users immediately notice when the active backend can't
+render SVG, instead of getting a silent blank slot.
+
+`<SvgIcon>` is the layout-side consumer; see
+[layout-spec.md](layout-spec.md) for the DSL surface.
+
+v1 limits: no tint / colour override, no cross-instance `SvgHandle`
+caching, no SMIL animation, no external `xlink:href`.
+
+### DPI Coordinate Space
+
+The Direct2D backend now calls `SetDpi(96, 96)` on the HWND render
+target so 1 DIP == 1 pixel and the renderer coordinate space matches the
+client-pixel space used by layout, hit-test, and `GET_X/Y_LPARAM` mouse
+events. Without this, `>100% DPI` displays produced an
+`(x*scale, y*scale)` drift between rendering and hover that grew further
+from the origin. The Skia backend already operated in pixel space and is
+unaffected.
 
 ## Current Limits
 
@@ -173,3 +230,6 @@ Implemented today:
 3. Use `resource/layouts/core_validation.xml` as the shared manual acceptance page while growing parity.
 4. Continue tuning image scaling quality and compare the current explicit linear sampling policy against Direct2D.
 5. Only after raster parity is acceptable, revisit either `vcpkg` or a self-build workflow.
+6. SVG follow-ups: tint via `SkColorFilter`, cross-icon `SvgHandle`
+   caching keyed by source path, run-time backend switching that
+   re-resolves cached handles.

@@ -12,6 +12,42 @@ It focuses on richer drawing capabilities and new reusable UI components:
 The goal is to keep implementation incremental, testable, and aligned with the
 existing XML/JSON layout pipeline.
 
+## Status Update — 2026-04-26
+
+Beyond the original three deliverables above, four out-of-scope tracks
+landed this sprint while the components matured. They are now part of
+the rendering baseline:
+
+- **Declarative style system v1** — `BoxDecoration`, `ComponentStyle`,
+  seven `StyleState` values, `Button` / `TextInput` / `Panel` /
+  `Checkbox` / `RadioButton` migrated to the new pipeline. Border now
+  participates in the Yoga box model (long-standing latent bug).
+  Plan: `doc/plan/2026-04-26-declarative-style-system-v1.md`.
+- **D2D DPI fix** — `SetDpi(96, 96)` aligns the Direct2D coordinate
+  space to client pixels so hover / hit-test stops drifting on >100%
+  DPI displays.
+- **Theme tokens v1** — `$color`, `$spacing`, `$radius`, `$fontSize`,
+  `$borderWidth` lookups against `resource/themes/default.json`,
+  magenta sentinel for unknown keys, five primary layouts already
+  migrated. Plan: `doc/plan/2026-04-26-theme-tokens-v1.md`.
+- **SVG via SkSVGDOM** — `IRenderer::DrawSvg`, `SvgIcon` UIElement,
+  CMake auto-detection of `third_party/skia-m124`, Direct2D placeholder
+  so missing-backend cases stay visible.
+  Plan: `doc/plan/2026-04-26-skia-svg-integration-v1.md`.
+
+Open follow-ups (queued for the next sprint):
+
+- `Slider` / `ListBox` / `ComboBox` / `TabControl` / `ListView` /
+  `TreeView` need a sub-style schema (`decoration.track`,
+  `decoration.thumb`, `itemStyle`) before they can adopt
+  `ComponentStyle`. Until then they keep their per-field properties.
+- `cornerRadius` / `fontSize` token migration of the remaining
+  layouts (only the five primary layouts are migrated so far).
+- Layout colour-field migration is intentionally deferred — it requires
+  a colour-naming decision separate from the token mechanic itself.
+- `DefaultStyle()` factories still hard-code hex so they work without
+  any theme; lazy theme resolution at `SetContext` time is a v2 task.
+
 ## Current Baseline And Constraint Notes
 
 Current repository state:
