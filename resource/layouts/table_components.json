@@ -1,9 +1,9 @@
 {
   "type": "Panel",
   "props": {
-    "padding": [24, 24, 24, 24],
+    "padding": "$spacing.xl",
     "spacing": 14,
-    "cornerRadius": 16,
+    "cornerRadius": "$radius.xl",
     "background": "#0D1520",
     "alignItems": "stretch"
   },
@@ -12,7 +12,7 @@
       "type": "Label",
       "props": {
         "text": "DataTable Component Validation",
-        "fontSize": 28,
+        "fontSize": "$fontSize.3xl",
         "color": "#F5F9FF"
       }
     },
@@ -20,7 +20,7 @@
       "type": "Label",
       "props": {
         "text": "Static table v1: header, column widths, zebra rows, grid lines, and cell padding.",
-        "fontSize": 14,
+        "fontSize": "$fontSize.base",
         "color": "#B6C4D5"
       }
     },

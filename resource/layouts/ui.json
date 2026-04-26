@@ -1,9 +1,9 @@
 {
   "type": "Panel",
   "props": {
-    "padding": [24, 24, 24, 24],
-    "spacing": 16,
-    "cornerRadius": 16,
+    "padding": "$spacing.xl",
+    "spacing": "$spacing.lg",
+    "cornerRadius": "$radius.xl",
     "background": "#151515",
     "alignItems": "stretch",
     "justifyContent": "start"
@@ -13,7 +13,7 @@
       "type": "Label",
       "props": {
         "text": "Yoga-backed Vertical Stack",
-        "fontSize": 28,
+        "fontSize": "$fontSize.3xl",
         "color": "#F5F5F5"
       }
     },
@@ -32,7 +32,7 @@
         "height": 620,
         "padding": [20, 20, 20, 20],
         "spacing": 14,
-        "cornerRadius": 16,
+        "cornerRadius": "$radius.xl",
         "background": "#1E1E1E",
         "alignItems": "stretch"
       },
@@ -43,7 +43,7 @@
             "height": 96,
             "padding": [18, 16, 18, 16],
             "spacing": 6,
-            "cornerRadius": 12,
+            "cornerRadius": "$radius.lg",
             "background": "#242424",
             "alignItems": "start"
           },
@@ -60,7 +60,7 @@
               "type": "Label",
               "props": {
                 "text": "The gallery keeps a fixed block height, the spacer grows, and the action tray stays pinned to the bottom.",
-                "fontSize": 14,
+                "fontSize": "$fontSize.base",
                 "color": "#C8C8C8"
               }
             }
@@ -71,9 +71,9 @@
           "props": {
             "height": 160,
             "columns": 4,
-            "spacing": 12,
+            "spacing": "$spacing.md",
             "rowHeight": 136,
-            "cornerRadius": 12,
+            "cornerRadius": "$radius.lg",
             "padding": [0, 12, 0, 12],
             "background": "#161616"
           },
@@ -87,9 +87,9 @@
         {
           "type": "Panel",
           "props": {
-            "padding": [16, 16, 16, 16],
-            "spacing": 8,
-            "cornerRadius": 12,
+            "padding": "$spacing.lg",
+            "spacing": "$spacing.sm",
+            "cornerRadius": "$radius.lg",
             "background": "#202A35",
             "alignItems": "stretch"
           },
@@ -98,7 +98,7 @@
               "type": "Label",
               "props": {
                 "text": "Flex card",
-                "fontSize": 18,
+                "fontSize": "$fontSize.xl",
                 "color": "#F5F5F5"
               }
             },
@@ -106,7 +106,7 @@
               "type": "Label",
               "props": {
                 "text": "This card keeps its intrinsic height and lets the spacer absorb the remaining vertical room.",
-                "fontSize": 14,
+                "fontSize": "$fontSize.base",
                 "color": "#C7D2E2"
               }
             },
@@ -114,10 +114,10 @@
               "type": "TextInput",
               "props": {
                 "text": "Focus the next milestone...",
-                "fontSize": 14,
+                "fontSize": "$fontSize.base",
                 "background": "#16202A",
                 "textColor": "#FFFFFF",
-                "cornerRadius": 8
+                "cornerRadius": "$radius.md"
               }
             }
           ]
@@ -127,8 +127,8 @@
           "props": {
             "direction": "row",
             "padding": [14, 14, 14, 14],
-            "spacing": 12,
-            "cornerRadius": 12,
+            "spacing": "$spacing.md",
+            "cornerRadius": "$radius.lg",
             "background": "#1A2330",
             "alignItems": "center"
           },
@@ -147,8 +147,8 @@
                 "text": "Preview",
                 "width": 120,
                 "height": 38,
-                "fontSize": 14,
-                "cornerRadius": 8
+                "fontSize": "$fontSize.base",
+                "cornerRadius": "$radius.md"
               }
             },
             {
@@ -157,9 +157,9 @@
                 "text": "Publish",
                 "width": 120,
                 "height": 38,
-                "fontSize": 14,
+                "fontSize": "$fontSize.base",
                 "background": "#2D6CDF",
-                "cornerRadius": 8
+                "cornerRadius": "$radius.md"
               }
             },
             {
@@ -173,7 +173,7 @@
               "type": "Label",
               "props": {
                 "text": "3 tasks left",
-                "fontSize": 14,
+                "fontSize": "$fontSize.base",
                 "color": "#AFC3DA"
               }
             }
@@ -189,9 +189,9 @@
         {
           "type": "Panel",
           "props": {
-            "padding": [16, 16, 16, 16],
+            "padding": "$spacing.lg",
             "spacing": 10,
-            "cornerRadius": 12,
+            "cornerRadius": "$radius.lg",
             "background": "#242424",
             "alignItems": "stretch"
           },
@@ -211,7 +211,7 @@
                 "height": 42,
                 "fontSize": 15,
                 "background": "#2D6CDF",
-                "cornerRadius": 8
+                "cornerRadius": "$radius.md"
               },
               "events": {
                 "onClick": "primaryAction"
@@ -223,7 +223,7 @@
                 "text": "Secondary Action",
                 "height": 42,
                 "fontSize": 15,
-                "cornerRadius": 8
+                "cornerRadius": "$radius.md"
               },
               "events": {
                 "onClick": "secondaryAction"

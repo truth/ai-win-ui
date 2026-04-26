@@ -3,7 +3,7 @@
   "props": {
     "padding": [22, 22, 22, 22],
     "spacing": 14,
-    "cornerRadius": 16,
+    "cornerRadius": "$radius.xl",
     "background": "#0D1521",
     "alignItems": "stretch"
   },
@@ -12,7 +12,7 @@
       "type": "Label",
       "props": {
         "text": "Navigation Components Validation",
-        "fontSize": 28,
+        "fontSize": "$fontSize.3xl",
         "color": "#F2F7FF"
       }
     },
@@ -20,7 +20,7 @@
       "type": "Label",
       "props": {
         "text": "Phase 7 v1: ListView and TreeView with keyboard and mouse navigation.",
-        "fontSize": 14,
+        "fontSize": "$fontSize.base",
         "color": "#B8C8D9"
       }
     },
@@ -28,7 +28,7 @@
       "type": "Panel",
       "props": {
         "direction": "column",
-        "spacing": 12,
+        "spacing": "$spacing.md",
         "background": "#0D1521",
         "alignItems": "stretch",
         "flexGrow": 1
@@ -38,8 +38,8 @@
           "type": "Panel",
           "props": {
             "background": "#122032",
-            "cornerRadius": 12,
-            "padding": [12, 12, 12, 12],
+            "cornerRadius": "$radius.lg",
+            "padding": "$spacing.md",
             "spacing": 10,
             "flexGrow": 1,
             "minHeight": 260
@@ -49,7 +49,7 @@
               "type": "Label",
               "props": {
                 "text": "ListView",
-                "fontSize": 16,
+                "fontSize": "$fontSize.lg",
                 "color": "#E9F2FD"
               }
             },
@@ -86,8 +86,8 @@
           "type": "Panel",
           "props": {
             "background": "#122032",
-            "cornerRadius": 12,
-            "padding": [12, 12, 12, 12],
+            "cornerRadius": "$radius.lg",
+            "padding": "$spacing.md",
             "spacing": 10,
             "flexGrow": 1,
             "minHeight": 260
@@ -97,7 +97,7 @@
               "type": "Label",
               "props": {
                 "text": "TreeView",
-                "fontSize": 16,
+                "fontSize": "$fontSize.lg",
                 "color": "#E9F2FD"
               }
             },

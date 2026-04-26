@@ -1,9 +1,9 @@
 {
   "type": "Panel",
   "props": {
-    "padding": [24, 24, 24, 24],
-    "spacing": 16,
-    "cornerRadius": 16,
+    "padding": "$spacing.xl",
+    "spacing": "$spacing.lg",
+    "cornerRadius": "$radius.xl",
     "background": "#0F1720",
     "alignItems": "stretch"
   },
@@ -12,7 +12,7 @@
       "type": "Label",
       "props": {
         "text": "Statistics Components Validation",
-        "fontSize": 28,
+        "fontSize": "$fontSize.3xl",
         "color": "#F8FAFC"
       }
     },
@@ -20,7 +20,7 @@
       "type": "Label",
       "props": {
         "text": "StatCard and SparklineChart are used here as the first advanced dashboard component pass.",
-        "fontSize": 14,
+        "fontSize": "$fontSize.base",
         "color": "#B6C2CF"
       }
     },
@@ -28,7 +28,7 @@
       "type": "Panel",
       "props": {
         "direction": "row",
-        "spacing": 12,
+        "spacing": "$spacing.md",
         "background": "#0F1720",
         "alignItems": "stretch",
         "wrap": "wrap"
@@ -78,7 +78,7 @@
       "type": "Panel",
       "props": {
         "direction": "row",
-        "spacing": 12,
+        "spacing": "$spacing.md",
         "background": "#0F1720",
         "alignItems": "stretch",
         "wrap": "wrap"
