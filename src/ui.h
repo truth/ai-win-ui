@@ -2160,7 +2160,31 @@ private:
 
 class Checkbox : public UIElement {
 public:
-    explicit Checkbox(std::wstring text = L"") : m_text(std::move(text)) {}
+    explicit Checkbox(std::wstring text = L"") : m_text(std::move(text)) {
+        m_style = DefaultStyle();
+    }
+
+    static ComponentStyle DefaultStyle() {
+        ComponentStyle s;
+        BoxDecoration normalDeco;
+        normalDeco.background = ColorFromHex(0x2D2D30);
+        normalDeco.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
+        normalDeco.border.color = ColorFromHex(0x6A6A6A);
+        s.base.decoration = normalDeco;
+        s.base.foreground = ColorFromHex(0xEDEDED);
+
+        BoxDecoration focusedDeco = normalDeco;
+        focusedDeco.border.width = Thickness{2.0f, 2.0f, 2.0f, 2.0f};
+        focusedDeco.border.color = ColorFromHex(0xFFFFFF);
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focusedDeco;
+
+        BoxDecoration disabledDeco = normalDeco;
+        disabledDeco.background = ColorFromHex(0x1F1F1F);
+        disabledDeco.border.color = ColorFromHex(0x3A3A3A);
+        s.overrides[static_cast<std::size_t>(StyleState::Disabled)].decoration = disabledDeco;
+        s.overrides[static_cast<std::size_t>(StyleState::Disabled)].opacity = 0.6f;
+        return s;
+    }
 
     bool IsFocusable() const override { return true; }
 
@@ -2209,20 +2233,29 @@ public:
     }
 
     void Render(IRenderer& renderer) override {
+        SyncQuickSetToStyle();
+        const StyleSpec resolved = m_style.Resolve(GetCurrentState());
+        BoxDecoration deco = resolved.decoration.value_or(BoxDecoration{});
+        deco.border.width = Thickness{
+            ScaleValue(deco.border.width.left),
+            ScaleValue(deco.border.width.top),
+            ScaleValue(deco.border.width.right),
+            ScaleValue(deco.border.width.bottom)
+        };
+        if (resolved.opacity.has_value()) {
+            deco.opacity = *resolved.opacity;
+        }
+
         const Rect box = Rect::Make(
             m_bounds.left,
             m_bounds.top + ScaleValue(2.0f),
             m_bounds.left + ScaleValue(18.0f),
             m_bounds.top + ScaleValue(20.0f));
-        renderer.FillRect(box, ColorFromHex(0x2D2D30));
-        renderer.DrawRect(box, ColorFromHex(0x6A6A6A), 1.0f);
+        DrawBoxDecoration(renderer, box, deco);
         if (m_checked) {
             const float inset = ScaleValue(4.0f);
             const Rect mark = Rect::Make(box.left + inset, box.top + inset, box.right - inset, box.bottom - inset);
             renderer.FillRect(mark, ColorFromHex(0x2D6CDF));
-        }
-        if (m_hasFocus) {
-            renderer.DrawRect(box, ColorFromHex(0xFFFFFF), 2.0f);
         }
 
         Rect textRect = m_bounds;
@@ -2232,14 +2265,25 @@ public:
             TextHorizontalAlign::Start,
             TextVerticalAlign::Center
         };
+        const Color fg = resolved.foreground.value_or(textColor);
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
             textRect,
-            textColor,
+            fg,
             ScaleValue(fontSize),
             textOptions);
     }
+
+private:
+    void SyncQuickSetToStyle() {
+        if (!m_style.base.decoration.has_value()) {
+            m_style.base.decoration = BoxDecoration{};
+        }
+        m_style.base.foreground = textColor;
+    }
+
+public:
 
     bool OnMouseDown(float x, float y) override {
         if (!HitTest(x, y)) {
@@ -2282,6 +2326,29 @@ public:
     explicit RadioButton(std::wstring text = L"", std::wstring group = L"default")
         : m_text(std::move(text)), m_group(std::move(group)) {
         s_groups[m_group].push_back(this);
+        m_style = DefaultStyle();
+    }
+
+    static ComponentStyle DefaultStyle() {
+        ComponentStyle s;
+        BoxDecoration normalDeco;
+        normalDeco.background = ColorFromHex(0x000000, 0.0f);  // transparent
+        normalDeco.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
+        normalDeco.border.color = ColorFromHex(0x6A6A6A);
+        normalDeco.radius = CornerRadius::Uniform(9.0f);
+        s.base.decoration = normalDeco;
+        s.base.foreground = ColorFromHex(0xEDEDED);
+
+        BoxDecoration focusedDeco = normalDeco;
+        focusedDeco.border.width = Thickness{2.0f, 2.0f, 2.0f, 2.0f};
+        focusedDeco.border.color = ColorFromHex(0xFFFFFF);
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focusedDeco;
+
+        BoxDecoration disabledDeco = normalDeco;
+        disabledDeco.border.color = ColorFromHex(0x3A3A3A);
+        s.overrides[static_cast<std::size_t>(StyleState::Disabled)].decoration = disabledDeco;
+        s.overrides[static_cast<std::size_t>(StyleState::Disabled)].opacity = 0.6f;
+        return s;
     }
 
     ~RadioButton() {
@@ -2336,19 +2403,30 @@ public:
     }
 
     void Render(IRenderer& renderer) override {
+        SyncQuickSetToStyle();
+        const StyleSpec resolved = m_style.Resolve(GetCurrentState());
+        BoxDecoration deco = resolved.decoration.value_or(BoxDecoration{});
+        deco.radius = CornerRadius::Uniform(ScaleValue(deco.radius.MaxRadius()));
+        deco.border.width = Thickness{
+            ScaleValue(deco.border.width.left),
+            ScaleValue(deco.border.width.top),
+            ScaleValue(deco.border.width.right),
+            ScaleValue(deco.border.width.bottom)
+        };
+        if (resolved.opacity.has_value()) {
+            deco.opacity = *resolved.opacity;
+        }
+
         const Rect circle = Rect::Make(
             m_bounds.left,
             m_bounds.top + ScaleValue(2.0f),
             m_bounds.left + ScaleValue(18.0f),
             m_bounds.top + ScaleValue(20.0f));
-        renderer.DrawRoundedRect(circle, ColorFromHex(0x6A6A6A), 1.0f, ScaleValue(9.0f));
+        DrawBoxDecoration(renderer, circle, deco);
         if (m_checked) {
             const float inset = ScaleValue(5.0f);
             const Rect dot = Rect::Make(circle.left + inset, circle.top + inset, circle.right - inset, circle.bottom - inset);
             renderer.FillRoundedRect(dot, ColorFromHex(0x2D6CDF), ScaleValue(5.0f));
-        }
-        if (m_hasFocus) {
-            renderer.DrawRoundedRect(circle, ColorFromHex(0xFFFFFF), 2.0f, ScaleValue(9.0f));
         }
 
         Rect textRect = m_bounds;
@@ -2358,14 +2436,25 @@ public:
             TextHorizontalAlign::Start,
             TextVerticalAlign::Center
         };
+        const Color fg = resolved.foreground.value_or(textColor);
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
             textRect,
-            textColor,
+            fg,
             ScaleValue(fontSize),
             textOptions);
     }
+
+private:
+    void SyncQuickSetToStyle() {
+        if (!m_style.base.decoration.has_value()) {
+            m_style.base.decoration = BoxDecoration{};
+        }
+        m_style.base.foreground = textColor;
+    }
+
+public:
 
     bool OnMouseDown(float x, float y) override {
         const bool hit = HitTest(x, y);

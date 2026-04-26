@@ -1,5 +1,6 @@
 #pragma once
 
+#include "theme.h"
 #include "ui_context.h"
 #include "ui.h"
 
@@ -46,6 +47,13 @@ public:
     static std::wstring Utf8ToUtf16(const std::string& utf8);
 
     static JsonValue ParseJson(const std::string& text);
+
+    // Resolve a single number JSON value, accepting either a literal number
+    // (e.g. 12) or a "$category.key" string token (e.g. "$spacing.lg").
+    // Pass the natural category of the field; unknown tokens return fallback + warning.
+    static float ParseNumberValue(const JsonValue& value,
+                                  Theme::NumberCategory category,
+                                  float fallback = 0.0f);
 
 private:
     static std::unique_ptr<UIElement> BuildFromJson(const JsonValue& node,

@@ -50,6 +50,24 @@ std::optional<float> TryResolveNumberToken(const std::string& s, Theme::NumberCa
     return std::nullopt;
 }
 
+// Assign a float field from a JSON value that may be either a literal number
+// or a "$category.key" string token. Returns true if target was modified.
+bool TryAssignNumber(const JsonValue& value,
+                     Theme::NumberCategory category,
+                     float& target) {
+    if (value.IsNumber()) {
+        target = static_cast<float>(value.numberValue);
+        return true;
+    }
+    if (value.IsString()) {
+        if (auto resolved = TryResolveNumberToken(value.stringValue, category)) {
+            target = *resolved;
+            return true;
+        }
+    }
+    return false;
+}
+
 void SkipWhitespace(const std::string& text, size_t& pos) {
     while (pos < text.size() && isspace(static_cast<unsigned char>(text[pos]))) {
         pos++;
@@ -898,6 +916,20 @@ Color LayoutParser::ColorFromString(const std::string& value) {
     return ParseHexColor(value);
 }
 
+float LayoutParser::ParseNumberValue(const JsonValue& value,
+                                     Theme::NumberCategory category,
+                                     float fallback) {
+    if (value.IsNumber()) {
+        return static_cast<float>(value.numberValue);
+    }
+    if (value.IsString()) {
+        if (auto v = TryResolveNumberToken(value.stringValue, category)) {
+            return *v;
+        }
+    }
+    return fallback;
+}
+
 std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourceProvider& provider, UIEventResolver eventResolver);
 std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourceProvider& provider, UIEventResolver eventResolver);
 
@@ -984,12 +1016,8 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["background"].IsString()) {
                 panel->background = LayoutParser::ColorFromString(props["background"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                panel->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
-            if (props["spacing"].IsNumber()) {
-                panel->spacing = static_cast<float>(props["spacing"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, panel->cornerRadius);
+            TryAssignNumber(props["spacing"], Theme::NumberCategory::Spacing, panel->spacing);
             if (props["padding"].IsArray() && props["padding"].arrayValue.size() == 4) {
                 panel->padding = ParseThickness(props["padding"]);
             }
@@ -1020,9 +1048,7 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["text"].IsString()) {
                 label->SetText(LayoutParser::Utf8ToUtf16(props["text"].stringValue));
             }
-            if (props["fontSize"].IsNumber()) {
-                label->m_fontSize = static_cast<float>(props["fontSize"].numberValue);
-            }
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, label->m_fontSize);
             if (props["color"].IsString()) {
                 label->m_color = LayoutParser::ColorFromString(props["color"].stringValue);
             }
@@ -1062,9 +1088,7 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["deltaColor"].IsString()) {
                 statCard->deltaColor = LayoutParser::ColorFromString(props["deltaColor"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                statCard->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, statCard->cornerRadius);
             ApplyCommonJsonProps(*statCard, props);
         }
         element = std::move(statCard);
@@ -1092,9 +1116,7 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["strokeWidth"].IsNumber()) {
                 chart->strokeWidth = static_cast<float>(props["strokeWidth"].numberValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                chart->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, chart->cornerRadius);
             if (props["minValue"].IsNumber() && props["maxValue"].IsNumber()) {
                 chart->SetRange(
                     static_cast<float>(props["minValue"].numberValue),
@@ -1192,18 +1214,14 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["textColor"].IsString()) {
                 table->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                table->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, table->cornerRadius);
             if (props["headerHeight"].IsNumber()) {
                 table->headerHeight = static_cast<float>(props["headerHeight"].numberValue);
             }
             if (props["rowHeight"].IsNumber()) {
                 table->rowHeight = static_cast<float>(props["rowHeight"].numberValue);
             }
-            if (props["fontSize"].IsNumber()) {
-                table->fontSize = static_cast<float>(props["fontSize"].numberValue);
-            }
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, table->fontSize);
             if (props["headerFontSize"].IsNumber()) {
                 table->headerFontSize = static_cast<float>(props["headerFontSize"].numberValue);
             }
@@ -1244,9 +1262,7 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["birdColor"].IsString()) {
                 animation->birdColor = LayoutParser::ColorFromString(props["birdColor"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                animation->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, animation->cornerRadius);
             ApplyCommonJsonProps(*animation, props);
         }
         element = std::move(animation);
@@ -1290,12 +1306,8 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["textColor"].IsString()) {
                 progressBar->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                progressBar->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
-            if (props["fontSize"].IsNumber()) {
-                progressBar->fontSize = static_cast<float>(props["fontSize"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, progressBar->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, progressBar->fontSize);
             if (props["barHeight"].IsNumber()) {
                 progressBar->barHeight = static_cast<float>(props["barHeight"].numberValue);
             }
@@ -1329,12 +1341,8 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["textColor"].IsString()) {
                 listBox->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                listBox->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
-            if (props["fontSize"].IsNumber()) {
-                listBox->fontSize = static_cast<float>(props["fontSize"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, listBox->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, listBox->fontSize);
             if (props["itemHeight"].IsNumber()) {
                 listBox->itemHeight = static_cast<float>(props["itemHeight"].numberValue);
             }
@@ -1377,12 +1385,8 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["textColor"].IsString()) {
                 comboBox->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                comboBox->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
-            if (props["fontSize"].IsNumber()) {
-                comboBox->fontSize = static_cast<float>(props["fontSize"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, comboBox->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, comboBox->fontSize);
             if (props["headerHeight"].IsNumber()) {
                 comboBox->headerHeight = static_cast<float>(props["headerHeight"].numberValue);
             }
@@ -1434,12 +1438,8 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["selectedTabTextColor"].IsString()) {
                 tabControl->selectedTabTextColor = LayoutParser::ColorFromString(props["selectedTabTextColor"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                tabControl->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
-            if (props["fontSize"].IsNumber()) {
-                tabControl->fontSize = static_cast<float>(props["fontSize"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, tabControl->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, tabControl->fontSize);
             if (props["headerHeight"].IsNumber()) {
                 tabControl->headerHeight = static_cast<float>(props["headerHeight"].numberValue);
             }
@@ -1544,18 +1544,14 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["textColor"].IsString()) {
                 listView->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                listView->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, listView->cornerRadius);
             if (props["headerHeight"].IsNumber()) {
                 listView->headerHeight = static_cast<float>(props["headerHeight"].numberValue);
             }
             if (props["rowHeight"].IsNumber()) {
                 listView->rowHeight = static_cast<float>(props["rowHeight"].numberValue);
             }
-            if (props["fontSize"].IsNumber()) {
-                listView->fontSize = static_cast<float>(props["fontSize"].numberValue);
-            }
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, listView->fontSize);
             if (props["headerFontSize"].IsNumber()) {
                 listView->headerFontSize = static_cast<float>(props["headerFontSize"].numberValue);
             }
@@ -1598,12 +1594,8 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["glyphColor"].IsString()) {
                 treeView->glyphColor = LayoutParser::ColorFromString(props["glyphColor"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                treeView->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
-            if (props["fontSize"].IsNumber()) {
-                treeView->fontSize = static_cast<float>(props["fontSize"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, treeView->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, treeView->fontSize);
             if (props["itemHeight"].IsNumber()) {
                 treeView->itemHeight = static_cast<float>(props["itemHeight"].numberValue);
             }
@@ -1621,18 +1613,14 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["text"].IsString()) {
                 button->SetText(LayoutParser::Utf8ToUtf16(props["text"].stringValue));
             }
-            if (props["fontSize"].IsNumber()) {
-                button->fontSize = static_cast<float>(props["fontSize"].numberValue);
-            }
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, button->fontSize);
             if (props["background"].IsString()) {
                 button->background = LayoutParser::ColorFromString(props["background"].stringValue);
             }
             if (props["foreground"].IsString()) {
                 button->foreground = LayoutParser::ColorFromString(props["foreground"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                button->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, button->cornerRadius);
             ApplyCommonJsonProps(*button, props);
         }
         if (node["events"].IsObject() && node["events"]["onClick"].IsString()) {
@@ -1728,9 +1716,7 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["background"].IsString()) {
                 grid->background = LayoutParser::ColorFromString(props["background"].stringValue);
             }
-            if (props["cornerRadius"].IsNumber()) {
-                grid->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
-            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, grid->cornerRadius);
             if (props["spacing"].IsNumber()) {
                 grid->cellSpacing = static_cast<float>(props["spacing"].numberValue);
             } else if (props["cellSpacing"].IsNumber()) {
