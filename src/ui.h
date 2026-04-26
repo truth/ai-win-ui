@@ -1481,6 +1481,78 @@ private:
     BitmapHandle m_bitmap = nullptr;
 };
 
+class SvgIcon : public UIElement {
+public:
+    enum class StretchMode {
+        Fill,
+        Uniform,
+        UniformToFill
+    };
+
+    explicit SvgIcon(std::wstring source) : m_source(std::move(source)) {}
+
+    StretchMode stretch = StretchMode::Uniform;
+
+    void SetSvgData(std::vector<uint8_t> svgData) {
+        m_svgData = std::move(svgData);
+        m_svg.reset();
+    }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        const float w = m_intrinsicSize.width > 0 ? m_intrinsicSize.width : 24.0f;
+        return std::min(availableWidth > 0 ? availableWidth : w, w);
+    }
+
+    float MeasurePreferredHeight(float /*width*/) const override {
+        return m_intrinsicSize.height > 0 ? m_intrinsicSize.height : 24.0f;
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        if (!m_svg && !m_svgData.empty()) {
+            m_svg = renderer.CreateSvgFromBytes(m_svgData.data(), m_svgData.size());
+            if (m_svg) {
+                m_intrinsicSize = renderer.GetSvgSize(m_svg);
+            }
+        }
+        if (!m_svg) {
+            renderer.FillRect(m_bounds, ColorFromHex(0x404040));
+            return;
+        }
+
+        Rect drawRect = m_bounds;
+        if (stretch != StretchMode::Fill && m_intrinsicSize.width > 0 && m_intrinsicSize.height > 0) {
+            const float targetWidth = m_bounds.Width();
+            const float targetHeight = m_bounds.Height();
+            const float sourceRatio = m_intrinsicSize.width / m_intrinsicSize.height;
+            const float targetRatio = targetWidth > 0 && targetHeight > 0
+                ? targetWidth / targetHeight : 1.0f;
+            const bool letterbox = stretch == StretchMode::Uniform
+                ? sourceRatio > targetRatio
+                : sourceRatio < targetRatio;
+            if (letterbox) {
+                const float scaledHeight = targetWidth / sourceRatio;
+                const float offsetY = (targetHeight - scaledHeight) * 0.5f;
+                drawRect = Rect::Make(m_bounds.left, m_bounds.top + offsetY,
+                                      m_bounds.right, m_bounds.top + offsetY + scaledHeight);
+            } else {
+                const float scaledWidth = targetHeight * sourceRatio;
+                const float offsetX = (targetWidth - scaledWidth) * 0.5f;
+                drawRect = Rect::Make(m_bounds.left + offsetX, m_bounds.top,
+                                      m_bounds.left + offsetX + scaledWidth, m_bounds.bottom);
+            }
+        }
+        renderer.DrawSvg(m_svg, drawRect);
+    }
+
+private:
+    std::wstring m_source;
+    std::vector<uint8_t> m_svgData;
+    SvgHandle m_svg = nullptr;
+    Size m_intrinsicSize{24.0f, 24.0f};
+};
+
 class Button : public UIElement {
 public:
     explicit Button(std::wstring text) : m_text(std::move(text)) {

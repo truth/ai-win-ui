@@ -4,10 +4,28 @@ project(AiWinUiRenderer LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(AI_WIN_UI_RESOURCE_DIR "${CMAKE_SOURCE_DIR}/resource")
-option(AI_WIN_UI_ENABLE_SKIA "Prepare build settings for a future Skia renderer backend." OFF)
+
+# Auto-detect bundled Skia SDK so SVG support works zero-config when
+# third_party/skia-m124 is present with prebuilt libs.
+set(_ai_win_ui_default_skia_dir "${CMAKE_SOURCE_DIR}/third_party/skia-m124")
+set(_ai_win_ui_skia_autodetected OFF)
+if(EXISTS "${_ai_win_ui_default_skia_dir}/out/Debug-x64/skia.lib"
+   AND EXISTS "${_ai_win_ui_default_skia_dir}/out/Release-x64/skia.lib"
+   AND EXISTS "${_ai_win_ui_default_skia_dir}/modules/svg/include/SkSVGDOM.h")
+    set(_ai_win_ui_skia_autodetected ON)
+    message(STATUS "Auto-detected Skia SDK at ${_ai_win_ui_default_skia_dir}; enabling Skia backend.")
+endif()
+
+option(AI_WIN_UI_ENABLE_SKIA "Build with Skia renderer backend (required for SVG)." ${_ai_win_ui_skia_autodetected})
 set(AI_WIN_UI_SKIA_PROVIDER "none" CACHE STRING "How Skia should be discovered when AI_WIN_UI_ENABLE_SKIA is ON.")
 set_property(CACHE AI_WIN_UI_SKIA_PROVIDER PROPERTY STRINGS none vcpkg local-sdk)
 set(AI_WIN_UI_SKIA_DIR "" CACHE PATH "Optional root directory of a local Skia SDK or prebuilt package.")
+if(_ai_win_ui_skia_autodetected AND AI_WIN_UI_SKIA_PROVIDER STREQUAL "none")
+    set(AI_WIN_UI_SKIA_PROVIDER "local-sdk" CACHE STRING "" FORCE)
+endif()
+if(_ai_win_ui_skia_autodetected AND NOT AI_WIN_UI_SKIA_DIR)
+    set(AI_WIN_UI_SKIA_DIR "${_ai_win_ui_default_skia_dir}" CACHE PATH "" FORCE)
+endif()
 set(AI_WIN_UI_SKIA_INCLUDE_DIR "" CACHE PATH "Optional override for the Skia include root when using AI_WIN_UI_SKIA_PROVIDER=local-sdk.")
 set(AI_WIN_UI_SKIA_LIBRARY_DIR "" CACHE PATH "Optional override for the directory containing skia.lib when using AI_WIN_UI_SKIA_PROVIDER=local-sdk.")
 

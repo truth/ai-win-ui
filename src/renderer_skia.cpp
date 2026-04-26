@@ -13,10 +13,14 @@
 #include "include/core/SkPath.h"
 #include "include/core/SkRRect.h"
 #include "include/core/SkSamplingOptions.h"
+#include "include/core/SkStream.h"
+#include "include/core/SkSize.h"
 #include "include/core/SkSurface.h"
 #include "include/core/SkSurfaceProps.h"
 #include "include/core/SkTextBlob.h"
 #include "include/core/SkTypes.h"
+
+#include "modules/svg/include/SkSVGDOM.h"
 
 #include <algorithm>
 #include <cmath>
@@ -60,6 +64,29 @@ public:
 private:
     Size m_size{};
     sk_sp<SkImage> m_image;
+};
+
+class SkiaSvgResource final : public SvgResource {
+public:
+    explicit SkiaSvgResource(sk_sp<SkSVGDOM> dom)
+        : m_dom(std::move(dom)) {
+        if (m_dom) {
+            const SkSize sz = m_dom->containerSize();
+            if (sz.width() > 0.0f && sz.height() > 0.0f) {
+                m_intrinsic = Size{sz.width(), sz.height()};
+            } else {
+                // SVG without explicit width/height: leave a sensible 24x24 hint.
+                m_intrinsic = Size{24.0f, 24.0f};
+            }
+        }
+    }
+
+    Size GetIntrinsicSize() const override { return m_intrinsic; }
+    const sk_sp<SkSVGDOM>& Dom() const { return m_dom; }
+
+private:
+    Size m_intrinsic{24.0f, 24.0f};
+    sk_sp<SkSVGDOM> m_dom;
 };
 
 class SkiaRenderer final : public IRenderer {
@@ -333,6 +360,43 @@ public:
             ToSkRect(rect),
             m_bitmapSampling,
             nullptr);
+    }
+
+    SvgHandle CreateSvgFromBytes(const uint8_t* data, size_t size) override {
+        if (!data || size == 0) {
+            return nullptr;
+        }
+        EnsureFontManager();
+        auto stream = SkMemoryStream::MakeCopy(data, size);
+        if (!stream) {
+            return nullptr;
+        }
+        sk_sp<SkSVGDOM> dom = SkSVGDOM::Builder()
+            .setFontManager(m_fontMgr)
+            .make(*stream);
+        if (!dom) {
+            return nullptr;
+        }
+        return std::make_shared<SkiaSvgResource>(std::move(dom));
+    }
+
+    Size GetSvgSize(SvgHandle svg) override {
+        return svg ? svg->GetIntrinsicSize() : Size{};
+    }
+
+    void DrawSvg(SvgHandle svg, const Rect& rect) override {
+        SkCanvas* canvas = Canvas();
+        if (!canvas || !svg) {
+            return;
+        }
+        auto skiaSvg = std::dynamic_pointer_cast<SkiaSvgResource>(svg);
+        if (!skiaSvg || !skiaSvg->Dom()) {
+            return;
+        }
+        SkAutoCanvasRestore restore(canvas, /*doSave=*/true);
+        canvas->translate(rect.left, rect.top);
+        skiaSvg->Dom()->setContainerSize(SkSize::Make(rect.Width(), rect.Height()));
+        skiaSvg->Dom()->render(canvas);
     }
 
 private:

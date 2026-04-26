@@ -65,6 +65,10 @@ public:
     virtual Size GetBitmapSize(BitmapHandle bitmap) = 0;
     virtual BitmapHandle CreateBitmapFromBytes(const uint8_t* data, size_t size) = 0;
     virtual void DrawBitmap(BitmapHandle bitmap, const Rect& rect) = 0;
+
+    virtual SvgHandle CreateSvgFromBytes(const uint8_t* data, size_t size) = 0;
+    virtual Size GetSvgSize(SvgHandle svg) = 0;
+    virtual void DrawSvg(SvgHandle svg, const Rect& rect) = 0;
 };
 
 std::unique_ptr<IRenderer> CreateDirect2DRenderer();

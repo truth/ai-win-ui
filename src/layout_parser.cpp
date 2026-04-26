@@ -1765,6 +1765,32 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*image, node["props"]);
         }
         element = std::move(image);
+    } else if (type == "SvgIcon") {
+        std::wstring source = L"";
+        if (node["props"].IsObject() && node["props"]["source"].IsString()) {
+            source = LayoutParser::Utf8ToUtf16(node["props"]["source"].stringValue);
+        }
+        auto icon = std::make_unique<SvgIcon>(std::move(source));
+        if (node["props"].IsObject()) {
+            if (node["props"]["stretch"].IsString()) {
+                const std::string stretchMode = node["props"]["stretch"].stringValue;
+                if (stretchMode == "fill") {
+                    icon->stretch = SvgIcon::StretchMode::Fill;
+                } else if (stretchMode == "uniformToFill") {
+                    icon->stretch = SvgIcon::StretchMode::UniformToFill;
+                } else {
+                    icon->stretch = SvgIcon::StretchMode::Uniform;
+                }
+            }
+            if (node["props"]["source"].IsString()) {
+                const std::string sourcePath = node["props"]["source"].stringValue;
+                if (provider.Exists(sourcePath)) {
+                    icon->SetSvgData(provider.LoadBytes(sourcePath));
+                }
+            }
+            ApplyCommonJsonProps(*icon, node["props"]);
+        }
+        element = std::move(icon);
     } else if (type == "Spacer") {
         auto spacer = std::make_unique<Spacer>();
         if (node["props"].IsObject()) {

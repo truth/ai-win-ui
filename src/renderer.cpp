@@ -94,6 +94,15 @@ private:
     uint64_t m_generation = 0;
 };
 
+// SVG sentinel for the Direct2D backend: SVG is only fully drawn when the
+// active backend is Skia. Direct2D paints a placeholder (gray box + "SVG"
+// label) so the user notices the mismatch instead of getting a silent
+// blank slot.
+class PlaceholderSvgResource final : public SvgResource {
+public:
+    Size GetIntrinsicSize() const override { return Size{16.0f, 16.0f}; }
+};
+
 class Direct2DRenderer final : public IRenderer {
 public:
     ~Direct2DRenderer() override {
@@ -409,6 +418,29 @@ public:
         }
 
         m_renderTarget->DrawBitmap(d2dBitmap, ToD2DRect(rect));
+    }
+
+    SvgHandle CreateSvgFromBytes(const uint8_t* /*data*/, size_t /*size*/) override {
+        return std::make_shared<PlaceholderSvgResource>();
+    }
+
+    Size GetSvgSize(SvgHandle /*svg*/) override {
+        return Size{16.0f, 16.0f};
+    }
+
+    void DrawSvg(SvgHandle svg, const Rect& rect) override {
+        if (!m_renderTarget) return;
+        const Color bg     = ColorFromHex(0x2A2A2A);
+        const Color border = ColorFromHex(0x6A6A6A);
+        const Color fg     = ColorFromHex(0xB7B7B7);
+        FillRect(rect, bg);
+        DrawRect(rect, border, 1.0f);
+        if (!svg) return;
+        const wchar_t* label = L"SVG";
+        DrawTextW(label, 3, rect, fg, 12.0f,
+                  TextRenderOptions{TextWrapMode::NoWrap,
+                                    TextHorizontalAlign::Center,
+                                    TextVerticalAlign::Center});
     }
 
 private:

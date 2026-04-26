@@ -71,3 +71,11 @@ public:
 };
 
 using BitmapHandle = std::shared_ptr<BitmapResource>;
+
+class SvgResource {
+public:
+    virtual ~SvgResource() = default;
+    virtual Size GetIntrinsicSize() const = 0;
+};
+
+using SvgHandle = std::shared_ptr<SvgResource>;
