@@ -602,6 +602,62 @@ std::vector<std::wstring> ParseWideStringArray(const JsonValue& value) {
     return result;
 }
 
+std::vector<StripItem> ParseStripItemsFromStrings(const std::string& itemsValue,
+                                                  const std::string& iconsValue,
+                                                  IResourceProvider& provider) {
+    std::vector<StripItem> result;
+    const auto texts = SplitString(itemsValue, '|');
+    const auto icons = iconsValue.empty() ? std::vector<std::string>{} : SplitString(iconsValue, '|');
+    result.reserve(texts.size());
+    for (size_t i = 0; i < texts.size(); ++i) {
+        StripItem item;
+        item.text = LayoutParser::Utf8ToUtf16(TrimString(texts[i]));
+        if (i < icons.size()) {
+            const std::string iconPath = TrimString(icons[i]);
+            if (!iconPath.empty() && provider.Exists(iconPath)) {
+                item.svgData = provider.LoadBytes(iconPath);
+            }
+        }
+        result.push_back(std::move(item));
+    }
+    return result;
+}
+
+std::vector<StripItem> ParseStripItemsFromJson(const JsonValue& value,
+                                               IResourceProvider& provider) {
+    std::vector<StripItem> result;
+    if (!value.IsArray()) {
+        return result;
+    }
+    result.reserve(value.arrayValue.size());
+    for (const auto& itemNode : value.arrayValue) {
+        StripItem item;
+        if (itemNode.IsString()) {
+            item.text = LayoutParser::Utf8ToUtf16(itemNode.stringValue);
+        } else if (itemNode.IsObject()) {
+            if (itemNode["text"].IsString()) {
+                item.text = LayoutParser::Utf8ToUtf16(itemNode["text"].stringValue);
+            } else if (itemNode["title"].IsString()) {
+                item.text = LayoutParser::Utf8ToUtf16(itemNode["title"].stringValue);
+            } else if (itemNode["name"].IsString()) {
+                item.text = LayoutParser::Utf8ToUtf16(itemNode["name"].stringValue);
+            }
+
+            std::string iconPath;
+            if (itemNode["icon"].IsString()) {
+                iconPath = itemNode["icon"].stringValue;
+            } else if (itemNode["source"].IsString()) {
+                iconPath = itemNode["source"].stringValue;
+            }
+            if (!iconPath.empty() && provider.Exists(iconPath)) {
+                item.svgData = provider.LoadBytes(iconPath);
+            }
+        }
+        result.push_back(std::move(item));
+    }
+    return result;
+}
+
 Panel::AlignItems ParseAlignItems(const std::string& value) {
     const std::string normalized = ToLowerAscii(TrimString(value));
     if (normalized == "start" || normalized == "left" || normalized == "flex-start" || normalized == "flexstart") {
@@ -1605,6 +1661,173 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*treeView, props);
         }
         element = std::move(treeView);
+    } else if (type == "MenuStrip") {
+        auto menuStrip = std::make_unique<MenuStrip>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["items"].IsArray()) {
+                menuStrip->SetEntries(ParseStripItemsFromJson(props["items"], provider));
+            } else if (props["items"].IsString()) {
+                const std::string icons = props["icons"].IsString() ? props["icons"].stringValue : std::string{};
+                menuStrip->SetEntries(ParseStripItemsFromStrings(props["items"].stringValue, icons, provider));
+            }
+            if (props["selectedIndex"].IsNumber()) {
+                menuStrip->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
+            }
+            if (props["background"].IsString()) {
+                menuStrip->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                menuStrip->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["hoverBackground"].IsString()) {
+                menuStrip->hoverBackground = LayoutParser::ColorFromString(props["hoverBackground"].stringValue);
+            }
+            if (props["selectedBackground"].IsString()) {
+                menuStrip->selectedBackground = LayoutParser::ColorFromString(props["selectedBackground"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                menuStrip->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["selectedTextColor"].IsString()) {
+                menuStrip->selectedTextColor = LayoutParser::ColorFromString(props["selectedTextColor"].stringValue);
+            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, menuStrip->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, menuStrip->fontSize);
+            if (props["stripHeight"].IsNumber()) {
+                menuStrip->stripHeight = static_cast<float>(props["stripHeight"].numberValue);
+            }
+            if (props["itemSpacing"].IsNumber()) {
+                menuStrip->itemSpacing = static_cast<float>(props["itemSpacing"].numberValue);
+            }
+            ApplyCommonJsonProps(*menuStrip, props);
+        }
+        element = std::move(menuStrip);
+    } else if (type == "ToolStrip") {
+        auto toolStrip = std::make_unique<ToolStrip>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["items"].IsArray()) {
+                toolStrip->SetEntries(ParseStripItemsFromJson(props["items"], provider));
+            } else if (props["items"].IsString()) {
+                const std::string icons = props["icons"].IsString() ? props["icons"].stringValue : std::string{};
+                toolStrip->SetEntries(ParseStripItemsFromStrings(props["items"].stringValue, icons, provider));
+            }
+            if (props["selectedIndex"].IsNumber()) {
+                toolStrip->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
+            }
+            if (props["background"].IsString()) {
+                toolStrip->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                toolStrip->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["buttonBackground"].IsString()) {
+                toolStrip->buttonBackground = LayoutParser::ColorFromString(props["buttonBackground"].stringValue);
+            }
+            if (props["buttonBorderColor"].IsString()) {
+                toolStrip->buttonBorderColor = LayoutParser::ColorFromString(props["buttonBorderColor"].stringValue);
+            }
+            if (props["hoverBackground"].IsString()) {
+                toolStrip->hoverBackground = LayoutParser::ColorFromString(props["hoverBackground"].stringValue);
+            }
+            if (props["selectedBackground"].IsString()) {
+                toolStrip->selectedBackground = LayoutParser::ColorFromString(props["selectedBackground"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                toolStrip->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["selectedTextColor"].IsString()) {
+                toolStrip->selectedTextColor = LayoutParser::ColorFromString(props["selectedTextColor"].stringValue);
+            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, toolStrip->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, toolStrip->fontSize);
+            if (props["stripHeight"].IsNumber()) {
+                toolStrip->stripHeight = static_cast<float>(props["stripHeight"].numberValue);
+            }
+            if (props["itemSpacing"].IsNumber()) {
+                toolStrip->itemSpacing = static_cast<float>(props["itemSpacing"].numberValue);
+            }
+            ApplyCommonJsonProps(*toolStrip, props);
+        }
+        element = std::move(toolStrip);
+    } else if (type == "StatusStrip") {
+        auto statusStrip = std::make_unique<StatusStrip>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["items"].IsArray()) {
+                statusStrip->SetItems(ParseWideStringArray(props["items"]));
+            } else if (props["items"].IsString()) {
+                statusStrip->SetItems(ParseWideStringList(props["items"].stringValue, '|'));
+            }
+            if (props["background"].IsString()) {
+                statusStrip->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                statusStrip->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["separatorColor"].IsString()) {
+                statusStrip->separatorColor = LayoutParser::ColorFromString(props["separatorColor"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                statusStrip->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["mutedTextColor"].IsString()) {
+                statusStrip->mutedTextColor = LayoutParser::ColorFromString(props["mutedTextColor"].stringValue);
+            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, statusStrip->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, statusStrip->fontSize);
+            if (props["stripHeight"].IsNumber()) {
+                statusStrip->stripHeight = static_cast<float>(props["stripHeight"].numberValue);
+            }
+            if (props["itemSpacing"].IsNumber()) {
+                statusStrip->itemSpacing = static_cast<float>(props["itemSpacing"].numberValue);
+            }
+            ApplyCommonJsonProps(*statusStrip, props);
+        }
+        element = std::move(statusStrip);
+    } else if (type == "ContextMenu") {
+        auto contextMenu = std::make_unique<ContextMenu>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["items"].IsArray()) {
+                contextMenu->SetEntries(ParseStripItemsFromJson(props["items"], provider));
+            } else if (props["items"].IsString()) {
+                const std::string icons = props["icons"].IsString() ? props["icons"].stringValue : std::string{};
+                contextMenu->SetEntries(ParseStripItemsFromStrings(props["items"].stringValue, icons, provider));
+            }
+            if (props["selectedIndex"].IsNumber()) {
+                contextMenu->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
+            }
+            if (props["background"].IsString()) {
+                contextMenu->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                contextMenu->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["hoverBackground"].IsString()) {
+                contextMenu->hoverBackground = LayoutParser::ColorFromString(props["hoverBackground"].stringValue);
+            }
+            if (props["selectedBackground"].IsString()) {
+                contextMenu->selectedBackground = LayoutParser::ColorFromString(props["selectedBackground"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                contextMenu->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["mutedTextColor"].IsString()) {
+                contextMenu->mutedTextColor = LayoutParser::ColorFromString(props["mutedTextColor"].stringValue);
+            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, contextMenu->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, contextMenu->fontSize);
+            if (props["itemHeight"].IsNumber()) {
+                contextMenu->itemHeight = static_cast<float>(props["itemHeight"].numberValue);
+            }
+            if (props["maxVisibleItems"].IsNumber()) {
+                contextMenu->maxVisibleItems = std::max(1, static_cast<int>(props["maxVisibleItems"].numberValue));
+            }
+            ApplyCommonJsonProps(*contextMenu, props);
+        }
+        element = std::move(contextMenu);
     } else if (type == "Button") {
         std::wstring text = L"Button";
         auto button = std::make_unique<Button>(std::move(text));
@@ -2324,6 +2547,169 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*treeView, node);
         element = std::move(treeView);
+    } else if (node.name == "MenuStrip") {
+        auto menuStrip = std::make_unique<MenuStrip>();
+        if (auto it = node.attributes.find("items"); it != node.attributes.end()) {
+            const std::string icons = node.attributes.count("icons") ? node.attributes.at("icons") : std::string{};
+            menuStrip->SetEntries(ParseStripItemsFromStrings(it->second, icons, provider));
+        }
+        if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
+            menuStrip->SetSelectedIndex(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            menuStrip->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            menuStrip->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("hoverBackground"); it != node.attributes.end()) {
+            menuStrip->hoverBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedBackground"); it != node.attributes.end()) {
+            menuStrip->selectedBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            menuStrip->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedTextColor"); it != node.attributes.end()) {
+            menuStrip->selectedTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            menuStrip->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            menuStrip->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("stripHeight"); it != node.attributes.end()) {
+            menuStrip->stripHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("itemSpacing"); it != node.attributes.end()) {
+            menuStrip->itemSpacing = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*menuStrip, node);
+        element = std::move(menuStrip);
+    } else if (node.name == "ToolStrip") {
+        auto toolStrip = std::make_unique<ToolStrip>();
+        if (auto it = node.attributes.find("items"); it != node.attributes.end()) {
+            const std::string icons = node.attributes.count("icons") ? node.attributes.at("icons") : std::string{};
+            toolStrip->SetEntries(ParseStripItemsFromStrings(it->second, icons, provider));
+        }
+        if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
+            toolStrip->SetSelectedIndex(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            toolStrip->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            toolStrip->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("buttonBackground"); it != node.attributes.end()) {
+            toolStrip->buttonBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("buttonBorderColor"); it != node.attributes.end()) {
+            toolStrip->buttonBorderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("hoverBackground"); it != node.attributes.end()) {
+            toolStrip->hoverBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedBackground"); it != node.attributes.end()) {
+            toolStrip->selectedBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            toolStrip->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedTextColor"); it != node.attributes.end()) {
+            toolStrip->selectedTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            toolStrip->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            toolStrip->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("stripHeight"); it != node.attributes.end()) {
+            toolStrip->stripHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("itemSpacing"); it != node.attributes.end()) {
+            toolStrip->itemSpacing = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*toolStrip, node);
+        element = std::move(toolStrip);
+    } else if (node.name == "StatusStrip") {
+        auto statusStrip = std::make_unique<StatusStrip>();
+        if (auto it = node.attributes.find("items"); it != node.attributes.end()) {
+            statusStrip->SetItems(ParseWideStringList(it->second, '|'));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            statusStrip->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            statusStrip->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("separatorColor"); it != node.attributes.end()) {
+            statusStrip->separatorColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            statusStrip->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("mutedTextColor"); it != node.attributes.end()) {
+            statusStrip->mutedTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            statusStrip->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            statusStrip->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("stripHeight"); it != node.attributes.end()) {
+            statusStrip->stripHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("itemSpacing"); it != node.attributes.end()) {
+            statusStrip->itemSpacing = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*statusStrip, node);
+        element = std::move(statusStrip);
+    } else if (node.name == "ContextMenu") {
+        auto contextMenu = std::make_unique<ContextMenu>();
+        if (auto it = node.attributes.find("items"); it != node.attributes.end()) {
+            const std::string icons = node.attributes.count("icons") ? node.attributes.at("icons") : std::string{};
+            contextMenu->SetEntries(ParseStripItemsFromStrings(it->second, icons, provider));
+        }
+        if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
+            contextMenu->SetSelectedIndex(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            contextMenu->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            contextMenu->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("hoverBackground"); it != node.attributes.end()) {
+            contextMenu->hoverBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("selectedBackground"); it != node.attributes.end()) {
+            contextMenu->selectedBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            contextMenu->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("mutedTextColor"); it != node.attributes.end()) {
+            contextMenu->mutedTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            contextMenu->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            contextMenu->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("itemHeight"); it != node.attributes.end()) {
+            contextMenu->itemHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("maxVisibleItems"); it != node.attributes.end()) {
+            contextMenu->maxVisibleItems = std::max(1, std::stoi(it->second));
+        }
+        ApplyCommonXmlAttributes(*contextMenu, node);
+        element = std::move(contextMenu);
     } else if (node.name == "Button") {
         std::wstring text = L"Button";
         auto button = std::make_unique<Button>(std::move(text));

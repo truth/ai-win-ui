@@ -27,7 +27,7 @@ Use these pages as the shared acceptance surface:
 - `layouts/core_controls_v2.xml`
   - core WinForms-like control set (`ProgressBar`, `ListBox`, `ComboBox`, `TabControl`)
 - `layouts/navigation_components.xml`
-  - navigation controls (`ListView`, `TreeView`)
+  - navigation and shell controls (`ListView`, `TreeView`, `MenuStrip`, `ToolStrip`, `StatusStrip`, `ContextMenu`)
 
 ## Recommended Run Commands
 
@@ -156,6 +156,8 @@ Pass if all of the following are true:
 - `SeagullAnimation` updates continuously without visible artifacts
 - `ProgressBar`, `ListBox`, `ComboBox`, and `TabControl` respond to mouse and keyboard input
 - `ListView` and `TreeView` support stable selection and keyboard traversal
+- `MenuStrip`, `ToolStrip`, and `ContextMenu` respond to arrow keys and mouse selection
+- `StatusStrip` segments render without overlap or clipping
 
 Shortcut: `run_layout_demo.ps1` also accepts aliases:
 

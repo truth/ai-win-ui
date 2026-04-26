@@ -110,17 +110,12 @@ As of 2026-04-22 on branch `feat/advanced-rendering-components`:
   - validation layouts added:
     - `resource/layouts/core_controls_v2.xml`
     - `resource/layouts/core_controls_v2.json`
-- Phase 7 is in progress:
-  - added `ListView` and `TreeView` in `src/ui.h`.
+- Phase 7 is implemented (v1):
+  - added `ListView`, `TreeView`, `MenuStrip`, `ToolStrip`, `StatusStrip`, and `ContextMenu` in `src/ui.h`.
   - parser support exists for XML and JSON.
   - validation layouts added:
     - `resource/layouts/navigation_components.xml`
     - `resource/layouts/navigation_components.json`
-  - shell strips are pending:
-    - `MenuStrip`
-    - `ToolStrip`
-    - `StatusStrip`
-    - `ContextMenu`
 
 ## WinForms Component Gap Analysis
 

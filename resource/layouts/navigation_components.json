@@ -19,7 +19,7 @@
     {
       "type": "Label",
       "props": {
-        "text": "Phase 7 v1: ListView and TreeView with keyboard and mouse navigation.",
+        "text": "Phase 7 v1: shell strips plus ListView and TreeView keyboard and mouse navigation.",
         "fontSize": "$fontSize.base",
         "color": "#B8C8D9"
       }
@@ -27,103 +27,201 @@
     {
       "type": "Panel",
       "props": {
-        "direction": "column",
-        "spacing": "$spacing.md",
-        "background": "#0D1521",
-        "alignItems": "stretch",
-        "flexGrow": 1
+        "background": "#122032",
+        "cornerRadius": "$radius.lg",
+        "padding": "$spacing.md",
+        "spacing": 10,
+        "alignItems": "stretch"
       },
       "children": [
         {
-          "type": "Panel",
+          "type": "Label",
           "props": {
-            "background": "#122032",
-            "cornerRadius": "$radius.lg",
-            "padding": "$spacing.md",
-            "spacing": 10,
-            "flexGrow": 1,
-            "minHeight": 260
-          },
-          "children": [
-            {
-              "type": "Label",
-              "props": {
-                "text": "ListView",
-                "fontSize": "$fontSize.lg",
-                "color": "#E9F2FD"
-              }
-            },
-            {
-              "type": "ListView",
-              "props": {
-                "columns": [
-                  "Name",
-                  "Role",
-                  "Region",
-                  "Status"
-                ],
-                "columnWidths": [160, 180, 140, 120],
-                "rows": [
-                  ["Ava Carter", "Product Designer", "APAC", "Online"],
-                  ["Noah Kim", "Frontend Engineer", "NA", "In Review"],
-                  ["Mia Chen", "Data Analyst", "EMEA", "Online"],
-                  ["Liam Patel", "QA Engineer", "APAC", "Blocked"],
-                  ["Emma Garcia", "PM", "NA", "Online"],
-                  ["Ethan Rossi", "Backend Engineer", "EMEA", "Offline"],
-                  ["Sophia Diaz", "UX Researcher", "LATAM", "Online"],
-                  ["Lucas Brown", "DevOps Engineer", "NA", "Online"],
-                  ["Olivia Park", "Tech Writer", "APAC", "Drafting"],
-                  ["Mason Hill", "Support Lead", "NA", "Escalated"]
-                ],
-                "selectedIndex": 2,
-                "flexGrow": 1,
-                "minHeight": 220
-              }
-            }
-          ]
+            "text": "Shell Strips",
+            "fontSize": "$fontSize.lg",
+            "color": "#E9F2FD"
+          }
+        },
+        {
+          "type": "MenuStrip",
+          "props": {
+            "items": [
+              { "text": "File", "icon": "icons/check.svg" },
+              { "text": "Edit", "icon": "icons/arrow-right.svg" },
+              { "text": "View", "icon": "icons/star.svg" },
+              { "text": "Project", "icon": "icons/check.svg" },
+              { "text": "Help", "icon": "icons/arrow-right.svg" }
+            ],
+            "selectedIndex": 2,
+            "background": "#132232",
+            "selectedBackground": "#2D567C"
+          }
+        },
+        {
+          "type": "ToolStrip",
+          "props": {
+            "items": [
+              { "text": "New", "icon": "icons/check.svg" },
+              { "text": "Open", "icon": "icons/arrow-right.svg" },
+              { "text": "Save", "icon": "icons/star.svg" },
+              { "text": "Run", "icon": "icons/check.svg" },
+              { "text": "Inspect", "icon": "icons/arrow-right.svg" },
+              { "text": "Publish", "icon": "icons/star.svg" }
+            ],
+            "selectedIndex": 3,
+            "background": "#132232",
+            "buttonBackground": "#1A3044",
+            "selectedBackground": "#315E88",
+            "stripHeight": 44
+          }
         },
         {
           "type": "Panel",
           "props": {
+            "direction": "row",
+            "spacing": "$spacing.md",
             "background": "#122032",
-            "cornerRadius": "$radius.lg",
-            "padding": "$spacing.md",
-            "spacing": 10,
-            "flexGrow": 1,
-            "minHeight": 260
+            "alignItems": "stretch",
+            "wrap": "wrap"
           },
           "children": [
             {
-              "type": "Label",
+              "type": "Panel",
               "props": {
-                "text": "TreeView",
-                "fontSize": "$fontSize.lg",
-                "color": "#E9F2FD"
-              }
+                "background": "#0F1A26",
+                "cornerRadius": "$radius.lg",
+                "padding": "$spacing.md",
+                "spacing": 10,
+                "width": 260,
+                "minHeight": 260
+              },
+              "children": [
+                {
+                  "type": "Label",
+                  "props": {
+                    "text": "ContextMenu",
+                    "fontSize": "$fontSize.lg",
+                    "color": "#E9F2FD"
+                  }
+                },
+                {
+                  "type": "ContextMenu",
+                  "props": {
+                    "items": [
+                      { "text": "Open", "icon": "icons/check.svg" },
+                      { "text": "Open With...", "icon": "icons/arrow-right.svg" },
+                      { "text": "Rename", "icon": "icons/star.svg" },
+                      { "text": "Duplicate", "icon": "icons/check.svg" },
+                      { "text": "Move To Archive", "icon": "icons/arrow-right.svg" },
+                      { "text": "Delete", "icon": "icons/star.svg" }
+                    ],
+                    "selectedIndex": 1,
+                    "itemHeight": 26,
+                    "height": 176
+                  }
+                }
+              ]
             },
             {
-              "type": "TreeView",
+              "type": "Panel",
               "props": {
-                "items": [
-                  "Workspace/Design System/Typography",
-                  "Workspace/Design System/Color Tokens",
-                  "Workspace/Design System/Icon Set",
-                  "Workspace/Frontend/Dashboard",
-                  "Workspace/Frontend/Settings",
-                  "Workspace/Backend/Auth Service",
-                  "Workspace/Backend/Telemetry",
-                  "Workspace/Backend/Reporting",
-                  "Workspace/Docs/Architecture",
-                  "Workspace/Docs/Release Notes",
-                  "Workspace/QA/Regression Pack",
-                  "Workspace/QA/Accessibility"
-                ],
-                "expandedAll": true,
+                "background": "#0F1A26",
+                "cornerRadius": "$radius.lg",
+                "padding": "$spacing.md",
+                "spacing": 10,
                 "flexGrow": 1,
-                "minHeight": 220
-              }
+                "minWidth": 340,
+                "minHeight": 260
+              },
+              "children": [
+                {
+                  "type": "Label",
+                  "props": {
+                    "text": "ListView",
+                    "fontSize": "$fontSize.lg",
+                    "color": "#E9F2FD"
+                  }
+                },
+                {
+                  "type": "ListView",
+                  "props": {
+                    "columns": ["Name", "Role", "Region", "Status"],
+                    "columnWidths": [160, 180, 140, 120],
+                    "rows": [
+                      ["Ava Carter", "Product Designer", "APAC", "Online"],
+                      ["Noah Kim", "Frontend Engineer", "NA", "In Review"],
+                      ["Mia Chen", "Data Analyst", "EMEA", "Online"],
+                      ["Liam Patel", "QA Engineer", "APAC", "Blocked"],
+                      ["Emma Garcia", "PM", "NA", "Online"],
+                      ["Ethan Rossi", "Backend Engineer", "EMEA", "Offline"],
+                      ["Sophia Diaz", "UX Researcher", "LATAM", "Online"],
+                      ["Lucas Brown", "DevOps Engineer", "NA", "Online"],
+                      ["Olivia Park", "Tech Writer", "APAC", "Drafting"],
+                      ["Mason Hill", "Support Lead", "NA", "Escalated"]
+                    ],
+                    "selectedIndex": 2,
+                    "flexGrow": 1,
+                    "minHeight": 220
+                  }
+                }
+              ]
+            },
+            {
+              "type": "Panel",
+              "props": {
+                "background": "#0F1A26",
+                "cornerRadius": "$radius.lg",
+                "padding": "$spacing.md",
+                "spacing": 10,
+                "flexGrow": 1,
+                "minWidth": 340,
+                "minHeight": 260
+              },
+              "children": [
+                {
+                  "type": "Label",
+                  "props": {
+                    "text": "TreeView",
+                    "fontSize": "$fontSize.lg",
+                    "color": "#E9F2FD"
+                  }
+                },
+                {
+                  "type": "TreeView",
+                  "props": {
+                    "items": [
+                      "Workspace/Design System/Typography",
+                      "Workspace/Design System/Color Tokens",
+                      "Workspace/Design System/Icon Set",
+                      "Workspace/Frontend/Dashboard",
+                      "Workspace/Frontend/Settings",
+                      "Workspace/Backend/Auth Service",
+                      "Workspace/Backend/Telemetry",
+                      "Workspace/Backend/Reporting",
+                      "Workspace/Docs/Architecture",
+                      "Workspace/Docs/Release Notes",
+                      "Workspace/QA/Regression Pack",
+                      "Workspace/QA/Accessibility"
+                    ],
+                    "expandedAll": true,
+                    "flexGrow": 1,
+                    "minHeight": 220
+                  }
+                }
+              ]
             }
           ]
+        },
+        {
+          "type": "StatusStrip",
+          "props": {
+            "items": [
+              "Ready",
+              "Phase 7 shell controls are inline validation widgets",
+              "Keyboard pass: Left/Right, Up/Down, Home/End"
+            ],
+            "stripHeight": 30
+          }
         }
       ]
     }

@@ -97,7 +97,7 @@ These layouts are the most useful when checking the current implementation:
 - `resource/layouts/core_controls_v2.xml`
   - core WinForms-like controls checks (`ProgressBar`, `ListBox`, `ComboBox`, `TabControl`)
 - `resource/layouts/navigation_components.xml`
-  - navigation controls checks (`ListView`, `TreeView`)
+  - navigation and shell controls checks (`ListView`, `TreeView`, `MenuStrip`, `ToolStrip`, `StatusStrip`, `ContextMenu`)
 - `resource/layouts/test_styles.json`
   - declarative `style` block four-state colour cycling on `Button`
 - `resource/layouts/test_theme.json`
