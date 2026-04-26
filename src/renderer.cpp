@@ -436,6 +436,11 @@ private:
             return false;
         }
 
+        // Force 1 DIP = 1 pixel so renderer coordinate space matches client
+        // pixels used by layout / hit-test. Without this D2D scales by system
+        // DPI and drawing drifts away from mouse coordinates on >100% scaling.
+        m_renderTarget->SetDpi(96.0f, 96.0f);
+
         if (FAILED(m_renderTarget->CreateSolidColorBrush(
                 D2D1::ColorF(D2D1::ColorF::White),
                 m_solidBrush.ReleaseAndGetAddressOf()))) {
