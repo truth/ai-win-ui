@@ -3,6 +3,7 @@
 #include "renderer.h"
 #include "resource_provider.h"
 #include "text_measurer.h"
+#include "theme.h"
 #include "ui_context.h"
 #include "ui.h"
 #include "zip_resource_provider.h"
@@ -216,6 +217,22 @@ private:
         return pos != std::wstring::npos ? exePath.substr(0, pos) : exePath;
     }
 
+    void LoadTheme() {
+        if (!m_uiContext.resourceProvider) {
+            return;
+        }
+        const std::wstring requestedTheme = GetEnvironmentValue(L"AI_WIN_UI_THEME");
+        const std::string themePath = requestedTheme.empty()
+            ? std::string("themes/default.json")
+            : Utf16ToUtf8(requestedTheme);
+        if (themePath.empty() || !m_uiContext.resourceProvider->Exists(themePath)) {
+            return;
+        }
+        const std::string text = m_uiContext.resourceProvider->LoadText(themePath);
+        m_theme = Theme::LoadFromJson(text);
+        m_uiContext.theme = m_theme.get();
+    }
+
     void BuildUI() {
         const std::wstring baseDir = GetExecutableDirectory();
         const std::wstring zipPath = baseDir.empty() ? L"assets.zip" : baseDir + L"\\assets.zip";
@@ -239,6 +256,8 @@ private:
             }
             return UIEventHandler();
         };
+
+        LoadTheme();
 
         std::vector<std::string> layoutCandidates;
         const std::wstring requestedLayout = GetEnvironmentValue(L"AI_WIN_UI_LAYOUT");
@@ -755,6 +774,7 @@ private:
     std::unique_ptr<ITextMeasurer> m_textMeasurer;
     std::unique_ptr<ILayoutEngine> m_layoutEngine;
     std::unique_ptr<IResourceProvider> m_resourceProvider;
+    std::unique_ptr<Theme> m_theme;
     std::string m_activeLayoutPath;
     RendererBackend m_requestedRendererBackend = RendererBackend::Direct2D;
     RendererBackend m_activeRendererBackend = RendererBackend::Direct2D;

@@ -1,13 +1,54 @@
 #include "layout_parser.h"
 #include "resource_provider.h"
+#include "theme.h"
 
 #include <algorithm>
 #include <cctype>
+#include <optional>
 #include <stdexcept>
 #include <sstream>
 #include <windows.h>
 
 namespace {
+
+const Theme* g_activeTheme = nullptr;
+
+bool StartsWith(const std::string& s, const char* prefix) {
+    const size_t n = std::char_traits<char>::length(prefix);
+    return s.size() >= n && s.compare(0, n, prefix) == 0;
+}
+
+void WarnUnknownToken(const std::string& token) {
+    OutputDebugStringA(("[Theme] Unknown token: " + token + "\n").c_str());
+}
+
+std::optional<Color> TryResolveColorToken(const std::string& s) {
+    if (!StartsWith(s, "$color.")) return std::nullopt;
+    const std::string key = s.substr(7);
+    if (g_activeTheme) {
+        if (auto v = g_activeTheme->ResolveColor(key)) return v;
+    }
+    WarnUnknownToken(s);
+    return ColorFromHex(0xFF00FF);  // magenta sentinel
+}
+
+std::optional<float> TryResolveNumberToken(const std::string& s, Theme::NumberCategory expected) {
+    auto matchPrefix = [&](const char* prefix, Theme::NumberCategory cat) -> std::optional<float> {
+        if (!StartsWith(s, prefix)) return std::nullopt;
+        const std::string key = s.substr(std::char_traits<char>::length(prefix));
+        if (g_activeTheme) {
+            if (auto v = g_activeTheme->ResolveNumber(cat, key)) return v;
+        }
+        WarnUnknownToken(s);
+        return 0.0f;
+    };
+    if (auto v = matchPrefix("$spacing.",     Theme::NumberCategory::Spacing))     return v;
+    if (auto v = matchPrefix("$radius.",      Theme::NumberCategory::Radius))      return v;
+    if (auto v = matchPrefix("$fontSize.",    Theme::NumberCategory::FontSize))    return v;
+    if (auto v = matchPrefix("$borderWidth.", Theme::NumberCategory::BorderWidth)) return v;
+    (void)expected;
+    return std::nullopt;
+}
 
 void SkipWhitespace(const std::string& text, size_t& pos) {
     while (pos < text.size() && isspace(static_cast<unsigned char>(text[pos]))) {
@@ -347,11 +388,24 @@ Thickness ParseThickness(const std::vector<std::string>& values) {
 
 Thickness ParseThickness(const JsonValue& value) {
     Thickness thickness;
+    if (value.IsString()) {
+        if (auto v = TryResolveNumberToken(value.stringValue, Theme::NumberCategory::Spacing)) {
+            return Thickness{*v, *v, *v, *v};
+        }
+    }
     if (value.IsArray() && value.arrayValue.size() == 4) {
-        thickness.left = static_cast<float>(value[0].numberValue);
-        thickness.top = static_cast<float>(value[1].numberValue);
-        thickness.right = static_cast<float>(value[2].numberValue);
-        thickness.bottom = static_cast<float>(value[3].numberValue);
+        // Each element may itself be a number or a "$spacing.x" string token.
+        auto resolveOne = [](const JsonValue& el) -> float {
+            if (el.IsString()) {
+                if (auto v = TryResolveNumberToken(el.stringValue, Theme::NumberCategory::Spacing)) return *v;
+                return 0.0f;
+            }
+            return static_cast<float>(el.numberValue);
+        };
+        thickness.left   = resolveOne(value[0]);
+        thickness.top    = resolveOne(value[1]);
+        thickness.right  = resolveOne(value[2]);
+        thickness.bottom = resolveOne(value[3]);
     } else if (value.IsNumber()) {
         const float v = static_cast<float>(value.numberValue);
         thickness = Thickness{v, v, v, v};
@@ -838,6 +892,9 @@ std::wstring LayoutParser::Utf8ToUtf16(const std::string& utf8) {
 }
 
 Color LayoutParser::ColorFromString(const std::string& value) {
+    if (auto token = TryResolveColorToken(value)) {
+        return *token;
+    }
     return ParseHexColor(value);
 }
 
@@ -849,6 +906,8 @@ std::unique_ptr<UIElement> LayoutParser::BuildFromFile(UIContext& context,
     if (!context.resourceProvider) {
         return nullptr;
     }
+
+    g_activeTheme = context.theme;
 
     IResourceProvider& provider = *context.resourceProvider;
     std::string path = resourcePath;

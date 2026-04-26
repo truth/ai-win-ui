@@ -1,0 +1,101 @@
+{
+  "type": "Panel",
+  "props": {
+    "padding": "$spacing.xl",
+    "spacing": 16,
+    "background": "$color.surface-0",
+    "alignItems": "stretch"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": {
+        "text": "Theme Tokens v1 - Test",
+        "fontSize": 22,
+        "color": "$color.fg-strong"
+      }
+    },
+
+    {
+      "type": "Panel",
+      "props": {
+        "padding": ["$spacing.lg", "$spacing.lg", "$spacing.lg", "$spacing.lg"],
+        "border": [4, 4, 4, 4],
+        "background": "$color.surface-2",
+        "cornerRadius": 8,
+        "spacing": 8
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "Panel: padding=$spacing.lg(16) border=4px bg=$color.surface-2",
+            "fontSize": 14,
+            "color": "$color.fg-muted"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "All values resolved from themes/default.json.",
+            "fontSize": 12,
+            "color": "$color.fg-dim"
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "Button",
+      "props": {
+        "text": "Token Styled Button",
+        "style": {
+          "base": {
+            "background": "$color.btn-bg",
+            "border":     { "width": 1, "color": "$color.border" },
+            "cornerRadius": 4,
+            "foreground": "$color.fg",
+            "fontSize": 14
+          },
+          "hover":   { "background": "$color.btn-bg-hover" },
+          "pressed": { "background": "$color.btn-bg-press" },
+          "focused": { "border": { "width": 2, "color": "$color.border-focus" } }
+        }
+      }
+    },
+
+    {
+      "type": "TextInput",
+      "props": {
+        "text": "Theme-tokenized TextInput"
+      }
+    },
+
+    {
+      "type": "Label",
+      "props": {
+        "text": "Below: deliberately broken token to test magenta fallback + warning",
+        "fontSize": 11,
+        "color": "$color.fg-dim"
+      }
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "background": "$color.does-not-exist",
+        "padding": [12, 12, 12, 12],
+        "cornerRadius": 4
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "If this panel is magenta, fallback works.",
+            "fontSize": 12,
+            "color": "$color.fg"
+          }
+        }
+      ]
+    }
+  ]
+}

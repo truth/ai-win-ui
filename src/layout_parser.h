@@ -45,6 +45,8 @@ public:
     static Color ColorFromString(const std::string& value);
     static std::wstring Utf8ToUtf16(const std::string& utf8);
 
+    static JsonValue ParseJson(const std::string& text);
+
 private:
     static std::unique_ptr<UIElement> BuildFromJson(const JsonValue& node,
                                                     IResourceProvider& provider,
@@ -53,6 +55,5 @@ private:
                                                    IResourceProvider& provider,
                                                    UIEventResolver eventResolver);
 
-    static JsonValue ParseJson(const std::string& text);
     static XmlNode ParseXml(const std::string& text);
 };
