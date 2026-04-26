@@ -26,3 +26,6 @@ third_party/skia-prebuilt/
 
 # vcpkg manifest-mode install tree
 vcpkg_installed/
+
+# Claude Code workspace (per-session plans, agent state, settings)
+.claude/
