@@ -1,0 +1,121 @@
+{
+  "type": "Panel",
+  "props": {
+    "padding": "$spacing.xl",
+    "spacing": "$spacing.lg",
+    "background": "$color.surface-0",
+    "alignItems": "stretch"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": {
+        "text": "SVG Integration v1 - Test",
+        "fontSize": "$fontSize.2xl",
+        "color": "$color.fg-strong"
+      }
+    },
+    {
+      "type": "Label",
+      "props": {
+        "text": "Set AI_WIN_UI_RENDERER=skia to see real SVG output. Default Direct2D shows placeholders.",
+        "fontSize": "$fontSize.sm",
+        "color": "$color.fg-muted"
+      }
+    },
+
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "row",
+        "spacing": "$spacing.lg",
+        "padding": "$spacing.lg",
+        "background": "$color.surface-2",
+        "cornerRadius": "$radius.md",
+        "alignItems": "center"
+      },
+      "children": [
+        {
+          "type": "SvgIcon",
+          "props": { "source": "icons/check.svg", "width": 48, "height": 48 }
+        },
+        {
+          "type": "SvgIcon",
+          "props": { "source": "icons/arrow-right.svg", "width": 48, "height": 48 }
+        },
+        {
+          "type": "SvgIcon",
+          "props": { "source": "icons/star.svg", "width": 48, "height": 48 }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "intrinsic 48x48 (uniform)",
+            "fontSize": "$fontSize.base",
+            "color": "$color.fg"
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "row",
+        "spacing": "$spacing.lg",
+        "padding": "$spacing.lg",
+        "background": "$color.surface-2",
+        "cornerRadius": "$radius.md",
+        "alignItems": "center"
+      },
+      "children": [
+        {
+          "type": "SvgIcon",
+          "props": { "source": "icons/star.svg", "stretch": "fill", "width": 80, "height": 40 }
+        },
+        {
+          "type": "SvgIcon",
+          "props": { "source": "icons/star.svg", "stretch": "uniform", "width": 80, "height": 40 }
+        },
+        {
+          "type": "SvgIcon",
+          "props": { "source": "icons/star.svg", "stretch": "uniformToFill", "width": 80, "height": 40 }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "stretch: fill / uniform / uniformToFill (80x40 box, square SVG)",
+            "fontSize": "$fontSize.sm",
+            "color": "$color.fg-muted"
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "row",
+        "spacing": "$spacing.md",
+        "padding": "$spacing.lg",
+        "background": "$color.surface-2",
+        "cornerRadius": "$radius.md",
+        "alignItems": "center"
+      },
+      "children": [
+        { "type": "SvgIcon", "props": { "source": "icons/check.svg",       "width": 16, "height": 16 } },
+        { "type": "SvgIcon", "props": { "source": "icons/check.svg",       "width": 24, "height": 24 } },
+        { "type": "SvgIcon", "props": { "source": "icons/check.svg",       "width": 48, "height": 48 } },
+        { "type": "SvgIcon", "props": { "source": "icons/check.svg",       "width": 96, "height": 96 } },
+        {
+          "type": "Label",
+          "props": {
+            "text": "scale 16/24/48/96 - bitmaps would blur, vectors stay crisp",
+            "fontSize": "$fontSize.sm",
+            "color": "$color.fg-muted"
+          }
+        }
+      ]
+    }
+  ]
+}
