@@ -1,0 +1,120 @@
+{
+  "type": "Panel",
+  "props": {
+    "padding": [24, 24, 24, 24],
+    "spacing": 16,
+    "background": "#10121A",
+    "alignItems": "stretch"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": {
+        "text": "Style System v1 - Test",
+        "fontSize": 22,
+        "color": "#F3F8FF"
+      }
+    },
+
+    {
+      "type": "Panel",
+      "props": {
+        "padding": [16, 16, 16, 16],
+        "border": [4, 4, 4, 4],
+        "background": "#1A1F2C",
+        "cornerRadius": 8,
+        "spacing": 8
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "Border (4px) inset - content stays inside frame",
+            "fontSize": 14,
+            "color": "#B8C8D9"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "If inset works, this label has 16+4=20px clearance from outer edge.",
+            "fontSize": 12,
+            "color": "#8090A0"
+          }
+        }
+      ]
+    },
+
+    {
+      "type": "Button",
+      "props": {
+        "text": "Custom Styled Button",
+        "style": {
+          "base": {
+            "background": "#1F6F43",
+            "cornerRadius": 6,
+            "border": { "width": 1, "color": "#2EA060" },
+            "foreground": "#EDFFF3",
+            "fontSize": 14
+          },
+          "hover": {
+            "background": "#2A8C57"
+          },
+          "pressed": {
+            "background": "#0E5A33"
+          },
+          "focused": {
+            "border": { "width": 2, "color": "#FFFFFF" }
+          },
+          "disabled": {
+            "background": "#1A1A1A",
+            "foreground": "#666666",
+            "opacity": 0.6
+          }
+        }
+      }
+    },
+
+    {
+      "type": "Button",
+      "props": {
+        "text": "Disabled Button",
+        "disabled": true,
+        "style": {
+          "base": {
+            "background": "#3A3F4A",
+            "cornerRadius": 4,
+            "foreground": "#FFFFFF"
+          },
+          "disabled": {
+            "background": "#1F1F1F",
+            "foreground": "#555555",
+            "opacity": 0.5
+          }
+        }
+      }
+    },
+
+    {
+      "type": "TextInput",
+      "props": {
+        "text": "Focus me - border 1px to 2px without content jump"
+      }
+    },
+
+    {
+      "type": "Label",
+      "props": {
+        "text": "Default Button (DefaultStyle from C++):",
+        "fontSize": 12,
+        "color": "#8090A0"
+      }
+    },
+    {
+      "type": "Button",
+      "props": {
+        "text": "Default Button"
+      }
+    }
+  ]
+}

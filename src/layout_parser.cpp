@@ -352,8 +352,97 @@ Thickness ParseThickness(const JsonValue& value) {
         thickness.top = static_cast<float>(value[1].numberValue);
         thickness.right = static_cast<float>(value[2].numberValue);
         thickness.bottom = static_cast<float>(value[3].numberValue);
+    } else if (value.IsNumber()) {
+        const float v = static_cast<float>(value.numberValue);
+        thickness = Thickness{v, v, v, v};
     }
     return thickness;
+}
+
+BorderSpec ParseBorderSpec(const JsonValue& value) {
+    BorderSpec border;
+    if (!value.IsObject()) {
+        return border;
+    }
+    if (value["width"].IsNumber()) {
+        const float w = static_cast<float>(value["width"].numberValue);
+        border.width = Thickness{w, w, w, w};
+    } else if (value["width"].IsArray() && value["width"].arrayValue.size() == 4) {
+        border.width = ParseThickness(value["width"]);
+    }
+    if (value["color"].IsString()) {
+        border.color = LayoutParser::ColorFromString(value["color"].stringValue);
+    }
+    return border;
+}
+
+StyleSpec ParseStyleSpec(const JsonValue& value) {
+    StyleSpec spec;
+    if (!value.IsObject()) {
+        return spec;
+    }
+    BoxDecoration deco;
+    bool decoTouched = false;
+    if (value["background"].IsString()) {
+        deco.background = LayoutParser::ColorFromString(value["background"].stringValue);
+        decoTouched = true;
+    }
+    if (value["border"].IsObject()) {
+        deco.border = ParseBorderSpec(value["border"]);
+        decoTouched = true;
+    }
+    if (value["cornerRadius"].IsNumber()) {
+        deco.radius = CornerRadius::Uniform(static_cast<float>(value["cornerRadius"].numberValue));
+        decoTouched = true;
+    }
+    if (value["opacity"].IsNumber()) {
+        deco.opacity = static_cast<float>(value["opacity"].numberValue);
+        decoTouched = true;
+        spec.opacity = static_cast<float>(value["opacity"].numberValue);
+    }
+    if (decoTouched) {
+        spec.decoration = deco;
+    }
+    if (value["foreground"].IsString()) {
+        spec.foreground = LayoutParser::ColorFromString(value["foreground"].stringValue);
+    }
+    if (value["fontSize"].IsNumber()) {
+        spec.fontSize = static_cast<float>(value["fontSize"].numberValue);
+    }
+    if (value["padding"].IsArray()) {
+        spec.padding = ParseThickness(value["padding"]);
+    }
+    if (value["margin"].IsArray()) {
+        spec.margin = ParseThickness(value["margin"]);
+    }
+    if (value["borderWidth"].IsArray() || value["borderWidth"].IsNumber()) {
+        spec.border = ParseThickness(value["borderWidth"]);
+    }
+    return spec;
+}
+
+ComponentStyle ParseComponentStyle(const JsonValue& value) {
+    ComponentStyle style;
+    if (!value.IsObject()) {
+        return style;
+    }
+    if (value["base"].IsObject()) {
+        style.base = ParseStyleSpec(value["base"]);
+    }
+    static const struct { const char* key; StyleState state; } kStateKeys[] = {
+        {"hover",    StyleState::Hover},
+        {"pressed",  StyleState::Pressed},
+        {"focused",  StyleState::Focused},
+        {"disabled", StyleState::Disabled},
+        {"selected", StyleState::Selected},
+        {"readonly", StyleState::ReadOnly},
+    };
+    for (const auto& entry : kStateKeys) {
+        if (value[entry.key].IsObject()) {
+            style.overrides[static_cast<std::size_t>(entry.state)] = ParseStyleSpec(value[entry.key]);
+        }
+    }
+    return style;
 }
 
 std::vector<float> ParseNumberList(const std::string& value, char separator = ',') {
@@ -586,6 +675,15 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
     }
     if (props["margin"].IsArray() && props["margin"].arrayValue.size() == 4) {
         element.SetMargin(ParseThickness(props["margin"]));
+    }
+    if (props["border"].IsArray() || props["border"].IsNumber()) {
+        element.SetBorder(ParseThickness(props["border"]));
+    }
+    if (props["style"].IsObject()) {
+        element.SetStyle(ParseComponentStyle(props["style"]));
+    }
+    if (props["disabled"].IsBool() && props["disabled"].boolValue) {
+        element.SetEnabled(false);
     }
     if (props["flexGrow"].IsNumber()) {
         element.SetFlexGrow(static_cast<float>(props["flexGrow"].numberValue));

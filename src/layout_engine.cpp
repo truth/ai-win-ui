@@ -174,6 +174,13 @@ void ApplyMargin(YGNodeRef node, const LayoutSpacing& margin) {
     YGNodeStyleSetMargin(node, YGEdgeBottom, margin.bottom);
 }
 
+void ApplyBorder(YGNodeRef node, const LayoutSpacing& border) {
+    YGNodeStyleSetBorder(node, YGEdgeLeft, border.left);
+    YGNodeStyleSetBorder(node, YGEdgeTop, border.top);
+    YGNodeStyleSetBorder(node, YGEdgeRight, border.right);
+    YGNodeStyleSetBorder(node, YGEdgeBottom, border.bottom);
+}
+
 struct BuiltYogaLayout {
     YogaTree root;
     std::vector<YGNodeRef> childNodes;
@@ -200,13 +207,16 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
     YGNodeStyleSetJustifyContent(root, ToYogaJustify(style.justifyContent));
     YGNodeStyleSetGap(root, style.direction == StackDirection::Row ? YGGutterColumn : YGGutterRow, style.spacing);
     ApplyPadding(root, style.padding);
+    ApplyBorder(root, style.border);
 
     const float clampedWidth = std::max(0.0f, availableWidth);
     const float clampedHeight = std::max(0.0f, availableHeight);
-    const float contentWidth =
-        std::max(0.0f, clampedWidth - style.padding.left - style.padding.right);
-    const float contentHeight =
-        std::max(0.0f, clampedHeight - style.padding.top - style.padding.bottom);
+    const float contentWidth = std::max(
+        0.0f,
+        clampedWidth - style.padding.left - style.padding.right - style.border.left - style.border.right);
+    const float contentHeight = std::max(
+        0.0f,
+        clampedHeight - style.padding.top - style.padding.bottom - style.border.top - style.border.bottom);
 
     if (exactWidth) {
         YGNodeStyleSetWidth(root, clampedWidth);

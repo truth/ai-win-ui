@@ -42,6 +42,7 @@ struct StackLayoutStyle {
     StackDirection direction = StackDirection::Column;
     StackWrap wrap = StackWrap::NoWrap;
     LayoutSpacing padding{};
+    LayoutSpacing border{};
     float spacing = 0.0f;
     StackAlignItems alignItems = StackAlignItems::Stretch;
     StackJustifyContent justifyContent = StackJustifyContent::Start;
@@ -50,6 +51,7 @@ struct StackLayoutStyle {
 struct StackLayoutChild {
     UIElement* element = nullptr;
     LayoutSpacing margin{};
+    LayoutSpacing border{};
 };
 
 class ILayoutEngine {

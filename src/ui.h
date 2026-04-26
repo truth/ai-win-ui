@@ -1,8 +1,10 @@
 #pragma once
 
+#include "box_decoration.h"
 #include "graphics_types.h"
 #include "layout_engine.h"
 #include "renderer.h"
+#include "style.h"
 #include "ui_context.h"
 #include "ui_text_metrics.h"
 
@@ -14,13 +16,6 @@
 #include <map>
 #include <string>
 #include <vector>
-
-struct Thickness {
-    float left = 0;
-    float top = 0;
-    float right = 0;
-    float bottom = 0;
-};
 
 class UIElement {
 public:
@@ -39,6 +34,8 @@ public:
     Size DesiredSize() const { return m_desiredSize; }
     void SetMargin(const Thickness& margin) { m_margin = margin; }
     const Thickness& Margin() const { return m_margin; }
+    void SetBorder(const Thickness& border) { m_border = border; }
+    const Thickness& Border() const { return m_border; }
     void SetFixedWidth(float width) { m_fixedWidth = width; }
     void SetFixedHeight(float height) { m_fixedHeight = height; }
     void SetMinWidth(float width) { m_minWidth = std::max(0.0f, width); }
@@ -105,6 +102,22 @@ public:
 
     virtual bool IsFocusable() const { return false; }
     bool HasFocus() const { return m_hasFocus; }
+    bool IsHovered() const { return m_hovered; }
+    bool IsPressed() const { return m_pressed; }
+    bool IsDisabled() const { return m_disabled; }
+    void SetEnabled(bool enabled) { m_disabled = !enabled; }
+
+    void SetStyle(ComponentStyle style) { m_style = std::move(style); }
+    const ComponentStyle& Style() const { return m_style; }
+    ComponentStyle& MutableStyle() { return m_style; }
+
+    virtual StyleState GetCurrentState() const {
+        if (m_disabled) return StyleState::Disabled;
+        if (m_pressed)  return StyleState::Pressed;
+        if (m_hovered)  return StyleState::Hover;
+        if (m_hasFocus) return StyleState::Focused;
+        return StyleState::Normal;
+    }
 
     virtual bool OnFocus() {
         if (!m_hasFocus) {
@@ -293,6 +306,7 @@ protected:
     Size m_desiredSize{};
     std::vector<std::unique_ptr<UIElement>> m_children;
     Thickness m_margin{};
+    Thickness m_border{};
     float m_fixedWidth = -1.0f;
     float m_fixedHeight = -1.0f;
     float m_minWidth = -1.0f;
@@ -304,6 +318,10 @@ protected:
     float m_flexBasis = -1.0f;
     SelfAlign m_alignSelf = SelfAlign::Auto;
     bool m_hasFocus = false;
+    bool m_hovered = false;
+    bool m_pressed = false;
+    bool m_disabled = false;
+    ComponentStyle m_style{};
     UIContext* m_context = nullptr;
 };
 
@@ -336,9 +354,8 @@ public:
     Thickness padding{8, 8, 8, 8};
     float spacing = 6.0f;
     float cornerRadius = 0.0f;
-    // Default transparent: Render skips fill when alpha<=0 so Panels without
-    // an explicit background let the parent color show through.
     Color background = ColorFromHex(0x000000, 0.0f);
+    Color borderColor = ColorFromHex(0x6A6A6A, 0.0f);
     Direction direction = Direction::Column;
     Wrap wrap = Wrap::NoWrap;
     AlignItems alignItems = AlignItems::Stretch;
@@ -497,10 +514,12 @@ public:
 protected:
     StackLayoutStyle ToStackLayoutStyle() const {
         const Thickness scaledPadding = ScaleThickness(padding);
+        const Thickness scaledBorder = ScaleThickness(Border());
         return StackLayoutStyle{
             direction == Direction::Row ? StackDirection::Row : StackDirection::Column,
             wrap == Wrap::Wrap ? StackWrap::Wrap : StackWrap::NoWrap,
             LayoutSpacing{scaledPadding.left, scaledPadding.top, scaledPadding.right, scaledPadding.bottom},
+            LayoutSpacing{scaledBorder.left, scaledBorder.top, scaledBorder.right, scaledBorder.bottom},
             ScaleValue(spacing),
             static_cast<StackAlignItems>(alignItems),
             static_cast<StackJustifyContent>(justifyContent)
@@ -512,9 +531,11 @@ protected:
         children.reserve(m_children.size());
         for (const auto& child : m_children) {
             const Thickness margin = child->ScaleThickness(child->Margin());
+            const Thickness border = child->ScaleThickness(child->Border());
             children.push_back(StackLayoutChild{
                 child.get(),
-                LayoutSpacing{margin.left, margin.top, margin.right, margin.bottom}
+                LayoutSpacing{margin.left, margin.top, margin.right, margin.bottom},
+                LayoutSpacing{border.left, border.top, border.right, border.bottom}
             });
         }
         return children;
@@ -567,15 +588,17 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
-        // Skip background/border entirely when the color is transparent
-        // (alpha<=0). Lets XML authors opt-out via background="transparent".
-        if (background.a > 0.0f) {
-            const float scaledCornerRadius = ScaleValue(cornerRadius);
-            if (scaledCornerRadius > 0.0f) {
-                renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
-            } else {
-                renderer.FillRect(m_bounds, background);
-            }
+        const Thickness scaledBorder = ScaleThickness(Border());
+        const bool hasBorder =
+            scaledBorder.left > 0.0f || scaledBorder.top > 0.0f ||
+            scaledBorder.right > 0.0f || scaledBorder.bottom > 0.0f;
+        if (background.a > 0.0f || hasBorder) {
+            BoxDecoration deco;
+            deco.background = background;
+            deco.border.width = scaledBorder;
+            deco.border.color = borderColor;
+            deco.radius = CornerRadius::Uniform(ScaleValue(cornerRadius));
+            DrawBoxDecoration(renderer, m_bounds, deco);
         }
         for (auto& child : m_children) {
             child->Render(renderer);
@@ -1460,7 +1483,9 @@ private:
 
 class Button : public UIElement {
 public:
-    explicit Button(std::wstring text) : m_text(std::move(text)) {}
+    explicit Button(std::wstring text) : m_text(std::move(text)) {
+        m_style = DefaultStyle();
+    }
 
     void SetOnClick(std::function<void()> onClick) { m_onClick = std::move(onClick); }
     void SetText(std::wstring text) { m_text = std::move(text); }
@@ -1469,6 +1494,38 @@ public:
     float fontSize = 14.0f;
     Color background = ColorFromHex(0x2D2D30);
     Color foreground = ColorFromHex(0xFFFFFF);
+
+    static ComponentStyle DefaultStyle() {
+        ComponentStyle s;
+        BoxDecoration normalDeco;
+        normalDeco.background = ColorFromHex(0x2D2D30);
+        normalDeco.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
+        normalDeco.border.color = ColorFromHex(0x6A6A6A);
+        normalDeco.radius = CornerRadius::Uniform(4.0f);
+        s.base.decoration = normalDeco;
+        s.base.foreground = ColorFromHex(0xFFFFFF);
+
+        BoxDecoration hoverDeco = normalDeco;
+        hoverDeco.background = ColorFromHex(0x3E3E42);
+        s.overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hoverDeco;
+
+        BoxDecoration pressedDeco = normalDeco;
+        pressedDeco.background = ColorFromHex(0x0E639C);
+        s.overrides[static_cast<std::size_t>(StyleState::Pressed)].decoration = pressedDeco;
+
+        BoxDecoration focusedDeco = normalDeco;
+        focusedDeco.border.width = Thickness{2.0f, 2.0f, 2.0f, 2.0f};
+        focusedDeco.border.color = ColorFromHex(0xFFFFFF);
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focusedDeco;
+
+        BoxDecoration disabledDeco = normalDeco;
+        disabledDeco.background = ColorFromHex(0x1F1F1F);
+        disabledDeco.border.color = ColorFromHex(0x3A3A3A);
+        s.overrides[static_cast<std::size_t>(StyleState::Disabled)].decoration = disabledDeco;
+        s.overrides[static_cast<std::size_t>(StyleState::Disabled)].opacity = 0.6f;
+
+        return s;
+    }
 
     bool IsFocusable() const override { return true; }
 
@@ -1530,27 +1587,20 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
-        Color bg = background;
-        if (m_pressed && m_hovered) {
-            bg = ColorFromHex(0x0E639C);
-        } else if (m_hovered) {
-            bg = ColorFromHex(0x3E3E42);
+        SyncQuickSetToStyle();
+        const StyleSpec resolved = m_style.Resolve(GetCurrentState());
+        BoxDecoration deco = resolved.decoration.value_or(BoxDecoration{});
+        deco.radius = CornerRadius::Uniform(ScaleValue(cornerRadius));
+        deco.border.width = Thickness{
+            ScaleValue(deco.border.width.left),
+            ScaleValue(deco.border.width.top),
+            ScaleValue(deco.border.width.right),
+            ScaleValue(deco.border.width.bottom)
+        };
+        if (resolved.opacity.has_value()) {
+            deco.opacity = *resolved.opacity;
         }
-
-        const float scaledCornerRadius = ScaleValue(cornerRadius);
-        if (scaledCornerRadius > 0.0f) {
-            renderer.FillRoundedRect(m_bounds, bg, scaledCornerRadius);
-            renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x6A6A6A), 1.0f, scaledCornerRadius);
-            if (m_hasFocus) {
-                renderer.DrawRoundedRect(m_bounds, ColorFromHex(0xFFFFFF), 2.0f, scaledCornerRadius);
-            }
-        } else {
-            renderer.FillRect(m_bounds, bg);
-            renderer.DrawRect(m_bounds, ColorFromHex(0x6A6A6A), 1.0f);
-            if (m_hasFocus) {
-                renderer.DrawRect(m_bounds, ColorFromHex(0xFFFFFF), 2.0f);
-            }
-        }
+        DrawBoxDecoration(renderer, m_bounds, deco);
 
         Rect textRect = m_bounds;
         textRect.left += ScaleValue(10.0f);
@@ -1559,15 +1609,29 @@ public:
             TextHorizontalAlign::Center,
             TextVerticalAlign::Center
         };
+        const Color fg = resolved.foreground.value_or(foreground);
+        const float fs = resolved.fontSize.value_or(fontSize);
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
             textRect,
-            foreground,
-            ScaleValue(fontSize),
+            fg,
+            ScaleValue(fs),
             textOptions
         );
     }
+
+private:
+    void SyncQuickSetToStyle() {
+        if (!m_style.base.decoration.has_value()) {
+            m_style.base.decoration = BoxDecoration{};
+        }
+        m_style.base.decoration->background = background;
+        m_style.base.foreground = foreground;
+        m_style.base.fontSize  = fontSize;
+    }
+
+public:
 
     bool OnMouseMove(float x, float y) override {
         const bool nextHovered = HitTest(x, y);
@@ -1607,14 +1671,38 @@ public:
 
 private:
     std::wstring m_text;
-    bool m_hovered = false;
-    bool m_pressed = false;
     std::function<void()> m_onClick;
 };
 
 class TextInput : public UIElement {
 public:
-    explicit TextInput(std::wstring text = L"") : m_text(std::move(text)), m_caretPosition(m_text.size()) {}
+    explicit TextInput(std::wstring text = L"") : m_text(std::move(text)), m_caretPosition(m_text.size()) {
+        m_style = DefaultStyle();
+    }
+
+    static ComponentStyle DefaultStyle() {
+        ComponentStyle s;
+        BoxDecoration normalDeco;
+        normalDeco.background = ColorFromHex(0x1F1F1F);
+        normalDeco.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
+        normalDeco.border.color = ColorFromHex(0x6A6A6A);
+        normalDeco.radius = CornerRadius::Uniform(4.0f);
+        s.base.decoration = normalDeco;
+        s.base.foreground = ColorFromHex(0xEDEDED);
+
+        BoxDecoration focusedDeco = normalDeco;
+        focusedDeco.border.width = Thickness{2.0f, 2.0f, 2.0f, 2.0f};
+        focusedDeco.border.color = ColorFromHex(0xFFFFFF);
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focusedDeco;
+
+        BoxDecoration disabledDeco = normalDeco;
+        disabledDeco.background = ColorFromHex(0x171717);
+        disabledDeco.border.color = ColorFromHex(0x3A3A3A);
+        s.overrides[static_cast<std::size_t>(StyleState::Disabled)].decoration = disabledDeco;
+        s.overrides[static_cast<std::size_t>(StyleState::Disabled)].opacity = 0.6f;
+
+        return s;
+    }
 
     bool IsFocusable() const override { return true; }
 
@@ -1937,12 +2025,20 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
-        const float scaledCornerRadius = ScaleValue(cornerRadius);
-        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
-        if (m_hasFocus) {
-            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
+        SyncQuickSetToStyle();
+        const StyleSpec resolved = m_style.Resolve(GetCurrentState());
+        BoxDecoration deco = resolved.decoration.value_or(BoxDecoration{});
+        deco.radius = CornerRadius::Uniform(ScaleValue(cornerRadius));
+        deco.border.width = Thickness{
+            ScaleValue(deco.border.width.left),
+            ScaleValue(deco.border.width.top),
+            ScaleValue(deco.border.width.right),
+            ScaleValue(deco.border.width.bottom)
+        };
+        if (resolved.opacity.has_value()) {
+            deco.opacity = *resolved.opacity;
         }
+        DrawBoxDecoration(renderer, m_bounds, deco);
 
         Rect textRect = m_bounds;
         textRect.left += ScaleValue(8.0f);
@@ -1974,11 +2070,12 @@ public:
             TextHorizontalAlign::Start,
             TextVerticalAlign::Center
         };
+        const Color fg = resolved.foreground.value_or(textColor);
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
             textRect,
-            textColor,
+            fg,
             ScaleValue(fontSize),
             textOptions);
 
@@ -1997,10 +2094,22 @@ public:
                 std::max(1.0f, textRect.right - textRect.left),
                 TextWrapMode::NoWrap).height;
             if (m_showCaret) {
-                renderer.DrawRect(Rect::Make(caretX, caretTop, caretX + ScaleValue(1.0f), caretBottom), textColor, 1.0f);
+                renderer.DrawRect(Rect::Make(caretX, caretTop, caretX + ScaleValue(1.0f), caretBottom), fg, 1.0f);
             }
         }
     }
+
+private:
+    void SyncQuickSetToStyle() {
+        if (!m_style.base.decoration.has_value()) {
+            m_style.base.decoration = BoxDecoration{};
+        }
+        m_style.base.decoration->background = background;
+        m_style.base.foreground = textColor;
+        m_style.base.fontSize  = fontSize;
+    }
+
+public:
 
 private:
     std::wstring m_text;
@@ -2164,7 +2273,6 @@ public:
 private:
     std::wstring m_text;
     bool m_checked = false;
-    bool m_pressed = false;
     Color textColor = ColorFromHex(0xEDEDED);
     float fontSize = 14.0f;
 };
@@ -2302,7 +2410,6 @@ private:
     std::wstring m_text;
     std::wstring m_group;
     bool m_checked = false;
-    bool m_pressed = false;
     Color textColor = ColorFromHex(0xEDEDED);
     float fontSize = 14.0f;
     inline static std::map<std::wstring, std::vector<RadioButton*>> s_groups;
