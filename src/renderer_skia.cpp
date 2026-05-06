@@ -41,6 +41,61 @@ SkRect ToSkRect(const Rect& rect) {
     return SkRect::MakeLTRB(rect.left, rect.top, rect.right, rect.bottom);
 }
 
+void DrawSimpleTextWithFallback(SkCanvas* canvas,
+                                const std::wstring& text,
+                                float x,
+                                float baseline,
+                                float fontSize,
+                                SkTypeface* defaultTypeface,
+                                SkFontMgr* fontMgr,
+                                const SkPaint& paint) {
+    if (!canvas || text.empty()) {
+        return;
+    }
+
+    const uint32_t len = static_cast<uint32_t>(text.size());
+    if (skia_font::TypefaceSupportsText(defaultTypeface, text.c_str(), len)) {
+        SkFont font = skia_font::CreateSkiaFont(fontSize, defaultTypeface);
+        const std::string utf8 = skia_font::WideToUtf8(text.c_str(), len);
+        if (!utf8.empty()) {
+            canvas->drawSimpleText(
+                utf8.data(),
+                utf8.size(),
+                SkTextEncoding::kUTF8,
+                x,
+                baseline,
+                font,
+                paint);
+        }
+        return;
+    }
+
+    float runX = x;
+    for (uint32_t i = 0; i < len;) {
+        uint32_t units = 0;
+        const SkUnichar ch = skia_font::DecodeUtf16At(text.c_str(), len, i, &units);
+        if (units == 0) {
+            break;
+        }
+
+        sk_sp<SkTypeface> typeface = skia_font::MatchTypefaceForCharacter(fontMgr, defaultTypeface, ch);
+        SkFont font = skia_font::CreateSkiaFont(fontSize, typeface.get());
+        const std::string utf8 = skia_font::WideToUtf8(text.c_str() + i, units);
+        if (!utf8.empty()) {
+            canvas->drawSimpleText(
+                utf8.data(),
+                utf8.size(),
+                SkTextEncoding::kUTF8,
+                runX,
+                baseline,
+                font,
+                paint);
+            runX += font.measureText(utf8.data(), utf8.size(), SkTextEncoding::kUTF8);
+        }
+        i += units;
+    }
+}
+
 class SkiaBitmapResource final : public BitmapResource {
 public:
     explicit SkiaBitmapResource(sk_sp<SkImage> image)
@@ -294,13 +349,6 @@ public:
                     break;
                 }
 
-                const std::string utf8 = skia_font::WideToUtf8(
-                    layout.lines[i].text.c_str(),
-                    static_cast<UINT32>(layout.lines[i].text.size()));
-                if (utf8.empty() && !layout.lines[i].text.empty()) {
-                    continue;
-                }
-
                 float drawX = rect.left;
                 if (options.horizontalAlign == TextHorizontalAlign::Center) {
                     drawX = rect.left + std::max(0.0f, (rect.Width() - layout.lines[i].width) * 0.5f);
@@ -308,13 +356,14 @@ public:
                     drawX = rect.right - layout.lines[i].width;
                 }
 
-                canvas->drawSimpleText(
-                    utf8.data(),
-                    utf8.size(),
-                    SkTextEncoding::kUTF8,
+                DrawSimpleTextWithFallback(
+                    canvas,
+                    layout.lines[i].text,
                     drawX,
                     baseline,
-                    font,
+                    fontSize,
+                    m_defaultTypeface.get(),
+                    m_fontMgr.get(),
                     paint);
             }
 

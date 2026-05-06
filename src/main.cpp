@@ -12,6 +12,7 @@
 #include <Windowsx.h>
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <memory>
 #include <string>
 #include <vector>
@@ -537,6 +538,15 @@ private:
     }
 
     bool OnKeyDown(WPARAM wParam, LPARAM lParam) {
+        if (wParam == VK_TAB) {
+            MoveFocus((GetKeyState(VK_SHIFT) & 0x8000) != 0);
+            return true;
+        }
+
+        if (m_focusedElement && m_focusedElement->OnKeyDown(wParam, lParam)) {
+            return true;
+        }
+
         switch (wParam) {
             case VK_PRIOR:
                 return ScrollBy(-std::max(48.0f, m_viewportHeight * 0.85f));
@@ -549,13 +559,6 @@ private:
             default:
                 break;
         }
-        if (wParam == VK_TAB) {
-            MoveFocus((GetKeyState(VK_SHIFT) & 0x8000) != 0);
-            return true;
-        }
-        if (m_focusedElement && m_focusedElement->OnKeyDown(wParam, lParam)) {
-            return true;
-        }
         return false;
     }
 
@@ -564,6 +567,30 @@ private:
             return true;
         }
         return false;
+    }
+
+    bool OnTextChar(wchar_t ch) {
+        return m_focusedElement && m_focusedElement->OnChar(ch);
+    }
+
+    bool OnUnicodeChar(WPARAM wParam) {
+        if (wParam == UNICODE_NOCHAR) {
+            return true;
+        }
+        if (wParam == 0 || wParam > 0x10FFFF) {
+            return false;
+        }
+
+        if (wParam <= 0xFFFF) {
+            return OnTextChar(static_cast<wchar_t>(wParam));
+        }
+
+        const uint32_t codepoint = static_cast<uint32_t>(wParam - 0x10000);
+        const wchar_t high = static_cast<wchar_t>(0xD800 + (codepoint >> 10));
+        const wchar_t low = static_cast<wchar_t>(0xDC00 + (codepoint & 0x3FF));
+        const bool insertedHigh = OnTextChar(high);
+        const bool insertedLow = OnTextChar(low);
+        return insertedHigh || insertedLow;
     }
 
     bool ScrollBy(float delta) {
@@ -731,17 +758,26 @@ private:
                 return 0;
             case WM_KEYDOWN:
                 if (OnKeyDown(wParam, lParam)) {
+                    InvalidateRect(m_hwnd, nullptr, FALSE);
                     return 0;
                 }
                 break;
             case WM_CHAR:
-                if (m_focusedElement && m_focusedElement->OnChar(static_cast<wchar_t>(wParam))) {
+            case WM_IME_CHAR:
+                if (OnTextChar(static_cast<wchar_t>(wParam))) {
+                    InvalidateRect(m_hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                break;
+            case WM_UNICHAR:
+                if (OnUnicodeChar(wParam)) {
                     InvalidateRect(m_hwnd, nullptr, FALSE);
                     return 0;
                 }
                 break;
             case WM_KEYUP:
                 if (OnKeyUp(wParam, lParam)) {
+                    InvalidateRect(m_hwnd, nullptr, FALSE);
                     return 0;
                 }
                 break;

@@ -23,13 +23,16 @@ std::wstring TrimTrailingWhitespace(const std::wstring& value) {
     return value.substr(0, end);
 }
 
-float MeasureWideTextWidth(const SkFont& font, const std::wstring& text) {
-    const std::string utf8 = skia_font::WideToUtf8(text.c_str(), static_cast<uint32_t>(text.size()));
-    if (utf8.empty()) {
-        return 0.0f;
-    }
-
-    return font.measureText(utf8.data(), utf8.size(), SkTextEncoding::kUTF8);
+float MeasureWideTextWidth(SkFontMgr* fontMgr,
+                           SkTypeface* defaultTypeface,
+                           float fontSize,
+                           const std::wstring& text) {
+    return skia_font::MeasureTextWidthWithFallback(
+        fontMgr,
+        defaultTypeface,
+        fontSize,
+        text.c_str(),
+        static_cast<uint32_t>(text.size()));
 }
 
 std::vector<std::wstring> SplitWideLines(const wchar_t* text, uint32_t len) {
@@ -63,13 +66,15 @@ std::vector<std::wstring> SplitWideLines(const wchar_t* text, uint32_t len) {
 }
 
 std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
-                                             const SkFont& font,
+                                             SkFontMgr* fontMgr,
+                                             SkTypeface* defaultTypeface,
+                                             float fontSize,
                                              float maxWidth) {
     if (line.empty()) {
         return {SkiaTextLayoutLine{}};
     }
 
-    const float unwrappedWidth = MeasureWideTextWidth(font, line);
+    const float unwrappedWidth = MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, line);
     if (maxWidth <= 1.0f || unwrappedWidth <= maxWidth) {
         return {SkiaTextLayoutLine{line, unwrappedWidth}};
     }
@@ -97,13 +102,13 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
                 lastWhitespaceBreak = i;
             }
 
-            if (MeasureWideTextWidth(font, candidate) <= maxWidth) {
+            if (MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, candidate) <= maxWidth) {
                 continue;
             }
 
             // Single character exceeds maxWidth — emit it anyway and move on.
             if (candidate.size() == 1) {
-                wrapped.push_back(SkiaTextLayoutLine{candidate, MeasureWideTextWidth(font, candidate)});
+                wrapped.push_back(SkiaTextLayoutLine{candidate, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, candidate)});
                 lineStart = i + 1;
                 emitted = true;
                 break;
@@ -120,11 +125,11 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
                 } else {
                     lineStart = lastWhitespaceBreak + 1;
                 }
-                wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(font, segment)});
+                wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, segment)});
             } else {
                 // No whitespace boundary found — break the word at the overflow point.
                 const std::wstring segment = candidate.substr(0, candidate.size() - 1);
-                wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(font, segment)});
+                wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, segment)});
                 lineStart = i;
             }
 
@@ -135,7 +140,7 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
         if (!emitted) {
             // Remaining text fits within maxWidth.
             std::wstring segment = TrimTrailingWhitespace(line.substr(lineStart));
-            wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(font, segment)});
+            wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, segment)});
             break;
         }
     }
@@ -148,18 +153,20 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
 
 std::vector<SkiaTextLayoutLine> LayoutTextLines(const wchar_t* text,
                                                 uint32_t len,
-                                                const SkFont& font,
+                                                SkFontMgr* fontMgr,
+                                                SkTypeface* defaultTypeface,
+                                                float fontSize,
                                                 float maxWidth,
                                                 TextWrapMode wrapMode) {
     const std::vector<std::wstring> splitLines = SplitWideLines(text, len);
     if (wrapMode == TextWrapMode::NoWrap) {
         const std::wstring firstLine = splitLines.empty() ? std::wstring{} : splitLines.front();
-        return {SkiaTextLayoutLine{firstLine, MeasureWideTextWidth(font, firstLine)}};
+        return {SkiaTextLayoutLine{firstLine, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, firstLine)}};
     }
 
     std::vector<SkiaTextLayoutLine> wrappedLines;
     for (const std::wstring& line : splitLines) {
-        const auto wrapped = WrapWideLine(line, font, maxWidth);
+        const auto wrapped = WrapWideLine(line, fontMgr, defaultTypeface, fontSize, maxWidth);
         wrappedLines.insert(wrappedLines.end(), wrapped.begin(), wrapped.end());
     }
     if (wrappedLines.empty()) {
@@ -168,9 +175,15 @@ std::vector<SkiaTextLayoutLine> LayoutTextLines(const wchar_t* text,
     return wrappedLines;
 }
 
-SkFont CreateDefaultFont(float fontSize) {
+SkFont CreateDefaultFont(float fontSize, SkFontMgr** fontMgrOut = nullptr, SkTypeface** typefaceOut = nullptr) {
     static sk_sp<SkFontMgr> s_fontMgr = skia_font::CreateDefaultFontManager();
     static sk_sp<SkTypeface> s_typeface = skia_font::CreateDefaultTypeface(s_fontMgr.get());
+    if (fontMgrOut) {
+        *fontMgrOut = s_fontMgr.get();
+    }
+    if (typefaceOut) {
+        *typefaceOut = s_typeface.get();
+    }
     return skia_font::CreateSkiaFont(fontSize, s_typeface.get());
 }
 
@@ -191,12 +204,14 @@ bool CreateSkiaTextLayout(const wchar_t* text,
         return true;
     }
 
-    SkFont font = CreateDefaultFont(fontSize);
+    SkFontMgr* fontMgr = nullptr;
+    SkTypeface* defaultTypeface = nullptr;
+    SkFont font = CreateDefaultFont(fontSize, &fontMgr, &defaultTypeface);
     if (!font.getTypeface()) {
         return false;
     }
 
-    layout->lines = LayoutTextLines(text, len, font, std::max(1.0f, maxWidth), wrapMode);
+    layout->lines = LayoutTextLines(text, len, fontMgr, defaultTypeface, fontSize, std::max(1.0f, maxWidth), wrapMode);
 
     SkFontMetrics metrics{};
     font.getMetrics(&metrics);

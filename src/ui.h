@@ -1957,6 +1957,9 @@ public:
     }
 
     bool OnChar(wchar_t ch) override {
+        if (ch == L'\b') {
+            return true;
+        }
         if (ch >= L' ' && ch != 0x7F) {
             if (HasSelection()) {
                 DeleteSelection();
@@ -2041,12 +2044,8 @@ public:
         size_t newCaret = m_text.size();
         for (size_t i = 0; i <= m_text.size(); ++i) {
             const std::wstring prefix = m_text.substr(0, i);
-            const Size metrics = MeasureTextValue(
-                prefix.empty() ? L" " : prefix,
-                fontSize,
-                std::max(1.0f, textRect.right - textRect.left),
-                TextWrapMode::NoWrap);
-            if (localX < metrics.width + ScaleValue(4.0f)) {
+            const float prefixWidth = MeasureNoWrapTextWidth(prefix, textRect.Width());
+            if (localX < prefixWidth + ScaleValue(4.0f)) {
                 newCaret = i;
                 break;
             }
@@ -2112,28 +2111,23 @@ public:
         }
         DrawBoxDecoration(renderer, m_bounds, deco);
 
-        Rect textRect = m_bounds;
-        textRect.left += ScaleValue(8.0f);
-        textRect.top += ScaleValue(6.0f);
+        const Rect textRect = ContentRect();
+        const Rect lineRect = TextLineRect(textRect);
         if (HasSelection()) {
             const auto [selStart, selEnd] = GetSelectionRange();
             std::wstring prefix = m_text.substr(0, selStart);
             std::wstring selection = m_text.substr(selStart, selEnd - selStart);
-            const Size prefixMetrics = MeasureTextValue(
-                prefix.empty() ? L" " : prefix,
-                fontSize,
-                std::max(1.0f, textRect.right - textRect.left),
-                TextWrapMode::NoWrap);
+            const float prefixWidth = MeasureNoWrapTextWidth(prefix, textRect.Width());
             const Size selectionMetrics = MeasureTextValue(
                 selection.empty() ? L" " : selection,
                 fontSize,
-                std::max(1.0f, textRect.right - textRect.left),
+                std::max(1.0f, textRect.Width()),
                 TextWrapMode::NoWrap);
             Rect selectionRect = Rect::Make(
-                textRect.left + prefixMetrics.width,
-                textRect.top,
-                textRect.left + prefixMetrics.width + selectionMetrics.width,
-                textRect.top + selectionMetrics.height
+                lineRect.left + prefixWidth,
+                lineRect.top,
+                lineRect.left + prefixWidth + selectionMetrics.width,
+                lineRect.bottom
             );
             renderer.FillRect(selectionRect, ColorFromHex(0x3A86FF));
         }
@@ -2146,25 +2140,16 @@ public:
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
-            textRect,
+            lineRect,
             fg,
             ScaleValue(fontSize),
             textOptions);
 
         if (m_hasFocus) {
             const std::wstring prefix = m_text.substr(0, m_caretPosition);
-            const Size caretMetrics = MeasureTextValue(
-                prefix.empty() ? L" " : prefix,
-                fontSize,
-                std::max(1.0f, textRect.right - textRect.left),
-                TextWrapMode::NoWrap);
-            const float caretX = textRect.left + caretMetrics.width;
-            const float caretTop = textRect.top;
-            const float caretBottom = textRect.top + MeasureTextValue(
-                L"|",
-                fontSize,
-                std::max(1.0f, textRect.right - textRect.left),
-                TextWrapMode::NoWrap).height;
+            const float caretX = lineRect.left + MeasureNoWrapTextWidth(prefix, textRect.Width());
+            const float caretTop = lineRect.top;
+            const float caretBottom = lineRect.bottom;
             if (m_showCaret) {
                 renderer.DrawRect(Rect::Make(caretX, caretTop, caretX + ScaleValue(1.0f), caretBottom), fg, 1.0f);
             }
@@ -2224,6 +2209,38 @@ private:
     void ResetCaretBlink() {
         m_showCaret = true;
         m_lastBlink = GetTickCount();
+    }
+
+    Rect ContentRect() const {
+        const float horizontalInset = ScaleValue(8.0f);
+        const float verticalInset = ScaleValue(6.0f);
+        return Rect::Make(
+            m_bounds.left + horizontalInset,
+            m_bounds.top + verticalInset,
+            std::max(m_bounds.left + horizontalInset, m_bounds.right - horizontalInset),
+            std::max(m_bounds.top + verticalInset, m_bounds.bottom - verticalInset));
+    }
+
+    Rect TextLineRect(const Rect& contentRect) const {
+        const Size metrics = MeasureTextValue(
+            m_text.empty() ? L" " : m_text,
+            fontSize,
+            std::max(1.0f, contentRect.Width()),
+            TextWrapMode::NoWrap);
+        const float lineHeight = std::min(contentRect.Height(), std::max(1.0f, metrics.height));
+        const float top = contentRect.top + std::max(0.0f, (contentRect.Height() - lineHeight) * 0.5f);
+        return Rect::Make(contentRect.left, top, contentRect.right, top + lineHeight);
+    }
+
+    float MeasureNoWrapTextWidth(const std::wstring& text, float maxWidth) const {
+        if (text.empty()) {
+            return 0.0f;
+        }
+        return MeasureTextValue(
+            text,
+            fontSize,
+            std::max(1.0f, maxWidth),
+            TextWrapMode::NoWrap).width;
     }
 
     bool m_isDragging = false;
