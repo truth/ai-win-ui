@@ -1,0 +1,40 @@
+<Panel direction="column" background="#0F172A" padding="24,24,24,24" spacing="14">
+  <Panel direction="column" background="#172033" padding="18,18,18,18" spacing="8" cornerRadius="14">
+    <Label text="中文彩色文本与背景渲染测试" fontSize="26" color="#FFFFFF" />
+    <Label text="Skia CJK fallback, text colors, panel backgrounds, TextInput background, and Button background." fontSize="15" color="#BFD0E4" />
+  </Panel>
+
+  <Panel direction="row" spacing="12" background="transparent" padding="0,0,0,0">
+    <Panel direction="column" background="#FEF3C7" padding="14,14,14,14" spacing="6" cornerRadius="12">
+      <Label text="浅色背景" fontSize="18" color="#92400E" />
+      <Label text="中文文本：暖色卡片" fontSize="15" color="#B45309" />
+      <Label text="English + 中文 + 123" fontSize="14" color="#7C2D12" />
+    </Panel>
+    <Panel direction="column" background="#DBEAFE" padding="14,14,14,14" spacing="6" cornerRadius="12">
+      <Label text="蓝色浅背景" fontSize="18" color="#1D4ED8" />
+      <Label text="中文文本：测量宽度" fontSize="15" color="#1E40AF" />
+      <Label text="繁體中文：顏色測試" fontSize="14" color="#1E3A8A" />
+    </Panel>
+    <Panel direction="column" background="#DCFCE7" padding="14,14,14,14" spacing="6" cornerRadius="12">
+      <Label text="绿色浅背景" fontSize="18" color="#166534" />
+      <Label text="日本語かなカナ" fontSize="15" color="#15803D" />
+      <Label text="한국어 테스트" fontSize="14" color="#14532D" />
+    </Panel>
+  </Panel>
+
+  <Panel direction="column" background="#111827" padding="16,16,16,16" spacing="10" cornerRadius="14">
+    <Label text="深色背景上的高对比彩色文本" fontSize="18" color="#FFFFFF" />
+    <Label text="红色中文文本：错误 / 警告 / 删除" fontSize="15" color="#F87171" />
+    <Label text="黄色中文文本：提醒 / 处理中 / 等待确认" fontSize="15" color="#FBBF24" />
+    <Label text="青色中文文本：信息 / 状态 / 链接" fontSize="15" color="#22D3EE" />
+    <Label text="紫色中文文本：高级设置 / 主题 / 动画" fontSize="15" color="#C084FC" />
+  </Panel>
+
+  <Panel direction="column" background="#FFFFFF" padding="16,16,16,16" spacing="10" cornerRadius="14">
+    <Label text="白色背景上的中文文本" fontSize="18" color="#111827" />
+    <Label text="长文本换行：这是一个用于测试 Skia 中文字体 fallback、宽度测量、换行和裁剪行为的段落。" fontSize="15" color="#374151" />
+  </Panel>
+
+  <TextInput text="输入框中文：可以测试拼音输入、退格、候选框位置" height="48" fontSize="16" background="#1E293B" textColor="#FFFFFF" cornerRadius="10" />
+  <Button text="按钮中文文本 - 确认渲染" height="46" fontSize="16" background="#2563EB" foreground="#FFFFFF" cornerRadius="10" />
+</Panel>

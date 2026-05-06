@@ -71,28 +71,62 @@ void DrawSimpleTextWithFallback(SkCanvas* canvas,
     }
 
     float runX = x;
-    for (uint32_t i = 0; i < len;) {
+    uint32_t runStart = 0;
+    sk_sp<SkTypeface> currentTypeface = nullptr;
+    uint32_t i = 0;
+
+    for (; i < len;) {
         uint32_t units = 0;
         const SkUnichar ch = skia_font::DecodeUtf16At(text.c_str(), len, i, &units);
         if (units == 0) {
             break;
         }
 
-        sk_sp<SkTypeface> typeface = skia_font::MatchTypefaceForCharacter(fontMgr, defaultTypeface, ch);
-        SkFont font = skia_font::CreateSkiaFont(fontSize, typeface.get());
-        const std::string utf8 = skia_font::WideToUtf8(text.c_str() + i, units);
-        if (!utf8.empty()) {
+        sk_sp<SkTypeface> charTypeface = skia_font::MatchTypefaceForCharacter(fontMgr, defaultTypeface, ch);
+
+        if (i == 0) {
+            currentTypeface = charTypeface;
+        } else {
+            bool sameTypeface = false;
+            if (currentTypeface.get() == charTypeface.get() && currentTypeface.get() == defaultTypeface) {
+                sameTypeface = true;
+            }
+
+            if (!sameTypeface) {
+                SkFont font = skia_font::CreateSkiaFont(fontSize, currentTypeface.get());
+                const std::string runUtf8 = skia_font::WideToUtf8(text.c_str() + runStart, i - runStart);
+                if (!runUtf8.empty()) {
+                    canvas->drawSimpleText(
+                        runUtf8.data(),
+                        runUtf8.size(),
+                        SkTextEncoding::kUTF8,
+                        runX,
+                        baseline,
+                        font,
+                        paint);
+                    runX += font.measureText(runUtf8.data(), runUtf8.size(), SkTextEncoding::kUTF8);
+                }
+                runStart = i;
+                currentTypeface = charTypeface;
+            }
+        }
+
+        i += units;
+    }
+
+    if (runStart < i && currentTypeface) {
+        SkFont font = skia_font::CreateSkiaFont(fontSize, currentTypeface.get());
+        const std::string runUtf8 = skia_font::WideToUtf8(text.c_str() + runStart, i - runStart);
+        if (!runUtf8.empty()) {
             canvas->drawSimpleText(
-                utf8.data(),
-                utf8.size(),
+                runUtf8.data(),
+                runUtf8.size(),
                 SkTextEncoding::kUTF8,
                 runX,
                 baseline,
                 font,
                 paint);
-            runX += font.measureText(utf8.data(), utf8.size(), SkTextEncoding::kUTF8);
         }
-        i += units;
     }
 }
 

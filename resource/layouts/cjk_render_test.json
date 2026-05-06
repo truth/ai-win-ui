@@ -1,0 +1,105 @@
+{
+  "type": "Panel",
+  "props": {
+    "direction": "column",
+    "background": "#0F172A",
+    "padding": [24, 24, 24, 24],
+    "spacing": 14
+  },
+  "children": [
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "column",
+        "background": "#172033",
+        "padding": [18, 18, 18, 18],
+        "spacing": 8,
+        "cornerRadius": 14
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "中文彩色文本与背景渲染测试",
+            "fontSize": 26,
+            "color": "#FFFFFF"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "JSON Unicode escape test: 中文 + English + 123",
+            "fontSize": 15,
+            "color": "#BFD0E4"
+          }
+        }
+      ]
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "column",
+        "background": "#111827",
+        "padding": [16, 16, 16, 16],
+        "spacing": 10,
+        "cornerRadius": 14
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "红色中文文本",
+            "fontSize": 16,
+            "color": "#F87171"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "青色中文文本",
+            "fontSize": 16,
+            "color": "#22D3EE"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "繁體中文：顏色測試",
+            "fontSize": 16,
+            "color": "#C084FC"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "日本語かなカナ / 한국어 테스트",
+            "fontSize": 16,
+            "color": "#FBBF24"
+          }
+        }
+      ]
+    },
+    {
+      "type": "TextInput",
+      "props": {
+        "text": "输入框中文：拼音输入、退格、候选框",
+        "height": 48,
+        "fontSize": 16,
+        "background": "#1E293B",
+        "textColor": "#FFFFFF",
+        "cornerRadius": 10
+      }
+    },
+    {
+      "type": "Button",
+      "props": {
+        "text": "按钮中文文本 - 确认渲染",
+        "height": 46,
+        "fontSize": 16,
+        "background": "#2563EB",
+        "foreground": "#FFFFFF",
+        "cornerRadius": 10
+      }
+    }
+  ]
+}

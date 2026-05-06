@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cstdint>
 #include <optional>
 #include <stdexcept>
 #include <sstream>
@@ -78,6 +79,105 @@ bool Matches(const std::string& text, size_t pos, const std::string& token) {
     return text.compare(pos, token.size(), token) == 0;
 }
 
+void AppendUtf8Codepoint(std::string& out, uint32_t cp) {
+    if (cp <= 0x7F) {
+        out.push_back(static_cast<char>(cp));
+    } else if (cp <= 0x7FF) {
+        out.push_back(static_cast<char>(0xC0 | (cp >> 6)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp <= 0xFFFF) {
+        out.push_back(static_cast<char>(0xE0 | (cp >> 12)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    } else if (cp <= 0x10FFFF) {
+        out.push_back(static_cast<char>(0xF0 | (cp >> 18)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 12) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | ((cp >> 6) & 0x3F)));
+        out.push_back(static_cast<char>(0x80 | (cp & 0x3F)));
+    }
+}
+
+int HexValue(char ch) {
+    if (ch >= '0' && ch <= '9') return ch - '0';
+    if (ch >= 'a' && ch <= 'f') return 10 + (ch - 'a');
+    if (ch >= 'A' && ch <= 'F') return 10 + (ch - 'A');
+    return -1;
+}
+
+bool ParseJsonHex4(const std::string& text, size_t pos, uint32_t& value) {
+    if (pos + 4 > text.size()) {
+        return false;
+    }
+    value = 0;
+    for (size_t i = 0; i < 4; ++i) {
+        const int digit = HexValue(text[pos + i]);
+        if (digit < 0) {
+            return false;
+        }
+        value = (value << 4) | static_cast<uint32_t>(digit);
+    }
+    return true;
+}
+
+std::string DecodeXmlEntities(const std::string& value) {
+    std::string result;
+    result.reserve(value.size());
+
+    for (size_t i = 0; i < value.size();) {
+        if (value[i] != '&') {
+            result.push_back(value[i++]);
+            continue;
+        }
+
+        const size_t semi = value.find(';', i + 1);
+        if (semi == std::string::npos) {
+            result.push_back(value[i++]);
+            continue;
+        }
+
+        const std::string entity = value.substr(i + 1, semi - i - 1);
+        if (entity == "amp") {
+            result.push_back('&');
+        } else if (entity == "lt") {
+            result.push_back('<');
+        } else if (entity == "gt") {
+            result.push_back('>');
+        } else if (entity == "quot") {
+            result.push_back('"');
+        } else if (entity == "apos") {
+            result.push_back('\'');
+        } else if (!entity.empty() && entity[0] == '#') {
+            uint32_t cp = 0;
+            bool ok = true;
+            size_t start = 1;
+            const bool hex = start < entity.size() && (entity[start] == 'x' || entity[start] == 'X');
+            if (hex) {
+                ++start;
+            }
+            for (size_t j = start; j < entity.size(); ++j) {
+                const int digit = hex
+                    ? HexValue(entity[j])
+                    : (std::isdigit(static_cast<unsigned char>(entity[j])) ? entity[j] - '0' : -1);
+                if (digit < 0) {
+                    ok = false;
+                    break;
+                }
+                cp = cp * (hex ? 16u : 10u) + static_cast<uint32_t>(digit);
+            }
+            if (ok) {
+                AppendUtf8Codepoint(result, cp);
+            } else {
+                result.append(value, i, semi - i + 1);
+            }
+        } else {
+            result.append(value, i, semi - i + 1);
+        }
+        i = semi + 1;
+    }
+
+    return result;
+}
+
 std::string ParseIdentifier(const std::string& text, size_t& pos) {
     size_t start = pos;
     while (pos < text.size() && (isalnum(static_cast<unsigned char>(text[pos])) || text[pos] == '_' || text[pos] == '-')) {
@@ -108,6 +208,24 @@ std::string ParseStringLiteral(const std::string& text, size_t& pos) {
             case 'n': result.push_back('\n'); break;
             case 'r': result.push_back('\r'); break;
             case 't': result.push_back('\t'); break;
+            case 'u': {
+                uint32_t cp = 0;
+                if (!ParseJsonHex4(text, pos, cp)) {
+                    result.push_back('u');
+                    break;
+                }
+                pos += 4;
+                if (cp >= 0xD800 && cp <= 0xDBFF &&
+                    pos + 6 <= text.size() && text[pos] == '\\' && text[pos + 1] == 'u') {
+                    uint32_t low = 0;
+                    if (ParseJsonHex4(text, pos + 2, low) && low >= 0xDC00 && low <= 0xDFFF) {
+                        cp = 0x10000 + (((cp - 0xD800) << 10) | (low - 0xDC00));
+                        pos += 6;
+                    }
+                }
+                AppendUtf8Codepoint(result, cp);
+                break;
+            }
             default: result.push_back(next); break;
             }
             continue;
@@ -264,7 +382,7 @@ std::string ReadAttributeValue(const std::string& text, size_t& pos) {
     if (pos >= text.size() || text[pos] != '"') {
         return {};
     }
-    return ParseStringLiteral(text, pos);
+    return DecodeXmlEntities(ParseStringLiteral(text, pos));
 }
 
 XmlNode ParseXmlNode(const std::string& text, size_t& pos);

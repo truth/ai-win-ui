@@ -143,6 +143,7 @@ target_link_libraries(ai_win_ui PRIVATE
     "$<$<NOT:$<CONFIG:Debug>>:${_ai_win_ui_yoga_build_dir}/yoga/Release/yogacore.lib>"
     d2d1
     dwrite
+    imm32
     windowscodecs
 )
 

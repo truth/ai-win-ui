@@ -147,6 +147,10 @@ public:
         return false;
     }
 
+    virtual bool GetTextInputCaretRect(Rect& /*out*/) const {
+        return false;
+    }
+
     virtual bool OnTimer(UINT_PTR timerId) {
         bool changed = false;
         for (auto& child : m_children) {
@@ -2071,6 +2075,14 @@ public:
     void SetTextColor(const Color& color) { textColor = color; }
     void SetCornerRadius(float radius) { cornerRadius = radius; }
 
+    bool GetTextInputCaretRect(Rect& out) const override {
+        if (!m_hasFocus) {
+            return false;
+        }
+        out = CaretRect();
+        return true;
+    }
+
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
         const std::wstring measureText = m_text.empty() ? L" " : m_text;
@@ -2146,12 +2158,9 @@ public:
             textOptions);
 
         if (m_hasFocus) {
-            const std::wstring prefix = m_text.substr(0, m_caretPosition);
-            const float caretX = lineRect.left + MeasureNoWrapTextWidth(prefix, textRect.Width());
-            const float caretTop = lineRect.top;
-            const float caretBottom = lineRect.bottom;
+            const Rect caretRect = CaretRect();
             if (m_showCaret) {
-                renderer.DrawRect(Rect::Make(caretX, caretTop, caretX + ScaleValue(1.0f), caretBottom), fg, 1.0f);
+                renderer.DrawRect(caretRect, fg, 1.0f);
             }
         }
     }
@@ -2241,6 +2250,14 @@ private:
             fontSize,
             std::max(1.0f, maxWidth),
             TextWrapMode::NoWrap).width;
+    }
+
+    Rect CaretRect() const {
+        const Rect textRect = ContentRect();
+        const Rect lineRect = TextLineRect(textRect);
+        const std::wstring prefix = m_text.substr(0, m_caretPosition);
+        const float caretX = lineRect.left + MeasureNoWrapTextWidth(prefix, textRect.Width());
+        return Rect::Make(caretX, lineRect.top, caretX + ScaleValue(1.0f), lineRect.bottom);
     }
 
     bool m_isDragging = false;

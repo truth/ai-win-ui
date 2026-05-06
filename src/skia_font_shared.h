@@ -94,12 +94,12 @@ inline sk_sp<SkTypeface> MatchTypefaceForCharacter(SkFontMgr* fontMgr,
         return defaultTypeface ? sk_ref_sp(defaultTypeface) : nullptr;
     }
 
-    const char* zhLocale[] = {"zh-Hans"};
+    const char* bcp47[] = {"zh-Hans", "zh-Hant", "zh-CN", "zh-TW", "ja", "ko"};
     if (sk_sp<SkTypeface> typeface = fontMgr->matchFamilyStyleCharacter(
             nullptr,
             SkFontStyle(),
-            zhLocale,
-            1,
+            bcp47,
+            6,
             character)) {
         return typeface;
     }
@@ -162,21 +162,49 @@ inline float MeasureTextWidthWithFallback(SkFontMgr* fontMgr,
     }
 
     float width = 0.0f;
-    for (uint32_t i = 0; i < len;) {
+    uint32_t runStart = 0;
+    sk_sp<SkTypeface> currentTypeface = nullptr;
+    uint32_t i = 0;
+
+    for (; i < len;) {
         uint32_t units = 0;
         const SkUnichar ch = DecodeUtf16At(text, len, i, &units);
         if (units == 0) {
             break;
         }
 
-        sk_sp<SkTypeface> typeface = MatchTypefaceForCharacter(fontMgr, defaultTypeface, ch);
-        SkFont font = CreateSkiaFont(fontSize, typeface.get());
-        const std::string glyphUtf8 = WideToUtf8(text + i, units);
-        if (!glyphUtf8.empty()) {
-            width += font.measureText(glyphUtf8.data(), glyphUtf8.size(), SkTextEncoding::kUTF8);
+        sk_sp<SkTypeface> charTypeface = MatchTypefaceForCharacter(fontMgr, defaultTypeface, ch);
+
+        if (i == 0) {
+            currentTypeface = charTypeface;
+        } else {
+            bool sameTypeface = false;
+            if (currentTypeface.get() == charTypeface.get() && currentTypeface.get() == defaultTypeface) {
+                sameTypeface = true;
+            }
+
+            if (!sameTypeface) {
+                SkFont font = CreateSkiaFont(fontSize, currentTypeface.get());
+                const std::string runUtf8 = WideToUtf8(text + runStart, i - runStart);
+                if (!runUtf8.empty()) {
+                    width += font.measureText(runUtf8.data(), runUtf8.size(), SkTextEncoding::kUTF8);
+                }
+                runStart = i;
+                currentTypeface = charTypeface;
+            }
         }
+
         i += units;
     }
+
+    if (runStart < i && currentTypeface) {
+        SkFont font = CreateSkiaFont(fontSize, currentTypeface.get());
+        const std::string runUtf8 = WideToUtf8(text + runStart, i - runStart);
+        if (!runUtf8.empty()) {
+            width += font.measureText(runUtf8.data(), runUtf8.size(), SkTextEncoding::kUTF8);
+        }
+    }
+
     return width;
 }
 

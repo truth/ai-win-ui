@@ -8,6 +8,7 @@
 #include "ui.h"
 #include "zip_resource_provider.h"
 
+#include <imm.h>
 #include <shellscalingapi.h>
 #include <Windowsx.h>
 #include <algorithm>
@@ -380,6 +381,7 @@ private:
                 -m_scrollOffset,
                 m_viewportWidth,
                 m_contentHeight - m_scrollOffset));
+            UpdateImeWindow();
         } else {
             m_contentHeight = m_viewportHeight;
         }
@@ -435,6 +437,7 @@ private:
 
         m_mouseCaptureTarget = m_root->FindHitElementAt(x, y);
         if (m_root->OnMouseDown(x, y)) {
+            UpdateImeWindow();
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
     }
@@ -455,6 +458,7 @@ private:
         }
 
         if (handled) {
+            UpdateImeWindow();
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
     }
@@ -502,6 +506,7 @@ private:
         if (m_focusedElement) {
             m_focusedElement->OnFocus();
             EnsureElementVisible(m_focusedElement);
+            UpdateImeWindow();
         }
         InvalidateRect(m_hwnd, nullptr, FALSE);
     }
@@ -540,10 +545,12 @@ private:
     bool OnKeyDown(WPARAM wParam, LPARAM lParam) {
         if (wParam == VK_TAB) {
             MoveFocus((GetKeyState(VK_SHIFT) & 0x8000) != 0);
+            UpdateImeWindow();
             return true;
         }
 
         if (m_focusedElement && m_focusedElement->OnKeyDown(wParam, lParam)) {
+            UpdateImeWindow();
             return true;
         }
 
@@ -570,7 +577,11 @@ private:
     }
 
     bool OnTextChar(wchar_t ch) {
-        return m_focusedElement && m_focusedElement->OnChar(ch);
+        if (!m_focusedElement || !m_focusedElement->OnChar(ch)) {
+            return false;
+        }
+        UpdateImeWindow();
+        return true;
     }
 
     bool OnUnicodeChar(WPARAM wParam) {
@@ -610,10 +621,45 @@ private:
                 -m_scrollOffset,
                 m_viewportWidth,
                 m_contentHeight - m_scrollOffset));
+            UpdateImeWindow();
         }
         UpdateScrollBar();
         InvalidateRect(m_hwnd, nullptr, FALSE);
         return true;
+    }
+
+    void UpdateImeWindow() {
+        if (!m_hwnd || !m_focusedElement) {
+            return;
+        }
+
+        Rect caret{};
+        if (!m_focusedElement->GetTextInputCaretRect(caret)) {
+            return;
+        }
+
+        HIMC imc = ImmGetContext(m_hwnd);
+        if (!imc) {
+            return;
+        }
+
+        const POINT caretPoint{
+            static_cast<LONG>(std::lround(caret.left)),
+            static_cast<LONG>(std::lround(caret.bottom + 2.0f))
+        };
+
+        COMPOSITIONFORM composition{};
+        composition.dwStyle = CFS_POINT;
+        composition.ptCurrentPos = caretPoint;
+        ImmSetCompositionWindow(imc, &composition);
+
+        CANDIDATEFORM candidate{};
+        candidate.dwIndex = 0;
+        candidate.dwStyle = CFS_CANDIDATEPOS;
+        candidate.ptCurrentPos = caretPoint;
+        ImmSetCandidateWindow(imc, &candidate);
+
+        ImmReleaseContext(m_hwnd, imc);
     }
 
     float MaxScrollOffset() const {
@@ -775,8 +821,14 @@ private:
                     return 0;
                 }
                 break;
+            case WM_IME_STARTCOMPOSITION:
+            case WM_IME_COMPOSITION:
+            case WM_IME_NOTIFY:
+                UpdateImeWindow();
+                break;
             case WM_KEYUP:
                 if (OnKeyUp(wParam, lParam)) {
+                    UpdateImeWindow();
                     InvalidateRect(m_hwnd, nullptr, FALSE);
                     return 0;
                 }
