@@ -109,7 +109,7 @@ inline sk_sp<SkTypeface> MatchTypefaceForCharacter(SkFontMgr* fontMgr,
 
 inline bool TypefaceSupportsText(SkTypeface* typeface, const wchar_t* text, uint32_t len) {
     if (!typeface || !text || len == 0) {
-        return true;
+        return false;
     }
     for (uint32_t i = 0; i < len;) {
         uint32_t units = 0;
@@ -178,16 +178,15 @@ inline float MeasureTextWidthWithFallback(SkFontMgr* fontMgr,
         if (i == 0) {
             currentTypeface = charTypeface;
         } else {
-            bool sameTypeface = false;
-            if (currentTypeface.get() == charTypeface.get() && currentTypeface.get() == defaultTypeface) {
-                sameTypeface = true;
-            }
+            const bool sameTypeface = (currentTypeface.get() == charTypeface.get());
 
             if (!sameTypeface) {
-                SkFont font = CreateSkiaFont(fontSize, currentTypeface.get());
-                const std::string runUtf8 = WideToUtf8(text + runStart, i - runStart);
-                if (!runUtf8.empty()) {
-                    width += font.measureText(runUtf8.data(), runUtf8.size(), SkTextEncoding::kUTF8);
+                if (currentTypeface) {
+                    SkFont font = CreateSkiaFont(fontSize, currentTypeface.get());
+                    const std::string runUtf8 = WideToUtf8(text + runStart, i - runStart);
+                    if (!runUtf8.empty()) {
+                        width += font.measureText(runUtf8.data(), runUtf8.size(), SkTextEncoding::kUTF8);
+                    }
                 }
                 runStart = i;
                 currentTypeface = charTypeface;

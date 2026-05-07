@@ -87,24 +87,23 @@ void DrawSimpleTextWithFallback(SkCanvas* canvas,
         if (i == 0) {
             currentTypeface = charTypeface;
         } else {
-            bool sameTypeface = false;
-            if (currentTypeface.get() == charTypeface.get() && currentTypeface.get() == defaultTypeface) {
-                sameTypeface = true;
-            }
+            const bool sameTypeface = (currentTypeface.get() == charTypeface.get());
 
             if (!sameTypeface) {
-                SkFont font = skia_font::CreateSkiaFont(fontSize, currentTypeface.get());
-                const std::string runUtf8 = skia_font::WideToUtf8(text.c_str() + runStart, i - runStart);
-                if (!runUtf8.empty()) {
-                    canvas->drawSimpleText(
-                        runUtf8.data(),
-                        runUtf8.size(),
-                        SkTextEncoding::kUTF8,
-                        runX,
-                        baseline,
-                        font,
-                        paint);
-                    runX += font.measureText(runUtf8.data(), runUtf8.size(), SkTextEncoding::kUTF8);
+                if (currentTypeface) {
+                    SkFont font = skia_font::CreateSkiaFont(fontSize, currentTypeface.get());
+                    const std::string runUtf8 = skia_font::WideToUtf8(text.c_str() + runStart, i - runStart);
+                    if (!runUtf8.empty()) {
+                        canvas->drawSimpleText(
+                            runUtf8.data(),
+                            runUtf8.size(),
+                            SkTextEncoding::kUTF8,
+                            runX,
+                            baseline,
+                            font,
+                            paint);
+                        runX += font.measureText(runUtf8.data(), runUtf8.size(), SkTextEncoding::kUTF8);
+                    }
                 }
                 runStart = i;
                 currentTypeface = charTypeface;
