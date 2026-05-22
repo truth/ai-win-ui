@@ -22,3 +22,37 @@ The font fallback logic (`IterateTextRuns`) strictly compared the matched charac
 
 **Solution:**
 Ensure consecutive characters sharing the exact same matched fallback typeface are batched together by comparing `currentTypeface.get() == charTypeface.get()`. Additionally, caching resolved fallbacks in an `std::unordered_map` eliminates redundant OS-level font queries.
+
+## 3. Debugging `STATUS_FATAL_USER_CALLBACK_EXCEPTION` without WinDbg
+**Context:**
+When a Win32 application crashes with `0xC000041D` (`STATUS_FATAL_USER_CALLBACK_EXCEPTION`), the OS is masking the true exception (such as Access Violation `0xC0000005` or Stack Overflow `0xC00000FD`). This happens because the exception originated inside a Windows callback (like `WndProc`) and crossed the user-mode callback boundary back into `USER32.dll` or `ntdll.dll`.
+
+**Methodology:**
+Instead of relying on heavy debuggers (like WinDbg/CDB) or complex minidump parsing to retrieve the nested exception record, you can quickly isolate the crash by injecting Structured Exception Handling (SEH) directly at the callback boundary:
+
+1. **Wrap the Window Procedure in `__try / __except`**:
+   Locate your window procedure (e.g., `WndProc` or `WndProcThunk`) and wrap the internal execution in a Microsoft-specific SEH block.
+   ```cpp
+   static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+       auto* app = reinterpret_cast<App*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+       if (!app) return DefWindowProcW(hwnd, msg, wParam, lParam);
+
+       __try {
+           return app->HandleMessage(hwnd, msg, wParam, lParam);
+       } __except (EXCEPTION_EXECUTE_HANDLER) {
+           // Grab the true underlying exception code and the message that triggered it
+           DWORD code = GetExceptionCode();
+           FILE* f;
+           if (fopen_s(&f, "seh_crash.log", "a") == 0) {
+               fprintf(f, "SEH EXCEPTION: 0x%X during message 0x%X\n", code, msg);
+               fclose(f);
+           }
+           std::exit(1);
+       }
+   }
+   ```
+
+2. **Trigger the Crash and Inspect the Log**:
+   Run the application normally. The OS will execute the callback, and instead of swallowing the true exception into a generic `0xC000041D` dump, your `__except` block will catch it. 
+   
+   In our case, the log cleanly output `SEH EXCEPTION: 0xC00000FD during message 0x282`, immediately pointing to a Stack Overflow (`0xFD`) during `WM_IME_NOTIFY` (`0x282`), turning an hours-long blind debugging session into a 2-minute fix.
