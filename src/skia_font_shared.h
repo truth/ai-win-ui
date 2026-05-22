@@ -5,6 +5,8 @@
 #include <algorithm>
 #include <cstdint>
 #include <string>
+#include <vector>
+#include <unordered_map>
 
 #if defined(AI_WIN_UI_HAS_VCPKG_SKIA) || defined(AI_WIN_UI_HAS_LOCAL_SKIA)
 #include "include/core/SkFont.h"
@@ -94,17 +96,26 @@ inline sk_sp<SkTypeface> MatchTypefaceForCharacter(SkFontMgr* fontMgr,
         return defaultTypeface ? sk_ref_sp(defaultTypeface) : nullptr;
     }
 
+    static std::unordered_map<SkUnichar, sk_sp<SkTypeface>> s_fallbackCache;
+    auto it = s_fallbackCache.find(character);
+    if (it != s_fallbackCache.end()) {
+        return it->second;
+    }
+
     const char* bcp47[] = {"zh-Hans", "zh-Hant", "zh-CN", "zh-TW", "ja", "ko"};
-    if (sk_sp<SkTypeface> typeface = fontMgr->matchFamilyStyleCharacter(
+    sk_sp<SkTypeface> typeface = fontMgr->matchFamilyStyleCharacter(
             nullptr,
             SkFontStyle(),
             bcp47,
             6,
-            character)) {
-        return typeface;
+            character);
+
+    if (!typeface) {
+        typeface = defaultTypeface ? sk_ref_sp(defaultTypeface) : fontMgr->legacyMakeTypeface(nullptr, SkFontStyle());
     }
 
-    return defaultTypeface ? sk_ref_sp(defaultTypeface) : fontMgr->legacyMakeTypeface(nullptr, SkFontStyle());
+    s_fallbackCache[character] = typeface;
+    return typeface;
 }
 
 inline bool TypefaceSupportsText(SkTypeface* typeface, const wchar_t* text, uint32_t len) {
@@ -142,26 +153,57 @@ inline SkFont CreateSkiaFont(float fontSize, SkTypeface* typeface = nullptr) {
     return font;
 }
 
-inline float MeasureTextWidthWithFallback(SkFontMgr* fontMgr,
-                                          SkTypeface* defaultTypeface,
-                                          float fontSize,
-                                          const wchar_t* text,
-                                          uint32_t len) {
-    if (!text || len == 0 || fontSize <= 0.0f) {
-        return 0.0f;
+template <size_t N = 256>
+class StackUtf8Converter {
+public:
+    StackUtf8Converter(const wchar_t* text, uint32_t len) {
+        if (!text || len == 0) {
+            m_ptr = "";
+            m_size = 0;
+            return;
+        }
+
+        int requiredSize = WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(len), nullptr, 0, nullptr, nullptr);
+        if (requiredSize <= 0) {
+            m_ptr = "";
+            m_size = 0;
+            return;
+        }
+
+        m_size = static_cast<size_t>(requiredSize);
+        if (m_size < N) {
+            WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(len), m_stackBuf, requiredSize, nullptr, nullptr);
+            m_stackBuf[m_size] = '\0';
+            m_ptr = m_stackBuf;
+        } else {
+            m_heapBuf.resize(m_size + 1);
+            WideCharToMultiByte(CP_UTF8, 0, text, static_cast<int>(len), m_heapBuf.data(), requiredSize, nullptr, nullptr);
+            m_heapBuf[m_size] = '\0';
+            m_ptr = m_heapBuf.data();
+        }
     }
 
-    SkFont defaultFont = CreateSkiaFont(fontSize, defaultTypeface);
-    const std::string utf8 = WideToUtf8(text, len);
-    if (utf8.empty()) {
-        return 0.0f;
+    const char* c_str() const { return m_ptr; }
+    size_t size() const { return m_size; }
+    bool empty() const { return m_size == 0; }
+
+private:
+    char m_stackBuf[N];
+    std::vector<char> m_heapBuf;
+    const char* m_ptr = nullptr;
+    size_t m_size = 0;
+};
+
+template <typename Callback>
+inline void IterateTextRuns(SkFontMgr* fontMgr,
+                            SkTypeface* defaultTypeface,
+                            const wchar_t* text,
+                            uint32_t len,
+                            Callback&& callback) {
+    if (!text || len == 0) {
+        return;
     }
 
-    if (TypefaceSupportsText(defaultTypeface, text, len)) {
-        return defaultFont.measureText(utf8.data(), utf8.size(), SkTextEncoding::kUTF8);
-    }
-
-    float width = 0.0f;
     uint32_t runStart = 0;
     sk_sp<SkTypeface> currentTypeface = nullptr;
     uint32_t i = 0;
@@ -182,11 +224,7 @@ inline float MeasureTextWidthWithFallback(SkFontMgr* fontMgr,
 
             if (!sameTypeface) {
                 if (currentTypeface) {
-                    SkFont font = CreateSkiaFont(fontSize, currentTypeface.get());
-                    const std::string runUtf8 = WideToUtf8(text + runStart, i - runStart);
-                    if (!runUtf8.empty()) {
-                        width += font.measureText(runUtf8.data(), runUtf8.size(), SkTextEncoding::kUTF8);
-                    }
+                    callback(text + runStart, i - runStart, currentTypeface.get());
                 }
                 runStart = i;
                 currentTypeface = charTypeface;
@@ -197,12 +235,36 @@ inline float MeasureTextWidthWithFallback(SkFontMgr* fontMgr,
     }
 
     if (runStart < i && currentTypeface) {
-        SkFont font = CreateSkiaFont(fontSize, currentTypeface.get());
-        const std::string runUtf8 = WideToUtf8(text + runStart, i - runStart);
-        if (!runUtf8.empty()) {
-            width += font.measureText(runUtf8.data(), runUtf8.size(), SkTextEncoding::kUTF8);
-        }
+        callback(text + runStart, i - runStart, currentTypeface.get());
     }
+}
+
+inline float MeasureTextWidthWithFallback(SkFontMgr* fontMgr,
+                                          SkTypeface* defaultTypeface,
+                                          float fontSize,
+                                          const wchar_t* text,
+                                          uint32_t len) {
+    if (!text || len == 0 || fontSize <= 0.0f) {
+        return 0.0f;
+    }
+
+    if (TypefaceSupportsText(defaultTypeface, text, len)) {
+        SkFont font = CreateSkiaFont(fontSize, defaultTypeface);
+        StackUtf8Converter<> utf8(text, len);
+        if (!utf8.empty()) {
+            return font.measureText(utf8.c_str(), utf8.size(), SkTextEncoding::kUTF8);
+        }
+        return 0.0f;
+    }
+
+    float width = 0.0f;
+    IterateTextRuns(fontMgr, defaultTypeface, text, len, [&](const wchar_t* runText, uint32_t runLen, SkTypeface* typeface) {
+        SkFont font = CreateSkiaFont(fontSize, typeface);
+        StackUtf8Converter<> runUtf8(runText, runLen);
+        if (!runUtf8.empty()) {
+            width += font.measureText(runUtf8.c_str(), runUtf8.size(), SkTextEncoding::kUTF8);
+        }
+    });
 
     return width;
 }

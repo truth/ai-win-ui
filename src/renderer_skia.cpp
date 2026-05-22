@@ -56,10 +56,10 @@ void DrawSimpleTextWithFallback(SkCanvas* canvas,
     const uint32_t len = static_cast<uint32_t>(text.size());
     if (skia_font::TypefaceSupportsText(defaultTypeface, text.c_str(), len)) {
         SkFont font = skia_font::CreateSkiaFont(fontSize, defaultTypeface);
-        const std::string utf8 = skia_font::WideToUtf8(text.c_str(), len);
+        skia_font::StackUtf8Converter<> utf8(text.c_str(), len);
         if (!utf8.empty()) {
             canvas->drawSimpleText(
-                utf8.data(),
+                utf8.c_str(),
                 utf8.size(),
                 SkTextEncoding::kUTF8,
                 x,
@@ -71,62 +71,21 @@ void DrawSimpleTextWithFallback(SkCanvas* canvas,
     }
 
     float runX = x;
-    uint32_t runStart = 0;
-    sk_sp<SkTypeface> currentTypeface = nullptr;
-    uint32_t i = 0;
-
-    for (; i < len;) {
-        uint32_t units = 0;
-        const SkUnichar ch = skia_font::DecodeUtf16At(text.c_str(), len, i, &units);
-        if (units == 0) {
-            break;
-        }
-
-        sk_sp<SkTypeface> charTypeface = skia_font::MatchTypefaceForCharacter(fontMgr, defaultTypeface, ch);
-
-        if (i == 0) {
-            currentTypeface = charTypeface;
-        } else {
-            const bool sameTypeface = (currentTypeface.get() == charTypeface.get());
-
-            if (!sameTypeface) {
-                if (currentTypeface) {
-                    SkFont font = skia_font::CreateSkiaFont(fontSize, currentTypeface.get());
-                    const std::string runUtf8 = skia_font::WideToUtf8(text.c_str() + runStart, i - runStart);
-                    if (!runUtf8.empty()) {
-                        canvas->drawSimpleText(
-                            runUtf8.data(),
-                            runUtf8.size(),
-                            SkTextEncoding::kUTF8,
-                            runX,
-                            baseline,
-                            font,
-                            paint);
-                        runX += font.measureText(runUtf8.data(), runUtf8.size(), SkTextEncoding::kUTF8);
-                    }
-                }
-                runStart = i;
-                currentTypeface = charTypeface;
-            }
-        }
-
-        i += units;
-    }
-
-    if (runStart < i && currentTypeface) {
-        SkFont font = skia_font::CreateSkiaFont(fontSize, currentTypeface.get());
-        const std::string runUtf8 = skia_font::WideToUtf8(text.c_str() + runStart, i - runStart);
+    skia_font::IterateTextRuns(fontMgr, defaultTypeface, text.c_str(), len, [&](const wchar_t* runText, uint32_t runLen, SkTypeface* typeface) {
+        SkFont font = skia_font::CreateSkiaFont(fontSize, typeface);
+        skia_font::StackUtf8Converter<> runUtf8(runText, runLen);
         if (!runUtf8.empty()) {
             canvas->drawSimpleText(
-                runUtf8.data(),
+                runUtf8.c_str(),
                 runUtf8.size(),
                 SkTextEncoding::kUTF8,
                 runX,
                 baseline,
                 font,
                 paint);
+            runX += font.measureText(runUtf8.c_str(), runUtf8.size(), SkTextEncoding::kUTF8);
         }
-    }
+    });
 }
 
 class SkiaBitmapResource final : public BitmapResource {
