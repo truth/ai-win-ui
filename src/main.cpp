@@ -823,7 +823,6 @@ private:
                 break;
             case WM_IME_STARTCOMPOSITION:
             case WM_IME_COMPOSITION:
-            case WM_IME_NOTIFY:
                 UpdateImeWindow();
                 break;
             case WM_KEYUP:
