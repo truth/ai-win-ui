@@ -192,20 +192,25 @@ Week 概念序（可按人力并行 A∥D 起步）:
 
 ## 完成定义（P0 Done）
 
-- [x] 文本规则文档化；Skia measure/draw 共享 `CreateSkiaTextLayout`（含 bold/italic）；DWrite NoWrap 首行 parity（2026-07-15 起步）
-- [x] `ScrollViewer` + `scroll_viewer_cases` + 解析（2026-07-15）
-- [ ] shaped hub **默认同进程** 开第二窗，关子窗 hub 仍在（Track C 未做）
-- [x] `name` + `AI_WIN_UI_MEASURE_DUMP` / `run_measure_dump.ps1`（golden 对比脚本后续）
-- [x] `doc/layout-spec.md` 已记 ScrollViewer / name / dump
+- [x] 文本规则文档化；Skia measure/draw 共享 `CreateSkiaTextLayout`（含 bold/italic）；DWrite NoWrap 首行 parity
+- [x] `ScrollViewer` + 滚轮 + **拖拽内容** + **拖滚动条** + demo
+- [x] shaped hub **默认同进程** 多根；`AI_WIN_UI_CHILD_PROCESS=1` 可回退 CreateProcess
+- [x] `name` + measure dump + **`run_measure_golden.ps1`** + `tests/golden/scroll-viewer.skia.ndjson`
+- [x] `doc/layout-spec.md` / `window-chrome.md` 已更新
 
 ## Progress log
 
+### 2026-07-15 — second pass
+
+- **ScrollViewer drag**: content pan、竖/横 thumb 拖、点 track 跳转；`FindHitElementAt` 保证 capture。
+- **C multi-root**: `g_secondaryHosts` + `g_liveHostCount`；最后一窗才 `PostQuitMessage`；`OpenSecondaryHost`。
+- **D golden**: `scripts/run_measure_golden.ps1`（`-UpdateGolden` / 容差 1.5px）。
+
 ### 2026-07-15 — first code pass
 
-- **A1/A2**: `skia_text_layout.h` 规则表；`CreateSkiaTextLayout(..., bold, italic)`；`renderer_skia` draw 传入 bold/italic；DWrite NoWrap 只量首行。
-- **B1–B4**: `ScrollViewer` 控件 + XML/JSON 解析 + `scroll_viewer_cases.xml` + 别名 `scroll-viewer`。
-- **D1/D2**: `UIElement::name`；`AI_WIN_UI_MEASURE_DUMP` NDJSON dump；`scripts/run_measure_dump.ps1`。
-- **C**: 未开始（仍 CreateProcess 异形窗）。
+- **A1/A2**: 文本规则 + bold/italic 共用 layout。
+- **B1–B4**: ScrollViewer 初版 + demo。
+- **D1/D2**: name + MEASURE_DUMP。
 
 ---
 

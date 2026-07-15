@@ -88,21 +88,22 @@ Demo layouts:
 
 ## Shaped multi-window (layout rules)
 
-### Why a separate process?
+### Multi-window (default: in-process)
 
-`WM_DESTROY` posts `PostQuitMessage` for the process. Opening a second top-level
-window in the **same** process would quit the hub when the shape closed.
-Buttons such as `openHeartWindow` therefore spawn **the same executable** as a
-child process with:
+Buttons such as `openHeartWindow` open a **second host** in the same process
+(shared message loop). Closing the shape does **not** quit the hub — only the
+last live host posts `PostQuitMessage`.
 
-| Env set for child | Value |
+Optional multi-process fallback: `AI_WIN_UI_CHILD_PROCESS=1` uses `CreateProcess`
+with the same env pattern as before.
+
+| Env for child host | Value |
 |-------------------|--------|
 | `AI_WIN_UI_LAYOUT` | e.g. `layouts/shaped_heart_window.xml` |
 | `AI_WIN_UI_CHROME` | `layered` |
 | `AI_WIN_UI_SIZE` | e.g. `420x460` |
-| `AI_WIN_UI_RENDERER` | inherits hub backend when parent had none set |
-
-Parent env vars are restored after `CreateProcess`.
+| `AI_WIN_UI_RENDERER` | matches hub backend |
+| `AI_WIN_UI_CHILD_PROCESS` | `1` → separate process (optional) |
 
 ### Recommended shape layout pattern (XML)
 

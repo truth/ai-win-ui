@@ -13,7 +13,7 @@
   <Label name="title" text="ScrollViewer cases" fontSize="20" color="#F5F8FC" />
   <Label
     name="hint"
-    text="Roll the wheel over the dark scroller. Content is taller than the viewport."
+    text="Wheel, drag the content, or drag the scrollbar thumb. Content is taller than the viewport."
     fontSize="13"
     color="#8FA3B8" />
 

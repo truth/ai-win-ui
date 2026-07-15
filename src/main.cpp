@@ -28,6 +28,7 @@ constexpr float kUnboundedLayoutHeight = 100000.0f;
 constexpr UINT_PTR kUiTimerId = 1;
 constexpr UINT_PTR kQuitTimerId = 2;
 constexpr UINT kUiTimerIntervalMs = 16;
+constexpr wchar_t kWindowClassName[] = L"AiWinUiWindowClass";
 
 std::wstring ToLowerAscii(std::wstring value) {
     for (auto& ch : value) {
@@ -87,21 +88,32 @@ UINT GetWindowDpiWithFallback(HWND hwnd) {
 
 } // namespace
 
+// Process-wide multi-host: each App is one HWND + UI tree.
+// Last live host WM_DESTROY posts quit; secondaries are heap-owned.
+class App;
+std::vector<std::unique_ptr<App>> g_secondaryHosts;
+int g_liveHostCount = 0;
+void PurgeClosedSecondaryHosts();
+
 class App {
 public:
     bool Initialize(HINSTANCE instance, int cmdShow) {
-        const wchar_t* kClassName = L"AiWinUiWindowClass";
+        m_instance = instance;
+        m_cmdShow = cmdShow;
 
         WNDCLASSW wc{};
         wc.lpfnWndProc = &App::WndProcSetup;
         wc.hInstance = instance;
-        wc.lpszClassName = kClassName;
+        wc.lpszClassName = kWindowClassName;
         wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
         wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
         wc.style = CS_DBLCLKS;
 
         if (!RegisterClassW(&wc)) {
-            return false;
+            const DWORD err = GetLastError();
+            if (err != ERROR_CLASS_ALREADY_EXISTS) {
+                return false;
+            }
         }
 
         // Env wins for initial create; layout chrome= can promote system -> custom later.
@@ -154,8 +166,8 @@ public:
 
         m_hwnd = CreateWindowExW(
             exStyle,
-            kClassName,
-            L"AI WinUI Renderer (DirectUI-style)",
+            kWindowClassName,
+            m_isSecondary ? L"AI WinUI (window)" : L"AI WinUI Renderer (DirectUI-style)",
             style,
             windowX,
             windowY,
@@ -170,6 +182,8 @@ public:
         if (!m_hwnd) {
             return false;
         }
+
+        ++g_liveHostCount;
 
         UpdateDpiContext(GetWindowDpiWithFallback(m_hwnd));
         m_windowChrome.SetDpi(m_uiContext.dpi);
@@ -295,9 +309,61 @@ public:
         while (GetMessageW(&msg, nullptr, 0, 0)) {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
+            PurgeClosedSecondaryHosts();
         }
         return static_cast<int>(msg.wParam);
     }
+
+    // In-process secondary host (shaped / extra windows). Owned by g_secondaryHosts.
+    static bool OpenSecondaryHost(
+        HINSTANCE instance,
+        const wchar_t* layoutRelPath,
+        const wchar_t* chromeMode,
+        const wchar_t* sizeWh,
+        RendererBackend renderer) {
+        auto host = std::make_unique<App>();
+        host->m_isSecondary = true;
+
+        const std::wstring prevLayout = host->GetEnvironmentValue(L"AI_WIN_UI_LAYOUT");
+        const std::wstring prevChrome = host->GetEnvironmentValue(L"AI_WIN_UI_CHROME");
+        const std::wstring prevSize = host->GetEnvironmentValue(L"AI_WIN_UI_SIZE");
+        const std::wstring prevRenderer = host->GetEnvironmentValue(L"AI_WIN_UI_RENDERER");
+
+        SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", layoutRelPath);
+        if (chromeMode && chromeMode[0] != L'\0') {
+            SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", chromeMode);
+        }
+        if (sizeWh && sizeWh[0] != L'\0') {
+            SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", sizeWh);
+        }
+        SetEnvironmentVariableW(
+            L"AI_WIN_UI_RENDERER",
+            renderer == RendererBackend::Skia ? L"skia" : L"direct2d");
+
+        const bool ok = host->Initialize(instance, SW_SHOWNORMAL);
+
+        auto restore = [](const wchar_t* name, const std::wstring& value) {
+            if (value.empty()) {
+                SetEnvironmentVariableW(name, nullptr);
+            } else {
+                SetEnvironmentVariableW(name, value.c_str());
+            }
+        };
+        restore(L"AI_WIN_UI_LAYOUT", prevLayout);
+        restore(L"AI_WIN_UI_CHROME", prevChrome);
+        restore(L"AI_WIN_UI_SIZE", prevSize);
+        restore(L"AI_WIN_UI_RENDERER", prevRenderer);
+
+        if (!ok) {
+            return false;
+        }
+        g_secondaryHosts.push_back(std::move(host));
+        return true;
+    }
+
+    void MarkClosed() { m_closed = true; }
+    bool IsClosed() const { return m_closed; }
+    bool IsSecondary() const { return m_isSecondary; }
 
 private:
     bool InitializeRenderer() {
@@ -529,8 +595,26 @@ private:
         }
     }
 
-    // Spawn a sibling process with layered chrome + layout (independent message loop).
+    // Default: same-process secondary host. Set AI_WIN_UI_CHILD_PROCESS=1 for CreateProcess.
     void LaunchShapedChild(const wchar_t* layoutRelPath, const wchar_t* sizeWh) {
+        const std::wstring forceProcess = GetEnvironmentValue(L"AI_WIN_UI_CHILD_PROCESS");
+        const bool useProcess =
+            forceProcess == L"1" || forceProcess == L"true" || forceProcess == L"TRUE";
+
+        if (!useProcess) {
+            if (OpenSecondaryHost(
+                    m_instance,
+                    layoutRelPath,
+                    L"layered",
+                    sizeWh,
+                    m_activeRendererBackend)) {
+                SetWindowTextW(m_hwnd, L"Opened shaped window (in-process)");
+            } else {
+                SetWindowTextW(m_hwnd, L"Failed to open in-process shaped window");
+            }
+            return;
+        }
+
         wchar_t exePath[MAX_PATH] = {};
         if (GetModuleFileNameW(nullptr, exePath, ARRAYSIZE(exePath)) == 0) {
             return;
@@ -546,7 +630,6 @@ private:
         if (sizeWh && sizeWh[0] != L'\0') {
             SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", sizeWh);
         }
-        // Keep the same renderer backend as the hub when possible.
         if (prevRenderer.empty()) {
             SetEnvironmentVariableW(
                 L"AI_WIN_UI_RENDERER",
@@ -580,12 +663,11 @@ private:
             if (pi.hProcess) {
                 CloseHandle(pi.hProcess);
             }
-            SetWindowTextW(m_hwnd, L"Opened shaped layered child window");
+            SetWindowTextW(m_hwnd, L"Opened shaped layered child process");
         } else {
-            SetWindowTextW(m_hwnd, L"Failed to launch shaped child window");
+            SetWindowTextW(m_hwnd, L"Failed to launch shaped child process");
         }
 
-        // Restore parent env so subsequent relaunches of this process stay stable.
         auto restore = [](const wchar_t* name, const std::wstring& value) {
             if (value.empty()) {
                 SetEnvironmentVariableW(name, nullptr);
@@ -597,9 +679,6 @@ private:
         restore(L"AI_WIN_UI_CHROME", prevChrome);
         restore(L"AI_WIN_UI_SIZE", prevSize);
         if (prevRenderer.empty()) {
-            // Only clear if we temporarily set it for the child.
-            // Leave existing hub value alone if parent already had one.
-            // (prevRenderer empty means we may have written renderer — restore to empty.)
             SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", nullptr);
         } else {
             SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", prevRenderer.c_str());
@@ -1532,7 +1611,16 @@ private:
             case WM_DESTROY:
                 KillTimer(hwnd, kUiTimerId);
                 KillTimer(hwnd, kQuitTimerId);
-                PostQuitMessage(0);
+                SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
+                m_hwnd = nullptr;
+                m_closed = true;
+                if (g_liveHostCount > 0) {
+                    --g_liveHostCount;
+                }
+                // Only quit the process when the last host closes.
+                if (g_liveHostCount <= 0) {
+                    PostQuitMessage(0);
+                }
                 return 0;
             default:
                 return DefWindowProcW(hwnd, msg, wParam, lParam);
@@ -1540,6 +1628,10 @@ private:
         return DefWindowProcW(hwnd, msg, wParam, lParam);
     }
 
+    HINSTANCE m_instance = nullptr;
+    int m_cmdShow = SW_SHOWNORMAL;
+    bool m_isSecondary = false;
+    bool m_closed = false;
     HWND m_hwnd = nullptr;
     UIContext m_uiContext{};
     WindowChrome m_windowChrome;
@@ -1567,6 +1659,17 @@ private:
     bool m_isInitialized = false;
     bool m_isTrackingMouseLeave = false;
 };
+
+void PurgeClosedSecondaryHosts() {
+    g_secondaryHosts.erase(
+        std::remove_if(
+            g_secondaryHosts.begin(),
+            g_secondaryHosts.end(),
+            [](const std::unique_ptr<App>& host) {
+                return host && host->IsClosed();
+            }),
+        g_secondaryHosts.end());
+}
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {
     InitializeDpiAwareness();

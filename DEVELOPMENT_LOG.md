@@ -2,7 +2,11 @@
 
 ## 2026-07-15
 
-- P0 硬化首批代码（A/B/D；C 多根未做）：
+- P0 硬化第二批：
+  - ScrollViewer：**拖拽内容滑动** + 滚动条 thumb/track
+  - 进程内多根窗口（关子窗不杀 hub）；`AI_WIN_UI_CHILD_PROCESS=1` 仍可多进程
+  - measure golden：`scripts/run_measure_golden.ps1` + `tests/golden/scroll-viewer.skia.ndjson`
+- P0 硬化首批代码（A/B/D）：
   - 文本：`CreateSkiaTextLayout` 规则表 + bold/italic 与 draw 共用；DWrite NoWrap 首行
   - `ScrollViewer` + `scroll_viewer_cases`（别名 `scroll-viewer`）
   - `name`/`id` + `AI_WIN_UI_MEASURE_DUMP` NDJSON + `scripts/run_measure_dump.ps1`
