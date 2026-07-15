@@ -278,6 +278,20 @@ public:
 
     void TeardownWindow() {
         m_isInitialized = false;
+        m_focusedElement = nullptr;
+        m_mouseCaptureTarget = nullptr;
+
+        // Drop UI / text (may hold DWrite) before renderer CoUninitialize.
+        m_root.reset();
+        m_layoutEngine.reset();
+        m_textMeasurer.reset();
+        m_uiContext.textMeasurer = nullptr;
+        m_uiContext.layoutEngine = nullptr;
+        m_uiContext.renderer = nullptr;
+
+        // Release HwndRenderTarget / Skia surface while HWND is still valid.
+        m_renderer.reset();
+
         if (m_hwnd) {
             KillTimer(m_hwnd, kUiTimerId);
             KillTimer(m_hwnd, kQuitTimerId);
@@ -291,12 +305,6 @@ public:
                 m_tearingDown = false;
             }
         }
-        m_renderer.reset();
-        m_textMeasurer.reset();
-        m_layoutEngine.reset();
-        m_root.reset();
-        m_focusedElement = nullptr;
-        m_mouseCaptureTarget = nullptr;
     }
 
     // Windows blocks SetForegroundWindow when launched from another process

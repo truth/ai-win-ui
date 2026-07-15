@@ -107,9 +107,23 @@ public:
 class Direct2DRenderer final : public IRenderer {
 public:
     ~Direct2DRenderer() override {
+        // Release all COM objects before CoUninitialize — otherwise combase AV on exit.
+        while (!m_layerStack.empty()) {
+            if (m_renderTarget) {
+                m_renderTarget->PopLayer();
+            }
+            m_layerStack.pop_back();
+        }
         ReleaseLayeredSurface();
+        DestroyRenderTarget();
+        m_solidBrush.Reset();
+        m_wicFactory.Reset();
+        m_dwriteFactory.Reset();
+        m_d2dFactory.Reset();
+        m_hwnd = nullptr;
         if (m_shouldCoUninitialize) {
             CoUninitialize();
+            m_shouldCoUninitialize = false;
         }
     }
 
