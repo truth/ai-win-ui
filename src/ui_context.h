@@ -22,4 +22,6 @@ struct UIContext {
     UIEventResolver eventResolver;
     UINT dpi = 96;
     float dpiScale = 1.0f;
+    // False while the top-level window is inactive (custom chrome dims caption).
+    bool windowActive = true;
 };

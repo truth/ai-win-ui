@@ -78,6 +78,16 @@ Demo layout: `resource/layouts/custom_chrome_demo.xml`.
 4. Fallback top strip (default 40 DIP) when regions are empty
 5. `HTCLIENT`
 
+## Inactive chrome
+
+When the window loses activation (`WM_ACTIVATE` / `WM_NCACTIVATE`):
+
+- caption band is dimmed with a dark translucent overlay
+- caption button glyphs reduce opacity
+- outer 1px edge uses a darker stroke
+
+`UIContext::windowActive` carries this state into caption button rendering.
+
 ## Limits (v1)
 
 - No layered true irregular shapes

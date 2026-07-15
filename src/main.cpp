@@ -270,6 +270,17 @@ private:
             regions.push_back(region);
         }
         m_windowChrome.SetHitRegions(std::move(regions));
+
+        // Caption band used for inactive dim overlay.
+        float band = static_cast<float>(m_windowChrome.FallbackCaptionHeightPx());
+        for (const auto& entry : captionRegions) {
+            band = std::max(band, entry.first.bottom);
+        }
+        // Clamp to a reasonable title-bar height so content is not dimmed.
+        m_captionBandHeight = std::min(band, std::max(0.0f, m_viewportHeight * 0.25f));
+        if (m_captionBandHeight <= 0.0f) {
+            m_captionBandHeight = static_cast<float>(m_windowChrome.FallbackCaptionHeightPx());
+        }
     }
 
     static void CollectCaptionMaximizeButtons(UIElement* element, std::vector<Button*>& out) {
@@ -528,15 +539,34 @@ private:
             if (m_root) {
                 m_root->Render(*m_renderer);
             }
-            // Subtle outer edge so borderless chrome stays visible on dark desktops.
             if (m_windowChrome.IsCustom() && m_viewportWidth > 1.0f && m_viewportHeight > 1.0f) {
+                // Dim the caption band when inactive (Fluent-like inactive chrome).
+                if (!m_uiContext.windowActive && m_captionBandHeight > 0.0f) {
+                    m_renderer->FillRect(
+                        Rect::Make(0.0f, 0.0f, m_viewportWidth, m_captionBandHeight),
+                        Color{0.0f, 0.0f, 0.0f, 0.28f});
+                }
+                // Subtle outer edge so borderless chrome stays visible on dark desktops.
                 const Rect edge = Rect::Make(0.5f, 0.5f, m_viewportWidth - 0.5f, m_viewportHeight - 0.5f);
-                m_renderer->DrawRect(edge, ColorFromHex(0x2A3A4C), 1.0f);
+                const Color edgeColor = m_uiContext.windowActive
+                    ? ColorFromHex(0x2A3A4C)
+                    : ColorFromHex(0x1A2430);
+                m_renderer->DrawRect(edge, edgeColor, 1.0f);
             }
             m_renderer->EndFrame();
         }
 
         EndPaint(m_hwnd, &ps);
+    }
+
+    void SetWindowActive(bool active) {
+        if (m_uiContext.windowActive == active) {
+            return;
+        }
+        m_uiContext.windowActive = active;
+        if (m_hwnd) {
+            InvalidateRect(m_hwnd, nullptr, FALSE);
+        }
     }
 
     void OnMouseMove(LPARAM lParam) {
@@ -913,6 +943,19 @@ private:
                 }
                 break;
             }
+            case WM_ACTIVATE: {
+                const bool active = (LOWORD(wParam) != WA_INACTIVE);
+                SetWindowActive(active);
+                break;
+            }
+            case WM_NCACTIVATE: {
+                // Keep custom chrome in sync even when only non-client activation changes.
+                if (m_windowChrome.IsCustom()) {
+                    SetWindowActive(wParam != FALSE);
+                    // Still let DefWindowProc paint default NC (none in custom) semantics.
+                }
+                break;
+            }
             case WM_DPICHANGED: {
                 UpdateDpiContext(HIWORD(wParam));
                 const auto* suggestedRect = reinterpret_cast<RECT*>(lParam);
@@ -1020,6 +1063,7 @@ private:
     UIContext m_uiContext{};
     WindowChrome m_windowChrome;
     bool m_chromeEnvForced = false;
+    float m_captionBandHeight = 44.0f;
     std::unique_ptr<IRenderer> m_renderer;
     std::unique_ptr<ITextMeasurer> m_textMeasurer;
     std::unique_ptr<ILayoutEngine> m_layoutEngine;

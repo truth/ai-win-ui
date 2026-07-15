@@ -1803,8 +1803,12 @@ public:
         }
         DrawBoxDecoration(renderer, m_bounds, deco);
 
-        const Color fg = resolved.foreground.value_or(foreground);
+        Color fg = resolved.foreground.value_or(foreground);
         if (IsCaptionVariant()) {
+            if (m_context && !m_context->windowActive) {
+                // Dim caption glyphs when the window is not active.
+                fg.a *= 0.45f;
+            }
             DrawCaptionGlyph(renderer, fg);
             return;
         }
