@@ -2,6 +2,7 @@
 
 ## 2026-07-15
 
+- **GridPanel → Yoga flex-wrap grid**：`ILayoutEngine::MeasureGrid` / `ArrangeGrid`；等分列宽 + `rowHeight` + gap；手写 fallback 保留
 - Wave1 **分任务执行**落地：
   - H3：`LogEffectiveEnv` + 标题 chrome + `AI_WIN_UI_IGNORE_ENV`
   - Q1：`check_gallery_coverage.ps1`；Q2：`core-validation` skia/d2d golden

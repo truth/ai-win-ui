@@ -29,7 +29,7 @@ and **JSON** describe the same tree; property names are largely shared.
 |------|------|
 | `Panel` | Main row/column composition, cards, shells |
 | `ScrollViewer` | Clipped viewport + scroll offset (prefer over window scroll for nested regions) |
-| `Grid` | Uniform tile matrix |
+| `Grid` / `GridPanel` | Uniform multi-column grid via **Yoga flex-wrap** (`ILayoutEngine::MeasureGrid` / `ArrangeGrid`); equal column widths, fixed `rowHeight`, `cellSpacing` as row+column gap |
 | `ShapePanel` / `Shape` | Parametric filled polygon (heart / petal / oval / star) |
 
 ### Text & chrome

@@ -54,6 +54,18 @@ struct StackLayoutChild {
     LayoutSpacing border{};
 };
 
+// Uniform multi-column grid (Yoga flex-wrap row under the hood; Yoga 3.x has no CSS Grid).
+// Matches legacy GridPanel: N equal columns, fixed rowHeight, cellSpacing as row/column gap.
+struct GridLayoutStyle {
+    int columns = 3;
+    LayoutSpacing padding{};
+    LayoutSpacing border{};
+    float cellSpacing = 0.0f;
+    float rowHeight = 120.0f;
+};
+
+using GridLayoutChild = StackLayoutChild;
+
 class ILayoutEngine {
 public:
     virtual ~ILayoutEngine() = default;
@@ -64,6 +76,14 @@ public:
     virtual void ArrangeStack(const StackLayoutStyle& style,
                               const std::vector<StackLayoutChild>& children,
                               const Rect& bounds) = 0;
+
+    virtual Size MeasureGrid(const GridLayoutStyle& style,
+                             const std::vector<GridLayoutChild>& children,
+                             float availableWidth,
+                             float availableHeight) = 0;
+    virtual void ArrangeGrid(const GridLayoutStyle& style,
+                             const std::vector<GridLayoutChild>& children,
+                             const Rect& bounds) = 0;
 };
 
 std::unique_ptr<ILayoutEngine> CreateDefaultLayoutEngine();

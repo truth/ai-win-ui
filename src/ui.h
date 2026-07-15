@@ -816,6 +816,7 @@ private:
     }
 };
 
+// Uniform multi-column grid. Prefer Yoga flex-wrap via ILayoutEngine::MeasureGrid/ArrangeGrid.
 class GridPanel : public UIElement {
 public:
     int columns = 3;
@@ -828,6 +829,98 @@ public:
     void Arrange(const Rect& finalRect) override {
         UIElement::Arrange(finalRect);
 
+        if (m_context && m_context->layoutEngine) {
+            m_context->layoutEngine->ArrangeGrid(ToGridLayoutStyle(), BuildGridChildren(), m_bounds);
+            return;
+        }
+        ArrangeFallback();
+    }
+
+    void Measure(float availableWidth, float availableHeight) override {
+        const float resolvedWidth = GetPreferredWidth(availableWidth);
+
+        if (m_context && m_context->layoutEngine) {
+            const Size measured = m_context->layoutEngine->MeasureGrid(
+                ToGridLayoutStyle(),
+                BuildGridChildren(),
+                resolvedWidth,
+                availableHeight);
+            m_desiredSize.width = resolvedWidth;
+            m_desiredSize.height = HasFixedHeight()
+                ? GetPreferredHeight(resolvedWidth)
+                : ClampHeight(std::max(0.0f, measured.height));
+            return;
+        }
+
+        MeasureFallback(resolvedWidth, availableHeight);
+    }
+
+protected:
+    float MeasurePreferredHeight(float width) const override {
+        if (m_context && m_context->layoutEngine) {
+            const Size measured = m_context->layoutEngine->MeasureGrid(
+                ToGridLayoutStyle(),
+                BuildGridChildren(),
+                width > 0.0f ? width : 4096.0f,
+                100000.0f);
+            return measured.height;
+        }
+        return MeasurePreferredHeightFallback(width);
+    }
+
+    GridLayoutStyle ToGridLayoutStyle() const {
+        const Thickness scaledPadding = ScaleThickness(padding);
+        const Thickness scaledBorder = ScaleThickness(Border());
+        return GridLayoutStyle{
+            std::max(1, columns),
+            LayoutSpacing{scaledPadding.left, scaledPadding.top, scaledPadding.right, scaledPadding.bottom},
+            LayoutSpacing{scaledBorder.left, scaledBorder.top, scaledBorder.right, scaledBorder.bottom},
+            ScaleValue(cellSpacing),
+            ScaleValue(rowHeight)
+        };
+    }
+
+    std::vector<GridLayoutChild> BuildGridChildren() const {
+        std::vector<GridLayoutChild> children;
+        children.reserve(m_children.size());
+        for (const auto& child : m_children) {
+            const Thickness margin = child->ScaleThickness(child->Margin());
+            const Thickness border = child->ScaleThickness(child->Border());
+            children.push_back(GridLayoutChild{
+                child.get(),
+                LayoutSpacing{margin.left, margin.top, margin.right, margin.bottom},
+                LayoutSpacing{border.left, border.top, border.right, border.bottom}
+            });
+        }
+        return children;
+    }
+
+    void MeasureFallback(float resolvedWidth, float availableHeight) {
+        const Thickness scaledPadding = ScaleThickness(padding);
+        const float scaledCellSpacing = ScaleValue(cellSpacing);
+        const float scaledRowHeight = ScaleValue(rowHeight);
+        const float contentWidth = std::max(0.0f, resolvedWidth - scaledPadding.left - scaledPadding.right);
+        const int cols = std::max(1, columns);
+        const float cellWidth = (contentWidth - scaledCellSpacing * (cols - 1)) / cols;
+        const int cellCount = static_cast<int>(m_children.size());
+        const int rows = (cellCount + cols - 1) / cols;
+
+        for (auto& child : m_children) {
+            const Thickness margin = child->ScaleThickness(child->Margin());
+            const float availableCellWidth = std::max(0.0f, cellWidth - margin.left - margin.right);
+            const float childWidth = child->HasFixedWidth() ? child->GetPreferredWidth(availableCellWidth) : availableCellWidth;
+            child->Measure(childWidth, availableHeight);
+        }
+
+        const float measuredHeight =
+            scaledPadding.top + scaledPadding.bottom + rows * scaledRowHeight + std::max(0, rows - 1) * scaledCellSpacing;
+        m_desiredSize.width = resolvedWidth;
+        m_desiredSize.height = HasFixedHeight()
+            ? GetPreferredHeight(resolvedWidth)
+            : ClampHeight(measuredHeight);
+    }
+
+    void ArrangeFallback() {
         const Thickness scaledPadding = ScaleThickness(padding);
         const float scaledCellSpacing = ScaleValue(cellSpacing);
         const float scaledRowHeight = ScaleValue(rowHeight);
@@ -862,34 +955,7 @@ public:
         }
     }
 
-    void Measure(float availableWidth, float availableHeight) override {
-        const float resolvedWidth = GetPreferredWidth(availableWidth);
-        const Thickness scaledPadding = ScaleThickness(padding);
-        const float scaledCellSpacing = ScaleValue(cellSpacing);
-        const float scaledRowHeight = ScaleValue(rowHeight);
-        const float contentWidth = std::max(0.0f, resolvedWidth - scaledPadding.left - scaledPadding.right);
-        const int cols = std::max(1, columns);
-        const float cellWidth = (contentWidth - scaledCellSpacing * (cols - 1)) / cols;
-        const int cellCount = static_cast<int>(m_children.size());
-        const int rows = (cellCount + cols - 1) / cols;
-
-        for (auto& child : m_children) {
-            const Thickness margin = child->ScaleThickness(child->Margin());
-            const float availableCellWidth = std::max(0.0f, cellWidth - margin.left - margin.right);
-            const float childWidth = child->HasFixedWidth() ? child->GetPreferredWidth(availableCellWidth) : availableCellWidth;
-            child->Measure(childWidth, availableHeight);
-        }
-
-        const float measuredHeight =
-            scaledPadding.top + scaledPadding.bottom + rows * scaledRowHeight + std::max(0, rows - 1) * scaledCellSpacing;
-        m_desiredSize.width = resolvedWidth;
-        m_desiredSize.height = HasFixedHeight()
-            ? GetPreferredHeight(resolvedWidth)
-            : ClampHeight(measuredHeight);
-    }
-
-protected:
-    float MeasurePreferredHeight(float width) const override {
+    float MeasurePreferredHeightFallback(float width) const {
         (void)width;
         const Thickness scaledPadding = ScaleThickness(padding);
         const float scaledCellSpacing = ScaleValue(cellSpacing);
@@ -911,7 +977,7 @@ public:
         if (scaledCornerRadius > 0.0f) {
             renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
             renderer.DrawRoundedRect(m_bounds, ColorFromHex(0x333333), 1.0f, scaledCornerRadius);
-        } else {
+        } else if (background.a > 0.0f) {
             renderer.FillRect(m_bounds, background);
         }
         for (auto& child : m_children) {

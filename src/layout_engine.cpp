@@ -368,6 +368,128 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
     return layout;
 }
 
+BuiltYogaLayout BuildGridLayout(const GridLayoutStyle& style,
+                                const std::vector<GridLayoutChild>& children,
+                                float availableWidth,
+                                float availableHeight,
+                                bool exactWidth,
+                                bool exactHeight) {
+    BuiltYogaLayout layout;
+    layout.root = YogaTree(YGNodeNew());
+    if (!layout.root) {
+        return layout;
+    }
+
+    YGNodeRef root = layout.root.get();
+    // Flex-wrap row approximates a CSS-like auto-flow grid (Yoga has no Grid module).
+    YGNodeStyleSetFlexDirection(root, YGFlexDirectionRow);
+    YGNodeStyleSetFlexWrap(root, YGWrapWrap);
+    YGNodeStyleSetAlignItems(root, YGAlignStretch);
+    YGNodeStyleSetAlignContent(root, YGAlignFlexStart);
+    YGNodeStyleSetJustifyContent(root, YGJustifyFlexStart);
+    YGNodeStyleSetGap(root, YGGutterColumn, style.cellSpacing);
+    YGNodeStyleSetGap(root, YGGutterRow, style.cellSpacing);
+    ApplyPadding(root, style.padding);
+    ApplyBorder(root, style.border);
+
+    const float clampedWidth = std::max(0.0f, availableWidth);
+    const float clampedHeight = std::max(0.0f, availableHeight);
+    if (exactWidth) {
+        YGNodeStyleSetWidth(root, clampedWidth);
+    }
+    if (exactHeight) {
+        YGNodeStyleSetHeight(root, clampedHeight);
+    }
+
+    const int cols = std::max(1, style.columns);
+    const float contentWidth = std::max(
+        0.0f,
+        clampedWidth - style.padding.left - style.padding.right - style.border.left - style.border.right);
+    const float cellWidth = cols > 0
+        ? (contentWidth - style.cellSpacing * static_cast<float>(cols - 1)) / static_cast<float>(cols)
+        : contentWidth;
+    const float cellHeight = std::max(0.0f, style.rowHeight);
+
+    layout.childNodes.reserve(children.size());
+    layout.elements.reserve(children.size());
+    layout.leafContexts.reserve(children.size());
+
+    for (const auto& child : children) {
+        if (!child.element) {
+            continue;
+        }
+
+        YGNodeRef childNode = YGNodeNew();
+        if (!childNode) {
+            continue;
+        }
+
+        ApplyMargin(childNode, child.margin);
+        ApplyBorder(childNode, child.border);
+
+        if (child.element->AlignSelf() != UIElement::SelfAlign::Auto) {
+            YGNodeStyleSetAlignSelf(childNode, ToYogaSelfAlign(child.element->AlignSelf()));
+        }
+        if (child.element->HasMinWidth()) {
+            YGNodeStyleSetMinWidth(childNode, child.element->MinWidth());
+        }
+        if (child.element->HasMaxWidth()) {
+            YGNodeStyleSetMaxWidth(childNode, child.element->MaxWidth());
+        }
+        if (child.element->HasMinHeight()) {
+            YGNodeStyleSetMinHeight(childNode, child.element->MinHeight());
+        }
+        if (child.element->HasMaxHeight()) {
+            YGNodeStyleSetMaxHeight(childNode, child.element->MaxHeight());
+        }
+
+        const float availableChildWidth =
+            std::max(0.0f, cellWidth - child.margin.left - child.margin.right);
+        const float availableChildHeight =
+            std::max(0.0f, cellHeight - child.margin.top - child.margin.bottom);
+
+        // Fixed cell box (legacy GridPanel contract).
+        const float boxW = child.element->HasFixedWidth()
+            ? child.element->GetPreferredWidth(availableChildWidth)
+            : availableChildWidth;
+        const float boxH = child.element->HasFixedHeight()
+            ? child.element->GetPreferredHeight(boxW)
+            : availableChildHeight;
+
+        if (child.element->IsLayoutLeaf()) {
+            auto context = std::make_unique<LeafMeasureContext>();
+            context->element = child.element;
+            LeafMeasureContext* contextPtr = context.get();
+            layout.leafContexts.push_back(std::move(context));
+            YGNodeSetContext(childNode, contextPtr);
+            YGNodeSetMeasureFunc(childNode, MeasureLeafNode);
+            YGNodeStyleSetWidth(childNode, boxW);
+            YGNodeStyleSetHeight(childNode, boxH);
+            // Prime measure cache for the cell size.
+            MeasureLeafWithContext(
+                *contextPtr,
+                boxW,
+                YGMeasureModeExactly,
+                boxH,
+                YGMeasureModeExactly);
+        } else {
+            child.element->Measure(boxW, boxH);
+            YGNodeStyleSetWidth(childNode, boxW);
+            YGNodeStyleSetHeight(childNode, boxH);
+        }
+
+        // Prevent flex shrink from collapsing equal columns.
+        YGNodeStyleSetFlexGrow(childNode, 0.0f);
+        YGNodeStyleSetFlexShrink(childNode, 0.0f);
+
+        YGNodeInsertChild(root, childNode, YGNodeGetChildCount(root));
+        layout.childNodes.push_back(childNode);
+        layout.elements.push_back(child.element);
+    }
+
+    return layout;
+}
+
 class YogaLayoutEngine final : public ILayoutEngine {
 public:
     Size MeasureStack(const StackLayoutStyle& style,
@@ -396,6 +518,49 @@ public:
                       const Rect& bounds) override {
         BuiltYogaLayout layout =
             BuildStackLayout(style, children, bounds.Width(), bounds.Height(), true, true);
+        if (!layout.root) {
+            return;
+        }
+
+        YGNodeCalculateLayout(layout.root.get(), bounds.Width(), bounds.Height(), YGDirectionLTR);
+
+        for (size_t i = 0; i < layout.childNodes.size(); ++i) {
+            UIElement* element = layout.elements[i];
+            YGNodeRef childNode = layout.childNodes[i];
+            const float left = bounds.left + YGNodeLayoutGetLeft(childNode);
+            const float top = bounds.top + YGNodeLayoutGetTop(childNode);
+            const float width = YGNodeLayoutGetWidth(childNode);
+            const float height = YGNodeLayoutGetHeight(childNode);
+            element->Arrange(Rect::Make(left, top, left + width, top + height));
+        }
+    }
+
+    Size MeasureGrid(const GridLayoutStyle& style,
+                     const std::vector<GridLayoutChild>& children,
+                     float availableWidth,
+                     float availableHeight) override {
+        BuiltYogaLayout layout =
+            BuildGridLayout(style, children, availableWidth, availableHeight, true, false);
+        if (!layout.root) {
+            return {};
+        }
+
+        YGNodeCalculateLayout(
+            layout.root.get(),
+            std::max(0.0f, availableWidth),
+            YGUndefined,
+            YGDirectionLTR);
+        return Size{
+            YGNodeLayoutGetWidth(layout.root.get()),
+            YGNodeLayoutGetHeight(layout.root.get())
+        };
+    }
+
+    void ArrangeGrid(const GridLayoutStyle& style,
+                     const std::vector<GridLayoutChild>& children,
+                     const Rect& bounds) override {
+        BuiltYogaLayout layout =
+            BuildGridLayout(style, children, bounds.Width(), bounds.Height(), true, true);
         if (!layout.root) {
             return;
         }

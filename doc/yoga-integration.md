@@ -235,3 +235,13 @@ $env:AI_WIN_UI_LAYOUT = "layouts/yoga_measure_cases.xml"
 - 表单区固定高度，底部按钮区贴边。
 - 卡片堆叠中插入一个或多个弹性间隔器。
 - 横向工具条、筛选栏、标签条。
+
+## GridPanel / Yoga flex-wrap grid (2026-07-15)
+
+Yoga 3.2 does **not** ship a CSS Grid module. GridPanel now prefers:
+
+- ILayoutEngine::MeasureGrid / ArrangeGrid
+- Implementation: single Yoga root with `flex-direction: row`, `flex-wrap: wrap`,
+  column+row `gap` = `cellSpacing`, each child fixed to equal cell width and `rowHeight`.
+
+Hand-written arrange remains as fallback when no layout engine is attached.

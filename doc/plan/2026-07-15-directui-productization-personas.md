@@ -102,7 +102,7 @@ P0 之后默认 **Wave 1 = 收口 L1**，再开 L2/L3 并行。
 | ID | 任务 | 完成判据 |
 |----|------|----------|
 | L5 | 百分比宽高 / 基础 absolute（若产品需要） | 设计评审 + demo |
-| L6 | GridPanel → Yoga grid 或文档化「永不替换」决策 | 决策写入 layout-spec |
+| L6 | GridPanel → Yoga grid 或文档化「永不替换」决策 | **done (2026-07-15)**：`MeasureGrid`/`ArrangeGrid` 用 Yoga flex-wrap 等分列；手写路径为 fallback |
 | L7 | catalog `padding` 可选同步到 Yoga（opt-in） | 与 **S** 协议字段 |
 
 **不负责：** 文本测量算法细节（归 R）。
