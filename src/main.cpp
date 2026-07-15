@@ -118,6 +118,10 @@ public:
         m_instance = instance;
         m_cmdShow = cmdShow;
 
+        // AI_WIN_UI_IGNORE_ENV=1|true → ignore sticky layout/chrome/size/theme/styles
+        // (keeps RENDERER so scripts can still pick backend).
+        ApplyIgnoreEnvIfRequested();
+
         WNDCLASSW wc{};
         wc.lpfnWndProc = &App::WndProcSetup;
         wc.hInstance = instance;
@@ -238,7 +242,9 @@ public:
         ApplyChromeFromRootIfNeeded();
         m_isInitialized = true;
         OnResize();
+        LogEffectiveEnv();
         MaybeDumpMeasureTree();
+        MaybeDumpTextMetrics();
 
         // Layered windows stay invisible until the first UpdateLayeredWindow.
         // Force an initial paint while still hidden so the first ShowWindow has
@@ -911,13 +917,18 @@ private:
     }
 
     void UpdateWindowTitle() {
-        std::wstring title = L"AI WinUI Renderer [";
+        std::wstring title = L"AI WinUI [";
         title += RendererBackendDisplayName(m_activeRendererBackend);
         if (m_requestedRendererBackend != m_activeRendererBackend) {
             title += L" fallback from ";
             title += RendererBackendDisplayName(m_requestedRendererBackend);
         }
         title += L"]";
+        if (m_windowChrome.IsLayered()) {
+            title += L" chrome=layered";
+        } else if (m_windowChrome.IsCustom()) {
+            title += L" chrome=custom";
+        }
         if (!m_activeLayoutPath.empty()) {
             const int size = MultiByteToWideChar(CP_UTF8, 0, m_activeLayoutPath.c_str(), -1, nullptr, 0);
             if (size > 1) {
@@ -928,6 +939,63 @@ private:
             }
         }
         SetWindowTextW(m_hwnd, title.c_str());
+    }
+
+    static bool EnvTruthy(const std::wstring& value) {
+        return value == L"1" || value == L"true" || value == L"TRUE" || value == L"yes" || value == L"YES";
+    }
+
+    void ApplyIgnoreEnvIfRequested() {
+        if (!EnvTruthy(GetEnvironmentValue(L"AI_WIN_UI_IGNORE_ENV"))) {
+            return;
+        }
+        // Clear sticky demo vars that commonly break "just launch the app".
+        SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", nullptr);
+        SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", nullptr);
+        SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", nullptr);
+        SetEnvironmentVariableW(L"AI_WIN_UI_THEME", nullptr);
+        SetEnvironmentVariableW(L"AI_WIN_UI_STYLES", nullptr);
+        SetEnvironmentVariableW(L"AI_WIN_UI_MEASURE_DUMP", nullptr);
+        SetEnvironmentVariableW(L"AI_WIN_UI_TEXT_DUMP", nullptr);
+        OutputDebugStringW(L"[Env] AI_WIN_UI_IGNORE_ENV: cleared sticky layout/chrome/size/theme/styles/dumps\n");
+    }
+
+    void LogEffectiveEnv() const {
+        auto line = [](const wchar_t* key, const std::wstring& value) {
+            std::wstring msg = L"[Env] ";
+            msg += key;
+            msg += L"=";
+            msg += value.empty() ? L"(default)" : value;
+            msg += L"\n";
+            OutputDebugStringW(msg.c_str());
+        };
+        line(L"AI_WIN_UI_LAYOUT", GetEnvironmentValue(L"AI_WIN_UI_LAYOUT"));
+        line(L"AI_WIN_UI_CHROME", GetEnvironmentValue(L"AI_WIN_UI_CHROME"));
+        line(L"AI_WIN_UI_RENDERER", GetEnvironmentValue(L"AI_WIN_UI_RENDERER"));
+        line(L"AI_WIN_UI_SIZE", GetEnvironmentValue(L"AI_WIN_UI_SIZE"));
+        line(L"AI_WIN_UI_THEME", GetEnvironmentValue(L"AI_WIN_UI_THEME"));
+        line(L"AI_WIN_UI_STYLES", GetEnvironmentValue(L"AI_WIN_UI_STYLES"));
+        line(L"AI_WIN_UI_QUIT_AFTER_MS", GetEnvironmentValue(L"AI_WIN_UI_QUIT_AFTER_MS"));
+        {
+            std::wstring msg = L"[Env] activeLayout=";
+            if (m_activeLayoutPath.empty()) {
+                msg += L"(none)";
+            } else {
+                const int n = MultiByteToWideChar(CP_UTF8, 0, m_activeLayoutPath.c_str(), -1, nullptr, 0);
+                if (n > 1) {
+                    std::wstring w(static_cast<size_t>(n - 1), L'\0');
+                    MultiByteToWideChar(CP_UTF8, 0, m_activeLayoutPath.c_str(), -1, w.data(), n);
+                    msg += w;
+                }
+            }
+            msg += L" chromeMode=";
+            msg += m_windowChrome.IsLayered() ? L"layered"
+                : (m_windowChrome.IsCustom() ? L"custom" : L"system");
+            msg += L" backend=";
+            msg += RendererBackendDisplayName(m_activeRendererBackend);
+            msg += L"\n";
+            OutputDebugStringW(msg.c_str());
+        }
     }
 
     UIElement* GetFirstFocusable() const {
@@ -1133,6 +1201,72 @@ private:
         walk(m_root.get(), "", 0);
         out.flush();
         OutputDebugStringW((L"[MeasureDump] wrote " + outPathW + L"\n").c_str());
+    }
+
+    // AI_WIN_UI_TEXT_DUMP=1|path → NDJSON of Label measure sizes (Wave1 R/A6).
+    void MaybeDumpTextMetrics() {
+        const std::wstring dumpEnv = GetEnvironmentValue(L"AI_WIN_UI_TEXT_DUMP");
+        if (dumpEnv.empty() || !m_root || !m_uiContext.textMeasurer) {
+            return;
+        }
+
+        std::wstring outPathW = dumpEnv;
+        if (EnvTruthy(dumpEnv)) {
+            const std::wstring dir = GetExecutableDirectory();
+            outPathW = dir.empty() ? L"text_dump.ndjson" : (dir + L"\\text_dump.ndjson");
+        }
+        const std::string outPath = Utf16ToUtf8(outPathW);
+        std::ofstream out(outPath.empty() ? "text_dump.ndjson" : outPath, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            OutputDebugStringW((L"[TextDump] failed to open " + outPathW + L"\n").c_str());
+            return;
+        }
+
+        std::function<void(UIElement*, const std::string&, int)> walk;
+        walk = [&](UIElement* el, const std::string& parentPath, int index) {
+            if (!el) {
+                return;
+            }
+            const std::string segment = el->Name().empty()
+                ? ("n" + std::to_string(index))
+                : el->Name();
+            const std::string path = parentPath.empty() ? segment : (parentPath + "/" + segment);
+
+            if (auto* label = dynamic_cast<Label*>(el)) {
+                const float fontSize = label->ScaleValue(label->FontSize());
+                const float maxW = std::max(1.0f, label->Bounds().Width());
+                const Size wrap = m_uiContext.textMeasurer->MeasureText(
+                    label->Text().c_str(),
+                    static_cast<uint32_t>(label->Text().size()),
+                    fontSize,
+                    maxW,
+                    TextWrapMode::Wrap);
+                const Size nowrap = m_uiContext.textMeasurer->MeasureText(
+                    label->Text().c_str(),
+                    static_cast<uint32_t>(label->Text().size()),
+                    fontSize,
+                    maxW,
+                    TextWrapMode::NoWrap);
+                out << "{\"path\":\"" << path
+                    << "\",\"font\":" << fontSize
+                    << ",\"maxW\":" << maxW
+                    << ",\"wrapW\":" << wrap.width
+                    << ",\"wrapH\":" << wrap.height
+                    << ",\"nowrapW\":" << nowrap.width
+                    << ",\"nowrapH\":" << nowrap.height
+                    << ",\"boxW\":" << label->Bounds().Width()
+                    << ",\"boxH\":" << label->Bounds().Height()
+                    << "}\n";
+            }
+
+            int childIndex = 0;
+            for (const auto& child : el->Children()) {
+                walk(child.get(), path, childIndex++);
+            }
+        };
+        walk(m_root.get(), "", 0);
+        out.flush();
+        OutputDebugStringW((L"[TextDump] wrote " + outPathW + L"\n").c_str());
     }
 
     void OnPaint() {

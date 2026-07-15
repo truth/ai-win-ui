@@ -11,6 +11,7 @@ $names = @(
     'AI_WIN_UI_SIZE',
     'AI_WIN_UI_QUIT_AFTER_MS',
     'AI_WIN_UI_MEASURE_DUMP',
+    'AI_WIN_UI_TEXT_DUMP',
     'AI_WIN_UI_CHILD_PROCESS',
     'AI_WIN_UI_IGNORE_ENV'
 )

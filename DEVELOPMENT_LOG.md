@@ -2,6 +2,10 @@
 
 ## 2026-07-15
 
+- Wave1 **分任务执行**落地：
+  - H3：`LogEffectiveEnv` + 标题 chrome + `AI_WIN_UI_IGNORE_ENV`
+  - Q1：`check_gallery_coverage.ps1`；Q2：`core-validation` skia/d2d golden
+  - R/A6：`AI_WIN_UI_TEXT_DUMP` + `run_text_dump.ps1`；`wave1-text-parity-notes.md`
 - DirectUI **产品化路线 · 分人物**：`doc/plan/2026-07-15-directui-productization-personas.md`
   - 六角色 R 文本 / L 布局 / C 控件 / S 样式 / H 宿主 / Q 质量
   - 三 Wave（L1 引擎可信 → L2 产品能力 → L3 交付形态）+ 认领表 + 文件边界

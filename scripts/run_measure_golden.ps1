@@ -51,7 +51,16 @@ $renderers = if ($Renderer -eq "both") { @("skia", "direct2d") } else { @($Rende
 $layoutRel = switch ($Layout.ToLowerInvariant()) {
     "scroll-viewer" { "layouts/scroll_viewer_cases.xml" }
     "scroll_viewer" { "layouts/scroll_viewer_cases.xml" }
+    "core-validation" { "layouts/core_validation.xml" }
+    "core_validation" { "layouts/core_validation.xml" }
+    "demo-gallery" { "layouts/demo_gallery.xml" }
+    "demo_gallery" { "layouts/demo_gallery.xml" }
     default { $Layout }
+}
+
+# Fixed client size so goldens are stable across machines.
+if (-not $env:AI_WIN_UI_SIZE) {
+    $env:AI_WIN_UI_SIZE = "1000x700"
 }
 
 $allOk = $true

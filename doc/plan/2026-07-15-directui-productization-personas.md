@@ -316,8 +316,23 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 
 ---
 
-## 9. 修订记录
+## 9. Wave1 执行进度（自动更新）
+
+| ID | 状态 | 说明 |
+|----|------|------|
+| H3 | **done** | 启动 `LogEffectiveEnv`；标题显示 chrome；`AI_WIN_UI_IGNORE_ENV` |
+| Q5 | **done** | `scripts/clear_ai_win_env.ps1` |
+| Q1 | **done** | `scripts/check_gallery_coverage.ps1` |
+| Q2 | **done** | `core-validation` skia+d2d + scroll-viewer skia（`tests/golden/`） |
+| R/A6 | **done** | `AI_WIN_UI_TEXT_DUMP` + `run_text_dump.ps1`；对照表见 `wave1-text-parity-notes.md` |
+| R1–R3 | **open** | 需双后端填表 / caret 验证 |
+| L1–L4 | **open** | |
+| C1–C3 | **open** | |
+| S1–S3 | **partial** | S3≈H3 日志 |
+
+## 10. 修订记录
 
 | 日期 | 变更 |
 |------|------|
 | 2026-07-15 | 初版：六人物 + 三 Wave + 认领表 + 契约 |
+| 2026-07-15 | Wave1 开跑：H3/Q1/Q5/R-dump 落地 |

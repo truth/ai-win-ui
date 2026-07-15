@@ -108,6 +108,11 @@
 
 # 若启动异常：清掉粘连的 AI_WIN_UI_* 环境变量
 .\scripts\clear_ai_win_env.ps1
+
+# Wave1 质量：gallery 覆盖 / measure golden / 文本 dump
+.\scripts\check_gallery_coverage.ps1
+.\scripts\run_measure_golden.ps1 -Layout core-validation -Renderer both
+.\scripts\run_text_dump.ps1 -Layout core-validation -Renderer skia
 ```
 
 | 环境变量 | 含义 |

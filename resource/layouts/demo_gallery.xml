@@ -2,7 +2,7 @@
   Manual test gallery: grid of every major layout case.
   Click Open to spawn an in-process secondary window (close child without quitting hub).
 
-  Event format: openDemo:layouts/path.xml[|chrome][|size]
+  Event format: openDemo + colon + layouts/file.xml optional pipe chrome optional pipe size
     chrome = system | custom | layered  (omit => system)
     size   = e.g. 1100x750
 

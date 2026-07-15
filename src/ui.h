@@ -925,6 +925,8 @@ public:
     explicit Label(std::wstring text) : m_text(std::move(text)) {}
 
     void SetText(std::wstring text) { m_text = std::move(text); }
+    const std::wstring& Text() const { return m_text; }
+    float FontSize() const { return m_fontSize; }
 
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
