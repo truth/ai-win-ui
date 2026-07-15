@@ -383,6 +383,10 @@ Optional env for any process:
 | `AI_WIN_UI_CHROME` | `system` \| `custom` \| `layered` |
 | `AI_WIN_UI_SIZE` | Client size `420x460` or `420,480` |
 | `AI_WIN_UI_QUIT_AFTER_MS` | Headless auto-close |
+| `AI_WIN_UI_IGNORE_ENV` | `1` clears sticky layout/chrome/size/theme/styles dumps |
+| `AI_WIN_UI_DISABLE_WINDOW_SCROLL` | `1` disables **legacy** host vertical scroll (use `ScrollViewer`) |
+| `AI_WIN_UI_TEXT_DUMP` | `1` or path → Label metrics NDJSON |
+| `AI_WIN_UI_MEASURE_DUMP` | `1` or path → tree measure NDJSON |
 
 ---
 

@@ -97,14 +97,17 @@ int g_liveHostCount = 0;
 void PurgeClosedSecondaryHosts();
 constexpr UINT WM_APP_OPEN_DEMO_HOST = WM_APP + 40;
 
-// Deferred secondary-window open (filled by button handler, consumed on WM_APP_OPEN_DEMO_HOST).
-struct PendingDemoHost {
-    std::wstring layout;
-    std::wstring chrome; // empty => clear AI_WIN_UI_CHROME (system chrome)
-    std::wstring size;   // empty => default window size
+// Public-ish host open parameters (H2). Still can be filled from env for CLI.
+struct OpenHostOptions {
+    std::wstring layout;     // resource path e.g. layouts/ui.xml
+    std::wstring chrome;     // empty/system => system frame; custom; layered
+    std::wstring size;       // empty => default; e.g. 1100x750
     RendererBackend renderer = RendererBackend::Direct2D;
+    bool childProcess = false; // true => CreateProcess instead of in-process
 };
-PendingDemoHost g_pendingDemoHost{};
+
+// Deferred secondary-window open (filled by button handler, consumed on WM_APP_OPEN_DEMO_HOST).
+OpenHostOptions g_pendingDemoHost{};
 bool g_hasPendingDemoHost = false;
 
 class App {
@@ -121,6 +124,9 @@ public:
         // AI_WIN_UI_IGNORE_ENV=1|true → ignore sticky layout/chrome/size/theme/styles
         // (keeps RENDERER so scripts can still pick backend).
         ApplyIgnoreEnvIfRequested();
+        // Legacy window-level vertical scroll (root content taller than client).
+        // Prefer ScrollViewer in layouts. Disable: AI_WIN_UI_DISABLE_WINDOW_SCROLL=1
+        m_windowScrollEnabled = !EnvTruthy(GetEnvironmentValue(L"AI_WIN_UI_DISABLE_WINDOW_SCROLL"));
 
         WNDCLASSW wc{};
         wc.lpfnWndProc = &App::WndProcSetup;
@@ -376,13 +382,8 @@ public:
         return static_cast<int>(msg.wParam);
     }
 
-    // In-process secondary host (shaped / extra windows). Heap-owned via g_secondaryHosts.
-    static bool OpenSecondaryHost(
-        HINSTANCE instance,
-        const wchar_t* layoutRelPath,
-        const wchar_t* chromeMode,
-        const wchar_t* sizeWh,
-        RendererBackend renderer) {
+    // Open a secondary host from structured options (H2). Prefer this over raw env.
+    static bool OpenSecondaryHost(HINSTANCE instance, const OpenHostOptions& options) {
         // Snapshot parent env without mutating globals until the last moment.
         wchar_t prevLayoutBuf[512] = {};
         wchar_t prevChromeBuf[512] = {};
@@ -393,21 +394,21 @@ public:
         const DWORD nSize = GetEnvironmentVariableW(L"AI_WIN_UI_SIZE", prevSizeBuf, 512);
         const DWORD nRenderer = GetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", prevRendererBuf, 512);
 
-        SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", layoutRelPath);
+        SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", options.layout.c_str());
         // Always set/clear chrome so secondary does not inherit hub chrome env.
-        if (chromeMode && chromeMode[0] != L'\0') {
-            SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", chromeMode);
+        if (!options.chrome.empty() && options.chrome != L"system") {
+            SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", options.chrome.c_str());
         } else {
             SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", nullptr);
         }
-        if (sizeWh && sizeWh[0] != L'\0') {
-            SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", sizeWh);
+        if (!options.size.empty()) {
+            SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", options.size.c_str());
         } else {
             SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", nullptr);
         }
         SetEnvironmentVariableW(
             L"AI_WIN_UI_RENDERER",
-            renderer == RendererBackend::Skia ? L"skia" : L"direct2d");
+            options.renderer == RendererBackend::Skia ? L"skia" : L"direct2d");
         // Never auto-quit secondary hosts.
         SetEnvironmentVariableW(L"AI_WIN_UI_QUIT_AFTER_MS", nullptr);
 
@@ -434,6 +435,20 @@ public:
         }
         g_secondaryHosts.push_back(host);
         return true;
+    }
+
+    static bool OpenSecondaryHost(
+        HINSTANCE instance,
+        const wchar_t* layoutRelPath,
+        const wchar_t* chromeMode,
+        const wchar_t* sizeWh,
+        RendererBackend renderer) {
+        OpenHostOptions options;
+        options.layout = layoutRelPath ? layoutRelPath : L"";
+        options.chrome = chromeMode ? chromeMode : L"";
+        options.size = sizeWh ? sizeWh : L"";
+        options.renderer = renderer;
+        return OpenSecondaryHost(instance, options);
     }
 
     void MarkClosed() { m_closed = true; }
@@ -673,27 +688,48 @@ private:
     // Open any layout as a secondary host (default in-process).
     // chrome: "" / "system" => system frame; "custom"; "layered"
     // Deferred via PostMessage so we never CreateWindow re-entrantly inside mouse handlers.
-    void LaunchDemoHost(const wchar_t* layoutRelPath, const wchar_t* chromeMode, const wchar_t* sizeWh) {
-        const std::wstring forceProcess = GetEnvironmentValue(L"AI_WIN_UI_CHILD_PROCESS");
-        const bool useProcess =
-            forceProcess == L"1" || forceProcess == L"true" || forceProcess == L"TRUE";
-
-        std::wstring chrome = chromeMode ? chromeMode : L"";
-        if (chrome == L"system") {
-            chrome.clear();
+    void LaunchDemoHost(const OpenHostOptions& options) {
+        OpenHostOptions opts = options;
+        if (opts.chrome == L"system") {
+            opts.chrome.clear();
+        }
+        if (EnvTruthy(GetEnvironmentValue(L"AI_WIN_UI_CHILD_PROCESS"))) {
+            opts.childProcess = true;
         }
 
-        if (!useProcess) {
-            g_pendingDemoHost.layout = layoutRelPath ? layoutRelPath : L"";
-            g_pendingDemoHost.chrome = chrome;
-            g_pendingDemoHost.size = sizeWh ? sizeWh : L"";
-            g_pendingDemoHost.renderer = m_activeRendererBackend;
+        if (!opts.childProcess) {
+            g_pendingDemoHost = opts;
+            if (g_pendingDemoHost.renderer != RendererBackend::Skia &&
+                g_pendingDemoHost.renderer != RendererBackend::Direct2D) {
+                g_pendingDemoHost.renderer = m_activeRendererBackend;
+            }
+            // Prefer hub's active backend when not explicitly set via process env.
+            if (GetEnvironmentValue(L"AI_WIN_UI_RENDERER").empty()) {
+                g_pendingDemoHost.renderer = m_activeRendererBackend;
+            }
             g_hasPendingDemoHost = true;
             if (m_hwnd) {
                 PostMessageW(m_hwnd, WM_APP_OPEN_DEMO_HOST, 0, 0);
             }
             return;
         }
+
+        LaunchDemoHostProcess(opts);
+    }
+
+    void LaunchDemoHost(const wchar_t* layoutRelPath, const wchar_t* chromeMode, const wchar_t* sizeWh) {
+        OpenHostOptions options;
+        options.layout = layoutRelPath ? layoutRelPath : L"";
+        options.chrome = chromeMode ? chromeMode : L"";
+        options.size = sizeWh ? sizeWh : L"";
+        options.renderer = m_activeRendererBackend;
+        LaunchDemoHost(options);
+    }
+
+    void LaunchDemoHostProcess(const OpenHostOptions& options) {
+        const wchar_t* layoutRelPath = options.layout.c_str();
+        const wchar_t* sizeWh = options.size.empty() ? nullptr : options.size.c_str();
+        const std::wstring& chrome = options.chrome;
 
         wchar_t exePath[MAX_PATH] = {};
         if (GetModuleFileNameW(nullptr, exePath, ARRAYSIZE(exePath)) == 0) {
@@ -716,11 +752,9 @@ private:
         } else {
             SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", nullptr);
         }
-        if (prevRenderer.empty()) {
-            SetEnvironmentVariableW(
-                L"AI_WIN_UI_RENDERER",
-                m_activeRendererBackend == RendererBackend::Skia ? L"skia" : L"direct2d");
-        }
+        SetEnvironmentVariableW(
+            L"AI_WIN_UI_RENDERER",
+            options.renderer == RendererBackend::Skia ? L"skia" : L"direct2d");
 
         std::wstring cmdLine = L"\"";
         cmdLine += exePath;
@@ -764,11 +798,7 @@ private:
         restore(L"AI_WIN_UI_LAYOUT", prevLayout);
         restore(L"AI_WIN_UI_CHROME", prevChrome);
         restore(L"AI_WIN_UI_SIZE", prevSize);
-        if (prevRenderer.empty()) {
-            SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", nullptr);
-        } else {
-            SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", prevRenderer.c_str());
-        }
+        restore(L"AI_WIN_UI_RENDERER", prevRenderer);
     }
 
     void BuildUI() {
@@ -976,6 +1006,8 @@ private:
         line(L"AI_WIN_UI_THEME", GetEnvironmentValue(L"AI_WIN_UI_THEME"));
         line(L"AI_WIN_UI_STYLES", GetEnvironmentValue(L"AI_WIN_UI_STYLES"));
         line(L"AI_WIN_UI_QUIT_AFTER_MS", GetEnvironmentValue(L"AI_WIN_UI_QUIT_AFTER_MS"));
+        line(L"AI_WIN_UI_DISABLE_WINDOW_SCROLL",
+             m_windowScrollEnabled ? L"0 (legacy window scroll ON)" : L"1 (window scroll OFF)");
         {
             std::wstring msg = L"[Env] activeLayout=";
             if (m_activeLayoutPath.empty()) {
@@ -1431,6 +1463,10 @@ private:
             return;
         }
 
+        // Legacy host scroll — opt out with AI_WIN_UI_DISABLE_WINDOW_SCROLL=1
+        if (!m_windowScrollEnabled) {
+            return;
+        }
         const float wheelStep = std::max(24.0f, 56.0f * m_uiContext.dpiScale);
         ScrollBy(-delta * wheelStep);
     }
@@ -1628,6 +1664,13 @@ private:
     }
 
     void UpdateScrollBar() const {
+        if (!m_hwnd) {
+            return;
+        }
+        if (!m_windowScrollEnabled) {
+            ShowScrollBar(m_hwnd, SB_VERT, FALSE);
+            return;
+        }
         SCROLLINFO si{};
         si.cbSize = sizeof(si);
         si.fMask = SIF_PAGE | SIF_POS | SIF_RANGE;
@@ -1636,6 +1679,7 @@ private:
         si.nPage = static_cast<UINT>(std::max(0.0f, m_viewportHeight));
         si.nPos = static_cast<int>(std::lround(m_scrollOffset));
         SetScrollInfo(m_hwnd, SB_VERT, &si, TRUE);
+        ShowScrollBar(m_hwnd, SB_VERT, MaxScrollOffset() > 0.5f ? TRUE : FALSE);
     }
 
     bool OnVerticalScroll(WPARAM wParam) {
@@ -1873,12 +1917,7 @@ private:
             case WM_APP_OPEN_DEMO_HOST:
                 if (g_hasPendingDemoHost) {
                     g_hasPendingDemoHost = false;
-                    const bool ok = OpenSecondaryHost(
-                        m_instance,
-                        g_pendingDemoHost.layout.c_str(),
-                        g_pendingDemoHost.chrome.empty() ? L"" : g_pendingDemoHost.chrome.c_str(),
-                        g_pendingDemoHost.size.empty() ? nullptr : g_pendingDemoHost.size.c_str(),
-                        g_pendingDemoHost.renderer);
+                    const bool ok = OpenSecondaryHost(m_instance, g_pendingDemoHost);
                     if (m_hwnd) {
                         std::wstring title = ok ? L"Opened: " : L"Failed: ";
                         title += g_pendingDemoHost.layout;
@@ -1938,6 +1977,8 @@ private:
     float m_viewportHeight = 0.0f;
     float m_contentHeight = 0.0f;
     float m_scrollOffset = 0.0f;
+    // Legacy: translate entire root when content taller than client (prefer ScrollViewer).
+    bool m_windowScrollEnabled = true;
     bool m_isInitialized = false;
     bool m_isTrackingMouseLeave = false;
 };

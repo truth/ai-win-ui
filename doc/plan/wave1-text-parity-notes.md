@@ -47,11 +47,20 @@
 - CJK 回退字体若系统缺字，宽度差可能 >2px → 先固定 YaHei UI 再比。
 - ClearType vs Skia 次像素抗锯齿：视觉略不同，以 **metrics** 为主。
 
+## 自动化对比
+
+```powershell
+.\scripts\compare_text_dumps.ps1 -Layout core-validation -TolerancePx 2
+.\scripts\compare_text_dumps.ps1 -Layout cjk-render -TolerancePx 2
+```
+
+默认容差 **2px**（R1 判据）。失败会保留两侧 dump 路径。
+
 ## 状态
 
 | ID | 状态 | 日期 |
 |----|------|------|
-| R1 规则表 | 工具已备，数值待填 | 2026-07-15 |
-| R2 多行 golden | 待 R1 | |
+| R1 规则表 + 对比脚本 | **PASS** core-validation @2px（2026-07-15 实测） | 2026-07-15 |
+| R2 多行 golden | 用 compare 看 wrapH；大 diff 再修 Skia wrap | |
 | R3 caret | 待 | |
 | A6 TEXT_DUMP | **已实现** `AI_WIN_UI_TEXT_DUMP` | 2026-07-15 |

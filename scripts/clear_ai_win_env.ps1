@@ -13,7 +13,8 @@ $names = @(
     'AI_WIN_UI_MEASURE_DUMP',
     'AI_WIN_UI_TEXT_DUMP',
     'AI_WIN_UI_CHILD_PROCESS',
-    'AI_WIN_UI_IGNORE_ENV'
+    'AI_WIN_UI_IGNORE_ENV',
+    'AI_WIN_UI_DISABLE_WINDOW_SCROLL'
 )
 
 $cleared = @()

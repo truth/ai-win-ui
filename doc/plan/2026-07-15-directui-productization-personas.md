@@ -321,13 +321,17 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 | ID | 状态 | 说明 |
 |----|------|------|
 | H3 | **done** | 启动 `LogEffectiveEnv`；标题显示 chrome；`AI_WIN_UI_IGNORE_ENV` |
+| H2 | **done** | `OpenHostOptions` + `OpenSecondaryHost(options)` / `LaunchDemoHost(options)` |
 | Q5 | **done** | `scripts/clear_ai_win_env.ps1` |
 | Q1 | **done** | `scripts/check_gallery_coverage.ps1` |
 | Q2 | **done** | `core-validation` skia+d2d + scroll-viewer skia（`tests/golden/`） |
-| R/A6 | **done** | `AI_WIN_UI_TEXT_DUMP` + `run_text_dump.ps1`；对照表见 `wave1-text-parity-notes.md` |
-| R1–R3 | **open** | 需双后端填表 / caret 验证 |
-| L1–L4 | **open** | |
-| C1–C3 | **open** | |
+| R/A6 | **done** | `AI_WIN_UI_TEXT_DUMP` + `run_text_dump.ps1` |
+| R1 | **partial** | `compare_text_dumps.ps1` 双后端 metrics 对比（容差 2px） |
+| R2–R3 | **open** | 大 diff 修复 / caret |
+| L1 | **done** | `AI_WIN_UI_DISABLE_WINDOW_SCROLL=1` 关闭宿主级竖滚（优先 ScrollViewer） |
+| L6 | **done** | GridPanel → Yoga flex-wrap MeasureGrid |
+| C1 | **done** | `doc/keyboard-matrix.md` 初表 |
+| C2–C3 | **open** | Popup / IME |
 | S1–S3 | **partial** | S3≈H3 日志 |
 
 ## 10. 修订记录
