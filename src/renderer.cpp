@@ -5,6 +5,7 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 
+#include <algorithm>
 #include <limits>
 #include <memory>
 #include <utility>
@@ -59,7 +60,7 @@ public:
         return m_size;
     }
 
-    ID2D1Bitmap* GetOrCreateBitmap(ID2D1HwndRenderTarget* renderTarget, uint64_t generation) {
+    ID2D1Bitmap* GetOrCreateBitmap(ID2D1RenderTarget* renderTarget, uint64_t generation) {
         if (!renderTarget || m_pixels.empty()) {
             return nullptr;
         }
@@ -90,7 +91,7 @@ private:
     UINT m_stride = 0;
     std::vector<uint8_t> m_pixels;
     ComPtr<ID2D1Bitmap> m_bitmap;
-    ID2D1HwndRenderTarget* m_cachedRenderTarget = nullptr;
+    ID2D1RenderTarget* m_cachedRenderTarget = nullptr;
     uint64_t m_generation = 0;
 };
 
@@ -106,6 +107,7 @@ public:
 class Direct2DRenderer final : public IRenderer {
 public:
     ~Direct2DRenderer() override {
+        ReleaseLayeredSurface();
         if (m_shouldCoUninitialize) {
             CoUninitialize();
         }
@@ -113,6 +115,31 @@ public:
 
     RendererBackend Backend() const override {
         return RendererBackend::Direct2D;
+    }
+
+    void SetPresentMode(PresentMode mode) override {
+        if (m_presentMode == mode) {
+            return;
+        }
+        m_presentMode = mode;
+        DestroyRenderTarget();
+    }
+
+    PresentMode GetPresentMode() const override {
+        return m_presentMode;
+    }
+
+    bool SampleOpaque(int x, int y, uint8_t alphaThreshold) const override {
+        if (m_presentMode != PresentMode::Layered || !m_dibBits || m_pixelWidth == 0 || m_pixelHeight == 0) {
+            return true;
+        }
+        if (x < 0 || y < 0 || x >= static_cast<int>(m_pixelWidth) || y >= static_cast<int>(m_pixelHeight)) {
+            return false;
+        }
+        // Top-down BGRA DIB: alpha in byte 3.
+        const size_t index = (static_cast<size_t>(y) * m_pixelWidth + static_cast<size_t>(x)) * 4u;
+        const auto* bytes = static_cast<const uint8_t*>(m_dibBits);
+        return bytes[index + 3] >= alphaThreshold;
     }
 
     bool Initialize(HWND hwnd) override {
@@ -143,18 +170,48 @@ public:
             return false;
         }
 
+        if (m_hwnd) {
+            RECT rc{};
+            GetClientRect(m_hwnd, &rc);
+            m_pixelWidth = static_cast<UINT>(std::max(1L, rc.right - rc.left));
+            m_pixelHeight = static_cast<UINT>(std::max(1L, rc.bottom - rc.top));
+        }
+
         return EnsureRenderTarget();
     }
 
     void Resize(UINT width, UINT height) override {
-        if (m_renderTarget) {
-            m_renderTarget->Resize(D2D1::SizeU(width, height));
+        m_pixelWidth = std::max(1u, width);
+        m_pixelHeight = std::max(1u, height);
+
+        if (m_presentMode == PresentMode::Layered) {
+            // Layered surface size is baked into the DIB; recreate on resize.
+            DestroyRenderTarget();
+            EnsureRenderTarget();
+            return;
+        }
+
+        if (m_hwndRenderTarget) {
+            m_hwndRenderTarget->Resize(D2D1::SizeU(m_pixelWidth, m_pixelHeight));
         }
     }
 
     void BeginFrame(const Color& clearColor) override {
         if (!EnsureRenderTarget()) {
             return;
+        }
+
+        if (m_presentMode == PresentMode::Layered && m_dcRenderTarget && m_memDC) {
+            const RECT bindRect{0, 0, static_cast<LONG>(m_pixelWidth), static_cast<LONG>(m_pixelHeight)};
+            if (FAILED(m_dcRenderTarget->BindDC(m_memDC, &bindRect))) {
+                DestroyRenderTarget();
+                if (!EnsureRenderTarget()) {
+                    return;
+                }
+                if (FAILED(m_dcRenderTarget->BindDC(m_memDC, &bindRect))) {
+                    return;
+                }
+            }
         }
 
         m_renderTarget->BeginDraw();
@@ -168,9 +225,12 @@ public:
 
         const HRESULT hr = m_renderTarget->EndDraw();
         if (hr == D2DERR_RECREATE_TARGET) {
-            m_layerStack.clear();
-            m_solidBrush.Reset();
-            m_renderTarget.Reset();
+            DestroyRenderTarget();
+            return;
+        }
+
+        if (m_presentMode == PresentMode::Layered && SUCCEEDED(hr)) {
+            PresentLayeredSurface();
         }
     }
 
@@ -449,6 +509,92 @@ private:
         ComPtr<ID2D1Layer> layer;
     };
 
+    void DestroyRenderTarget() {
+        m_layerStack.clear();
+        m_solidBrush.Reset();
+        m_renderTarget.Reset();
+        m_hwndRenderTarget.Reset();
+        m_dcRenderTarget.Reset();
+        ReleaseLayeredSurface();
+    }
+
+    void ReleaseLayeredSurface() {
+        if (m_memDC) {
+            if (m_oldBitmap) {
+                SelectObject(m_memDC, m_oldBitmap);
+                m_oldBitmap = nullptr;
+            }
+            DeleteDC(m_memDC);
+            m_memDC = nullptr;
+        }
+        if (m_dib) {
+            DeleteObject(m_dib);
+            m_dib = nullptr;
+        }
+        m_dibBits = nullptr;
+    }
+
+    bool CreateLayeredSurface() {
+        ReleaseLayeredSurface();
+        if (m_pixelWidth == 0 || m_pixelHeight == 0) {
+            return false;
+        }
+
+        HDC screenDc = GetDC(nullptr);
+        if (!screenDc) {
+            return false;
+        }
+        m_memDC = CreateCompatibleDC(screenDc);
+        ReleaseDC(nullptr, screenDc);
+        if (!m_memDC) {
+            return false;
+        }
+
+        BITMAPINFO bmi{};
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = static_cast<LONG>(m_pixelWidth);
+        bmi.bmiHeader.biHeight = -static_cast<LONG>(m_pixelHeight); // top-down
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
+
+        m_dib = CreateDIBSection(m_memDC, &bmi, DIB_RGB_COLORS, &m_dibBits, nullptr, 0);
+        if (!m_dib || !m_dibBits) {
+            ReleaseLayeredSurface();
+            return false;
+        }
+        m_oldBitmap = static_cast<HBITMAP>(SelectObject(m_memDC, m_dib));
+        // Clear to transparent.
+        ZeroMemory(m_dibBits, static_cast<size_t>(m_pixelWidth) * m_pixelHeight * 4u);
+        return true;
+    }
+
+    void PresentLayeredSurface() {
+        if (!m_hwnd || !m_memDC || m_pixelWidth == 0 || m_pixelHeight == 0) {
+            return;
+        }
+
+        POINT src{0, 0};
+        SIZE size{static_cast<LONG>(m_pixelWidth), static_cast<LONG>(m_pixelHeight)};
+        BLENDFUNCTION blend{};
+        blend.BlendOp = AC_SRC_OVER;
+        blend.BlendFlags = 0;
+        blend.SourceConstantAlpha = 255;
+        blend.AlphaFormat = AC_SRC_ALPHA;
+
+        // Leave position unchanged (pptDst = nullptr); only refresh pixels/size.
+        UpdateLayeredWindow(
+            m_hwnd,
+            nullptr,
+            nullptr,
+            &size,
+            m_memDC,
+            &src,
+            0,
+            &blend,
+            ULW_ALPHA);
+    }
+
     bool EnsureRenderTarget() {
         if (m_renderTarget) {
             return true;
@@ -457,49 +603,90 @@ private:
             return false;
         }
 
-        RECT rc{};
-        GetClientRect(m_hwnd, &rc);
-        const auto size = D2D1::SizeU(rc.right - rc.left, rc.bottom - rc.top);
-
-        if (FAILED(m_d2dFactory->CreateHwndRenderTarget(
-                D2D1::RenderTargetProperties(),
-                D2D1::HwndRenderTargetProperties(m_hwnd, size),
-                m_renderTarget.ReleaseAndGetAddressOf()))) {
-            return false;
+        if (m_pixelWidth == 0 || m_pixelHeight == 0) {
+            RECT rc{};
+            GetClientRect(m_hwnd, &rc);
+            m_pixelWidth = static_cast<UINT>(std::max(1L, rc.right - rc.left));
+            m_pixelHeight = static_cast<UINT>(std::max(1L, rc.bottom - rc.top));
         }
 
-        // Force 1 DIP = 1 pixel so renderer coordinate space matches client
-        // pixels used by layout / hit-test. Without this D2D scales by system
-        // DPI and drawing drifts away from mouse coordinates on >100% scaling.
-        m_renderTarget->SetDpi(96.0f, 96.0f);
+        if (m_presentMode == PresentMode::Layered) {
+            if (!CreateLayeredSurface()) {
+                return false;
+            }
+
+            const D2D1_RENDER_TARGET_PROPERTIES props = D2D1::RenderTargetProperties(
+                D2D1_RENDER_TARGET_TYPE_DEFAULT,
+                D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+                96.0f,
+                96.0f,
+                D2D1_RENDER_TARGET_USAGE_NONE,
+                D2D1_FEATURE_LEVEL_DEFAULT);
+
+            if (FAILED(m_d2dFactory->CreateDCRenderTarget(&props, m_dcRenderTarget.ReleaseAndGetAddressOf()))) {
+                ReleaseLayeredSurface();
+                return false;
+            }
+
+            const RECT bindRect{0, 0, static_cast<LONG>(m_pixelWidth), static_cast<LONG>(m_pixelHeight)};
+            if (FAILED(m_dcRenderTarget->BindDC(m_memDC, &bindRect))) {
+                m_dcRenderTarget.Reset();
+                ReleaseLayeredSurface();
+                return false;
+            }
+
+            m_renderTarget = m_dcRenderTarget;
+            // Grayscale AA avoids ClearType fringing on transparent edges.
+            m_renderTarget->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
+        } else {
+            const auto size = D2D1::SizeU(m_pixelWidth, m_pixelHeight);
+            if (FAILED(m_d2dFactory->CreateHwndRenderTarget(
+                    D2D1::RenderTargetProperties(),
+                    D2D1::HwndRenderTargetProperties(m_hwnd, size),
+                    m_hwndRenderTarget.ReleaseAndGetAddressOf()))) {
+                return false;
+            }
+            m_renderTarget = m_hwndRenderTarget;
+            // Force 1 DIP = 1 pixel so layout / hit-test stay aligned with mouse.
+            m_renderTarget->SetDpi(96.0f, 96.0f);
+            m_renderTarget->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
+        }
 
         if (FAILED(m_renderTarget->CreateSolidColorBrush(
                 D2D1::ColorF(D2D1::ColorF::White),
                 m_solidBrush.ReleaseAndGetAddressOf()))) {
-            m_renderTarget.Reset();
+            DestroyRenderTarget();
             return false;
         }
 
         m_renderTarget->SetAntialiasMode(D2D1_ANTIALIAS_MODE_PER_PRIMITIVE);
-        m_renderTarget->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
-
         ++m_renderTargetGeneration;
         return true;
     }
 
-    ID2D1HwndRenderTarget* Target() const {
+    ID2D1RenderTarget* Target() const {
         return m_renderTarget.Get();
     }
 
     HWND m_hwnd = nullptr;
+    PresentMode m_presentMode = PresentMode::Hwnd;
+    UINT m_pixelWidth = 0;
+    UINT m_pixelHeight = 0;
     ComPtr<ID2D1Factory> m_d2dFactory;
     ComPtr<IWICImagingFactory> m_wicFactory;
     ComPtr<IDWriteFactory> m_dwriteFactory;
-    ComPtr<ID2D1HwndRenderTarget> m_renderTarget;
+    ComPtr<ID2D1RenderTarget> m_renderTarget;
+    ComPtr<ID2D1HwndRenderTarget> m_hwndRenderTarget;
+    ComPtr<ID2D1DCRenderTarget> m_dcRenderTarget;
     ComPtr<ID2D1SolidColorBrush> m_solidBrush;
     std::vector<LayerEntry> m_layerStack;
     uint64_t m_renderTargetGeneration = 0;
     bool m_shouldCoUninitialize = false;
+
+    HDC m_memDC = nullptr;
+    HBITMAP m_dib = nullptr;
+    HBITMAP m_oldBitmap = nullptr;
+    void* m_dibBits = nullptr;
 };
 
 } // namespace

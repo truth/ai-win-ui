@@ -969,6 +969,8 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
         const std::string value = ToLowerAscii(props["chrome"].stringValue);
         if (value == "custom") {
             element.SetWindowChromeRequest(UIElement::WindowChromeRequest::Custom);
+        } else if (value == "layered" || value == "irregular") {
+            element.SetWindowChromeRequest(UIElement::WindowChromeRequest::Layered);
         } else if (value == "system") {
             element.SetWindowChromeRequest(UIElement::WindowChromeRequest::System);
         }
@@ -1050,6 +1052,8 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
         const std::string value = ToLowerAscii(TrimString(it->second));
         if (value == "custom") {
             element.SetWindowChromeRequest(UIElement::WindowChromeRequest::Custom);
+        } else if (value == "layered" || value == "irregular") {
+            element.SetWindowChromeRequest(UIElement::WindowChromeRequest::Layered);
         } else if (value == "system") {
             element.SetWindowChromeRequest(UIElement::WindowChromeRequest::System);
         }

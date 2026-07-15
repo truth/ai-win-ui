@@ -8,36 +8,37 @@ This document describes the optional **custom title bar** path for `ai-win-ui`.
 |------|----------|
 | `system` (default) | Standard `WS_OVERLAPPEDWINDOW` frame and title bar |
 | `custom` | Borderless client area; UI draws the title bar; Win32 NC hit-testing bridges drag / resize |
+| `layered` | Same as custom chrome + `WS_EX_LAYERED` + Direct2D `UpdateLayeredWindow` present (per-pixel alpha) |
 
-Irregular windows with per-pixel alpha (`UpdateLayeredWindow`) are **out of scope** for v1. Custom mode may still use DWM rounded corners on Windows 11.
+`layered` is the **v2 irregular window** path: transparent clear outside rounded UI, desktop shows through corners, clicks on fully transparent pixels return `HTTRANSPARENT`.
 
 ## Enabling custom chrome
 
 Priority (highest first):
 
-1. Environment variable `AI_WIN_UI_CHROME=custom` (or `system`)
-2. Root layout attribute `chrome="custom"` / `chrome="system"`
+1. Environment variable `AI_WIN_UI_CHROME=custom|layered|system`
+2. Root layout attribute `chrome="custom|layered|system"`
 3. Default: `system`
 
 Examples:
 
 ```powershell
-$env:AI_WIN_UI_CHROME = "custom"
-$env:AI_WIN_UI_LAYOUT = "layouts/custom_chrome_demo.xml"
-.\build\Release\ai_win_ui.exe
-```
-
-Or:
-
-```powershell
+# Custom title bar
 .\scripts\run_custom_chrome_demo.ps1 -BuildIfMissing
+
+# Layered irregular (per-pixel alpha)
+.\scripts\run_layered_chrome_demo.ps1 -BuildIfMissing
+
+$env:AI_WIN_UI_CHROME = "layered"
+$env:AI_WIN_UI_LAYOUT = "layouts/layered_chrome_demo.xml"
+.\build\Release\ai_win_ui.exe
 ```
 
 ## Layout attributes
 
 | Attribute | Where | Meaning |
 |-----------|--------|---------|
-| `chrome="custom\|system"` | Root element | Request window chrome mode when env is unset |
+| `chrome="custom\|layered\|system"` | Root element | Request window chrome mode when env is unset |
 | `hitTest="caption\|client"` | Any element | Caption = draggable; client = interactive |
 | `role="titleBar"` | Panel | Convenience alias for caption region |
 
@@ -88,12 +89,27 @@ When the window loses activation (`WM_ACTIVATE` / `WM_NCACTIVATE`):
 
 `UIContext::windowActive` carries this state into caption button rendering.
 
-## Limits (v1)
+## Layered present (v2)
 
-- No layered true irregular shapes
+| Piece | Role |
+|-------|------|
+| `PresentMode::Layered` | Direct2D DC RT + top-down BGRA DIB |
+| `UpdateLayeredWindow` | Per-pixel alpha blit each frame |
+| `IRenderer::SampleOpaque` | Alpha threshold for hit-testing |
+| Demo | `resource/layouts/layered_chrome_demo.xml` |
+
+Notes:
+
+- Layered mode currently forces the **Direct2D** backend (Skia layered present is future work).
+- Clear color is fully transparent; UI must paint opaque content where the window should be solid.
+- Resize borders remain active on the HWND rect even over transparent margins; caption/client hits honor alpha.
+
+## Limits
+
 - No runtime hot-switch of chrome without restart (style can be reapplied once from layout after load)
-- Custom mode disables the system `WS_VSCROLL` style; use client-area scrolling as before
-- DWM corner preference is best-effort (fails open on older OS builds)
+- Custom/layered modes disable the system `WS_VSCROLL` style; use client-area scrolling as before
+- DWM corner preference applies to custom (HWND) mode; layered skips DWM frame extend
+- Skia + layered present not implemented yet
 
 ## Related plan
 

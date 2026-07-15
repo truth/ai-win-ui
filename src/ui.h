@@ -40,6 +40,7 @@ public:
         Unspecified = 0,
         System = 1,
         Custom = 2,
+        Layered = 3,
     };
 
     virtual ~UIElement() = default;
@@ -634,16 +635,26 @@ public:
         const bool hasBorder =
             scaledBorder.left > 0.0f || scaledBorder.top > 0.0f ||
             scaledBorder.right > 0.0f || scaledBorder.bottom > 0.0f;
+        const float scaledRadius = ScaleValue(cornerRadius);
         if (background.a > 0.0f || hasBorder) {
             BoxDecoration deco;
             deco.background = background;
             deco.border.width = scaledBorder;
             deco.border.color = borderColor;
-            deco.radius = CornerRadius::Uniform(ScaleValue(cornerRadius));
+            deco.radius = CornerRadius::Uniform(scaledRadius);
             DrawBoxDecoration(renderer, m_bounds, deco);
+        }
+        // Clip children to rounded bounds so layered/irregular cards do not
+        // paint square child corners over transparent margins.
+        const bool clipChildren = scaledRadius > 0.5f && !m_children.empty();
+        if (clipChildren) {
+            renderer.PushRoundedClip(m_bounds, scaledRadius);
         }
         for (auto& child : m_children) {
             child->Render(renderer);
+        }
+        if (clipChildren) {
+            renderer.PopLayer();
         }
     }
 

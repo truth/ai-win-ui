@@ -56,6 +56,7 @@ function Resolve-LayoutPath {
         "core-controls-v2" = "layouts/core_controls_v2.xml"
         "navigation-components" = "layouts/navigation_components.xml"
         "custom-chrome" = "layouts/custom_chrome_demo.xml"
+        "layered-chrome" = "layouts/layered_chrome_demo.xml"
     }
     $aliasKey = $layoutPath.ToLowerInvariant()
     if ($layoutAliases.ContainsKey($aliasKey)) {

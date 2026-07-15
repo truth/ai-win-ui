@@ -78,21 +78,19 @@
 - `.\build.ps1 -Configuration Release -Clean`
 - `.\build.ps1 -Run`
 
-## 自定义标题栏（Custom Chrome）
+## 自定义标题栏 / 异形窗口
 
-默认仍使用系统标题栏。可选启用无边框自绘 chrome（拖动、缩放、min/max/close）：
+默认仍使用系统标题栏。
 
 ```powershell
-# 一键 demo
+# 无边框自绘标题栏（HWND）
 .\scripts\run_custom_chrome_demo.ps1 -Configuration Release -BuildIfMissing
 
-# 或手动
-$env:AI_WIN_UI_CHROME = "custom"
-$env:AI_WIN_UI_LAYOUT = "layouts/custom_chrome_demo.xml"
-.\build\Release\ai_win_ui.exe
+# Layered 真异形（每像素透明，圆角外露桌面）
+.\scripts\run_layered_chrome_demo.ps1 -Configuration Release -BuildIfMissing
 ```
 
-也可在根布局写 `chrome="custom"`。说明见 `doc/window-chrome.md`。
+环境变量：`AI_WIN_UI_CHROME=custom|layered`。说明见 `doc/window-chrome.md`。
 
 ## Script Usage
 

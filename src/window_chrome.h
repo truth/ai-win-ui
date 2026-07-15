@@ -7,6 +7,7 @@
 enum class WindowChromeMode {
     System,
     Custom,
+    Layered, // custom chrome + WS_EX_LAYERED / per-pixel alpha present
 };
 
 struct WindowChromeHitRegion {
@@ -21,7 +22,10 @@ class WindowChrome {
 public:
     void SetMode(WindowChromeMode mode);
     WindowChromeMode Mode() const { return m_mode; }
-    bool IsCustom() const { return m_mode == WindowChromeMode::Custom; }
+    bool IsCustom() const {
+        return m_mode == WindowChromeMode::Custom || m_mode == WindowChromeMode::Layered;
+    }
+    bool IsLayered() const { return m_mode == WindowChromeMode::Layered; }
 
     void SetDpi(UINT dpi);
     UINT Dpi() const { return m_dpi; }

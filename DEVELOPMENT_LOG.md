@@ -2,6 +2,11 @@
 
 ## 2026-07-15
 
+- Layered 真异形 v2：`PresentMode::Layered`（Direct2D DC RT + DIB + `UpdateLayeredWindow`）
+  - `AI_WIN_UI_CHROME=layered` / 根布局 `chrome="layered"`
+  - 透明 clear + 圆角卡片 demo：`layouts/layered_chrome_demo.xml`
+  - 透明像素 `HTTRANSPARENT`（缩放边框仍可用）
+  - 计划：`doc/plan/2026-07-15-layered-irregular-window-v2.md`
 - 分支：`feature/custom-window-chrome-v1`（已 push 到 origin）
 - 落地自定义窗口 chrome（计划见 `doc/plan/2026-07-15-custom-chrome-irregular-window-v1.md`）
 - 新增 `src/window_chrome.*`：`WM_NCCALCSIZE` / `WM_NCHITTEST` / `WM_GETMINMAXINFO`、DPI 边框、DWM 圆角

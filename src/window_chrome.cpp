@@ -43,12 +43,16 @@ void WindowChrome::ClearHitRegions() {
 
 DWORD WindowChrome::WindowStyle() const {
     if (IsCustom()) {
+        // Layered and custom share borderless popup chrome; layered adds WS_EX_LAYERED.
         return WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN;
     }
     return WS_OVERLAPPEDWINDOW | WS_VSCROLL | WS_CLIPCHILDREN;
 }
 
 DWORD WindowChrome::WindowExStyle() const {
+    if (IsLayered()) {
+        return WS_EX_LAYERED;
+    }
     return 0;
 }
 
@@ -69,7 +73,8 @@ void WindowChrome::ApplyWindowStyle(HWND hwnd) const {
 }
 
 bool WindowChrome::InitializeDwm(HWND hwnd) {
-    if (!hwnd || !IsCustom()) {
+    // Layered windows own transparency via UpdateLayeredWindow; skip DWM frame extend.
+    if (!hwnd || !IsCustom() || IsLayered()) {
         return false;
     }
 
@@ -246,20 +251,29 @@ WindowChromeMode WindowChrome::ParseMode(const wchar_t* value) {
         return WindowChromeMode::System;
     }
 
-    // Case-insensitive ASCII compare for "custom".
-    const wchar_t* custom = L"custom";
-    size_t i = 0;
-    for (; value[i] && custom[i]; ++i) {
-        wchar_t c = value[i];
-        if (c >= L'A' && c <= L'Z') {
-            c = static_cast<wchar_t>(c - L'A' + L'a');
+    auto equalsIgnoreCase = [](const wchar_t* a, const wchar_t* b) {
+        size_t i = 0;
+        for (; a[i] && b[i]; ++i) {
+            wchar_t ca = a[i];
+            wchar_t cb = b[i];
+            if (ca >= L'A' && ca <= L'Z') {
+                ca = static_cast<wchar_t>(ca - L'A' + L'a');
+            }
+            if (cb >= L'A' && cb <= L'Z') {
+                cb = static_cast<wchar_t>(cb - L'A' + L'a');
+            }
+            if (ca != cb) {
+                return false;
+            }
         }
-        if (c != custom[i]) {
-            return WindowChromeMode::System;
-        }
-    }
-    if (value[i] == L'\0' && custom[i] == L'\0') {
+        return a[i] == L'\0' && b[i] == L'\0';
+    };
+
+    if (equalsIgnoreCase(value, L"custom")) {
         return WindowChromeMode::Custom;
+    }
+    if (equalsIgnoreCase(value, L"layered") || equalsIgnoreCase(value, L"irregular")) {
+        return WindowChromeMode::Layered;
     }
     return WindowChromeMode::System;
 }

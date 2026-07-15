@@ -1,0 +1,81 @@
+<!--
+  Layered irregular window demo (v2).
+  Transparent clear outside a rounded card — desktop shows through corners.
+  Enable: AI_WIN_UI_CHROME=layered  (or root chrome="layered")
+-->
+<Panel
+  chrome="layered"
+  direction="column"
+  background="transparent"
+  padding="28,28,28,28"
+  spacing="0"
+  alignItems="stretch">
+
+  <!-- Floating card: opaque body with soft round corners -->
+  <Panel
+    direction="column"
+    background="#0E1622"
+    cornerRadius="18"
+    spacing="0"
+    alignItems="stretch"
+    flexGrow="1">
+
+    <Panel
+      role="titleBar"
+      hitTest="caption"
+      direction="row"
+      height="44"
+      background="#121C2C"
+      padding="0,0,0,0"
+      spacing="0"
+      alignItems="stretch"
+      justifyContent="spaceBetween">
+
+      <Panel
+        direction="row"
+        height="44"
+        padding="16,0,12,0"
+        spacing="0"
+        alignItems="center"
+        hitTest="caption"
+        flexGrow="1"
+        flexShrink="1"
+        flexBasis="0">
+        <Panel width="10" height="10" background="#6EA0FF" cornerRadius="3" margin="0,0,10,0" />
+        <Label text="AI WinUI" fontSize="13" color="#F2F6FB" margin="0,0,8,0" />
+        <Label text="Layered · irregular" fontSize="12" color="#7F93A8" />
+      </Panel>
+
+      <Panel direction="row" height="44" width="138" spacing="0" alignItems="stretch" flexGrow="0" flexShrink="0">
+        <Button variant="caption-minimize" width="46" height="44" hitTest="client" onClick="windowMinimize" />
+        <Button variant="caption-maximize" width="46" height="44" hitTest="client" onClick="windowMaximize" />
+        <Button variant="caption-close" width="46" height="44" hitTest="client" onClick="windowClose" />
+      </Panel>
+    </Panel>
+
+    <Panel height="1" background="#1A2838" />
+
+    <Panel
+      flexGrow="1"
+      direction="column"
+      padding="28,28,28,28"
+      spacing="14"
+      background="#0A121C"
+      alignItems="stretch">
+      <Label text="Per-pixel alpha window" fontSize="22" color="#F5F8FC" />
+      <Label
+        text="Corners are transparent — the desktop shows through. Clicks on empty alpha pass through. Drag the title bar; use edges to resize."
+        fontSize="14"
+        color="#9AADC0" />
+      <TextInput text="Still interactive under layered present" />
+      <Panel direction="row" spacing="10">
+        <Button text="Primary Action" onClick="primaryAction" />
+        <Button text="Secondary Action" onClick="secondaryAction" />
+      </Panel>
+      <Label
+        text="Launch: scripts/run_layered_chrome_demo.ps1  ·  AI_WIN_UI_CHROME=layered"
+        fontSize="12"
+        color="#5C7085" />
+    </Panel>
+  </Panel>
+</Panel>

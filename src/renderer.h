@@ -13,6 +13,12 @@ enum class RendererBackend {
     Skia,
 };
 
+// How the backend presents pixels to the OS window.
+enum class PresentMode {
+    Hwnd = 0,    // ID2D1HwndRenderTarget / normal HWND paint
+    Layered = 1, // offscreen BGRA + UpdateLayeredWindow (per-pixel alpha)
+};
+
 enum class TextWrapMode {
     NoWrap,
     Wrap,
@@ -47,6 +53,17 @@ public:
     virtual void Resize(UINT width, UINT height) = 0;
     virtual void BeginFrame(const Color& clearColor) = 0;
     virtual void EndFrame() = 0;
+
+    // Optional present path. Default backends keep HWND presentation.
+    virtual void SetPresentMode(PresentMode mode) { (void)mode; }
+    virtual PresentMode GetPresentMode() const { return PresentMode::Hwnd; }
+    // Sample last presented frame alpha (Layered only). Defaults to opaque.
+    virtual bool SampleOpaque(int x, int y, uint8_t alphaThreshold = 16) const {
+        (void)x;
+        (void)y;
+        (void)alphaThreshold;
+        return true;
+    }
 
     virtual void FillRect(const Rect& rect, const Color& color) = 0;
     virtual void FillRoundedRect(const Rect& rect, const Color& color, float radius) = 0;

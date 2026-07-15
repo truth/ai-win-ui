@@ -191,15 +191,20 @@ public:
 
 private:
     bool InitializeRenderer() {
+        // Layered per-pixel alpha present is implemented on the Direct2D path.
+        if (m_windowChrome.IsLayered()) {
+            m_requestedRendererBackend = RendererBackend::Direct2D;
+        }
+
         m_renderer = CreateRenderer(m_requestedRendererBackend);
-        if (m_renderer && m_renderer->Initialize(m_hwnd)) {
+        if (ConfigureAndInitRenderer(m_renderer.get())) {
             m_activeRendererBackend = m_renderer->Backend();
             return true;
         }
 
         if (m_requestedRendererBackend != RendererBackend::Direct2D) {
             m_renderer = CreateDirect2DRenderer();
-            if (m_renderer && m_renderer->Initialize(m_hwnd)) {
+            if (ConfigureAndInitRenderer(m_renderer.get())) {
                 m_activeRendererBackend = m_renderer->Backend();
                 return true;
             }
@@ -207,6 +212,15 @@ private:
 
         m_renderer.reset();
         return false;
+    }
+
+    bool ConfigureAndInitRenderer(IRenderer* renderer) {
+        if (!renderer) {
+            return false;
+        }
+        renderer->SetPresentMode(
+            m_windowChrome.IsLayered() ? PresentMode::Layered : PresentMode::Hwnd);
+        return renderer->Initialize(m_hwnd);
     }
 
     void UpdateDpiContext(UINT dpi) {
@@ -223,9 +237,12 @@ private:
         if (request == UIElement::WindowChromeRequest::Unspecified) {
             return;
         }
-        const WindowChromeMode desired = (request == UIElement::WindowChromeRequest::Custom)
-            ? WindowChromeMode::Custom
-            : WindowChromeMode::System;
+        WindowChromeMode desired = WindowChromeMode::System;
+        if (request == UIElement::WindowChromeRequest::Custom) {
+            desired = WindowChromeMode::Custom;
+        } else if (request == UIElement::WindowChromeRequest::Layered) {
+            desired = WindowChromeMode::Layered;
+        }
         if (desired == m_windowChrome.Mode()) {
             return;
         }
@@ -233,6 +250,14 @@ private:
         m_windowChrome.ApplyWindowStyle(m_hwnd);
         if (m_windowChrome.IsCustom()) {
             m_windowChrome.InitializeDwm(m_hwnd);
+        }
+        if (m_renderer) {
+            m_renderer->SetPresentMode(
+                m_windowChrome.IsLayered() ? PresentMode::Layered : PresentMode::Hwnd);
+            // Force surface recreate with the new present mode.
+            m_renderer->Resize(
+                static_cast<UINT>(std::max(1.0f, m_viewportWidth)),
+                static_cast<UINT>(std::max(1.0f, m_viewportHeight)));
         }
     }
 
@@ -535,7 +560,11 @@ private:
         BeginPaint(m_hwnd, &ps);
 
         if (m_isInitialized && m_renderer) {
-            m_renderer->BeginFrame(ColorFromHex(0x101010));
+            // Layered present clears to transparent so desktop shows in empty regions.
+            const Color clearColor = m_windowChrome.IsLayered()
+                ? Color{0.0f, 0.0f, 0.0f, 0.0f}
+                : ColorFromHex(0x101010);
+            m_renderer->BeginFrame(clearColor);
             if (m_root) {
                 m_root->Render(*m_renderer);
             }
@@ -546,12 +575,14 @@ private:
                         Rect::Make(0.0f, 0.0f, m_viewportWidth, m_captionBandHeight),
                         Color{0.0f, 0.0f, 0.0f, 0.28f});
                 }
-                // Subtle outer edge so borderless chrome stays visible on dark desktops.
-                const Rect edge = Rect::Make(0.5f, 0.5f, m_viewportWidth - 0.5f, m_viewportHeight - 0.5f);
-                const Color edgeColor = m_uiContext.windowActive
-                    ? ColorFromHex(0x2A3A4C)
-                    : ColorFromHex(0x1A2430);
-                m_renderer->DrawRect(edge, edgeColor, 1.0f);
+                // Opaque custom chrome needs an edge; layered shapes define their own outline in UI.
+                if (!m_windowChrome.IsLayered()) {
+                    const Rect edge = Rect::Make(0.5f, 0.5f, m_viewportWidth - 0.5f, m_viewportHeight - 0.5f);
+                    const Color edgeColor = m_uiContext.windowActive
+                        ? ColorFromHex(0x2A3A4C)
+                        : ColorFromHex(0x1A2430);
+                    m_renderer->DrawRect(edge, edgeColor, 1.0f);
+                }
             }
             m_renderer->EndFrame();
         }
@@ -931,6 +962,20 @@ private:
                 bool handled = false;
                 const LRESULT result = m_windowChrome.HandleNcHitTest(hwnd, lParam, handled);
                 if (handled) {
+                    // Keep resize borders usable even on transparent margins; only
+                    // caption/client hits honor per-pixel alpha pass-through.
+                    const bool isResizeBorder =
+                        result == HTLEFT || result == HTRIGHT || result == HTTOP || result == HTBOTTOM ||
+                        result == HTTOPLEFT || result == HTTOPRIGHT || result == HTBOTTOMLEFT ||
+                        result == HTBOTTOMRIGHT;
+                    if (!isResizeBorder && m_windowChrome.IsLayered() && m_renderer) {
+                        POINT screenPt{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                        POINT clientPt = screenPt;
+                        ScreenToClient(hwnd, &clientPt);
+                        if (!m_renderer->SampleOpaque(clientPt.x, clientPt.y, 16)) {
+                            return HTTRANSPARENT;
+                        }
+                    }
                     return result;
                 }
                 break;
