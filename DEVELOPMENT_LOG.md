@@ -2,6 +2,8 @@
 
 ## 2026-07-15
 
+- DirectUI 差距评估 → P0 硬化计划：`doc/plan/2026-07-15-directui-p0-hardening.md`
+  - Track A 文本 parity / B ScrollViewer / C 进程内多根 / D measure golden
 - 文档：样式/布局规则同步更新
   - 重写 `doc/layout-spec.md`（XML vs JSON、`$style` 三种写法、嵌套 style、ShapePanel、chrome/events）
   - 新增 `doc/style-catalog.md`；更新 `doc/window-chrome.md`、`doc/README.md`、根 `README.md`、`doc/resource-packaging.md`

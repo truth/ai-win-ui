@@ -21,6 +21,10 @@ It is blocked by three closing tasks:
 2. Yoga behavior calibration
 3. MVP acceptance and validation flow
 
+**DirectUI P0 hardening** (engine trust) expands these into four tracks —
+text parity, `ScrollViewer`, in-process multi-root hosts, and measure goldens.
+File-level checklist: `doc/plan/2026-07-15-directui-p0-hardening.md`.
+
 Work outside these areas is useful, but it should not take priority until the
 three blockers above are in a clearly better state.
 

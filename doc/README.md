@@ -32,8 +32,9 @@ older design snapshot.
 - `doc/skia-prebuilt-survey.md`
   - comparison of prebuilt Skia package options
 - `doc/plan/`
-  - dated implementation plans archived after they ship
-  (e.g. declarative style v1, theme tokens, layered window v2)
+  - dated implementation plans (shipped and active)
+  - active: `2026-07-15-directui-p0-hardening.md`（文本 parity / ScrollViewer / 多根窗口 / measure golden）
+  - archived examples: declarative style v1, theme tokens, layered window v2
 
 ## Current System Snapshot
 
