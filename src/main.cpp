@@ -116,10 +116,19 @@ public:
         int windowX = CW_USEDEFAULT;
         int windowY = 0;
         // WS_POPUP ignores CW_USEDEFAULT placement and often lands at (0,0).
-        // Center custom chrome on the primary work area for a predictable start.
+        // Center on the monitor under the cursor (multi-monitor aware).
         if (m_windowChrome.IsCustom()) {
+            POINT cursor{};
+            GetCursorPos(&cursor);
+            HMONITOR monitor = MonitorFromPoint(cursor, MONITOR_DEFAULTTONEAREST);
+            MONITORINFO monitorInfo{};
+            monitorInfo.cbSize = sizeof(monitorInfo);
             RECT work{};
-            SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+            if (GetMonitorInfoW(monitor, &monitorInfo)) {
+                work = monitorInfo.rcWork;
+            } else {
+                SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+            }
             windowX = work.left + std::max(0L, (work.right - work.left - windowWidth) / 2);
             windowY = work.top + std::max(0L, (work.bottom - work.top - windowHeight) / 2);
         }
@@ -191,11 +200,8 @@ public:
 
 private:
     bool InitializeRenderer() {
-        // Layered per-pixel alpha present is implemented on the Direct2D path.
-        if (m_windowChrome.IsLayered()) {
-            m_requestedRendererBackend = RendererBackend::Direct2D;
-        }
-
+        // Layered present is supported on both Direct2D and Skia. Prefer the
+        // requested backend; fall back to Direct2D if Skia init fails.
         m_renderer = CreateRenderer(m_requestedRendererBackend);
         if (ConfigureAndInitRenderer(m_renderer.get())) {
             m_activeRendererBackend = m_renderer->Backend();
@@ -1094,6 +1100,7 @@ private:
                 break;
             }
             case WM_DPICHANGED: {
+                // Fired when the window moves across monitors with different DPI.
                 UpdateDpiContext(HIWORD(wParam));
                 const auto* suggestedRect = reinterpret_cast<RECT*>(lParam);
                 if (suggestedRect) {
@@ -1109,6 +1116,14 @@ private:
                 OnResize();
                 return 0;
             }
+            case WM_DISPLAYCHANGE:
+                // Display topology / resolution change: refresh layout against
+                // the monitor that currently hosts the window.
+                if (m_hwnd) {
+                    UpdateDpiContext(GetWindowDpiWithFallback(m_hwnd));
+                    OnResize();
+                }
+                return 0;
             case WM_SIZE:
                 OnResize();
                 SyncCaptionMaximizeGlyphs();

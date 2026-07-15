@@ -138,8 +138,40 @@ private:
 
 class SkiaRenderer final : public IRenderer {
 public:
+    ~SkiaRenderer() override {
+        ReleasePresentSurface();
+    }
+
     RendererBackend Backend() const override {
         return RendererBackend::Skia;
+    }
+
+    void SetPresentMode(PresentMode mode) override {
+        if (m_presentMode == mode) {
+            return;
+        }
+        m_presentMode = mode;
+        // Rebuild backing so layered/hwnd share the same DIB path.
+        m_width = 0;
+        m_height = 0;
+        RecreateSurface();
+    }
+
+    PresentMode GetPresentMode() const override {
+        return m_presentMode;
+    }
+
+    bool SampleOpaque(int x, int y, uint8_t alphaThreshold) const override {
+        if (m_presentMode != PresentMode::Layered || !m_dibBits || m_width == 0 || m_height == 0) {
+            return true;
+        }
+        if (x < 0 || y < 0 || x >= static_cast<int>(m_width) || y >= static_cast<int>(m_height)) {
+            return false;
+        }
+        // N32 premul on Windows is BGRA; alpha is byte 3.
+        const size_t index = (static_cast<size_t>(y) * m_width + static_cast<size_t>(x)) * 4u;
+        const auto* bytes = static_cast<const uint8_t*>(m_dibBits);
+        return bytes[index + 3] >= alphaThreshold;
     }
 
     bool Initialize(HWND hwnd) override {
@@ -149,6 +181,11 @@ public:
     }
 
     void Resize(UINT width, UINT height) override {
+        width = std::max(1u, width);
+        height = std::max(1u, height);
+        if (width == m_width && height == m_height && m_surface) {
+            return;
+        }
         m_width = width;
         m_height = height;
         RecreateSurface();
@@ -166,42 +203,28 @@ public:
         canvas->resetMatrix();
         canvas->restoreToCount(1);
         canvas->clear(ToSkColor(clearColor));
+        m_frameDirty = true;
     }
 
     void EndFrame() override {
-        if (!m_surface || m_pixels.empty() || !m_hwnd || m_width == 0 || m_height == 0) {
+        if (!m_surface || !m_dibBits || !m_hwnd || m_width == 0 || m_height == 0) {
+            return;
+        }
+        // Skip presents while minimized; surface stays warm for restore.
+        if (IsIconic(m_hwnd)) {
+            m_frameDirty = false;
+            return;
+        }
+        if (!m_frameDirty) {
             return;
         }
 
-        BITMAPINFO bmi{};
-        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        bmi.bmiHeader.biWidth = static_cast<LONG>(m_width);
-        bmi.bmiHeader.biHeight = -static_cast<LONG>(m_height);
-        bmi.bmiHeader.biPlanes = 1;
-        bmi.bmiHeader.biBitCount = 32;
-        bmi.bmiHeader.biCompression = BI_RGB;
-
-        HDC dc = GetDC(m_hwnd);
-        if (!dc) {
-            return;
+        if (m_presentMode == PresentMode::Layered) {
+            PresentLayered();
+        } else {
+            PresentHwnd();
         }
-
-        StretchDIBits(
-            dc,
-            0,
-            0,
-            static_cast<int>(m_width),
-            static_cast<int>(m_height),
-            0,
-            0,
-            static_cast<int>(m_width),
-            static_cast<int>(m_height),
-            m_pixels.data(),
-            &bmi,
-            DIB_RGB_COLORS,
-            SRCCOPY);
-
-        ReleaseDC(m_hwnd, dc);
+        m_frameDirty = false;
     }
 
     void FillRect(const Rect& rect, const Color& color) override {
@@ -454,6 +477,101 @@ private:
         return m_surface || RecreateSurface();
     }
 
+    void ReleasePresentSurface() {
+        m_surface.reset();
+        if (m_memDC) {
+            if (m_oldBitmap) {
+                SelectObject(m_memDC, m_oldBitmap);
+                m_oldBitmap = nullptr;
+            }
+            DeleteDC(m_memDC);
+            m_memDC = nullptr;
+        }
+        if (m_dib) {
+            DeleteObject(m_dib);
+            m_dib = nullptr;
+        }
+        m_dibBits = nullptr;
+    }
+
+    bool CreatePresentSurface() {
+        ReleasePresentSurface();
+        if (m_width == 0 || m_height == 0) {
+            return false;
+        }
+
+        HDC screenDc = GetDC(nullptr);
+        if (!screenDc) {
+            return false;
+        }
+        m_memDC = CreateCompatibleDC(screenDc);
+        ReleaseDC(nullptr, screenDc);
+        if (!m_memDC) {
+            return false;
+        }
+
+        BITMAPINFO bmi{};
+        bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+        bmi.bmiHeader.biWidth = static_cast<LONG>(m_width);
+        bmi.bmiHeader.biHeight = -static_cast<LONG>(m_height); // top-down
+        bmi.bmiHeader.biPlanes = 1;
+        bmi.bmiHeader.biBitCount = 32;
+        bmi.bmiHeader.biCompression = BI_RGB;
+
+        m_dib = CreateDIBSection(m_memDC, &bmi, DIB_RGB_COLORS, &m_dibBits, nullptr, 0);
+        if (!m_dib || !m_dibBits) {
+            ReleasePresentSurface();
+            return false;
+        }
+        m_oldBitmap = static_cast<HBITMAP>(SelectObject(m_memDC, m_dib));
+        ZeroMemory(m_dibBits, static_cast<size_t>(m_width) * m_height * 4u);
+        return true;
+    }
+
+    void PresentLayered() {
+        if (!m_memDC) {
+            return;
+        }
+        POINT src{0, 0};
+        SIZE size{static_cast<LONG>(m_width), static_cast<LONG>(m_height)};
+        BLENDFUNCTION blend{};
+        blend.BlendOp = AC_SRC_OVER;
+        blend.SourceConstantAlpha = 255;
+        blend.AlphaFormat = AC_SRC_ALPHA;
+        UpdateLayeredWindow(
+            m_hwnd,
+            nullptr,
+            nullptr,
+            &size,
+            m_memDC,
+            &src,
+            0,
+            &blend,
+            ULW_ALPHA);
+    }
+
+    void PresentHwnd() {
+        if (!m_memDC) {
+            return;
+        }
+        HDC dc = GetDC(m_hwnd);
+        if (!dc) {
+            return;
+        }
+        // Zero-copy present: Skia draws into the DIB, BitBlt to the window.
+        BitBlt(
+            dc,
+            0,
+            0,
+            static_cast<int>(m_width),
+            static_cast<int>(m_height),
+            m_memDC,
+            0,
+            0,
+            SRCCOPY);
+        ReleaseDC(m_hwnd, dc);
+    }
+
     bool RecreateSurface() {
         if (!m_hwnd) {
             return false;
@@ -462,21 +580,24 @@ private:
         if (m_width == 0 || m_height == 0) {
             RECT clientRect{};
             GetClientRect(m_hwnd, &clientRect);
-            m_width = static_cast<UINT>(std::max<LONG>(0, clientRect.right - clientRect.left));
-            m_height = static_cast<UINT>(std::max<LONG>(0, clientRect.bottom - clientRect.top));
+            m_width = static_cast<UINT>(std::max<LONG>(1, clientRect.right - clientRect.left));
+            m_height = static_cast<UINT>(std::max<LONG>(1, clientRect.bottom - clientRect.top));
         }
 
         if (m_width == 0 || m_height == 0) {
-            m_surface.reset();
-            m_pixels.clear();
+            ReleasePresentSurface();
+            return false;
+        }
+
+        if (!CreatePresentSurface()) {
             return false;
         }
 
         const size_t rowBytes = static_cast<size_t>(m_width) * 4;
-        m_pixels.assign(rowBytes * m_height, 0);
-
+        // Draw directly into the DIB (shared by HWND BitBlt and layered ULW).
         const SkImageInfo info = SkImageInfo::MakeN32Premul(static_cast<int>(m_width), static_cast<int>(m_height));
-        m_surface = SkSurfaces::WrapPixels(info, m_pixels.data(), rowBytes, &m_surfaceProps);
+        m_surface = SkSurfaces::WrapPixels(info, m_dibBits, rowBytes, &m_surfaceProps);
+        m_frameDirty = true;
         return static_cast<bool>(m_surface);
     }
 
@@ -485,9 +606,14 @@ private:
     }
 
     HWND m_hwnd = nullptr;
+    PresentMode m_presentMode = PresentMode::Hwnd;
     UINT m_width = 0;
     UINT m_height = 0;
-    std::vector<uint8_t> m_pixels;
+    bool m_frameDirty = false;
+    HDC m_memDC = nullptr;
+    HBITMAP m_dib = nullptr;
+    HBITMAP m_oldBitmap = nullptr;
+    void* m_dibBits = nullptr;
     sk_sp<SkSurface> m_surface;
     SkSurfaceProps m_surfaceProps{
         SkSurfaceProps::kUseDeviceIndependentFonts_Flag,

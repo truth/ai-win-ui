@@ -181,8 +181,13 @@ public:
     }
 
     void Resize(UINT width, UINT height) override {
-        m_pixelWidth = std::max(1u, width);
-        m_pixelHeight = std::max(1u, height);
+        width = std::max(1u, width);
+        height = std::max(1u, height);
+        if (width == m_pixelWidth && height == m_pixelHeight && m_renderTarget) {
+            return;
+        }
+        m_pixelWidth = width;
+        m_pixelHeight = height;
 
         if (m_presentMode == PresentMode::Layered) {
             // Layered surface size is baked into the DIB; recreate on resize.
@@ -216,6 +221,7 @@ public:
 
         m_renderTarget->BeginDraw();
         m_renderTarget->Clear(ToD2DColor(clearColor));
+        m_frameDirty = true;
     }
 
     void EndFrame() override {
@@ -226,12 +232,25 @@ public:
         const HRESULT hr = m_renderTarget->EndDraw();
         if (hr == D2DERR_RECREATE_TARGET) {
             DestroyRenderTarget();
+            m_frameDirty = false;
             return;
         }
 
-        if (m_presentMode == PresentMode::Layered && SUCCEEDED(hr)) {
-            PresentLayeredSurface();
+        if (FAILED(hr)) {
+            m_frameDirty = false;
+            return;
         }
+
+        if (m_presentMode == PresentMode::Layered) {
+            if (m_hwnd && IsIconic(m_hwnd)) {
+                m_frameDirty = false;
+                return;
+            }
+            if (m_frameDirty) {
+                PresentLayeredSurface();
+            }
+        }
+        m_frameDirty = false;
     }
 
     void FillRect(const Rect& rect, const Color& color) override {
@@ -672,6 +691,7 @@ private:
     PresentMode m_presentMode = PresentMode::Hwnd;
     UINT m_pixelWidth = 0;
     UINT m_pixelHeight = 0;
+    bool m_frameDirty = false;
     ComPtr<ID2D1Factory> m_d2dFactory;
     ComPtr<IWICImagingFactory> m_wicFactory;
     ComPtr<IDWriteFactory> m_dwriteFactory;

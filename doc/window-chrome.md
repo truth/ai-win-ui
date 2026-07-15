@@ -100,11 +100,21 @@ When the window loses activation (`WM_ACTIVATE` / `WM_NCACTIVATE`):
 
 Notes:
 
-- Layered mode currently forces the **Direct2D** backend (Skia layered present is future work).
+- Layered present is supported on **Direct2D and Skia**. Prefer via `AI_WIN_UI_RENDERER=skia|direct2d`.
 - Clear color is fully transparent; UI must paint opaque content where the window should be solid.
 - Resize borders remain active on the HWND rect even over transparent margins; caption/client hits honor alpha.
 - App paints a soft multi-pass drop shadow under the first child card of the root panel.
 - When maximized, floating padding and card corner radius collapse so the shell fills the work area.
+- Placement centers on the **monitor under the cursor** (not always the primary).
+- Skia layered uses a shared DIB backing (zero-copy ULW); minimized windows skip presents.
+
+```powershell
+# Skia layered (default for the script)
+.\scripts\run_layered_chrome_demo.ps1 -Renderer skia
+
+# Direct2D layered
+.\scripts\run_layered_chrome_demo.ps1 -Renderer direct2d
+```
 
 ## Limits
 

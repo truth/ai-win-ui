@@ -2,6 +2,11 @@
 
 ## 2026-07-15
 
+- 分支 `feature/skia-layered-multimon-perf`：
+  - Skia layered present（DIB 零拷贝 + `UpdateLayeredWindow` / HWND `BitBlt`）
+  - 多显示器：光标所在显示器居中；`WM_DISPLAYCHANGE` 刷新；DPI 跨屏沿用 `WM_DPICHANGED`
+  - 性能：同尺寸跳过 resize、最小化跳过 present、脏帧门控
+  - layered 不再强制 Direct2D；脚本默认 Skia
 - Layered 真异形 v2：`PresentMode::Layered`（Direct2D DC RT + DIB + `UpdateLayeredWindow`）
   - `AI_WIN_UI_CHROME=layered` / 根布局 `chrome="layered"`
   - 透明 clear + 圆角卡片 demo：`layouts/layered_chrome_demo.xml`

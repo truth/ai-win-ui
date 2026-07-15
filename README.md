@@ -86,11 +86,12 @@
 # 无边框自绘标题栏（HWND）
 .\scripts\run_custom_chrome_demo.ps1 -Configuration Release -BuildIfMissing
 
-# Layered 真异形（每像素透明，圆角外露桌面）
+# Layered 真异形（每像素透明；默认 Skia，可切 Direct2D）
 .\scripts\run_layered_chrome_demo.ps1 -Configuration Release -BuildIfMissing
+.\scripts\run_layered_chrome_demo.ps1 -Renderer direct2d
 ```
 
-环境变量：`AI_WIN_UI_CHROME=custom|layered`。说明见 `doc/window-chrome.md`。
+环境变量：`AI_WIN_UI_CHROME=custom|layered`，`AI_WIN_UI_RENDERER=skia|direct2d`。说明见 `doc/window-chrome.md`。
 
 ## Script Usage
 

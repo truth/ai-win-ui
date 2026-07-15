@@ -1,6 +1,8 @@
 param(
     [ValidateSet("Release", "Debug")]
     [string]$Configuration = "Release",
+    [ValidateSet("skia", "direct2d")]
+    [string]$Renderer = "skia",
     [switch]$BuildIfMissing,
     [switch]$NoLaunch
 )
@@ -23,12 +25,12 @@ if (-not (Test-Path -LiteralPath $exePath)) {
 
 $env:AI_WIN_UI_CHROME = "layered"
 $env:AI_WIN_UI_LAYOUT = "layouts/layered_chrome_demo.xml"
-# Layered present is Direct2D-backed in v2.
-$env:AI_WIN_UI_RENDERER = "direct2d"
+$env:AI_WIN_UI_RENDERER = $Renderer
 
-Write-Host "Chrome : layered (per-pixel alpha)"
-Write-Host "Layout : layouts/layered_chrome_demo.xml"
-Write-Host "Exe    : $exePath"
+Write-Host "Chrome   : layered (per-pixel alpha)"
+Write-Host "Renderer : $Renderer"
+Write-Host "Layout   : layouts/layered_chrome_demo.xml"
+Write-Host "Exe      : $exePath"
 
 if (-not $NoLaunch) {
     Start-Process -FilePath $exePath -WorkingDirectory (Split-Path -Parent $exePath) | Out-Null
