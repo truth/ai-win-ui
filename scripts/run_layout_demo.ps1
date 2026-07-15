@@ -90,6 +90,9 @@ function Resolve-LayoutPath {
         "scroll-viewer" = "layouts/scroll_viewer_cases.xml"
         "scroll_viewer" = "layouts/scroll_viewer_cases.xml"
         "scroll_viewer_cases" = "layouts/scroll_viewer_cases.xml"
+        "demo-gallery" = "layouts/demo_gallery.xml"
+        "demo_gallery" = "layouts/demo_gallery.xml"
+        "gallery" = "layouts/demo_gallery.xml"
     }
     $aliasKey = $layoutPath.ToLowerInvariant()
     if ($layoutAliases.ContainsKey($aliasKey)) {

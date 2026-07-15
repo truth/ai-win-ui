@@ -1,0 +1,199 @@
+<!--
+  Manual test gallery: grid of every major layout case.
+  Click Open to spawn an in-process secondary window (close child without quitting hub).
+
+  Event format: openDemo:layouts/path.xml[|chrome][|size]
+    chrome = system | custom | layered  (omit => system)
+    size   = e.g. 1100x750
+
+  Launch:
+    .\scripts\run_layout_demo.ps1 -Layout demo-gallery
+    .\scripts\run_demo_gallery.ps1
+-->
+<Panel
+  name="galleryRoot"
+  direction="column"
+  background="#0B121A"
+  padding="20,16,20,16"
+  spacing="10"
+  alignItems="stretch">
+
+  <Panel direction="row" spacing="12" alignItems="center" height="36">
+    <Label name="title" text="AI WinUI · Demo Gallery" fontSize="22" color="#F5F8FC" />
+    <Label text="Click Open on any card · child windows are in-process" fontSize="12" color="#7F93A8" />
+  </Panel>
+
+  <ScrollViewer
+    name="galleryScroll"
+    flexGrow="1"
+    height="720"
+    scrollY="true"
+    scrollX="false"
+    showScrollbars="true"
+    background="#0E1620"
+    barThickness="10">
+
+    <Panel name="galleryContent" direction="column" padding="12,12,12,12" spacing="18" alignItems="stretch">
+
+      <!-- ========== Core / MVP ========== -->
+      <Label text="Core · MVP" fontSize="15" color="#6EA0FF" />
+      <Grid name="gridCore" columns="3" spacing="12" cellSpacing="12" rowHeight="148" background="transparent" padding="0,0,0,0">
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Core Validation" fontSize="14" color="#F2F6FB" />
+          <Label text="Text · flex · focus · interaction" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/core_validation.xml||1100x750" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Yoga Measure" fontSize="14" color="#F2F6FB" />
+          <Label text="Row/column sizing cases" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/yoga_measure_cases.xml||1000x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="UI Sample" fontSize="14" color="#F2F6FB" />
+          <Label text="Default mixed demo (ui.xml)" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/ui.xml||1100x750" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="CJK Render" fontSize="14" color="#F2F6FB" />
+          <Label text="Chinese / multi-line text" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/cjk_render_test.xml||900x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Skia Image Cases" fontSize="14" color="#F2F6FB" />
+          <Label text="Bitmap load · clip · scale" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/skia_image_cases.xml||1000x700" height="32" />
+        </Panel>
+      </Grid>
+
+      <!-- ========== Controls ========== -->
+      <Label text="Controls" fontSize="15" color="#6EA0FF" />
+      <Grid name="gridControls" columns="3" spacing="12" cellSpacing="12" rowHeight="148" background="transparent" padding="0,0,0,0">
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Core Controls v2" fontSize="14" color="#F2F6FB" />
+          <Label text="Progress · ListBox · Combo · Tab" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/core_controls_v2.xml||1100x720" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Navigation" fontSize="14" color="#F2F6FB" />
+          <Label text="ListView · TreeView · shell strips" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/navigation_components.xml||1200x750" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Advanced Inputs" fontSize="14" color="#F2F6FB" />
+          <Label text="Numeric · DateTime · RichText" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/advanced_inputs.xml||1100x720" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Stats Components" fontSize="14" color="#F2F6FB" />
+          <Label text="StatCard · SparklineChart" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/stats_components.xml||1100x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Data Table" fontSize="14" color="#F2F6FB" />
+          <Label text="Select · sort · edit · resize · freeze" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/table_components.xml||1200x750" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Seagull Animation" fontSize="14" color="#F2F6FB" />
+          <Label text="Timer-driven animation" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/seagull_animation.xml||1000x700" height="32" />
+        </Panel>
+      </Grid>
+
+      <!-- ========== Style / Theme ========== -->
+      <Label text="Style · Theme" fontSize="15" color="#6EA0FF" />
+      <Grid name="gridStyle" columns="3" spacing="12" cellSpacing="12" rowHeight="148" background="transparent" padding="0,0,0,0">
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Style Catalog" fontSize="14" color="#F2F6FB" />
+          <Label text="$style.xxx · import · ShapePanel" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/style_catalog_demo.xml||1000x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Test Styles (JSON)" fontSize="14" color="#F2F6FB" />
+          <Label text="Inline multi-state Button style" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/test_styles.json||900x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Test Theme (JSON)" fontSize="14" color="#F2F6FB" />
+          <Label text="$color / $spacing tokens" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/test_theme.json||900x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Test SVG (JSON)" fontSize="14" color="#F2F6FB" />
+          <Label text="SvgIcon · Skia recommended" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/test_svg.json||900x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="ScrollViewer" fontSize="14" color="#F2F6FB" />
+          <Label text="Wheel · drag-pan · scrollbar" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/scroll_viewer_cases.xml||1000x700" height="32" />
+        </Panel>
+      </Grid>
+
+      <!-- ========== Dashboard ========== -->
+      <Label text="Dashboard" fontSize="15" color="#6EA0FF" />
+      <Grid name="gridDash" columns="3" spacing="12" cellSpacing="12" rowHeight="148" background="transparent" padding="0,0,0,0">
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Dashboard Responsive" fontSize="14" color="#F2F6FB" />
+          <Label text="Responsive shell · cards" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/dashboard_responsive.xml||1280x800" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Dashboard Reference" fontSize="14" color="#F2F6FB" />
+          <Label text="Reference recreation page" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/dashboard_reference.xml||1280x800" height="32" />
+        </Panel>
+      </Grid>
+
+      <!-- ========== Window chrome ========== -->
+      <Label text="Window Chrome" fontSize="15" color="#6EA0FF" />
+      <Grid name="gridChrome" columns="3" spacing="12" cellSpacing="12" rowHeight="148" background="transparent" padding="0,0,0,0">
+        <Panel direction="column" background="#1A2438" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Custom Chrome" fontSize="14" color="#F2F6FB" />
+          <Label text="Borderless · caption buttons" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.secondaryButton" onClick="openDemo:layouts/custom_chrome_demo.xml|custom|1000x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#1A2438" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Layered Rounded Card" fontSize="14" color="#F2F6FB" />
+          <Label text="Per-pixel alpha · HTTRANSPARENT" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.secondaryButton" onClick="openDemo:layouts/layered_chrome_demo.xml|layered|1000x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#1A2438" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Shaped Hub" fontSize="14" color="#F2F6FB" />
+          <Label text="Heart / petal / oval / star launcher" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.secondaryButton" onClick="openDemo:layouts/shaped_windows_hub.xml||1000x700" height="32" />
+        </Panel>
+      </Grid>
+
+      <!-- ========== Irregular shapes ========== -->
+      <Label text="Irregular Layered Shapes" fontSize="15" color="#6EA0FF" />
+      <Grid name="gridShapes" columns="4" spacing="12" cellSpacing="12" rowHeight="148" background="transparent" padding="0,0,0,0">
+        <Panel direction="column" background="#2A1520" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="center">
+          <ShapePanel kind="heart" width="64" height="56" fill="#E85D75" />
+          <Label text="Heart" fontSize="12" color="#F2F6FB" />
+          <Button text="Open" style="$style.dangerButton" onClick="openDemo:layouts/shaped_heart_window.xml|layered|420x460" height="30" width="100" />
+        </Panel>
+        <Panel direction="column" background="#1A1830" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="center">
+          <ShapePanel kind="petal" width="64" height="56" fill="#7B6CFF" />
+          <Label text="Petal" fontSize="12" color="#F2F6FB" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/shaped_petal_window.xml|layered|440x440" height="30" width="100" />
+        </Panel>
+        <Panel direction="column" background="#152820" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="center">
+          <ShapePanel kind="oval" width="72" height="48" fill="#3DBE8B" />
+          <Label text="Oval" fontSize="12" color="#F2F6FB" />
+          <Button text="Open" style="$style.secondaryButton" onClick="openDemo:layouts/shaped_oval_window.xml|layered|400x320" height="30" width="100" />
+        </Panel>
+        <Panel direction="column" background="#2A2410" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="center">
+          <ShapePanel kind="star" width="56" height="56" fill="#F0B429" />
+          <Label text="Star" fontSize="12" color="#F2F6FB" />
+          <Button text="Open" style="$style.secondaryButton" onClick="openDemo:layouts/shaped_star_window.xml|layered|400x400" height="30" width="100" />
+        </Panel>
+      </Grid>
+
+      <Label
+        text="Tip: drag ScrollViewer content · child windows close independently · AI_WIN_UI_CHILD_PROCESS=1 forces multi-process"
+        fontSize="11"
+        color="#5C7085" />
+    </Panel>
+  </ScrollViewer>
+</Panel>

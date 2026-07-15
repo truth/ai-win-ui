@@ -95,16 +95,17 @@ class App;
 std::vector<App*> g_secondaryHosts;
 int g_liveHostCount = 0;
 void PurgeClosedSecondaryHosts();
-constexpr UINT WM_APP_OPEN_SHAPED_HOST = WM_APP + 40;
+constexpr UINT WM_APP_OPEN_DEMO_HOST = WM_APP + 40;
 
-struct PendingShapedHost {
+// Deferred secondary-window open (filled by button handler, consumed on WM_APP_OPEN_DEMO_HOST).
+struct PendingDemoHost {
     std::wstring layout;
-    std::wstring size;
+    std::wstring chrome; // empty => clear AI_WIN_UI_CHROME (system chrome)
+    std::wstring size;   // empty => default window size
     RendererBackend renderer = RendererBackend::Direct2D;
 };
-// One deferred open request (filled by button handler, consumed on WM_APP_OPEN_SHAPED_HOST).
-PendingShapedHost g_pendingShapedHost{};
-bool g_hasPendingShapedHost = false;
+PendingDemoHost g_pendingDemoHost{};
+bool g_hasPendingDemoHost = false;
 
 class App {
 public:
@@ -387,11 +388,16 @@ public:
         const DWORD nRenderer = GetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", prevRendererBuf, 512);
 
         SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", layoutRelPath);
+        // Always set/clear chrome so secondary does not inherit hub chrome env.
         if (chromeMode && chromeMode[0] != L'\0') {
             SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", chromeMode);
+        } else {
+            SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", nullptr);
         }
         if (sizeWh && sizeWh[0] != L'\0') {
             SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", sizeWh);
+        } else {
+            SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", nullptr);
         }
         SetEnvironmentVariableW(
             L"AI_WIN_UI_RENDERER",
@@ -658,20 +664,27 @@ private:
         }
     }
 
-    // Default: same-process secondary host. Set AI_WIN_UI_CHILD_PROCESS=1 for CreateProcess.
+    // Open any layout as a secondary host (default in-process).
+    // chrome: "" / "system" => system frame; "custom"; "layered"
     // Deferred via PostMessage so we never CreateWindow re-entrantly inside mouse handlers.
-    void LaunchShapedChild(const wchar_t* layoutRelPath, const wchar_t* sizeWh) {
+    void LaunchDemoHost(const wchar_t* layoutRelPath, const wchar_t* chromeMode, const wchar_t* sizeWh) {
         const std::wstring forceProcess = GetEnvironmentValue(L"AI_WIN_UI_CHILD_PROCESS");
         const bool useProcess =
             forceProcess == L"1" || forceProcess == L"true" || forceProcess == L"TRUE";
 
+        std::wstring chrome = chromeMode ? chromeMode : L"";
+        if (chrome == L"system") {
+            chrome.clear();
+        }
+
         if (!useProcess) {
-            g_pendingShapedHost.layout = layoutRelPath ? layoutRelPath : L"";
-            g_pendingShapedHost.size = sizeWh ? sizeWh : L"";
-            g_pendingShapedHost.renderer = m_activeRendererBackend;
-            g_hasPendingShapedHost = true;
+            g_pendingDemoHost.layout = layoutRelPath ? layoutRelPath : L"";
+            g_pendingDemoHost.chrome = chrome;
+            g_pendingDemoHost.size = sizeWh ? sizeWh : L"";
+            g_pendingDemoHost.renderer = m_activeRendererBackend;
+            g_hasPendingDemoHost = true;
             if (m_hwnd) {
-                PostMessageW(m_hwnd, WM_APP_OPEN_SHAPED_HOST, 0, 0);
+                PostMessageW(m_hwnd, WM_APP_OPEN_DEMO_HOST, 0, 0);
             }
             return;
         }
@@ -687,9 +700,15 @@ private:
         const std::wstring prevRenderer = GetEnvironmentValue(L"AI_WIN_UI_RENDERER");
 
         SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", layoutRelPath);
-        SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", L"layered");
+        if (chrome.empty()) {
+            SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", nullptr);
+        } else {
+            SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", chrome.c_str());
+        }
         if (sizeWh && sizeWh[0] != L'\0') {
             SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", sizeWh);
+        } else {
+            SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", nullptr);
         }
         if (prevRenderer.empty()) {
             SetEnvironmentVariableW(
@@ -724,9 +743,9 @@ private:
             if (pi.hProcess) {
                 CloseHandle(pi.hProcess);
             }
-            SetWindowTextW(m_hwnd, L"Opened shaped layered child process");
+            SetWindowTextW(m_hwnd, L"Opened demo child process");
         } else {
-            SetWindowTextW(m_hwnd, L"Failed to launch shaped child process");
+            SetWindowTextW(m_hwnd, L"Failed to launch demo child process");
         }
 
         auto restore = [](const wchar_t* name, const std::wstring& value) {
@@ -778,26 +797,72 @@ private:
             if (eventId == "windowClose") {
                 return [this]() { PostMessageW(m_hwnd, WM_CLOSE, 0, 0); };
             }
-            // Open irregular layered child process windows (separate process so
-            // WM_DESTROY/PostQuitMessage does not tear down the hub).
+            // Shaped demos (layered).
             if (eventId == "openHeartWindow") {
                 return [this]() {
-                    LaunchShapedChild(L"layouts/shaped_heart_window.xml", L"420x460");
+                    LaunchDemoHost(L"layouts/shaped_heart_window.xml", L"layered", L"420x460");
                 };
             }
             if (eventId == "openPetalWindow") {
                 return [this]() {
-                    LaunchShapedChild(L"layouts/shaped_petal_window.xml", L"440x440");
+                    LaunchDemoHost(L"layouts/shaped_petal_window.xml", L"layered", L"440x440");
                 };
             }
             if (eventId == "openOvalWindow") {
                 return [this]() {
-                    LaunchShapedChild(L"layouts/shaped_oval_window.xml", L"400x320");
+                    LaunchDemoHost(L"layouts/shaped_oval_window.xml", L"layered", L"400x320");
                 };
             }
             if (eventId == "openStarWindow") {
                 return [this]() {
-                    LaunchShapedChild(L"layouts/shaped_star_window.xml", L"400x400");
+                    LaunchDemoHost(L"layouts/shaped_star_window.xml", L"layered", L"400x400");
+                };
+            }
+            // Gallery: openDemo:layoutPath[|chrome][|size]
+            // chrome: system|custom|layered (default system). size: e.g. 1100x750
+            if (eventId.rfind("openDemo:", 0) == 0) {
+                const std::string payload = eventId.substr(9);
+                return [this, payload]() {
+                    std::string layout = payload;
+                    std::string chrome;
+                    std::string size;
+                    const auto p1 = payload.find('|');
+                    if (p1 == std::string::npos) {
+                        layout = payload;
+                    } else {
+                        layout = payload.substr(0, p1);
+                        const auto rest = payload.substr(p1 + 1);
+                        const auto p2 = rest.find('|');
+                        if (p2 == std::string::npos) {
+                            chrome = rest;
+                        } else {
+                            chrome = rest.substr(0, p2);
+                            size = rest.substr(p2 + 1);
+                        }
+                    }
+                    if (layout.empty()) {
+                        return;
+                    }
+                    // Utf8 -> wide for env APIs.
+                    auto toWide = [](const std::string& utf8) -> std::wstring {
+                        if (utf8.empty()) {
+                            return {};
+                        }
+                        const int n = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+                        if (n <= 1) {
+                            return {};
+                        }
+                        std::wstring w(static_cast<size_t>(n - 1), L'\0');
+                        MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, w.data(), n);
+                        return w;
+                    };
+                    const std::wstring wLayout = toWide(layout);
+                    const std::wstring wChrome = toWide(chrome);
+                    const std::wstring wSize = toWide(size);
+                    LaunchDemoHost(
+                        wLayout.c_str(),
+                        wChrome.empty() ? L"" : wChrome.c_str(),
+                        wSize.empty() ? nullptr : wSize.c_str());
                 };
             }
             return UIEventHandler();
@@ -1671,20 +1736,19 @@ private:
                 return 0;
             case WM_ERASEBKGND:
                 return 1;
-            case WM_APP_OPEN_SHAPED_HOST:
-                if (g_hasPendingShapedHost) {
-                    g_hasPendingShapedHost = false;
+            case WM_APP_OPEN_DEMO_HOST:
+                if (g_hasPendingDemoHost) {
+                    g_hasPendingDemoHost = false;
                     const bool ok = OpenSecondaryHost(
                         m_instance,
-                        g_pendingShapedHost.layout.c_str(),
-                        L"layered",
-                        g_pendingShapedHost.size.empty() ? nullptr : g_pendingShapedHost.size.c_str(),
-                        g_pendingShapedHost.renderer);
+                        g_pendingDemoHost.layout.c_str(),
+                        g_pendingDemoHost.chrome.empty() ? L"" : g_pendingDemoHost.chrome.c_str(),
+                        g_pendingDemoHost.size.empty() ? nullptr : g_pendingDemoHost.size.c_str(),
+                        g_pendingDemoHost.renderer);
                     if (m_hwnd) {
-                        SetWindowTextW(
-                            m_hwnd,
-                            ok ? L"Opened shaped window (in-process)"
-                               : L"Failed to open in-process shaped window");
+                        std::wstring title = ok ? L"Opened: " : L"Failed: ";
+                        title += g_pendingDemoHost.layout;
+                        SetWindowTextW(m_hwnd, title.c_str());
                     }
                 }
                 return 0;

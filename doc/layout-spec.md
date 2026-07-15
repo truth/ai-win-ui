@@ -494,8 +494,21 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_headless_smoke.ps1 `
 | `test_svg.json` | SvgIcon |
 | **`style_catalog_demo.xml` / `.json`** | **`$style` catalog + ShapePanel** |
 | **`shaped_windows_hub.xml`** | **Open layered shape children** |
+| **`demo_gallery.xml`** | **Grid of all cases · click Open (manual QA hub)** |
 | `layered_chrome_demo.xml` | Rounded layered card |
 | `shaped_*_window.xml` | Single-shape layered shells |
+
+### Demo gallery events
+
+Buttons may use:
+
+```
+onClick="openDemo:layouts/core_validation.xml"
+onClick="openDemo:layouts/layered_chrome_demo.xml|layered|1000x700"
+```
+
+Format: `openDemo:<path>[|<chrome>][|<size>]` where `chrome` is `system` / `custom` / `layered`.
+Opens an in-process secondary window (hub stays alive).
 
 ## Naming Guidance
 

@@ -98,7 +98,11 @@
 # 样式 catalog（$style.xxx）+ ShapePanel 预览
 .\scripts\run_layout_demo.ps1 -Layout style-catalog -Renderer skia
 
-# 点击打开心形/花瓣等子进程异形窗
+# 网格案例总览（手工点开每个 demo）
+.\scripts\run_demo_gallery.ps1
+# 或: .\scripts\run_layout_demo.ps1 -Layout demo-gallery
+
+# 点击打开心形/花瓣等异形窗
 .\scripts\run_shaped_windows_demo.ps1
 ```
 
