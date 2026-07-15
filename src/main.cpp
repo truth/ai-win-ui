@@ -1,4 +1,5 @@
-﻿#include "layout_parser.h"
+﻿#include "host_options.h"
+#include "layout_parser.h"
 #include "layout_engine.h"
 #include "renderer.h"
 #include "resource_provider.h"
@@ -96,15 +97,6 @@ std::vector<App*> g_secondaryHosts;
 int g_liveHostCount = 0;
 void PurgeClosedSecondaryHosts();
 constexpr UINT WM_APP_OPEN_DEMO_HOST = WM_APP + 40;
-
-// Public-ish host open parameters (H2). Still can be filled from env for CLI.
-struct OpenHostOptions {
-    std::wstring layout;     // resource path e.g. layouts/ui.xml
-    std::wstring chrome;     // empty/system => system frame; custom; layered
-    std::wstring size;       // empty => default; e.g. 1100x750
-    RendererBackend renderer = RendererBackend::Direct2D;
-    bool childProcess = false; // true => CreateProcess instead of in-process
-};
 
 // Deferred secondary-window open (filled by button handler, consumed on WM_APP_OPEN_DEMO_HOST).
 OpenHostOptions g_pendingDemoHost{};
@@ -1388,6 +1380,13 @@ private:
 
         // Expanded popups (ComboBox list) win over normal tree z-order.
         UIElement* overlayHit = m_root->FindOverlayHitAt(x, y);
+
+        // Click outside any open overlay → dismiss (keep header clicks for toggle).
+        if (!overlayHit) {
+            if (m_root->DismissOverlaysAt(x, y)) {
+                InvalidateRect(m_hwnd, nullptr, FALSE);
+            }
+        }
         UIElement* focusTarget = overlayHit
             ? (overlayHit->IsFocusable() ? overlayHit : overlayHit->FindFocusableAt(x, y))
             : m_root->FindFocusableAt(x, y);

@@ -321,18 +321,22 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 | ID | 状态 | 说明 |
 |----|------|------|
 | H3 | **done** | 启动 `LogEffectiveEnv`；标题显示 chrome；`AI_WIN_UI_IGNORE_ENV` |
-| H2 | **done** | `OpenHostOptions` + `OpenSecondaryHost(options)` / `LaunchDemoHost(options)` |
+| H2 | **done** | `OpenHostOptions` in `host_options.h` + `OpenSecondaryHost(options)` |
+| H1 | **partial** | 选项头文件抽出；完整 `UiHost` 类拆分仍 open |
 | Q5 | **done** | `scripts/clear_ai_win_env.ps1` |
 | Q1 | **done** | `scripts/check_gallery_coverage.ps1` |
 | Q2 | **done** | `core-validation` skia+d2d + scroll-viewer skia（`tests/golden/`） |
 | R/A6 | **done** | `AI_WIN_UI_TEXT_DUMP` + `run_text_dump.ps1` |
-| R1 | **partial** | `compare_text_dumps.ps1` 双后端 metrics 对比（容差 2px） |
-| R2–R3 | **open** | 大 diff 修复 / caret |
-| L1 | **done** | `AI_WIN_UI_DISABLE_WINDOW_SCROLL=1` 关闭宿主级竖滚（优先 ScrollViewer） |
+| R1 | **done** | `compare_text_dumps` core-validation **PASS ≤2px** |
+| R3 | **done** | TextInput caret 点击落最近字形边界（同 NoWrap measure） |
+| R2 | **open** | 极端多行 wrap golden（当前 height 已对齐） |
+| L1 | **done** | `AI_WIN_UI_DISABLE_WINDOW_SCROLL=1` |
 | L6 | **done** | GridPanel → Yoga flex-wrap MeasureGrid |
-| C1 | **done** | `doc/keyboard-matrix.md` 初表 |
-| C2–C3 | **open** | Popup / IME |
-| S1–S3 | **partial** | S3≈H3 日志 |
+| C1 | **done** | `doc/keyboard-matrix.md` |
+| C2 | **partial** | Combo `DismissOverlaysAt` 点外关闭；完整 Popup 仍 open |
+| C3 | **open** | IME 合成窗 |
+| S1 | **done** | `doc/plan/token-migration-strategy.md` |
+| S2–S3 | **partial** | S3≈H3 日志 |
 
 ## 10. 修订记录
 

@@ -27,9 +27,9 @@
 
 ## 已知缺口（C2/C3 后续）
 
-1. Combo 下拉打开时 **焦点陷阱** 与点外部关闭需统一到 Popup。  
+1. Combo 下拉 **点外部关闭**：已用 `DismissOverlaysAt`（2026-07-15）；完整 Popup 层仍待 C4。  
 2. Radio 组内箭头键切换未强制。  
-3. **IME**：合成窗位置随 caret（依赖 R3 TextInput metrics）。  
+3. **IME**：合成窗位置随 caret（R3 caret 已改为最近边界；IME 窗跟随待验）。  
 4. DataTable 编辑态 Esc 取消需验收。
 
 ## 相关页面

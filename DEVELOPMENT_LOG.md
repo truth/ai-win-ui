@@ -2,6 +2,7 @@
 
 ## 2026-07-15
 
+- Wave1 续 2：`host_options.h`；Combo 点外关闭 `DismissOverlaysAt`；TextInput caret 最近边界；`token-migration-strategy.md`
 - Wave1 续：`OpenHostOptions`；`AI_WIN_UI_DISABLE_WINDOW_SCROLL`；`compare_text_dumps.ps1`（core-validation skia/d2d **PASS ≤2px**）；`doc/keyboard-matrix.md`
 - **GridPanel → Yoga flex-wrap grid**：`ILayoutEngine::MeasureGrid` / `ArrangeGrid`；等分列宽 + `rowHeight` + gap；手写 fallback 保留
 - Wave1 **分任务执行**落地：

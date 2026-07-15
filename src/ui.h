@@ -154,6 +154,15 @@ public:
         return nullptr;
     }
 
+    // Close popups that do not contain (x,y). Used for click-outside dismiss (C2).
+    virtual bool DismissOverlaysAt(float x, float y) {
+        bool changed = false;
+        for (auto& child : m_children) {
+            changed = child->DismissOverlaysAt(x, y) || changed;
+        }
+        return changed;
+    }
+
     virtual bool IsFocusable() const { return false; }
     bool HasFocus() const { return m_hasFocus; }
     bool IsHovered() const { return m_hovered; }
@@ -3692,17 +3701,23 @@ public:
         return true;
     }
 
+    // Place caret at the glyph boundary nearest to localX (same NoWrap metrics as draw).
     size_t ComputeCaretIndex(float localX, const Rect& textRect) const {
-        size_t newCaret = m_text.size();
-        for (size_t i = 0; i <= m_text.size(); ++i) {
-            const std::wstring prefix = m_text.substr(0, i);
-            const float prefixWidth = MeasureNoWrapTextWidth(prefix, textRect.Width());
-            if (localX < prefixWidth + ScaleValue(4.0f)) {
-                newCaret = i;
-                break;
+        if (m_text.empty()) {
+            return 0;
+        }
+        const float maxW = textRect.Width();
+        size_t best = 0;
+        float bestDist = std::abs(localX - 0.0f);
+        for (size_t i = 1; i <= m_text.size(); ++i) {
+            const float prefixWidth = MeasureNoWrapTextWidth(m_text.substr(0, i), maxW);
+            const float dist = std::abs(localX - prefixWidth);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = i;
             }
         }
-        return newCaret;
+        return best;
     }
 
     bool OnTimer(UINT_PTR /*timerId*/) override {
@@ -7477,6 +7492,18 @@ public:
             return this;
         }
         return nullptr;
+    }
+
+    bool DismissOverlaysAt(float x, float y) override {
+        bool changed = UIElement::DismissOverlaysAt(x, y);
+        if (m_expanded &&
+            !HeaderRect().Contains(x, y) &&
+            !DropdownRect().Contains(x, y)) {
+            m_expanded = false;
+            m_hoveredIndex = -1;
+            changed = true;
+        }
+        return changed;
     }
 
     void SetItems(std::vector<std::wstring> items) {
