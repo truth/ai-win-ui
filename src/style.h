@@ -2,9 +2,11 @@
 
 #include "box_decoration.h"
 #include "graphics_types.h"
+#include "theme.h"
 
 #include <array>
 #include <cstddef>
+#include <memory>
 #include <optional>
 
 enum class StyleState : std::size_t {
@@ -39,6 +41,18 @@ public:
     StyleSpec base;
     std::array<StyleSpec, kStyleStateCount> overrides{};
 
+    // Nested styles for list rows, tab chips, and combo dropdown panels.
+    std::unique_ptr<ComponentStyle> itemStyle;
+    std::unique_ptr<ComponentStyle> tabStyle;
+    std::unique_ptr<ComponentStyle> dropdownStyle;
+
+    ComponentStyle();
+    ComponentStyle(const ComponentStyle& other);
+    ComponentStyle& operator=(const ComponentStyle& other);
+    ComponentStyle(ComponentStyle&&) noexcept;
+    ComponentStyle& operator=(ComponentStyle&&) noexcept;
+    ~ComponentStyle();
+
     StyleSpec Resolve(StyleState state) const;
 
     void SetBaseBackground(Color c);
@@ -46,4 +60,8 @@ public:
     void SetBaseRadius(const CornerRadius& r);
     void SetBaseForeground(Color c);
     void SetBaseFontSize(float size);
+
+    // Resolve optional theme color with hard-coded fallback (DefaultStyle lazy theme).
+    static Color ThemeColor(const Theme* theme, const char* key, Color fallback);
+    static float ThemeNumber(const Theme* theme, Theme::NumberCategory category, const char* key, float fallback);
 };

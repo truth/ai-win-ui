@@ -1,6 +1,6 @@
 <Panel padding="24,24,24,24" spacing="14" cornerRadius="16" background="#0D1520" alignItems="stretch">
   <Label text="DataTable Component Validation" fontSize="28" color="#F5F9FF" />
-  <Label text="v2: click rows to select, click headers to sort (numeric-aware). Up/Down when focused. Overflow scrolls with selection." fontSize="14" color="#B6C4D5" />
+  <Label text="v3: multi-select (Ctrl/Shift), F2/double-click cell edit, drag column edges to resize. Sort + keyboard still work." fontSize="14" color="#B6C4D5" />
 
   <DataTable
     columns="Name|Role|Region|Score"
@@ -8,6 +8,9 @@
     rows="Ava Carter|Product Designer|APAC|91;Noah Kim|Frontend Engineer|NA|88;Mia Chen|Data Analyst|EMEA|94;Liam Patel|QA Engineer|APAC|86;Emma Garcia|PM|NA|90;Ethan Rossi|Backend Engineer|EMEA|89;Sophia Diaz|UX Researcher|LATAM|87;Lucas Brown|DevOps Engineer|NA|92;Olivia Park|SRE|APAC|95;James Wright|Security|NA|84;Amelia Ng|Mobile Engineer|APAC|93;Henry Cho|Platform|EMEA|88"
     selectable="true"
     sortable="true"
+    multiSelect="true"
+    editable="true"
+    resizableColumns="true"
     selectedIndex="0"
     headerBackground="#203143"
     rowBackgroundA="#152232"
@@ -32,6 +35,9 @@
     rows="Widgets|12;Gadgets|7;Sprockets|3"
     selectable="false"
     sortable="false"
+    multiSelect="false"
+    editable="false"
+    resizableColumns="false"
     height="140"
     headerBackground="#203143"
     rowBackgroundA="#152232"

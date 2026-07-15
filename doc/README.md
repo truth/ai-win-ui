@@ -91,7 +91,7 @@ These layouts are the most useful when checking the current implementation:
 - `resource/layouts/stats_components.xml`
   - advanced statistics component checks (`StatCard`, `SparklineChart`)
 - `resource/layouts/table_components.xml`
-  - advanced table checks (`DataTable` v2: select, sort, hover, scroll)
+  - advanced table checks (`DataTable` v3: multi-select, cell edit, column resize, sort)
 - `resource/layouts/seagull_animation.xml`
   - animation checks for `SeagullAnimation` and timer-driven rendering
 - `resource/layouts/core_controls_v2.xml`

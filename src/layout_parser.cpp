@@ -663,6 +663,16 @@ ComponentStyle ParseComponentStyle(const JsonValue& value) {
             style.overrides[static_cast<std::size_t>(entry.state)] = ParseStyleSpec(value[entry.key]);
         }
     }
+    // Nested composite styles (list rows, tabs, combo dropdown panel).
+    if (value["itemStyle"].IsObject()) {
+        style.itemStyle = std::make_unique<ComponentStyle>(ParseComponentStyle(value["itemStyle"]));
+    }
+    if (value["tabStyle"].IsObject()) {
+        style.tabStyle = std::make_unique<ComponentStyle>(ParseComponentStyle(value["tabStyle"]));
+    }
+    if (value["dropdownStyle"].IsObject()) {
+        style.dropdownStyle = std::make_unique<ComponentStyle>(ParseComponentStyle(value["dropdownStyle"]));
+    }
     return style;
 }
 
@@ -1486,6 +1496,15 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
             if (props["sortable"].IsBool()) {
                 table->SetSortable(props["sortable"].boolValue);
+            }
+            if (props["multiSelect"].IsBool()) {
+                table->SetMultiSelect(props["multiSelect"].boolValue);
+            }
+            if (props["editable"].IsBool()) {
+                table->SetEditable(props["editable"].boolValue);
+            }
+            if (props["resizableColumns"].IsBool()) {
+                table->SetResizableColumns(props["resizableColumns"].boolValue);
             }
             if (props["selectedIndex"].IsNumber()) {
                 table->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
@@ -2558,6 +2577,15 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         if (auto it = node.attributes.find("sortable"); it != node.attributes.end()) {
             table->SetSortable(ToLowerAscii(it->second) == "true");
+        }
+        if (auto it = node.attributes.find("multiSelect"); it != node.attributes.end()) {
+            table->SetMultiSelect(ToLowerAscii(it->second) == "true");
+        }
+        if (auto it = node.attributes.find("editable"); it != node.attributes.end()) {
+            table->SetEditable(ToLowerAscii(it->second) == "true");
+        }
+        if (auto it = node.attributes.find("resizableColumns"); it != node.attributes.end()) {
+            table->SetResizableColumns(ToLowerAscii(it->second) == "true");
         }
         if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
             table->SetSelectedIndex(std::stoi(it->second));

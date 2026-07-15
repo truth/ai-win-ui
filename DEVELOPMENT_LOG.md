@@ -2,6 +2,12 @@
 
 ## 2026-07-15
 
+- 嵌套样式 + 主题 DefaultStyle + DataTable v3：
+  - `ComponentStyle.itemStyle` / `tabStyle` / `dropdownStyle`（布局解析 + 深拷贝）
+  - ListBox 行绘制走 `itemStyle`；ComboBox 下拉/行；TabControl tab 条走 `tabStyle`
+  - `DefaultStyle(const Theme*)` + `ApplyThemeDefaults()`：Button / TextInput / Checkbox / Radio / Slider / Progress / List / Combo / Tab
+  - DataTable v3：`multiSelect`（Ctrl 点选 / Shift 范围）、`editable`（F2 / 双击单元格）、`resizableColumns`（列边拖拽）
+  - 校验：`table_components.xml` / `.json`
 - ProgressBar 接入 `ComponentStyle`（`track` / `fill`，hover/pressed fill）；`fillColor`/`trackColor` 同步样式
 - ComboBox：布局高度仅标题行；下拉为 `RenderOverlay` 浮层；`FindOverlayHitAt` 优先命中
 - ComboBox：底部空间不足时列表向上展开（`viewportHeight` 写入 `UIContext`）

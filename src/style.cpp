@@ -1,4 +1,7 @@
 #include "style.h"
+#include "theme.h"
+
+#include <utility>
 
 namespace {
 
@@ -9,7 +12,40 @@ void MergeOptional(std::optional<T>& dst, const std::optional<T>& src) {
     }
 }
 
+std::unique_ptr<ComponentStyle> CloneNested(const std::unique_ptr<ComponentStyle>& src) {
+    if (!src) {
+        return nullptr;
+    }
+    return std::make_unique<ComponentStyle>(*src);
+}
+
 } // namespace
+
+ComponentStyle::ComponentStyle() = default;
+
+ComponentStyle::ComponentStyle(const ComponentStyle& other)
+    : base(other.base)
+    , overrides(other.overrides)
+    , itemStyle(CloneNested(other.itemStyle))
+    , tabStyle(CloneNested(other.tabStyle))
+    , dropdownStyle(CloneNested(other.dropdownStyle)) {
+}
+
+ComponentStyle& ComponentStyle::operator=(const ComponentStyle& other) {
+    if (this == &other) {
+        return *this;
+    }
+    base = other.base;
+    overrides = other.overrides;
+    itemStyle = CloneNested(other.itemStyle);
+    tabStyle = CloneNested(other.tabStyle);
+    dropdownStyle = CloneNested(other.dropdownStyle);
+    return *this;
+}
+
+ComponentStyle::ComponentStyle(ComponentStyle&&) noexcept = default;
+ComponentStyle& ComponentStyle::operator=(ComponentStyle&&) noexcept = default;
+ComponentStyle::~ComponentStyle() = default;
 
 StyleSpec ComponentStyle::Resolve(StyleState state) const {
     StyleSpec result = base;
@@ -62,4 +98,24 @@ void ComponentStyle::SetBaseForeground(Color c) {
 
 void ComponentStyle::SetBaseFontSize(float size) {
     base.fontSize = size;
+}
+
+Color ComponentStyle::ThemeColor(const Theme* theme, const char* key, Color fallback) {
+    if (!theme || !key) {
+        return fallback;
+    }
+    if (auto c = theme->ResolveColor(key)) {
+        return *c;
+    }
+    return fallback;
+}
+
+float ComponentStyle::ThemeNumber(const Theme* theme, Theme::NumberCategory category, const char* key, float fallback) {
+    if (!theme || !key) {
+        return fallback;
+    }
+    if (auto n = theme->ResolveNumber(category, key)) {
+        return *n;
+    }
+    return fallback;
 }

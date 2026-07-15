@@ -16,6 +16,7 @@
 #include <limits>
 #include <memory>
 #include <map>
+#include <set>
 #include <string>
 #include <utility>
 #include <vector>
@@ -85,11 +86,21 @@ public:
     SelfAlign AlignSelf() const { return m_alignSelf; }
     void SetContext(UIContext* context) {
         m_context = context;
+        ApplyThemeDefaults();
         for (auto& child : m_children) {
             child->SetContext(context);
         }
     }
     UIContext* Context() const { return m_context; }
+
+    // Lazy theme: refresh DefaultStyle() from theme when style was not set from layout.
+    virtual void ApplyThemeDefaults() {}
+    void SetStyle(ComponentStyle style) {
+        m_style = std::move(style);
+        m_styleFromLayout = true;
+    }
+    const ComponentStyle& Style() const { return m_style; }
+    ComponentStyle& MutableStyle() { return m_style; }
 
     float GetPreferredWidth(float availableWidth) const {
         const float clampedWidth = std::max(0.0f, availableWidth);
@@ -145,10 +156,6 @@ public:
     bool IsPressed() const { return m_pressed; }
     bool IsDisabled() const { return m_disabled; }
     void SetEnabled(bool enabled) { m_disabled = !enabled; }
-
-    void SetStyle(ComponentStyle style) { m_style = std::move(style); }
-    const ComponentStyle& Style() const { return m_style; }
-    ComponentStyle& MutableStyle() { return m_style; }
 
     virtual StyleState GetCurrentState() const {
         if (m_disabled) return StyleState::Disabled;
@@ -386,6 +393,7 @@ protected:
     HitTestRole m_hitTestRole = HitTestRole::Default;
     WindowChromeRequest m_windowChromeRequest = WindowChromeRequest::Unspecified;
     ComponentStyle m_style{};
+    bool m_styleFromLayout = false;
     UIContext* m_context = nullptr;
 };
 
@@ -1125,6 +1133,7 @@ public:
     };
 
     void SetColumns(std::vector<Column> columns) {
+        CommitEdit(false);
         m_columns = std::move(columns);
         if (m_sortColumn >= static_cast<int>(m_columns.size())) {
             m_sortColumn = -1;
@@ -1132,10 +1141,12 @@ public:
         RebuildViewOrder();
     }
     void SetRows(std::vector<std::vector<std::wstring>> rows) {
+        CommitEdit(false);
         m_rows = std::move(rows);
         if (m_selectedIndex >= static_cast<int>(m_rows.size())) {
             m_selectedIndex = m_rows.empty() ? -1 : 0;
         }
+        SanitizeSelection();
         RebuildViewOrder();
     }
     void SetColumnWidths(std::vector<float> widths) {
@@ -1146,17 +1157,52 @@ public:
     }
     void SetSelectable(bool selectable) { m_selectable = selectable; }
     void SetSortable(bool sortable) { m_sortable = sortable; }
+    void SetMultiSelect(bool multi) {
+        m_multiSelect = multi;
+        if (!multi) {
+            m_selectedSet.clear();
+            if (m_selectedIndex >= 0) {
+                m_selectedSet.insert(m_selectedIndex);
+            }
+        }
+    }
+    void SetEditable(bool editable) {
+        if (!editable) {
+            CommitEdit(false);
+        }
+        m_editable = editable;
+    }
+    void SetResizableColumns(bool resizable) {
+        if (!resizable) {
+            EndColumnResize();
+        }
+        m_resizableColumns = resizable;
+    }
+    bool MultiSelect() const { return m_multiSelect; }
+    bool Editable() const { return m_editable; }
+    bool ResizableColumns() const { return m_resizableColumns; }
+
     void SetSelectedIndex(int index) {
         if (m_rows.empty()) {
             m_selectedIndex = -1;
+            m_selectedSet.clear();
             return;
         }
         m_selectedIndex = std::clamp(index, 0, static_cast<int>(m_rows.size()) - 1);
+        m_selectedSet.clear();
+        m_selectedSet.insert(m_selectedIndex);
+        m_selectionAnchor = m_selectedIndex;
         EnsureSelectedVisible();
     }
     int SelectedIndex() const { return m_selectedIndex; }
+    std::vector<int> SelectedIndices() const {
+        return std::vector<int>(m_selectedSet.begin(), m_selectedSet.end());
+    }
+    bool IsRowSelected(int dataRow) const {
+        return m_selectedSet.find(dataRow) != m_selectedSet.end();
+    }
 
-    bool IsFocusable() const override { return m_selectable || m_sortable; }
+    bool IsFocusable() const override { return m_selectable || m_sortable || m_editable || m_resizableColumns; }
 
     bool OnFocus() override {
         if (!m_hasFocus) {
@@ -1167,54 +1213,159 @@ public:
     }
 
     bool OnBlur() override {
-        if (!m_hasFocus && m_hoveredRow < 0 && m_hoveredHeader < 0) {
-            return false;
+        bool changed = false;
+        if (m_editing) {
+            CommitEdit(true);
+            changed = true;
+        }
+        if (m_resizingColumn >= 0) {
+            EndColumnResize();
+            changed = true;
+        }
+        if (!m_hasFocus && m_hoveredRow < 0 && m_hoveredHeader < 0 && m_hoveredResizeEdge < 0) {
+            return changed;
         }
         m_hasFocus = false;
         m_hoveredRow = -1;
         m_hoveredHeader = -1;
+        m_hoveredResizeEdge = -1;
         return true;
     }
 
     bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
+        if (m_editing) {
+            switch (keyCode) {
+                case VK_ESCAPE:
+                    CommitEdit(false);
+                    return true;
+                case VK_RETURN:
+                    CommitEdit(true);
+                    return true;
+                case VK_LEFT:
+                    if (m_editCaret > 0) {
+                        --m_editCaret;
+                        return true;
+                    }
+                    return true;
+                case VK_RIGHT:
+                    if (m_editCaret < static_cast<int>(m_editBuffer.size())) {
+                        ++m_editCaret;
+                        return true;
+                    }
+                    return true;
+                case VK_HOME:
+                    m_editCaret = 0;
+                    return true;
+                case VK_END:
+                    m_editCaret = static_cast<int>(m_editBuffer.size());
+                    return true;
+                case VK_BACK:
+                    if (m_editCaret > 0 && !m_editBuffer.empty()) {
+                        m_editBuffer.erase(static_cast<size_t>(m_editCaret - 1), 1);
+                        --m_editCaret;
+                        return true;
+                    }
+                    return true;
+                case VK_DELETE:
+                    if (m_editCaret < static_cast<int>(m_editBuffer.size())) {
+                        m_editBuffer.erase(static_cast<size_t>(m_editCaret), 1);
+                        return true;
+                    }
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
         if (!m_selectable || m_rows.empty()) {
+            if (m_editable && keyCode == VK_F2 && m_selectedIndex >= 0) {
+                return BeginEdit(m_selectedIndex, std::max(0, m_editFocusCol));
+            }
             return false;
         }
+
+        const bool shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+        const bool ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+
         switch (keyCode) {
             case VK_UP:
-                return MoveSelection(-1);
+                return MoveSelection(-1, shift, ctrl);
             case VK_DOWN:
-                return MoveSelection(1);
+                return MoveSelection(1, shift, ctrl);
             case VK_HOME:
-                return SetSelectedIndexInternal(0);
+                return SetSelectedIndexInternal(ViewToDataRow(0), shift, ctrl);
             case VK_END:
-                return SetSelectedIndexInternal(static_cast<int>(m_rows.size()) - 1);
+                return SetSelectedIndexInternal(
+                    ViewToDataRow(static_cast<int>(m_viewOrder.size()) - 1), shift, ctrl);
             case VK_PRIOR:
-                return MoveSelection(-std::max(1, VisibleRowCount()));
+                return MoveSelection(-std::max(1, VisibleRowCount()), shift, ctrl);
             case VK_NEXT:
-                return MoveSelection(std::max(1, VisibleRowCount()));
+                return MoveSelection(std::max(1, VisibleRowCount()), shift, ctrl);
+            case VK_SPACE:
+                if (m_multiSelect && m_selectedIndex >= 0) {
+                    ToggleRowSelection(m_selectedIndex);
+                    return true;
+                }
+                return false;
+            case VK_F2:
+                if (m_editable && m_selectedIndex >= 0) {
+                    return BeginEdit(m_selectedIndex, std::max(0, m_editFocusCol));
+                }
+                return false;
             default:
                 return false;
         }
     }
 
+    bool OnChar(wchar_t ch) override {
+        if (!m_editing) {
+            return false;
+        }
+        if (ch < 32 && ch != L'\t') {
+            return false;
+        }
+        if (ch == L'\t') {
+            CommitEdit(true);
+            return true;
+        }
+        m_editBuffer.insert(static_cast<size_t>(m_editCaret), 1, ch);
+        ++m_editCaret;
+        return true;
+    }
+
     bool OnMouseMove(float x, float y) override {
-        if (!HitTest(x, y)) {
-            if (m_hoveredRow < 0 && m_hoveredHeader < 0) {
-                return false;
-            }
-            m_hoveredRow = -1;
-            m_hoveredHeader = -1;
+        if (m_resizingColumn >= 0) {
+            const float delta = (x - m_resizeStartX) / std::max(0.001f, DpiScale());
+            const float minW = 36.0f;
+            m_columns[static_cast<size_t>(m_resizingColumn)].width =
+                std::max(minW, m_resizeStartWidth + delta);
             return true;
         }
 
+        if (!HitTest(x, y)) {
+            bool changed = false;
+            if (m_hoveredRow >= 0 || m_hoveredHeader >= 0 || m_hoveredResizeEdge >= 0) {
+                m_hoveredRow = -1;
+                m_hoveredHeader = -1;
+                m_hoveredResizeEdge = -1;
+                changed = true;
+            }
+            return changed;
+        }
+
         bool changed = false;
-        const int header = HeaderIndexFromPoint(x, y);
+        const int resizeEdge = m_resizableColumns ? ResizeEdgeFromPoint(x, y) : -1;
+        if (resizeEdge != m_hoveredResizeEdge) {
+            m_hoveredResizeEdge = resizeEdge;
+            changed = true;
+        }
+
+        const int header = (resizeEdge >= 0) ? -1 : HeaderIndexFromPoint(x, y);
         if (header != m_hoveredHeader) {
             m_hoveredHeader = header;
             changed = true;
         }
-        const int row = (header >= 0) ? -1 : RowIndexFromPoint(x, y);
+        const int row = (header >= 0 || resizeEdge >= 0) ? -1 : RowIndexFromPoint(x, y);
         if (row != m_hoveredRow) {
             m_hoveredRow = row;
             changed = true;
@@ -1223,17 +1374,44 @@ public:
     }
 
     bool OnMouseLeave() override {
-        if (m_hoveredRow < 0 && m_hoveredHeader < 0) {
+        if (m_hoveredRow < 0 && m_hoveredHeader < 0 && m_hoveredResizeEdge < 0 && m_resizingColumn < 0) {
             return false;
         }
         m_hoveredRow = -1;
         m_hoveredHeader = -1;
+        m_hoveredResizeEdge = -1;
         return true;
     }
 
     bool OnMouseDown(float x, float y) override {
         if (!HitTest(x, y)) {
             return false;
+        }
+
+        if (m_editing) {
+            int row = -1;
+            int col = -1;
+            if (!CellFromPoint(x, y, row, col) || row != m_editRow || col != m_editCol) {
+                CommitEdit(true);
+            }
+        }
+
+        if (m_resizableColumns) {
+            const int edge = ResizeEdgeFromPoint(x, y);
+            if (edge >= 0) {
+                m_resizingColumn = edge;
+                m_resizeStartX = x;
+                float startW = m_columns[static_cast<size_t>(edge)].width;
+                if (startW <= 0.0f) {
+                    const auto widths = ResolveColumnWidths();
+                    startW = (edge < static_cast<int>(widths.size()))
+                        ? (widths[static_cast<size_t>(edge)] / std::max(0.001f, DpiScale()))
+                        : 80.0f;
+                }
+                m_resizeStartWidth = startW;
+                m_columns[static_cast<size_t>(edge)].width = startW;
+                return true;
+            }
         }
 
         const int header = HeaderIndexFromPoint(x, y);
@@ -1244,14 +1422,47 @@ public:
             return true;
         }
 
-        if (m_selectable) {
-            const int row = RowIndexFromPoint(x, y);
-            if (row >= 0) {
-                SetSelectedIndexInternal(row);
+        int row = -1;
+        int col = -1;
+        const bool hitCell = CellFromPoint(x, y, row, col);
+        if (hitCell && row >= 0) {
+            m_editFocusCol = col;
+
+            const DWORD now = GetTickCount();
+            const bool isDoubleClick =
+                m_editable &&
+                row == m_lastClickRow &&
+                col == m_lastClickCol &&
+                (now - m_lastClickTime) <= GetDoubleClickTime();
+            m_lastClickRow = row;
+            m_lastClickCol = col;
+            m_lastClickTime = now;
+
+            if (isDoubleClick) {
+                if (m_selectable) {
+                    SetSelectedIndexInternal(row, false, false);
+                }
+                return BeginEdit(row, col);
+            }
+
+            if (m_selectable) {
+                const bool shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+                const bool ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+                SetSelectedIndexInternal(row, shift, ctrl);
                 return true;
             }
         }
         return true;
+    }
+
+    bool OnMouseUp(float x, float y) override {
+        (void)x;
+        (void)y;
+        if (m_resizingColumn >= 0) {
+            EndColumnResize();
+            return true;
+        }
+        return false;
     }
 
     Color background = ColorFromHex(0x121A24);
@@ -1266,6 +1477,9 @@ public:
     Color headerTextColor = ColorFromHex(0xEAF2FB);
     Color textColor = ColorFromHex(0xC7D4E2);
     Color selectedTextColor = ColorFromHex(0xFFFFFF);
+    Color editBackground = ColorFromHex(0x0F2438);
+    Color editBorderColor = ColorFromHex(0x4E8FEA);
+    Color resizeGuideColor = ColorFromHex(0x6AA8FF);
     float cornerRadius = 10.0f;
     float headerHeight = 34.0f;
     float rowHeight = 30.0f;
@@ -1403,11 +1617,13 @@ public:
 
             if (col + 1 < m_columns.size()) {
                 const float x = currentX + cellWidth;
+                const bool resizeHot =
+                    m_hoveredResizeEdge == static_cast<int>(col) || m_resizingColumn == static_cast<int>(col);
                 renderer.DrawLine(
                     PointF{x, tableTop},
                     PointF{x, tableBottom},
-                    gridLineColor,
-                    1.0f);
+                    resizeHot ? resizeGuideColor : gridLineColor,
+                    resizeHot ? 2.0f : 1.0f);
             }
             currentX += cellWidth;
         }
@@ -1430,23 +1646,36 @@ public:
                 const Rect rowRect = Rect::Make(m_bounds.left, rowTop, m_bounds.right, rowBottom);
 
                 Color rowColor = ((viewRow - first) % 2 == 0) ? rowBackgroundA : rowBackgroundB;
-                if (m_selectable && dataRow == m_selectedIndex) {
+                const bool selected = m_selectable && IsRowSelected(dataRow);
+                if (selected) {
                     rowColor = selectedRowBackground;
                 } else if (m_selectable && dataRow == m_hoveredRow) {
                     rowColor = rowHoverBackground;
                 }
                 renderer.FillRect(rowRect, rowColor);
 
-                const Color rowTextColor =
-                    (m_selectable && dataRow == m_selectedIndex) ? selectedTextColor : textColor;
+                const Color rowTextColor = selected ? selectedTextColor : textColor;
 
                 float rowX = m_bounds.left;
                 for (size_t col = 0; col < m_columns.size(); ++col) {
                     const float cellWidth = columnWidths[col];
-                    const std::wstring cellText =
+                    const bool isEditCell =
+                        m_editing && dataRow == m_editRow && static_cast<int>(col) == m_editCol;
+                    std::wstring cellText =
                         (col < m_rows[static_cast<size_t>(dataRow)].size())
                             ? m_rows[static_cast<size_t>(dataRow)][col]
                             : L"";
+                    if (isEditCell) {
+                        cellText = m_editBuffer;
+                        renderer.FillRect(
+                            Rect::Make(rowX + 1.0f, rowTop + 1.0f, rowX + cellWidth - 1.0f, rowBottom - 1.0f),
+                            editBackground);
+                        renderer.DrawRect(
+                            Rect::Make(rowX + 1.0f, rowTop + 1.0f, rowX + cellWidth - 1.0f, rowBottom - 1.0f),
+                            editBorderColor,
+                            1.5f);
+                    }
+
                     const Rect textRect = Rect::Make(
                         rowX + scaledCellPadding.left,
                         rowTop + scaledCellPadding.top,
@@ -1461,9 +1690,18 @@ public:
                         cellText.c_str(),
                         static_cast<UINT32>(cellText.size()),
                         textRect,
-                        rowTextColor,
+                        isEditCell ? selectedTextColor : rowTextColor,
                         ScaleValue(fontSize),
                         cellTextOptions);
+
+                    if (isEditCell) {
+                        const std::wstring prefix = m_editBuffer.substr(0, static_cast<size_t>(m_editCaret));
+                        const Size prefixSize = MeasureTextValue(prefix, fontSize, 4096.0f, TextWrapMode::NoWrap);
+                        const float caretX = textRect.left + prefixSize.width;
+                        renderer.FillRect(
+                            Rect::Make(caretX, textRect.top + 2.0f, caretX + ScaleValue(1.0f), textRect.bottom - 2.0f),
+                            selectedTextColor);
+                    }
                     rowX += cellWidth;
                 }
 
@@ -1513,7 +1751,8 @@ private:
             totalWidth += widths[i];
         }
 
-        if (totalWidth > tableWidth && totalWidth > 0.0f) {
+        // Only shrink-to-fit when not interactively resizing (preserve user widths).
+        if (m_resizingColumn < 0 && totalWidth > tableWidth && totalWidth > 0.0f) {
             const float ratio = tableWidth / totalWidth;
             for (float& width : widths) {
                 width = std::max(ScaleValue(28.0f), width * ratio);
@@ -1544,6 +1783,26 @@ private:
         return -1;
     }
 
+    // Returns the left column index of the resize edge under the pointer, or -1.
+    int ResizeEdgeFromPoint(float x, float y) const {
+        if (m_columns.size() < 2) {
+            return -1;
+        }
+        if (y < m_bounds.top || y > m_bounds.bottom) {
+            return -1;
+        }
+        const auto widths = ResolveColumnWidths();
+        const float hitSlop = ScaleValue(4.0f);
+        float currentX = m_bounds.left;
+        for (size_t col = 0; col + 1 < widths.size(); ++col) {
+            currentX += widths[col];
+            if (std::abs(x - currentX) <= hitSlop) {
+                return static_cast<int>(col);
+            }
+        }
+        return -1;
+    }
+
     int RowIndexFromPoint(float x, float y) const {
         (void)x;
         const float bodyTop = m_bounds.top + ScaleValue(headerHeight);
@@ -1557,6 +1816,25 @@ private:
             return -1;
         }
         return ViewToDataRow(viewRow);
+    }
+
+    bool CellFromPoint(float x, float y, int& outRow, int& outCol) const {
+        outRow = RowIndexFromPoint(x, y);
+        if (outRow < 0) {
+            outCol = -1;
+            return false;
+        }
+        const auto widths = ResolveColumnWidths();
+        float currentX = m_bounds.left;
+        for (size_t col = 0; col < widths.size(); ++col) {
+            if (x >= currentX && x <= currentX + widths[col]) {
+                outCol = static_cast<int>(col);
+                return true;
+            }
+            currentX += widths[col];
+        }
+        outCol = -1;
+        return false;
     }
 
     int ViewToDataRow(int viewRow) const {
@@ -1609,7 +1887,6 @@ private:
         std::stable_sort(m_viewOrder.begin(), m_viewOrder.end(), [&](int a, int b) {
             const std::wstring& left = CellText(a, col);
             const std::wstring& right = CellText(b, col);
-            // Numeric-aware compare when both cells parse as numbers.
             double leftNum = 0.0;
             double rightNum = 0.0;
             const bool leftIsNum = TryParseNumber(left, leftNum);
@@ -1644,32 +1921,149 @@ private:
         return end && end != text.c_str() && *end == L'\0';
     }
 
-    bool MoveSelection(int delta) {
+    bool MoveSelection(int delta, bool shift, bool ctrl) {
         if (m_rows.empty()) {
             return false;
         }
         int view = DataToViewRow(m_selectedIndex);
         if (view < 0) {
             view = (delta >= 0) ? 0 : static_cast<int>(m_viewOrder.size()) - 1;
-            return SetSelectedIndexInternal(ViewToDataRow(view));
+            return SetSelectedIndexInternal(ViewToDataRow(view), shift, ctrl);
         }
         view = std::clamp(view + delta, 0, static_cast<int>(m_viewOrder.size()) - 1);
-        return SetSelectedIndexInternal(ViewToDataRow(view));
+        return SetSelectedIndexInternal(ViewToDataRow(view), shift, ctrl);
     }
 
-    bool SetSelectedIndexInternal(int dataRow) {
+    bool SetSelectedIndexInternal(int dataRow, bool shift, bool ctrl) {
         if (m_rows.empty()) {
             m_selectedIndex = -1;
+            m_selectedSet.clear();
             return false;
         }
         dataRow = std::clamp(dataRow, 0, static_cast<int>(m_rows.size()) - 1);
-        if (dataRow == m_selectedIndex) {
+
+        if (m_multiSelect && shift && m_selectionAnchor >= 0) {
+            SelectRange(m_selectionAnchor, dataRow);
+            m_selectedIndex = dataRow;
             EnsureSelectedVisible();
+            return true;
+        }
+
+        if (m_multiSelect && ctrl) {
+            ToggleRowSelection(dataRow);
+            m_selectedIndex = dataRow;
+            m_selectionAnchor = dataRow;
+            EnsureSelectedVisible();
+            return true;
+        }
+
+        const bool same = (dataRow == m_selectedIndex) &&
+            m_selectedSet.size() == 1 &&
+            IsRowSelected(dataRow);
+        m_selectedIndex = dataRow;
+        m_selectedSet.clear();
+        m_selectedSet.insert(dataRow);
+        m_selectionAnchor = dataRow;
+        EnsureSelectedVisible();
+        return !same;
+    }
+
+    void ToggleRowSelection(int dataRow) {
+        if (dataRow < 0 || dataRow >= static_cast<int>(m_rows.size())) {
+            return;
+        }
+        auto it = m_selectedSet.find(dataRow);
+        if (it != m_selectedSet.end()) {
+            m_selectedSet.erase(it);
+        } else {
+            m_selectedSet.insert(dataRow);
+        }
+    }
+
+    void SelectRange(int fromData, int toData) {
+        const int fromView = DataToViewRow(fromData);
+        const int toView = DataToViewRow(toData);
+        if (fromView < 0 || toView < 0) {
+            m_selectedSet.clear();
+            m_selectedSet.insert(toData);
+            return;
+        }
+        const int lo = std::min(fromView, toView);
+        const int hi = std::max(fromView, toView);
+        m_selectedSet.clear();
+        for (int v = lo; v <= hi; ++v) {
+            const int data = ViewToDataRow(v);
+            if (data >= 0) {
+                m_selectedSet.insert(data);
+            }
+        }
+    }
+
+    void SanitizeSelection() {
+        std::set<int> next;
+        for (int idx : m_selectedSet) {
+            if (idx >= 0 && idx < static_cast<int>(m_rows.size())) {
+                next.insert(idx);
+            }
+        }
+        m_selectedSet.swap(next);
+        if (m_selectedIndex >= static_cast<int>(m_rows.size())) {
+            m_selectedIndex = m_rows.empty() ? -1 : static_cast<int>(m_rows.size()) - 1;
+        }
+        if (m_selectedIndex >= 0 && m_selectedSet.empty()) {
+            m_selectedSet.insert(m_selectedIndex);
+        }
+    }
+
+    bool BeginEdit(int row, int col) {
+        if (!m_editable || row < 0 || row >= static_cast<int>(m_rows.size()) || m_columns.empty()) {
             return false;
         }
-        m_selectedIndex = dataRow;
+        col = std::clamp(col, 0, static_cast<int>(m_columns.size()) - 1);
+        CommitEdit(true);
+        auto& cells = m_rows[static_cast<size_t>(row)];
+        if (cells.size() <= static_cast<size_t>(col)) {
+            cells.resize(static_cast<size_t>(col) + 1);
+        }
+        m_editing = true;
+        m_editRow = row;
+        m_editCol = col;
+        m_editBuffer = cells[static_cast<size_t>(col)];
+        m_editCaret = static_cast<int>(m_editBuffer.size());
+        m_selectedIndex = row;
+        m_selectedSet.clear();
+        m_selectedSet.insert(row);
         EnsureSelectedVisible();
         return true;
+    }
+
+    void CommitEdit(bool apply) {
+        if (!m_editing) {
+            return;
+        }
+        if (apply &&
+            m_editRow >= 0 && m_editRow < static_cast<int>(m_rows.size()) &&
+            m_editCol >= 0 && m_editCol < static_cast<int>(m_columns.size())) {
+            auto& cells = m_rows[static_cast<size_t>(m_editRow)];
+            if (cells.size() <= static_cast<size_t>(m_editCol)) {
+                cells.resize(static_cast<size_t>(m_editCol) + 1);
+            }
+            cells[static_cast<size_t>(m_editCol)] = m_editBuffer;
+            if (m_sortColumn == m_editCol) {
+                ApplySort();
+            }
+        }
+        m_editing = false;
+        m_editRow = -1;
+        m_editCol = -1;
+        m_editBuffer.clear();
+        m_editCaret = 0;
+    }
+
+    void EndColumnResize() {
+        m_resizingColumn = -1;
+        m_resizeStartX = 0.0f;
+        m_resizeStartWidth = 0.0f;
     }
 
     void EnsureSelectedVisible() {
@@ -1697,15 +2091,37 @@ private:
     std::vector<Column> m_columns;
     std::vector<std::vector<std::wstring>> m_rows;
     std::vector<int> m_viewOrder;
+    std::set<int> m_selectedSet;
     bool m_selectable = true;
     bool m_sortable = true;
+    bool m_multiSelect = false;
+    bool m_editable = false;
+    bool m_resizableColumns = false;
     int m_selectedIndex = -1;
+    int m_selectionAnchor = -1;
     int m_hoveredRow = -1;
     int m_hoveredHeader = -1;
+    int m_hoveredResizeEdge = -1;
     int m_sortColumn = -1;
     bool m_sortAscending = true;
     int m_scrollRow = 0;
+
+    bool m_editing = false;
+    int m_editRow = -1;
+    int m_editCol = -1;
+    int m_editFocusCol = 0;
+    std::wstring m_editBuffer;
+    int m_editCaret = 0;
+
+    int m_lastClickRow = -1;
+    int m_lastClickCol = -1;
+    DWORD m_lastClickTime = 0;
+
+    int m_resizingColumn = -1;
+    float m_resizeStartX = 0.0f;
+    float m_resizeStartWidth = 0.0f;
 };
+
 
 class SeagullAnimation : public UIElement {
 public:
@@ -1969,30 +2385,34 @@ public:
     };
 
     explicit Button(std::wstring text) : m_text(std::move(text)) {
-        m_style = DefaultStyle();
+        m_style = DefaultStyle(nullptr);
     }
 
     void SetOnClick(std::function<void()> onClick) { m_onClick = std::move(onClick); }
     void SetText(std::wstring text) { m_text = std::move(text); }
     void SetVariant(Variant variant) {
         m_variant = variant;
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
         switch (variant) {
             case Variant::CaptionMinimize:
             case Variant::CaptionMaximize:
                 m_style = CaptionStyle();
+                m_styleFromLayout = true; // caption styles are fixed, not layout/theme
                 cornerRadius = 0.0f;
                 background = Color{0, 0, 0, 0};
                 foreground = ColorFromHex(0xD7E2EE);
                 break;
             case Variant::CaptionClose:
                 m_style = CaptionCloseStyle();
+                m_styleFromLayout = true;
                 cornerRadius = 0.0f;
                 background = Color{0, 0, 0, 0};
                 foreground = ColorFromHex(0xD7E2EE);
                 break;
             case Variant::Default:
             default:
-                m_style = DefaultStyle();
+                m_styleFromLayout = false;
+                m_style = DefaultStyle(theme);
                 break;
         }
     }
@@ -2007,36 +2427,53 @@ public:
     Color background = ColorFromHex(0x2D2D30);
     Color foreground = ColorFromHex(0xFFFFFF);
 
-    static ComponentStyle DefaultStyle() {
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
         ComponentStyle s;
         BoxDecoration normalDeco;
-        normalDeco.background = ColorFromHex(0x2D2D30);
+        normalDeco.background = ComponentStyle::ThemeColor(theme, "btn-bg", ColorFromHex(0x2D2D30));
         normalDeco.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
-        normalDeco.border.color = ColorFromHex(0x6A6A6A);
-        normalDeco.radius = CornerRadius::Uniform(4.0f);
+        normalDeco.border.color = ComponentStyle::ThemeColor(theme, "border", ColorFromHex(0x6A6A6A));
+        normalDeco.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "sm", 4.0f));
         s.base.decoration = normalDeco;
-        s.base.foreground = ColorFromHex(0xFFFFFF);
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg-strong", ColorFromHex(0xFFFFFF));
 
         BoxDecoration hoverDeco = normalDeco;
-        hoverDeco.background = ColorFromHex(0x3E3E42);
+        hoverDeco.background = ComponentStyle::ThemeColor(theme, "btn-bg-hover", ColorFromHex(0x3E3E42));
         s.overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hoverDeco;
 
         BoxDecoration pressedDeco = normalDeco;
-        pressedDeco.background = ColorFromHex(0x0E639C);
+        pressedDeco.background = ComponentStyle::ThemeColor(theme, "btn-bg-press", ColorFromHex(0x0E639C));
         s.overrides[static_cast<std::size_t>(StyleState::Pressed)].decoration = pressedDeco;
 
         BoxDecoration focusedDeco = normalDeco;
         focusedDeco.border.width = Thickness{2.0f, 2.0f, 2.0f, 2.0f};
-        focusedDeco.border.color = ColorFromHex(0xFFFFFF);
+        focusedDeco.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
         s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focusedDeco;
 
         BoxDecoration disabledDeco = normalDeco;
-        disabledDeco.background = ColorFromHex(0x1F1F1F);
-        disabledDeco.border.color = ColorFromHex(0x3A3A3A);
+        disabledDeco.background = ComponentStyle::ThemeColor(theme, "surface-4", ColorFromHex(0x1F1F1F));
+        disabledDeco.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3A3A3A));
         s.overrides[static_cast<std::size_t>(StyleState::Disabled)].decoration = disabledDeco;
         s.overrides[static_cast<std::size_t>(StyleState::Disabled)].opacity = 0.6f;
 
         return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout || m_variant != Variant::Default) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            foreground = *m_style.base.foreground;
+        }
     }
 
     // Soft luminous wash — no border, flat against the title bar.
@@ -2317,31 +2754,39 @@ private:
 class TextInput : public UIElement {
 public:
     explicit TextInput(std::wstring text = L"") : m_text(std::move(text)), m_caretPosition(m_text.size()) {
-        m_style = DefaultStyle();
+        m_style = DefaultStyle(nullptr);
     }
 
-    static ComponentStyle DefaultStyle() {
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
         ComponentStyle s;
         BoxDecoration normalDeco;
-        normalDeco.background = ColorFromHex(0x1F1F1F);
+        normalDeco.background = ComponentStyle::ThemeColor(theme, "input-bg", ColorFromHex(0x1F1F1F));
         normalDeco.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
-        normalDeco.border.color = ColorFromHex(0x6A6A6A);
-        normalDeco.radius = CornerRadius::Uniform(4.0f);
+        normalDeco.border.color = ComponentStyle::ThemeColor(theme, "border", ColorFromHex(0x6A6A6A));
+        normalDeco.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "sm", 4.0f));
         s.base.decoration = normalDeco;
-        s.base.foreground = ColorFromHex(0xEDEDED);
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xEDEDED));
 
         BoxDecoration focusedDeco = normalDeco;
         focusedDeco.border.width = Thickness{2.0f, 2.0f, 2.0f, 2.0f};
-        focusedDeco.border.color = ColorFromHex(0xFFFFFF);
+        focusedDeco.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
         s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focusedDeco;
 
         BoxDecoration disabledDeco = normalDeco;
-        disabledDeco.background = ColorFromHex(0x171717);
-        disabledDeco.border.color = ColorFromHex(0x3A3A3A);
+        disabledDeco.background = ComponentStyle::ThemeColor(theme, "surface-0", ColorFromHex(0x171717));
+        disabledDeco.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3A3A3A));
         s.overrides[static_cast<std::size_t>(StyleState::Disabled)].decoration = disabledDeco;
         s.overrides[static_cast<std::size_t>(StyleState::Disabled)].opacity = 0.6f;
 
         return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
     }
 
     bool IsFocusable() const override { return true; }
@@ -2831,29 +3276,40 @@ private:
 class Checkbox : public UIElement {
 public:
     explicit Checkbox(std::wstring text = L"") : m_text(std::move(text)) {
-        m_style = DefaultStyle();
+        m_style = DefaultStyle(nullptr);
     }
 
-    static ComponentStyle DefaultStyle() {
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
         ComponentStyle s;
         BoxDecoration normalDeco;
-        normalDeco.background = ColorFromHex(0x2D2D30);
+        normalDeco.background = ComponentStyle::ThemeColor(theme, "btn-bg", ColorFromHex(0x2D2D30));
         normalDeco.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
-        normalDeco.border.color = ColorFromHex(0x6A6A6A);
+        normalDeco.border.color = ComponentStyle::ThemeColor(theme, "border", ColorFromHex(0x6A6A6A));
         s.base.decoration = normalDeco;
-        s.base.foreground = ColorFromHex(0xEDEDED);
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xEDEDED));
 
         BoxDecoration focusedDeco = normalDeco;
         focusedDeco.border.width = Thickness{2.0f, 2.0f, 2.0f, 2.0f};
-        focusedDeco.border.color = ColorFromHex(0xFFFFFF);
+        focusedDeco.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
         s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focusedDeco;
 
         BoxDecoration disabledDeco = normalDeco;
-        disabledDeco.background = ColorFromHex(0x1F1F1F);
-        disabledDeco.border.color = ColorFromHex(0x3A3A3A);
+        disabledDeco.background = ComponentStyle::ThemeColor(theme, "surface-4", ColorFromHex(0x1F1F1F));
+        disabledDeco.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3A3A3A));
         s.overrides[static_cast<std::size_t>(StyleState::Disabled)].decoration = disabledDeco;
         s.overrides[static_cast<std::size_t>(StyleState::Disabled)].opacity = 0.6f;
         return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
     }
 
     bool IsFocusable() const override { return true; }
@@ -2996,29 +3452,40 @@ public:
     explicit RadioButton(std::wstring text = L"", std::wstring group = L"default")
         : m_text(std::move(text)), m_group(std::move(group)) {
         s_groups[m_group].push_back(this);
-        m_style = DefaultStyle();
+        m_style = DefaultStyle(nullptr);
     }
 
-    static ComponentStyle DefaultStyle() {
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
         ComponentStyle s;
         BoxDecoration normalDeco;
         normalDeco.background = ColorFromHex(0x000000, 0.0f);  // transparent
         normalDeco.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
-        normalDeco.border.color = ColorFromHex(0x6A6A6A);
+        normalDeco.border.color = ComponentStyle::ThemeColor(theme, "border", ColorFromHex(0x6A6A6A));
         normalDeco.radius = CornerRadius::Uniform(9.0f);
         s.base.decoration = normalDeco;
-        s.base.foreground = ColorFromHex(0xEDEDED);
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xEDEDED));
 
         BoxDecoration focusedDeco = normalDeco;
         focusedDeco.border.width = Thickness{2.0f, 2.0f, 2.0f, 2.0f};
-        focusedDeco.border.color = ColorFromHex(0xFFFFFF);
+        focusedDeco.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
         s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focusedDeco;
 
         BoxDecoration disabledDeco = normalDeco;
-        disabledDeco.border.color = ColorFromHex(0x3A3A3A);
+        disabledDeco.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3A3A3A));
         s.overrides[static_cast<std::size_t>(StyleState::Disabled)].decoration = disabledDeco;
         s.overrides[static_cast<std::size_t>(StyleState::Disabled)].opacity = 0.6f;
         return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
     }
 
     ~RadioButton() {
@@ -3177,51 +3644,59 @@ private:
 class Slider : public UIElement {
 public:
     explicit Slider(std::wstring label = L"") : m_label(std::move(label)) {
-        m_style = DefaultStyle();
+        m_style = DefaultStyle(nullptr);
     }
 
-    static ComponentStyle DefaultStyle() {
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
         ComponentStyle s;
         BoxDecoration shell;
-        shell.background = ColorFromHex(0x1F1F1F);
+        shell.background = ComponentStyle::ThemeColor(theme, "input-bg", ColorFromHex(0x1F1F1F));
         shell.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
-        shell.border.color = ColorFromHex(0x6A6A6A);
-        shell.radius = CornerRadius::Uniform(8.0f);
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border", ColorFromHex(0x6A6A6A));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
         s.base.decoration = shell;
-        s.base.foreground = ColorFromHex(0xEDEDED);
-        s.base.fontSize = 13.0f;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xEDEDED));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
 
         BoxDecoration track;
-        track.background = ColorFromHex(0x333333);
+        track.background = ComponentStyle::ThemeColor(theme, "surface-4", ColorFromHex(0x333333));
         track.radius = CornerRadius::Uniform(4.0f);
         s.base.track = track;
 
         BoxDecoration fill;
-        fill.background = ColorFromHex(0x2D6CDF);
+        fill.background = ComponentStyle::ThemeColor(theme, "accent", ColorFromHex(0x2D6CDF));
         fill.radius = CornerRadius::Uniform(4.0f);
         s.base.fill = fill;
 
         BoxDecoration thumb;
-        thumb.background = ColorFromHex(0x2D6CDF);
+        thumb.background = ComponentStyle::ThemeColor(theme, "accent", ColorFromHex(0x2D6CDF));
         thumb.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
-        thumb.border.color = ColorFromHex(0x6A6A6A);
+        thumb.border.color = ComponentStyle::ThemeColor(theme, "border", ColorFromHex(0x6A6A6A));
         thumb.radius = CornerRadius::Uniform(8.0f);
         s.base.thumb = thumb;
 
         BoxDecoration focusedShell = shell;
         focusedShell.border.width = Thickness{2.0f, 2.0f, 2.0f, 2.0f};
-        focusedShell.border.color = ColorFromHex(0xFFFFFF);
+        focusedShell.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
         s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focusedShell;
 
         BoxDecoration hoverThumb = thumb;
-        hoverThumb.background = ColorFromHex(0x4A8AFF);
+        hoverThumb.background = ComponentStyle::ThemeColor(theme, "accent", ColorFromHex(0x4A8AFF));
         s.overrides[static_cast<std::size_t>(StyleState::Hover)].thumb = hoverThumb;
 
         BoxDecoration pressedThumb = thumb;
-        pressedThumb.background = ColorFromHex(0x1A5AD0);
+        pressedThumb.background = ComponentStyle::ThemeColor(theme, "accent-soft", ColorFromHex(0x1A5AD0));
         s.overrides[static_cast<std::size_t>(StyleState::Pressed)].thumb = pressedThumb;
 
         return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
     }
 
     bool IsFocusable() const override { return true; }
@@ -3477,44 +3952,52 @@ private:
 class ProgressBar : public UIElement {
 public:
     explicit ProgressBar(std::wstring label = L"") : m_label(std::move(label)) {
-        m_style = DefaultStyle();
+        m_style = DefaultStyle(nullptr);
     }
 
-    static ComponentStyle DefaultStyle() {
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
         ComponentStyle s;
         BoxDecoration shell;
-        shell.background = ColorFromHex(0x1A2431);
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-2", ColorFromHex(0x1A2431));
         shell.border.width = Thickness{1.0f, 1.0f, 1.0f, 1.0f};
-        shell.border.color = ColorFromHex(0x3A4B5D);
-        shell.radius = CornerRadius::Uniform(8.0f);
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3A4B5D));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
         s.base.decoration = shell;
-        s.base.foreground = ColorFromHex(0xEAF3FF);
-        s.base.fontSize = 12.0f;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xEAF3FF));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 12.0f);
 
         BoxDecoration track;
-        track.background = ColorFromHex(0x2A3747);
+        track.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x2A3747));
         track.radius = CornerRadius::Uniform(5.0f);
         s.base.track = track;
 
         BoxDecoration fill;
-        fill.background = ColorFromHex(0x4E7BFF);
+        fill.background = ComponentStyle::ThemeColor(theme, "accent", ColorFromHex(0x4E7BFF));
         fill.radius = CornerRadius::Uniform(5.0f);
         s.base.fill = fill;
 
         BoxDecoration focused = shell;
         focused.border.width = Thickness{2.0f, 2.0f, 2.0f, 2.0f};
-        focused.border.color = ColorFromHex(0xFFFFFF);
+        focused.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
         s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
 
         BoxDecoration hoverFill = fill;
-        hoverFill.background = ColorFromHex(0x6A93FF);
+        hoverFill.background = ComponentStyle::ThemeColor(theme, "accent", ColorFromHex(0x6A93FF));
         s.overrides[static_cast<std::size_t>(StyleState::Hover)].fill = hoverFill;
 
         BoxDecoration pressedFill = fill;
-        pressedFill.background = ColorFromHex(0x3A68D8);
+        pressedFill.background = ComponentStyle::ThemeColor(theme, "accent-soft", ColorFromHex(0x3A68D8));
         s.overrides[static_cast<std::size_t>(StyleState::Pressed)].fill = pressedFill;
 
         return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
     }
 
     bool IsFocusable() const override { return true; }
@@ -5410,6 +5893,51 @@ private:
 
 class ListBox : public UIElement {
 public:
+    ListBox() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-2", ColorFromHex(0x14202D));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x34485C));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xE7EFFA));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+
+        BoxDecoration focused = shell;
+        focused.border.width = Thickness{2, 2, 2, 2};
+        focused.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
+
+        auto item = std::make_unique<ComponentStyle>();
+        item->base.decoration = BoxDecoration{};
+        item->base.decoration->background = Color{0, 0, 0, 0};
+        item->base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xE7EFFA));
+        BoxDecoration hover;
+        hover.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x1F3247));
+        hover.radius = CornerRadius::Uniform(4.0f);
+        item->overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+        BoxDecoration selected;
+        selected.background = ComponentStyle::ThemeColor(theme, "accent-soft", ColorFromHex(0x2F4F77));
+        selected.radius = CornerRadius::Uniform(4.0f);
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].decoration = selected;
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].foreground =
+            ComponentStyle::ThemeColor(theme, "fg-strong", ColorFromHex(0xFFFFFF));
+        s.itemStyle = std::move(item);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
+
     bool IsFocusable() const override { return true; }
 
     bool OnFocus() override {
@@ -5433,22 +5961,14 @@ public:
         if (m_items.empty()) {
             return false;
         }
-
         switch (keyCode) {
-            case VK_UP:
-                return MoveSelectionBy(-1);
-            case VK_DOWN:
-                return MoveSelectionBy(1);
-            case VK_HOME:
-                return SetSelectedIndex(0);
-            case VK_END:
-                return SetSelectedIndex(static_cast<int>(m_items.size()) - 1);
-            case VK_PRIOR:
-                return MoveSelectionBy(-VisibleRowCount());
-            case VK_NEXT:
-                return MoveSelectionBy(VisibleRowCount());
-            default:
-                break;
+            case VK_UP: return MoveSelectionBy(-1);
+            case VK_DOWN: return MoveSelectionBy(1);
+            case VK_HOME: return SetSelectedIndex(0);
+            case VK_END: return SetSelectedIndex(static_cast<int>(m_items.size()) - 1);
+            case VK_PRIOR: return MoveSelectionBy(-VisibleRowCount());
+            case VK_NEXT: return MoveSelectionBy(VisibleRowCount());
+            default: break;
         }
         return false;
     }
@@ -5495,11 +6015,7 @@ protected:
             const float horizontalPadding = ScaleValue(16.0f);
             float widest = 0.0f;
             for (size_t i = 0; i < std::min<size_t>(m_items.size(), 24); ++i) {
-                const Size measured = MeasureTextValue(
-                    m_items[i],
-                    fontSize,
-                    4096.0f,
-                    TextWrapMode::NoWrap);
+                const Size measured = MeasureTextValue(m_items[i], fontSize, 4096.0f, TextWrapMode::NoWrap);
                 widest = std::max(widest, measured.width);
             }
             preferred = std::max(preferred, widest + horizontalPadding);
@@ -5515,71 +6031,81 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
-        const float scaledCornerRadius = ScaleValue(cornerRadius);
-        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
-        if (m_hasFocus) {
-            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
+        const StyleSpec shell = m_style.Resolve(GetCurrentState());
+        BoxDecoration deco = shell.decoration.value_or(BoxDecoration{});
+        if (!shell.decoration.has_value()) {
+            deco.background = background;
+            deco.border.width = Thickness{1, 1, 1, 1};
+            deco.border.color = borderColor;
+            deco.radius = CornerRadius::Uniform(cornerRadius);
         }
+        deco.radius = CornerRadius::Uniform(ScaleValue(deco.radius.IsZero() ? cornerRadius : deco.radius.MaxRadius()));
+        deco.border.width = Thickness{
+            ScaleValue(deco.border.width.left), ScaleValue(deco.border.width.top),
+            ScaleValue(deco.border.width.right), ScaleValue(deco.border.width.bottom)};
+        DrawBoxDecoration(renderer, m_bounds, deco);
+
+        const Color shellFg = shell.foreground.value_or(textColor);
+        const float shellFs = shell.fontSize.value_or(fontSize);
 
         if (m_items.empty()) {
             const std::wstring message = L"(empty)";
-            const TextRenderOptions textOptions{
-                TextWrapMode::NoWrap,
-                TextHorizontalAlign::Center,
-                TextVerticalAlign::Center
-            };
-            renderer.DrawTextW(
-                message.c_str(),
-                static_cast<UINT32>(message.size()),
-                m_bounds,
-                mutedTextColor,
-                ScaleValue(fontSize),
-                textOptions);
+            const TextRenderOptions textOptions{TextWrapMode::NoWrap, TextHorizontalAlign::Center, TextVerticalAlign::Center};
+            renderer.DrawTextW(message.c_str(), static_cast<UINT32>(message.size()), m_bounds, mutedTextColor, ScaleValue(shellFs), textOptions);
             return;
         }
 
         const float inset = ScaleValue(4.0f);
         const float rowHeight = ScaleValue(itemHeight);
-        const Rect contentRect = Rect::Make(
-            m_bounds.left + inset,
-            m_bounds.top + inset,
-            m_bounds.right - inset,
-            m_bounds.bottom - inset);
-
+        const Rect contentRect = Rect::Make(m_bounds.left + inset, m_bounds.top + inset, m_bounds.right - inset, m_bounds.bottom - inset);
         const int visibleRows = std::max(1, static_cast<int>(std::floor(contentRect.Height() / std::max(1.0f, rowHeight))));
         const int maxStart = std::max(0, static_cast<int>(m_items.size()) - visibleRows);
         m_scrollOffset = std::clamp(m_scrollOffset, 0, maxStart);
         const int endIndex = std::min(static_cast<int>(m_items.size()), m_scrollOffset + visibleRows);
+
+        const ComponentStyle* itemStyle = m_style.itemStyle ? m_style.itemStyle.get() : nullptr;
 
         for (int i = m_scrollOffset; i < endIndex; ++i) {
             const float rowTop = contentRect.top + static_cast<float>(i - m_scrollOffset) * rowHeight;
             const float rowBottom = std::min(contentRect.bottom, rowTop + rowHeight);
             const Rect rowRect = Rect::Make(contentRect.left, rowTop, contentRect.right, rowBottom);
 
+            StyleState itemState = StyleState::Normal;
             if (i == m_selectedIndex) {
-                renderer.FillRoundedRect(rowRect, selectedBackground, ScaleValue(4.0f));
+                itemState = StyleState::Selected;
             } else if (i == m_hoveredIndex) {
-                renderer.FillRoundedRect(rowRect, hoverBackground, ScaleValue(4.0f));
+                itemState = StyleState::Hover;
             }
 
-            const Rect textRect = Rect::Make(
-                rowRect.left + ScaleValue(8.0f),
-                rowRect.top,
-                rowRect.right - ScaleValue(8.0f),
-                rowRect.bottom);
-            const TextRenderOptions textOptions{
-                TextWrapMode::NoWrap,
-                TextHorizontalAlign::Start,
-                TextVerticalAlign::Center
-            };
-            renderer.DrawTextW(
-                m_items[i].c_str(),
-                static_cast<UINT32>(m_items[i].size()),
-                textRect,
-                textColor,
-                ScaleValue(fontSize),
-                textOptions);
+            Color rowBg = Color{0, 0, 0, 0};
+            Color rowFg = shellFg;
+            float rowRadius = ScaleValue(4.0f);
+            if (itemStyle) {
+                const StyleSpec itemSpec = itemStyle->Resolve(itemState);
+                if (itemSpec.decoration.has_value()) {
+                    rowBg = itemSpec.decoration->background;
+                    if (!itemSpec.decoration->radius.IsZero()) {
+                        rowRadius = ScaleValue(itemSpec.decoration->radius.MaxRadius());
+                    }
+                }
+                if (itemSpec.foreground.has_value()) {
+                    rowFg = *itemSpec.foreground;
+                }
+            } else {
+                if (i == m_selectedIndex) {
+                    rowBg = selectedBackground;
+                } else if (i == m_hoveredIndex) {
+                    rowBg = hoverBackground;
+                }
+            }
+
+            if (rowBg.a > 0.001f) {
+                renderer.FillRoundedRect(rowRect, rowBg, rowRadius);
+            }
+
+            const Rect textRect = Rect::Make(rowRect.left + ScaleValue(8.0f), rowRect.top, rowRect.right - ScaleValue(8.0f), rowRect.bottom);
+            const TextRenderOptions textOptions{TextWrapMode::NoWrap, TextHorizontalAlign::Start, TextVerticalAlign::Center};
+            renderer.DrawTextW(m_items[i].c_str(), static_cast<UINT32>(m_items[i].size()), textRect, rowFg, ScaleValue(shellFs), textOptions);
         }
 
         if (visibleRows < static_cast<int>(m_items.size())) {
@@ -5588,13 +6114,10 @@ public:
             const float barLeft = barRight - barWidth;
             const float ratio = static_cast<float>(visibleRows) / static_cast<float>(m_items.size());
             const float thumbHeight = std::max(ScaleValue(14.0f), contentRect.Height() * ratio);
-            const float trackTop = contentRect.top;
-            const float trackBottom = contentRect.bottom;
             const float maxOffset = static_cast<float>(std::max(1, static_cast<int>(m_items.size()) - visibleRows));
             const float offsetRatio = static_cast<float>(m_scrollOffset) / maxOffset;
-            const float thumbTop = trackTop + (contentRect.Height() - thumbHeight) * offsetRatio;
-            const Rect thumbRect = Rect::Make(barLeft, thumbTop, barRight, thumbTop + thumbHeight);
-            renderer.FillRoundedRect(thumbRect, scrollThumbColor, ScaleValue(2.0f));
+            const float thumbTop = contentRect.top + (contentRect.Height() - thumbHeight) * offsetRatio;
+            renderer.FillRoundedRect(Rect::Make(barLeft, thumbTop, barRight, thumbTop + thumbHeight), scrollThumbColor, ScaleValue(2.0f));
         }
     }
 
@@ -5643,6 +6166,32 @@ public:
     float itemHeight = 28.0f;
 
 private:
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        if (m_style.itemStyle) {
+            const StyleSpec hover = m_style.itemStyle->Resolve(StyleState::Hover);
+            const StyleSpec selected = m_style.itemStyle->Resolve(StyleState::Selected);
+            if (hover.decoration.has_value()) {
+                hoverBackground = hover.decoration->background;
+            }
+            if (selected.decoration.has_value()) {
+                selectedBackground = selected.decoration->background;
+            }
+        }
+    }
+
     int VisibleRowCount() const {
         const float innerHeight = std::max(1.0f, m_bounds.Height() - ScaleValue(8.0f));
         const float rowHeight = std::max(1.0f, ScaleValue(itemHeight));
@@ -5700,6 +6249,48 @@ private:
 
 class ComboBox : public UIElement {
 public:
+    ComboBox() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-2", ColorFromHex(0x13202D));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x36506A));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xE9F2FD));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+
+        auto dropdown = std::make_unique<ComponentStyle>();
+        BoxDecoration drop;
+        drop.background = ComponentStyle::ThemeColor(theme, "surface-1", ColorFromHex(0x112130));
+        drop.border.width = Thickness{1, 1, 1, 1};
+        drop.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x36506A));
+        dropdown->base.decoration = drop;
+        s.dropdownStyle = std::move(dropdown);
+
+        auto item = std::make_unique<ComponentStyle>();
+        item->base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xE9F2FD));
+        BoxDecoration hover;
+        hover.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x20374F));
+        item->overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+        BoxDecoration selected;
+        selected.background = ComponentStyle::ThemeColor(theme, "accent-soft", ColorFromHex(0x2F4F77));
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].decoration = selected;
+        s.itemStyle = std::move(item);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
+
     bool IsFocusable() const override { return true; }
 
     // Layout size is always the closed header. Expanded list is an overlay popup.
@@ -5862,11 +6453,30 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
-        const float scaledCornerRadius = ScaleValue(cornerRadius);
+        const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
+        Color shellBg = background;
+        Color shellBorder = borderColor;
+        float scaledCornerRadius = ScaleValue(cornerRadius);
+        Color shellFg = textColor;
+        float shellFs = fontSize;
+        if (shell.decoration.has_value()) {
+            shellBg = shell.decoration->background;
+            shellBorder = shell.decoration->border.color;
+            if (!shell.decoration->radius.IsZero()) {
+                scaledCornerRadius = ScaleValue(shell.decoration->radius.MaxRadius());
+            }
+        }
+        if (shell.foreground.has_value()) {
+            shellFg = *shell.foreground;
+        }
+        if (shell.fontSize.has_value()) {
+            shellFs = *shell.fontSize;
+        }
+
         // Header only in the normal pass; list is drawn in RenderOverlay so it sits above siblings.
         const Rect header = HeaderRect();
-        renderer.FillRoundedRect(header, background, scaledCornerRadius);
-        renderer.DrawRoundedRect(header, borderColor, 1.0f, scaledCornerRadius);
+        renderer.FillRoundedRect(header, shellBg, scaledCornerRadius);
+        renderer.DrawRoundedRect(header, shellBorder, 1.0f, scaledCornerRadius);
         if (m_hasFocus) {
             renderer.DrawRoundedRect(header, focusBorderColor, 2.0f, scaledCornerRadius);
         }
@@ -5890,8 +6500,8 @@ public:
             selectedText.c_str(),
             static_cast<UINT32>(selectedText.size()),
             textRect,
-            textColor,
-            ScaleValue(fontSize),
+            shellFg,
+            ScaleValue(shellFs),
             textOptions);
 
         const float arrowCenterX = header.right - ScaleValue(14.0f);
@@ -5934,8 +6544,14 @@ public:
             return;
         }
 
-        renderer.FillRect(dropdownRect, dropdownBackground);
-        renderer.DrawRect(dropdownRect, borderColor, 1.0f);
+        Color dropBg = dropdownBackground;
+        Color dropBorder = borderColor;
+        if (m_style.dropdownStyle && m_style.dropdownStyle->base.decoration.has_value()) {
+            dropBg = m_style.dropdownStyle->base.decoration->background;
+            dropBorder = m_style.dropdownStyle->base.decoration->border.color;
+        }
+        renderer.FillRect(dropdownRect, dropBg);
+        renderer.DrawRect(dropdownRect, dropBorder, 1.0f);
 
         const TextRenderOptions textOptions{
             TextWrapMode::NoWrap,
@@ -5950,10 +6566,31 @@ public:
             const float bottom = std::min(dropdownRect.bottom, top + rowHeight);
             const Rect rowRect = Rect::Make(dropdownRect.left, top, dropdownRect.right, bottom);
 
+            StyleState itemState = StyleState::Normal;
             if (i == m_selectedIndex) {
-                renderer.FillRect(rowRect, selectedBackground);
+                itemState = StyleState::Selected;
             } else if (i == m_hoveredIndex) {
-                renderer.FillRect(rowRect, hoverBackground);
+                itemState = StyleState::Hover;
+            }
+            Color rowBg = Color{0, 0, 0, 0};
+            Color rowFg = textColor;
+            if (m_style.itemStyle) {
+                const StyleSpec itemSpec = m_style.itemStyle->Resolve(itemState);
+                if (itemSpec.decoration.has_value()) {
+                    rowBg = itemSpec.decoration->background;
+                }
+                if (itemSpec.foreground.has_value()) {
+                    rowFg = *itemSpec.foreground;
+                }
+            } else {
+                if (i == m_selectedIndex) {
+                    rowBg = selectedBackground;
+                } else if (i == m_hoveredIndex) {
+                    rowBg = hoverBackground;
+                }
+            }
+            if (rowBg.a > 0.001f) {
+                renderer.FillRect(rowRect, rowBg);
             }
 
             const Rect rowTextRect = Rect::Make(
@@ -5965,7 +6602,7 @@ public:
                 m_items[i].c_str(),
                 static_cast<UINT32>(m_items[i].size()),
                 rowTextRect,
-                textColor,
+                rowFg,
                 ScaleValue(fontSize),
                 textOptions);
         }
@@ -6030,6 +6667,36 @@ public:
     int maxVisibleItems = 5;
 
 private:
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            headerBackground = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        if (m_style.dropdownStyle && m_style.dropdownStyle->base.decoration.has_value()) {
+            dropdownBackground = m_style.dropdownStyle->base.decoration->background;
+        }
+        if (m_style.itemStyle) {
+            const StyleSpec hover = m_style.itemStyle->Resolve(StyleState::Hover);
+            const StyleSpec selected = m_style.itemStyle->Resolve(StyleState::Selected);
+            if (hover.decoration.has_value()) {
+                hoverBackground = hover.decoration->background;
+            }
+            if (selected.decoration.has_value()) {
+                selectedBackground = selected.decoration->background;
+            }
+        }
+    }
+
     Rect HeaderRect() const {
         // Always use design header height — layout bounds are header-sized.
         const float height = ScaleValue(headerHeight);
@@ -6143,6 +6810,45 @@ private:
 
 class TabControl : public UIElement {
 public:
+    TabControl() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-2", ColorFromHex(0x121F2E));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3B536B));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "lg", 10.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xD6E4F2));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+
+        auto tab = std::make_unique<ComponentStyle>();
+        BoxDecoration tabBase;
+        tabBase.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x1F3247));
+        tab->base.decoration = tabBase;
+        tab->base.foreground = ComponentStyle::ThemeColor(theme, "fg-muted", ColorFromHex(0xD6E4F2));
+        BoxDecoration hover;
+        hover.background = ComponentStyle::ThemeColor(theme, "surface-4", ColorFromHex(0x2A415A));
+        tab->overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+        BoxDecoration selected;
+        selected.background = ComponentStyle::ThemeColor(theme, "accent-soft", ColorFromHex(0x355A82));
+        tab->overrides[static_cast<std::size_t>(StyleState::Selected)].decoration = selected;
+        tab->overrides[static_cast<std::size_t>(StyleState::Selected)].foreground =
+            ComponentStyle::ThemeColor(theme, "fg-strong", ColorFromHex(0xFFFFFF));
+        s.tabStyle = std::move(tab);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
+
     // Own children (tab pages) are managed internally — Yoga must treat this as a leaf
     // so height/width attributes and preferred size are honored.
     bool IsLayoutLeaf() const override { return true; }
@@ -6333,9 +7039,24 @@ public:
             LayoutTabPages();
         }
 
-        const float scaledCornerRadius = ScaleValue(cornerRadius);
-        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+        const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
+        Color shellBg = background;
+        Color shellBorder = borderColor;
+        float scaledCornerRadius = ScaleValue(cornerRadius);
+        float shellFs = fontSize;
+        if (shell.decoration.has_value()) {
+            shellBg = shell.decoration->background;
+            shellBorder = shell.decoration->border.color;
+            if (!shell.decoration->radius.IsZero()) {
+                scaledCornerRadius = ScaleValue(shell.decoration->radius.MaxRadius());
+            }
+        }
+        if (shell.fontSize.has_value()) {
+            shellFs = *shell.fontSize;
+        }
+
+        renderer.FillRoundedRect(m_bounds, shellBg, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, shellBorder, 1.0f, scaledCornerRadius);
         if (m_hasFocus) {
             renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
         }
@@ -6346,23 +7067,41 @@ public:
             renderer.DrawLine(
                 PointF{header.left, header.bottom},
                 PointF{header.right, header.bottom},
-                borderColor,
+                shellBorder,
                 1.0f);
 
             const std::vector<Rect> tabs = BuildTabRects();
+            const ComponentStyle* tabStyle = m_style.tabStyle ? m_style.tabStyle.get() : nullptr;
             for (size_t i = 0; i < tabs.size(); ++i) {
                 const bool selected = static_cast<int>(i) == m_selectedIndex;
                 const bool hovered = static_cast<int>(i) == m_hoveredTab;
 
+                StyleState tabState = StyleState::Normal;
+                if (selected) {
+                    tabState = StyleState::Selected;
+                } else if (hovered) {
+                    tabState = StyleState::Hover;
+                }
+
                 Color tabBg = tabBackground;
+                Color tabFg = selected ? selectedTabTextColor : tabTextColor;
                 if (selected) {
                     tabBg = selectedTabBackground;
                 } else if (hovered) {
                     tabBg = hoverTabBackground;
                 }
+                if (tabStyle) {
+                    const StyleSpec tabSpec = tabStyle->Resolve(tabState);
+                    if (tabSpec.decoration.has_value()) {
+                        tabBg = tabSpec.decoration->background;
+                    }
+                    if (tabSpec.foreground.has_value()) {
+                        tabFg = *tabSpec.foreground;
+                    }
+                }
 
                 renderer.FillRect(tabs[i], tabBg);
-                renderer.DrawRect(tabs[i], borderColor, 1.0f);
+                renderer.DrawRect(tabs[i], shellBorder, 1.0f);
 
                 const std::wstring title = TabTitle(i);
                 const TextRenderOptions tabTextOptions{
@@ -6374,8 +7113,8 @@ public:
                     title.c_str(),
                     static_cast<UINT32>(title.size()),
                     tabs[i],
-                    selected ? selectedTabTextColor : tabTextColor,
-                    ScaleValue(fontSize),
+                    tabFg,
+                    ScaleValue(shellFs),
                     tabTextOptions);
             }
         }
@@ -6383,7 +7122,7 @@ public:
         const Rect content = ContentRect();
         if (content.Width() > 0.5f && content.Height() > 0.5f) {
             renderer.FillRect(content, contentBackground);
-            renderer.DrawRect(content, borderColor, 1.0f);
+            renderer.DrawRect(content, shellBorder, 1.0f);
 
             if (UIElement* child = SelectedChild()) {
                 child->Render(renderer);
@@ -6432,6 +7171,44 @@ public:
     float headerHeight = 34.0f;
 
 private:
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            headerBackground = m_style.base.decoration->background;
+            contentBackground = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            tabTextColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        if (m_style.tabStyle) {
+            const StyleSpec normal = m_style.tabStyle->Resolve(StyleState::Normal);
+            const StyleSpec hover = m_style.tabStyle->Resolve(StyleState::Hover);
+            const StyleSpec selected = m_style.tabStyle->Resolve(StyleState::Selected);
+            if (normal.decoration.has_value()) {
+                tabBackground = normal.decoration->background;
+            }
+            if (hover.decoration.has_value()) {
+                hoverTabBackground = hover.decoration->background;
+            }
+            if (selected.decoration.has_value()) {
+                selectedTabBackground = selected.decoration->background;
+            }
+            if (selected.foreground.has_value()) {
+                selectedTabTextColor = *selected.foreground;
+            }
+            if (normal.foreground.has_value()) {
+                tabTextColor = *normal.foreground;
+            }
+        }
+    }
+
     // Place selected page into content rect; park others off-screen.
     void LayoutTabPages() {
         if (m_bounds.Width() <= 0.0f || m_bounds.Height() <= 0.0f) {

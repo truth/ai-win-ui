@@ -19,7 +19,7 @@
     {
       "type": "Label",
       "props": {
-        "text": "v2: click rows to select, click headers to sort (numeric-aware). Up/Down when focused. Overflow scrolls with selection.",
+        "text": "v3: multi-select (Ctrl/Shift), F2/double-click cell edit, drag column edges to resize. Sort + keyboard still work.",
         "fontSize": "$fontSize.base",
         "color": "#B6C4D5"
       }
@@ -49,6 +49,9 @@
         ],
         "selectable": true,
         "sortable": true,
+        "multiSelect": true,
+        "editable": true,
+        "resizableColumns": true,
         "selectedIndex": 0,
         "headerBackground": "#203143",
         "rowBackgroundA": "#152232",

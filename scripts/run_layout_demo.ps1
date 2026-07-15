@@ -49,16 +49,31 @@ function Resolve-LayoutPath {
 
     $layoutAliases = @{
         "core-validation" = "layouts/core_validation.xml"
+        "core_validation" = "layouts/core_validation.xml"
         "yoga-measure" = "layouts/yoga_measure_cases.xml"
+        "yoga_measure" = "layouts/yoga_measure_cases.xml"
+        "yoga_measure_cases" = "layouts/yoga_measure_cases.xml"
         "skia-image" = "layouts/skia_image_cases.xml"
+        "skia_image" = "layouts/skia_image_cases.xml"
+        "skia_image_cases" = "layouts/skia_image_cases.xml"
         "stats-components" = "layouts/stats_components.xml"
+        "stats_components" = "layouts/stats_components.xml"
         "table-components" = "layouts/table_components.xml"
+        "table_components" = "layouts/table_components.xml"
         "seagull-animation" = "layouts/seagull_animation.xml"
+        "seagull_animation" = "layouts/seagull_animation.xml"
         "core-controls-v2" = "layouts/core_controls_v2.xml"
+        "core_controls_v2" = "layouts/core_controls_v2.xml"
         "navigation-components" = "layouts/navigation_components.xml"
+        "navigation_components" = "layouts/navigation_components.xml"
         "advanced-inputs" = "layouts/advanced_inputs.xml"
+        "advanced_inputs" = "layouts/advanced_inputs.xml"
         "custom-chrome" = "layouts/custom_chrome_demo.xml"
+        "custom_chrome" = "layouts/custom_chrome_demo.xml"
+        "custom_chrome_demo" = "layouts/custom_chrome_demo.xml"
         "layered-chrome" = "layouts/layered_chrome_demo.xml"
+        "layered_chrome" = "layouts/layered_chrome_demo.xml"
+        "layered_chrome_demo" = "layouts/layered_chrome_demo.xml"
     }
     $aliasKey = $layoutPath.ToLowerInvariant()
     if ($layoutAliases.ContainsKey($aliasKey)) {
@@ -72,12 +87,35 @@ function Resolve-LayoutPath {
         return (Resolve-Path $layoutPath).Path
     }
 
-    $resourceCandidate = Join-Path $RepoRoot ("resource\" + $layoutPath.Replace("/", "\"))
-    if (-not (Test-Path $resourceCandidate)) {
-        throw "Layout file not found under resource/: $layoutPath"
+    $resourceRoot = Join-Path $RepoRoot "resource"
+    $candidates = @(
+        ($layoutPath.Replace("/", "\")),
+        ("layouts\" + $layoutPath.Replace("/", "\")),
+        ("layouts\" + $layoutPath.Replace("/", "\") + ".xml"),
+        ("layouts\" + $layoutPath.Replace("/", "\") + ".json")
+    )
+    # Bare stem without extension: layouts/<name>.xml then .json
+    $leaf = [System.IO.Path]::GetFileName($layoutPath)
+    if ($leaf -notmatch '\.(xml|json)$') {
+        $candidates += @(
+            ("layouts\" + $leaf + ".xml"),
+            ("layouts\" + $leaf + ".json")
+        )
     }
 
-    return $layoutPath.Replace("\", "/")
+    foreach ($rel in $candidates) {
+        $resourceCandidate = Join-Path $resourceRoot $rel
+        if (Test-Path $resourceCandidate) {
+            $full = (Resolve-Path $resourceCandidate).Path
+            $prefix = (Resolve-Path $resourceRoot).Path.TrimEnd('\') + '\'
+            if ($full.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                return $full.Substring($prefix.Length).Replace("\", "/")
+            }
+            return $rel.Replace("\", "/")
+        }
+    }
+
+    throw "Layout file not found under resource/: $RequestedLayout (tried layouts/ prefix and .xml/.json). Example: -Layout table-components or -Layout layouts/table_components.xml"
 }
 
 function Get-LatestSourceWriteTime {

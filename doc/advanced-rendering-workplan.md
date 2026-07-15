@@ -155,6 +155,13 @@ Suggested delivery priority:
 1. `itemStyle` for ListBox / ComboBox / TabControl / ListView / TreeView
 2. Further DataGrid features (cell edit, multi-select, column resize)
 
+### Nested styles + lazy theme DefaultStyle (2026-07-15)
+
+- [x] `ComponentStyle.itemStyle` / `tabStyle` / `dropdownStyle` (JSON style block + deep copy)
+- [x] ListBox paints rows via `itemStyle`; ComboBox dropdown panel + items; TabControl tabs via `tabStyle`
+- [x] `DefaultStyle(const Theme*)` + `ApplyThemeDefaults()` on Button, TextInput, Checkbox, RadioButton, Slider, ProgressBar, ListBox, ComboBox, TabControl
+- [ ] ListView / TreeView `itemStyle` (still open)
+
 ### DataTable v2 (2026-07-15)
 
 - [x] Row selection (mouse + keyboard Up/Down/Home/End/Page)
@@ -163,6 +170,13 @@ Suggested delivery priority:
 - [x] Body scroll while keeping selection visible
 - [x] Props: `selectable`, `sortable`, `selectedIndex`, `selectedRowBackground`, `rowHoverBackground`
 - Validation: `resource/layouts/table_components.xml` / `.json`
+
+### DataTable v3 (2026-07-15)
+
+- [x] Multi-select: `multiSelect=true`, Ctrl+click toggle, Shift+click/arrow range, Space toggle
+- [x] Cell edit: `editable=true`, F2 or double-click, Enter commit / Esc cancel
+- [x] Column resize: `resizableColumns=true`, drag vertical grid edge (hot guide)
+- [x] Props: `multiSelect`, `editable`, `resizableColumns`; API `SelectedIndices()`
 
 ## Execution Plan
 
