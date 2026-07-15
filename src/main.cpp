@@ -111,15 +111,28 @@ public:
         const DWORD exStyle = m_windowChrome.WindowExStyle();
         AdjustWindowRectExForDpi(&initialRect, style, FALSE, exStyle, initialDpi);
 
+        const int windowWidth = initialRect.right - initialRect.left;
+        const int windowHeight = initialRect.bottom - initialRect.top;
+        int windowX = CW_USEDEFAULT;
+        int windowY = 0;
+        // WS_POPUP ignores CW_USEDEFAULT placement and often lands at (0,0).
+        // Center custom chrome on the primary work area for a predictable start.
+        if (m_windowChrome.IsCustom()) {
+            RECT work{};
+            SystemParametersInfoW(SPI_GETWORKAREA, 0, &work, 0);
+            windowX = work.left + std::max(0L, (work.right - work.left - windowWidth) / 2);
+            windowY = work.top + std::max(0L, (work.bottom - work.top - windowHeight) / 2);
+        }
+
         m_hwnd = CreateWindowExW(
             exStyle,
             kClassName,
             L"AI WinUI Renderer (DirectUI-style)",
             style,
-            CW_USEDEFAULT,
-            CW_USEDEFAULT,
-            initialRect.right - initialRect.left,
-            initialRect.bottom - initialRect.top,
+            windowX,
+            windowY,
+            windowWidth,
+            windowHeight,
             nullptr,
             nullptr,
             instance,
@@ -257,6 +270,39 @@ private:
             regions.push_back(region);
         }
         m_windowChrome.SetHitRegions(std::move(regions));
+    }
+
+    static void CollectCaptionMaximizeButtons(UIElement* element, std::vector<Button*>& out) {
+        if (!element) {
+            return;
+        }
+        if (auto* button = dynamic_cast<Button*>(element)) {
+            if (button->GetVariant() == Button::Variant::CaptionMaximize) {
+                out.push_back(button);
+            }
+        }
+        for (auto& child : element->Children()) {
+            CollectCaptionMaximizeButtons(child.get(), out);
+        }
+    }
+
+    void SyncCaptionMaximizeGlyphs() {
+        if (!m_root || !m_hwnd) {
+            return;
+        }
+        const bool maximized = IsZoomed(m_hwnd) != FALSE;
+        std::vector<Button*> buttons;
+        CollectCaptionMaximizeButtons(m_root.get(), buttons);
+        bool changed = false;
+        for (Button* button : buttons) {
+            if (button->ShowRestoreGlyph() != maximized) {
+                button->SetShowRestoreGlyph(maximized);
+                changed = true;
+            }
+        }
+        if (changed) {
+            InvalidateRect(m_hwnd, nullptr, FALSE);
+        }
     }
 
     std::wstring GetEnvironmentValue(const wchar_t* name) const {
@@ -880,6 +926,7 @@ private:
             }
             case WM_SIZE:
                 OnResize();
+                SyncCaptionMaximizeGlyphs();
                 return 0;
             case WM_MOUSEMOVE:
                 OnMouseMove(lParam);

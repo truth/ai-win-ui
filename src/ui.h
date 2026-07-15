@@ -1636,6 +1636,10 @@ public:
     }
     Variant GetVariant() const { return m_variant; }
 
+    // When true on CaptionMaximize, draw the dual-square restore glyph.
+    void SetShowRestoreGlyph(bool show) { m_showRestoreGlyph = show; }
+    bool ShowRestoreGlyph() const { return m_showRestoreGlyph; }
+
     float cornerRadius = 4.0f;
     float fontSize = 14.0f;
     Color background = ColorFromHex(0x2D2D30);
@@ -1846,8 +1850,24 @@ private:
                 break;
             }
             case Variant::CaptionMaximize: {
-                const Rect box = Rect::Make(cx - half, cy - half, cx + half, cy + half);
-                renderer.DrawRect(box, color, stroke);
+                if (m_showRestoreGlyph) {
+                    // Overlapping squares (restore): back offset up-right, front lower-left.
+                    const float offset = ScaleValue(2.2f);
+                    const float s = half * 0.78f;
+                    const Rect back = Rect::Make(
+                        cx - s + offset, cy - s - offset,
+                        cx + s + offset, cy + s - offset);
+                    const Rect front = Rect::Make(
+                        cx - s - offset, cy - s + offset,
+                        cx + s - offset, cy + s + offset);
+                    renderer.DrawRect(back, color, stroke);
+                    // Clear the overlapping edge of the back square by filling front bg is
+                    // unavailable; draw front on top for a clean dual-window mark.
+                    renderer.DrawRect(front, color, stroke);
+                } else {
+                    const Rect box = Rect::Make(cx - half, cy - half, cx + half, cy + half);
+                    renderer.DrawRect(box, color, stroke);
+                }
                 break;
             }
             case Variant::CaptionClose: {
@@ -1925,6 +1945,7 @@ private:
     std::wstring m_text;
     std::function<void()> m_onClick;
     Variant m_variant = Variant::Default;
+    bool m_showRestoreGlyph = false;
 };
 
 class TextInput : public UIElement {
