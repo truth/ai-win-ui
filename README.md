@@ -47,6 +47,7 @@
 ## 相关文档
 
 - `doc/README.md`：文档索引与现状快照
+- `doc/plan/2026-07-15-directui-productization-personas.md`：**产品化路线 · 分人物（R/L/C/S/H/Q）**
 - `doc/layout-spec.md`：**布局 XML/JSON 规则**（含 `$style`、ShapePanel、chrome）
 - `doc/style-catalog.md`：样式目录 `import` / `extend` / 引用语法
 - `doc/window-chrome.md`：自定义标题栏与 layered 异形窗
@@ -104,6 +105,9 @@
 
 # 点击打开心形/花瓣等异形窗
 .\scripts\run_shaped_windows_demo.ps1
+
+# 若启动异常：清掉粘连的 AI_WIN_UI_* 环境变量
+.\scripts\clear_ai_win_env.ps1
 ```
 
 | 环境变量 | 含义 |

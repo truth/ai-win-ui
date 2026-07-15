@@ -25,8 +25,15 @@ It is blocked by three closing tasks:
 text parity, `ScrollViewer`, in-process multi-root hosts, and measure goldens.
 File-level checklist: `doc/plan/2026-07-15-directui-p0-hardening.md`.
 
-Work outside these areas is useful, but it should not take priority until the
-three blockers above are in a clearly better state.
+**Productization (post-P0)** is planned by **persona/role** (parallel tracks),
+not a single linear queue. See:
+
+- `doc/plan/2026-07-15-directui-productization-personas.md`
+
+Wave 1 still prioritizes text parity (role **R**) and measure goldens (role **Q**).
+
+Work outside Wave 1 L1 exit criteria is useful, but should not block the
+persona roadmap exits above.
 
 ## Execution Order
 

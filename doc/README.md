@@ -33,7 +33,9 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
-  - active: `2026-07-15-directui-p0-hardening.md`（文本 parity / ScrollViewer / 多根窗口 / measure golden）
+  - **active productization:** `2026-07-15-directui-productization-personas.md`
+    （按 6 个人物/角色分工：R 文本 · L 布局 · C 控件 · S 样式 · H 宿主 · Q 质量）
+  - P0 hardening: `2026-07-15-directui-p0-hardening.md`
   - archived examples: declarative style v1, theme tokens, layered window v2
 
 ## Current System Snapshot

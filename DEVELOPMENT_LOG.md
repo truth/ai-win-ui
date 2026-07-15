@@ -2,6 +2,10 @@
 
 ## 2026-07-15
 
+- DirectUI **产品化路线 · 分人物**：`doc/plan/2026-07-15-directui-productization-personas.md`
+  - 六角色 R 文本 / L 布局 / C 控件 / S 样式 / H 宿主 / Q 质量
+  - 三 Wave（L1 引擎可信 → L2 产品能力 → L3 交付形态）+ 认领表 + 文件边界
+  - 辅助：`scripts/clear_ai_win_env.ps1`
 - P0 硬化第二批：
   - ScrollViewer：**拖拽内容滑动** + 滚动条 thumb/track
   - 进程内多根窗口（关子窗不杀 hub）；`AI_WIN_UI_CHILD_PROCESS=1` 仍可多进程
