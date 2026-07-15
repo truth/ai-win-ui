@@ -1,0 +1,40 @@
+<Panel padding="22,22,22,22" spacing="14" cornerRadius="16" background="#0C1522" alignItems="stretch">
+  <Label text="Advanced Inputs Validation" fontSize="28" color="#F3F8FF" />
+  <Label text="Left: NumericUpDown + DateTimePicker. Right: RichTextBox (always beside)." fontSize="14" color="#B8C8D9" />
+
+  <!-- No wrap / alignItems=start: same pattern as TabControl layout fix. -->
+  <Panel direction="row" spacing="12" background="#0C1522" alignItems="start">
+    <Panel background="#122032" cornerRadius="12" padding="12,12,12,12" spacing="10" width="340" flexShrink="0">
+      <Label text="NumericUpDown" fontSize="16" color="#E9F2FD" />
+      <NumericUpDown label="Quantity" min="0" max="100" value="12" step="1" />
+      <NumericUpDown label="Opacity" min="0" max="1" value="0.75" step="0.05" decimalPlaces="2" />
+      <NumericUpDown label="Temperature" min="-20" max="40" value="22" step="0.5" decimalPlaces="1" />
+
+      <Label text="DateTimePicker" fontSize="16" color="#E9F2FD" />
+      <DateTimePicker label="Date" mode="date" value="2026-07-15" />
+      <DateTimePicker label="Time" mode="time" value="14:30" />
+      <DateTimePicker label="DateTime" mode="dateTime" value="2026-07-15 18:45" />
+      <DateTimePicker label="Full" mode="dateTime" value="2026-12-31 23:59:59" showSeconds="true" />
+    </Panel>
+
+    <Panel background="#122032" cornerRadius="12" padding="12,12,12,12" spacing="10" flexGrow="1" minWidth="360" flexShrink="1">
+      <Label text="RichTextBox (right panel)" fontSize="16" color="#E9F2FD" />
+      <Label text="Enter = new line. Ctrl+B bold, Ctrl+I italic. Markup **bold** *italic* on load." fontSize="12" color="#9BB0C3" />
+      <RichTextBox
+        height="200"
+        text="Welcome to **RichTextBox** v1.\nSelect words and press Ctrl+B / Ctrl+I.\nPlain *italic* and **bold** markup is parsed at load." />
+      <RichTextBox
+        height="120"
+        plainText="Plain text box (no markup). Type freely and format with Ctrl+B / Ctrl+I." />
+
+      <Label text="How to test" fontSize="16" color="#E9F2FD" />
+      <Label text="1. Left: spin arrows / date segments." fontSize="13" color="#D7E4F1" />
+      <Label text="2. Right: multi-line edit, select, Ctrl+B/I." fontSize="13" color="#D7E4F1" />
+      <Label text="3. Combo near window bottom opens list upward." fontSize="13" color="#D7E4F1" />
+      <ComboBox
+        items="Alpha|Bravo|Charlie|Delta|Echo|Foxtrot|Golf"
+        selectedIndex="0"
+        maxVisibleItems="6" />
+    </Panel>
+  </Panel>
+</Panel>

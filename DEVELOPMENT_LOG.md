@@ -2,6 +2,28 @@
 
 ## 2026-07-15
 
+- ProgressBar 接入 `ComponentStyle`（`track` / `fill`，hover/pressed fill）；`fillColor`/`trackColor` 同步样式
+- ComboBox：布局高度仅标题行；下拉为 `RenderOverlay` 浮层；`FindOverlayHitAt` 优先命中
+- ComboBox：底部空间不足时列表向上展开（`viewportHeight` 写入 `UIContext`）
+- advanced_inputs：左 Numeric/DateTime，右 RichTextBox（取消 wrap，避免被挤到窗口底）
+- core_controls_v2：左栏 Progress/List/Combo，右栏 TabControl（取消 wrap，始终并排）
+- 修复 TabControl 不显示：
+  - `IsLayoutLeaf()` 改为 virtual；TabControl 返回 true，Yoga 按叶子测量并尊重 `height`
+  - 切换 tab 时 `LayoutTabPages()` 重新 Measure/Arrange 当前页（否则页面停在屏外 -10000）
+  - 高度自适应内容；demo 卡片 `alignItems=start`
+- Slider 接入 `ComponentStyle`：`StyleSpec.track` / `thumb` / `fill` 子装饰
+  - hover/pressed thumb 态；进度填充；`highlightColor` 属性同步 fill/thumb
+  - 解析支持 `style.track|thumb|fill` 与 `style.decoration.track|thumb|fill`
+- DataTable v2：行选择、表头排序（数字感知）、hover、选中滚动可见
+  - 属性：`selectable` / `sortable` / `selectedIndex` / `selectedRowBackground` / `rowHoverBackground`
+  - 校验页：`table_components.xml` / `.json` 扩充更多行与静态对照表
+- `run_layout_demo.ps1`：源码新于 exe 时自动重建（修复旧 Debug 二进制导致新控件无响应）
+- Phase 8 完成：高级输入控件
+  - `NumericUpDown`：`label` / `min` / `max` / `value` / `step` / `decimalPlaces`；chevron + 方向键
+  - `DateTimePicker`：`mode=date|time|dateTime`、`value`、`showSeconds`；分段高亮、左右切字段、闰年/月末钳制
+  - `RichTextBox`：多行编辑、Ctrl+B/I、加载时 `**bold**` / `*italic*`；`TextRenderOptions.bold/italic` 贯通 D2D/Skia
+  - 校验页：`resource/layouts/advanced_inputs.xml` + `.json`；别名 `advanced-inputs`
+  - 文档：`doc/advanced-rendering-workplan.md` Phase 8 进度；chrome 过期说明已修正
 - 分支 `feature/skia-layered-multimon-perf`：
   - Skia layered present（DIB 零拷贝 + `UpdateLayeredWindow` / HWND `BitBlt`）
   - 多显示器：光标所在显示器居中；`WM_DISPLAYCHANGE` 刷新；DPI 跨屏沿用 `WM_DPICHANGED`

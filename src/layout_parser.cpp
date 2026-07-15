@@ -566,33 +566,64 @@ BorderSpec ParseBorderSpec(const JsonValue& value) {
     return border;
 }
 
+// Parses a partial BoxDecoration object: background / border / cornerRadius / opacity.
+// Used for StyleSpec.decoration and sub-parts (track / thumb / fill).
+bool ParseBoxDecorationObject(const JsonValue& value, BoxDecoration& out) {
+    if (!value.IsObject()) {
+        return false;
+    }
+    bool touched = false;
+    if (value["background"].IsString()) {
+        out.background = LayoutParser::ColorFromString(value["background"].stringValue);
+        touched = true;
+    }
+    if (value["border"].IsObject()) {
+        out.border = ParseBorderSpec(value["border"]);
+        touched = true;
+    }
+    if (value["cornerRadius"].IsNumber()) {
+        out.radius = CornerRadius::Uniform(static_cast<float>(value["cornerRadius"].numberValue));
+        touched = true;
+    }
+    if (value["opacity"].IsNumber()) {
+        out.opacity = static_cast<float>(value["opacity"].numberValue);
+        touched = true;
+    }
+    return touched;
+}
+
 StyleSpec ParseStyleSpec(const JsonValue& value) {
     StyleSpec spec;
     if (!value.IsObject()) {
         return spec;
     }
     BoxDecoration deco;
-    bool decoTouched = false;
-    if (value["background"].IsString()) {
-        deco.background = LayoutParser::ColorFromString(value["background"].stringValue);
-        decoTouched = true;
-    }
-    if (value["border"].IsObject()) {
-        deco.border = ParseBorderSpec(value["border"]);
-        decoTouched = true;
-    }
-    if (value["cornerRadius"].IsNumber()) {
-        deco.radius = CornerRadius::Uniform(static_cast<float>(value["cornerRadius"].numberValue));
-        decoTouched = true;
-    }
-    if (value["opacity"].IsNumber()) {
-        deco.opacity = static_cast<float>(value["opacity"].numberValue);
-        decoTouched = true;
-        spec.opacity = static_cast<float>(value["opacity"].numberValue);
-    }
-    if (decoTouched) {
+    if (ParseBoxDecorationObject(value, deco)) {
+        if (value["opacity"].IsNumber()) {
+            spec.opacity = static_cast<float>(value["opacity"].numberValue);
+        }
         spec.decoration = deco;
     }
+    // Sub-parts: flat keys (track/thumb/fill) or nested under decoration.*.
+    auto tryAssignPart = [&](const char* key, std::optional<BoxDecoration>& target) {
+        const JsonValue* src = nullptr;
+        if (value[key].IsObject()) {
+            src = &value[key];
+        } else if (value["decoration"].IsObject() && value["decoration"][key].IsObject()) {
+            src = &value["decoration"][key];
+        }
+        if (!src) {
+            return;
+        }
+        BoxDecoration part;
+        if (ParseBoxDecorationObject(*src, part)) {
+            target = part;
+        }
+    };
+    tryAssignPart("track", spec.track);
+    tryAssignPart("thumb", spec.thumb);
+    tryAssignPart("fill", spec.fill);
+
     if (value["foreground"].IsString()) {
         spec.foreground = LayoutParser::ColorFromString(value["foreground"].stringValue);
     }
@@ -1450,6 +1481,21 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["cellPadding"].IsArray() && props["cellPadding"].arrayValue.size() == 4) {
                 table->cellPadding = ParseThickness(props["cellPadding"]);
             }
+            if (props["selectable"].IsBool()) {
+                table->SetSelectable(props["selectable"].boolValue);
+            }
+            if (props["sortable"].IsBool()) {
+                table->SetSortable(props["sortable"].boolValue);
+            }
+            if (props["selectedIndex"].IsNumber()) {
+                table->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
+            }
+            if (props["selectedRowBackground"].IsString()) {
+                table->selectedRowBackground = LayoutParser::ColorFromString(props["selectedRowBackground"].stringValue);
+            }
+            if (props["rowHoverBackground"].IsString()) {
+                table->rowHoverBackground = LayoutParser::ColorFromString(props["rowHoverBackground"].stringValue);
+            }
             ApplyCommonJsonProps(*table, props);
         }
         element = std::move(table);
@@ -1519,12 +1565,6 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["borderColor"].IsString()) {
                 progressBar->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
             }
-            if (props["trackColor"].IsString()) {
-                progressBar->trackColor = LayoutParser::ColorFromString(props["trackColor"].stringValue);
-            }
-            if (props["fillColor"].IsString()) {
-                progressBar->fillColor = LayoutParser::ColorFromString(props["fillColor"].stringValue);
-            }
             if (props["textColor"].IsString()) {
                 progressBar->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
             }
@@ -1534,8 +1574,117 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
                 progressBar->barHeight = static_cast<float>(props["barHeight"].numberValue);
             }
             ApplyCommonJsonProps(*progressBar, props);
+            // After style block so attribute colors win for track/fill.
+            if (props["trackColor"].IsString()) {
+                progressBar->SetTrackColor(LayoutParser::ColorFromString(props["trackColor"].stringValue));
+            }
+            if (props["fillColor"].IsString()) {
+                progressBar->SetFillColor(LayoutParser::ColorFromString(props["fillColor"].stringValue));
+            }
         }
         element = std::move(progressBar);
+    } else if (type == "NumericUpDown") {
+        auto spin = std::make_unique<NumericUpDown>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["label"].IsString()) {
+                spin->SetLabel(LayoutParser::Utf8ToUtf16(props["label"].stringValue));
+            }
+            if (props["min"].IsNumber()) {
+                const float minValue = static_cast<float>(props["min"].numberValue);
+                const float maxValue = props["max"].IsNumber()
+                    ? static_cast<float>(props["max"].numberValue)
+                    : 100.0f;
+                spin->SetRange(minValue, maxValue);
+            } else if (props["max"].IsNumber()) {
+                spin->SetRange(0.0f, static_cast<float>(props["max"].numberValue));
+            }
+            if (props["value"].IsNumber()) {
+                spin->SetValue(static_cast<float>(props["value"].numberValue));
+            }
+            if (props["step"].IsNumber()) {
+                spin->SetStep(static_cast<float>(props["step"].numberValue));
+            }
+            if (props["decimalPlaces"].IsNumber()) {
+                spin->SetDecimalPlaces(static_cast<int>(props["decimalPlaces"].numberValue));
+            }
+            if (props["background"].IsString()) {
+                spin->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                spin->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                spin->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, spin->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, spin->fontSize);
+            ApplyCommonJsonProps(*spin, props);
+        }
+        element = std::move(spin);
+    } else if (type == "DateTimePicker") {
+        auto picker = std::make_unique<DateTimePicker>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["label"].IsString()) {
+                picker->SetLabel(LayoutParser::Utf8ToUtf16(props["label"].stringValue));
+            }
+            if (props["mode"].IsString()) {
+                const std::string mode = props["mode"].stringValue;
+                if (mode == "time") {
+                    picker->SetMode(DateTimePicker::Mode::Time);
+                } else if (mode == "dateTime" || mode == "datetime") {
+                    picker->SetMode(DateTimePicker::Mode::DateTime);
+                } else {
+                    picker->SetMode(DateTimePicker::Mode::Date);
+                }
+            }
+            if (props["showSeconds"].IsBool()) {
+                picker->SetShowSeconds(props["showSeconds"].boolValue);
+            }
+            if (props["value"].IsString()) {
+                picker->SetFromString(LayoutParser::Utf8ToUtf16(props["value"].stringValue));
+            }
+            if (props["background"].IsString()) {
+                picker->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                picker->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                picker->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, picker->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, picker->fontSize);
+            ApplyCommonJsonProps(*picker, props);
+        }
+        element = std::move(picker);
+    } else if (type == "RichTextBox") {
+        auto rich = std::make_unique<RichTextBox>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["text"].IsString()) {
+                rich->SetText(LayoutParser::Utf8ToUtf16(props["text"].stringValue));
+            } else if (props["plainText"].IsString()) {
+                rich->SetPlainText(LayoutParser::Utf8ToUtf16(props["plainText"].stringValue));
+            }
+            if (props["background"].IsString()) {
+                rich->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                rich->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                rich->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            if (props["height"].IsNumber()) {
+                rich->preferredHeight = static_cast<float>(props["height"].numberValue);
+            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, rich->cornerRadius);
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, rich->fontSize);
+            ApplyCommonJsonProps(*rich, props);
+        }
+        element = std::move(rich);
     } else if (type == "ListBox") {
         auto listBox = std::make_unique<ListBox>();
         if (node["props"].IsObject()) {
@@ -2105,7 +2254,17 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["step"].IsNumber()) {
                 slider->SetStep(static_cast<float>(props["step"].numberValue));
             }
+            if (props["background"].IsString()) {
+                slider->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["textColor"].IsString()) {
+                slider->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            }
+            // style block first, then highlightColor so attribute can retint fill/thumb.
             ApplyCommonJsonProps(*slider, props);
+            if (props["highlightColor"].IsString()) {
+                slider->SetHighlightColor(LayoutParser::ColorFromString(props["highlightColor"].stringValue));
+            }
         }
         element = std::move(slider);
     } else if (type == "Grid") {
@@ -2394,6 +2553,21 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
                 table->cellPadding = ParseThickness(values);
             }
         }
+        if (auto it = node.attributes.find("selectable"); it != node.attributes.end()) {
+            table->SetSelectable(ToLowerAscii(it->second) == "true");
+        }
+        if (auto it = node.attributes.find("sortable"); it != node.attributes.end()) {
+            table->SetSortable(ToLowerAscii(it->second) == "true");
+        }
+        if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
+            table->SetSelectedIndex(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("selectedRowBackground"); it != node.attributes.end()) {
+            table->selectedRowBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("rowHoverBackground"); it != node.attributes.end()) {
+            table->rowHoverBackground = LayoutParser::ColorFromString(it->second);
+        }
         ApplyCommonXmlAttributes(*table, node);
         element = std::move(table);
     } else if (node.name == "SeagullAnimation") {
@@ -2460,12 +2634,6 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
             progressBar->borderColor = LayoutParser::ColorFromString(it->second);
         }
-        if (auto it = node.attributes.find("trackColor"); it != node.attributes.end()) {
-            progressBar->trackColor = LayoutParser::ColorFromString(it->second);
-        }
-        if (auto it = node.attributes.find("fillColor"); it != node.attributes.end()) {
-            progressBar->fillColor = LayoutParser::ColorFromString(it->second);
-        }
         if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
             progressBar->textColor = LayoutParser::ColorFromString(it->second);
         }
@@ -2479,7 +2647,119 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             progressBar->barHeight = std::stof(it->second);
         }
         ApplyCommonXmlAttributes(*progressBar, node);
+        if (auto it = node.attributes.find("trackColor"); it != node.attributes.end()) {
+            progressBar->SetTrackColor(LayoutParser::ColorFromString(it->second));
+        }
+        if (auto it = node.attributes.find("fillColor"); it != node.attributes.end()) {
+            progressBar->SetFillColor(LayoutParser::ColorFromString(it->second));
+        }
         element = std::move(progressBar);
+    } else if (node.name == "NumericUpDown") {
+        auto spin = std::make_unique<NumericUpDown>();
+        if (auto it = node.attributes.find("label"); it != node.attributes.end()) {
+            spin->SetLabel(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("min"); it != node.attributes.end()) {
+            const float minValue = std::stof(it->second);
+            if (auto it2 = node.attributes.find("max"); it2 != node.attributes.end()) {
+                spin->SetRange(minValue, std::stof(it2->second));
+            } else {
+                spin->SetRange(minValue, 100.0f);
+            }
+        } else if (auto it = node.attributes.find("max"); it != node.attributes.end()) {
+            spin->SetRange(0.0f, std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("value"); it != node.attributes.end()) {
+            spin->SetValue(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("step"); it != node.attributes.end()) {
+            spin->SetStep(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("decimalPlaces"); it != node.attributes.end()) {
+            spin->SetDecimalPlaces(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            spin->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            spin->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            spin->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            spin->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            spin->fontSize = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*spin, node);
+        element = std::move(spin);
+    } else if (node.name == "DateTimePicker") {
+        auto picker = std::make_unique<DateTimePicker>();
+        if (auto it = node.attributes.find("label"); it != node.attributes.end()) {
+            picker->SetLabel(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("mode"); it != node.attributes.end()) {
+            const std::string mode = ToLowerAscii(it->second);
+            if (mode == "time") {
+                picker->SetMode(DateTimePicker::Mode::Time);
+            } else if (mode == "datetime") {
+                picker->SetMode(DateTimePicker::Mode::DateTime);
+            } else {
+                picker->SetMode(DateTimePicker::Mode::Date);
+            }
+        }
+        if (auto it = node.attributes.find("showSeconds"); it != node.attributes.end()) {
+            picker->SetShowSeconds(ToLowerAscii(it->second) == "true");
+        }
+        if (auto it = node.attributes.find("value"); it != node.attributes.end()) {
+            picker->SetFromString(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            picker->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            picker->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            picker->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            picker->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            picker->fontSize = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*picker, node);
+        element = std::move(picker);
+    } else if (node.name == "RichTextBox") {
+        auto rich = std::make_unique<RichTextBox>();
+        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
+            rich->SetText(LayoutParser::Utf8ToUtf16(it->second));
+        } else if (auto it = node.attributes.find("plainText"); it != node.attributes.end()) {
+            rich->SetPlainText(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            rich->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            rich->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            rich->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("height"); it != node.attributes.end()) {
+            rich->preferredHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            rich->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            rich->fontSize = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*rich, node);
+        element = std::move(rich);
     } else if (node.name == "ListBox") {
         auto listBox = std::make_unique<ListBox>();
         if (auto it = node.attributes.find("items"); it != node.attributes.end()) {
@@ -2987,7 +3267,16 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         if (auto it = node.attributes.find("step"); it != node.attributes.end()) {
             slider->SetStep(std::stof(it->second));
         }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            slider->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            slider->textColor = LayoutParser::ColorFromString(it->second);
+        }
         ApplyCommonXmlAttributes(*slider, node);
+        if (auto it = node.attributes.find("highlightColor"); it != node.attributes.end()) {
+            slider->SetHighlightColor(LayoutParser::ColorFromString(it->second));
+        }
         element = std::move(slider);
     } else if (node.name == "Grid") {
         auto grid = std::make_unique<GridPanel>();

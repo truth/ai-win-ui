@@ -37,10 +37,14 @@ the rendering baseline:
 
 Open follow-ups (queued for the next sprint):
 
-- `Slider` / `ListBox` / `ComboBox` / `TabControl` / `ListView` /
-  `TreeView` need a sub-style schema (`decoration.track`,
-  `decoration.thumb`, `itemStyle`) before they can adopt
-  `ComponentStyle`. Until then they keep their per-field properties.
+- [x] `Slider` sub-style schema (`track` / `thumb` / `fill` on `StyleSpec`)
+  + `ComponentStyle` adoption (2026-07-15)
+- [x] `ProgressBar` uses `track` / `fill` + hover/pressed fill (2026-07-15)
+- [x] `ComboBox` closed-height + overlay dropdown paint/hit pass (2026-07-15)
+- [x] `TabControl` layout leaf + page re-arrange; demo on right column
+- `ListBox` / `ComboBox` / `TabControl` / `ListView` /
+  `TreeView` still need full `itemStyle` (and related parts) before complete
+  `ComponentStyle` adoption.
 - `cornerRadius` / `fontSize` token migration of the remaining
   layouts (only the five primary layouts are migrated so far).
 - Layout colour-field migration is intentionally deferred — it requires
@@ -140,22 +144,25 @@ Current custom component set in this repository:
 
 Common WinForms components not yet available:
 
-- navigation and shell:
-  - menu strip
-  - tool strip
-  - status strip
-  - context menu
 - data presentation:
   - data grid view style table features beyond static table v1
-- input controls:
-  - numeric up-down
-  - date time picker
-  - rich text box
+
+Shipped since this section was written: MenuStrip / ToolStrip / StatusStrip /
+ContextMenu (Phase 7), NumericUpDown + DateTimePicker + RichTextBox (Phase 8).
 
 Suggested delivery priority:
 
-1. MenuStrip, ToolStrip, StatusStrip, ContextMenu
-2. NumericUpDown, DateTimePicker, RichTextBox
+1. `itemStyle` for ListBox / ComboBox / TabControl / ListView / TreeView
+2. Further DataGrid features (cell edit, multi-select, column resize)
+
+### DataTable v2 (2026-07-15)
+
+- [x] Row selection (mouse + keyboard Up/Down/Home/End/Page)
+- [x] Header click sort with ▲/▼ indicator (numeric-aware when both cells parse as numbers)
+- [x] Hover highlight on rows / headers
+- [x] Body scroll while keeping selection visible
+- [x] Props: `selectable`, `sortable`, `selectedIndex`, `selectedRowBackground`, `rowHoverBackground`
+- Validation: `resource/layouts/table_components.xml` / `.json`
 
 ## Execution Plan
 
@@ -318,10 +325,18 @@ Primary files:
 - `resource/layouts/advanced_inputs.xml`
 - `resource/layouts/advanced_inputs.json`
 
+Progress (2026-07-15):
+
+- [x] `NumericUpDown` — spin box with min/max/step/decimalPlaces, keyboard + chevron buttons
+- [x] `DateTimePicker` — segment editor (`date` / `time` / `dateTime`), leap-year clamp, spin chevrons
+- [x] `RichTextBox` — multi-line edit, Ctrl+B/I, load-time `**bold**` / `*italic*` markup
+- Validation layout: `resource/layouts/advanced_inputs.xml` / `.json`
+- Launcher alias: `advanced-inputs`
+
 Exit criteria:
 
-- values can be edited safely
-- focus and keyboard behavior match the existing interaction model
+- [x] values can be edited safely
+- [x] focus and keyboard behavior match the existing interaction model
 
 ## Proposed Component DSL (Initial)
 

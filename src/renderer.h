@@ -40,6 +40,8 @@ struct TextRenderOptions {
     TextWrapMode wrap = TextWrapMode::Wrap;
     TextHorizontalAlign horizontalAlign = TextHorizontalAlign::Start;
     TextVerticalAlign verticalAlign = TextVerticalAlign::Start;
+    bool bold = false;
+    bool italic = false;
 };
 
 const char* RendererBackendId(RendererBackend backend);

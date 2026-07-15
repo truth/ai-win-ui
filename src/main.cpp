@@ -618,6 +618,8 @@ private:
         GetClientRect(m_hwnd, &rc);
         m_viewportWidth = static_cast<float>(std::max<LONG>(0, rc.right - rc.left));
         m_viewportHeight = static_cast<float>(std::max<LONG>(0, rc.bottom - rc.top));
+        m_uiContext.viewportWidth = m_viewportWidth;
+        m_uiContext.viewportHeight = m_viewportHeight;
         if (m_renderer) {
             m_renderer->Resize(static_cast<UINT>(m_viewportWidth), static_cast<UINT>(m_viewportHeight));
         }
@@ -740,6 +742,8 @@ private:
             }
             if (m_root) {
                 m_root->Render(*m_renderer);
+                // Popups (ComboBox dropdown, etc.) above the rest of the tree.
+                m_root->RenderOverlay(*m_renderer);
             }
             if (m_windowChrome.IsCustom() && m_viewportWidth > 1.0f && m_viewportHeight > 1.0f) {
                 // Dim caption on inactive windows. Prefer the card title strip when layered
@@ -791,6 +795,8 @@ private:
         bool handled = false;
         if (m_mouseCaptureTarget) {
             handled = m_mouseCaptureTarget->OnMouseMove(x, y);
+        } else if (UIElement* overlay = m_root->FindOverlayHitAt(x, y)) {
+            handled = overlay->OnMouseMove(x, y);
         } else {
             handled = m_root->OnMouseMove(x, y);
         }
@@ -806,11 +812,27 @@ private:
         const float x = static_cast<float>(GET_X_LPARAM(lParam));
         const float y = static_cast<float>(GET_Y_LPARAM(lParam));
 
-        UIElement* focusTarget = m_root->FindFocusableAt(x, y);
+        // Expanded popups (ComboBox list) win over normal tree z-order.
+        UIElement* overlayHit = m_root->FindOverlayHitAt(x, y);
+        UIElement* focusTarget = overlayHit
+            ? (overlayHit->IsFocusable() ? overlayHit : overlayHit->FindFocusableAt(x, y))
+            : m_root->FindFocusableAt(x, y);
+        if (!focusTarget && overlayHit && overlayHit->IsFocusable()) {
+            focusTarget = overlayHit;
+        }
         if (!focusTarget) {
             SetFocusedElement(nullptr);
         } else {
             SetFocusedElement(focusTarget);
+        }
+
+        if (overlayHit) {
+            m_mouseCaptureTarget = overlayHit;
+            if (overlayHit->OnMouseDown(x, y)) {
+                UpdateImeWindow();
+                InvalidateRect(m_hwnd, nullptr, FALSE);
+            }
+            return;
         }
 
         m_mouseCaptureTarget = m_root->FindHitElementAt(x, y);

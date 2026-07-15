@@ -63,27 +63,34 @@ inline SkUnichar DecodeUtf16At(const wchar_t* text, uint32_t len, uint32_t index
     return static_cast<SkUnichar>(first);
 }
 
-inline sk_sp<SkTypeface> TryMatchFamily(SkFontMgr* fontMgr, const char* familyName) {
+inline SkFontStyle MakeFontStyle(bool bold = false, bool italic = false) {
+    return SkFontStyle(
+        bold ? SkFontStyle::kBold_Weight : SkFontStyle::kNormal_Weight,
+        SkFontStyle::kNormal_Width,
+        italic ? SkFontStyle::kItalic_Slant : SkFontStyle::kUpright_Slant);
+}
+
+inline sk_sp<SkTypeface> TryMatchFamily(SkFontMgr* fontMgr, const char* familyName, bool bold = false, bool italic = false) {
     if (!fontMgr || !familyName || !familyName[0]) {
         return nullptr;
     }
-    return fontMgr->matchFamilyStyle(familyName, SkFontStyle());
+    return fontMgr->matchFamilyStyle(familyName, MakeFontStyle(bold, italic));
 }
 
-inline sk_sp<SkTypeface> CreateDefaultTypeface(SkFontMgr* fontMgr) {
+inline sk_sp<SkTypeface> CreateDefaultTypeface(SkFontMgr* fontMgr, bool bold = false, bool italic = false) {
     if (!fontMgr) {
         return nullptr;
     }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Segoe UI")) {
+    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Segoe UI", bold, italic)) {
         return typeface;
     }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Arial")) {
+    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Arial", bold, italic)) {
         return typeface;
     }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Tahoma")) {
+    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Tahoma", bold, italic)) {
         return typeface;
     }
-    return fontMgr->legacyMakeTypeface(nullptr, SkFontStyle());
+    return fontMgr->legacyMakeTypeface(nullptr, MakeFontStyle(bold, italic));
 }
 
 inline sk_sp<SkTypeface> MatchTypefaceForCharacter(SkFontMgr* fontMgr,

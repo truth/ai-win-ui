@@ -328,7 +328,15 @@ public:
 
             EnsureFontManager();
 
-            SkFont font = skia_font::CreateSkiaFont(fontSize, m_defaultTypeface.get());
+            sk_sp<SkTypeface> styleFace = m_defaultTypeface;
+            if (options.bold || options.italic) {
+                styleFace = skia_font::CreateDefaultTypeface(m_fontMgr.get(), options.bold, options.italic);
+                if (!styleFace) {
+                    styleFace = m_defaultTypeface;
+                }
+            }
+
+            SkFont font = skia_font::CreateSkiaFont(fontSize, styleFace.get());
 
             SkiaTextLayout layout;
             if (!CreateSkiaTextLayout(
@@ -377,7 +385,7 @@ public:
                     drawX,
                     baseline,
                     fontSize,
-                    m_defaultTypeface.get(),
+                    styleFace.get(),
                     m_fontMgr.get(),
                     paint);
             }

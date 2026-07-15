@@ -1,14 +1,19 @@
 <Panel padding="24,24,24,24" spacing="14" cornerRadius="16" background="#0D1520" alignItems="stretch">
   <Label text="DataTable Component Validation" fontSize="28" color="#F5F9FF" />
-  <Label text="Static table v1: header, column widths, zebra rows, grid lines, and cell padding." fontSize="14" color="#B6C4D5" />
+  <Label text="v2: click rows to select, click headers to sort (numeric-aware). Up/Down when focused. Overflow scrolls with selection." fontSize="14" color="#B6C4D5" />
 
   <DataTable
     columns="Name|Role|Region|Score"
     columnWidths="170|180|150|110"
-    rows="Ava Carter|Product Designer|APAC|91;Noah Kim|Frontend Engineer|NA|88;Mia Chen|Data Analyst|EMEA|94;Liam Patel|QA Engineer|APAC|86;Emma Garcia|PM|NA|90;Ethan Rossi|Backend Engineer|EMEA|89;Sophia Diaz|UX Researcher|LATAM|87;Lucas Brown|DevOps Engineer|NA|92"
+    rows="Ava Carter|Product Designer|APAC|91;Noah Kim|Frontend Engineer|NA|88;Mia Chen|Data Analyst|EMEA|94;Liam Patel|QA Engineer|APAC|86;Emma Garcia|PM|NA|90;Ethan Rossi|Backend Engineer|EMEA|89;Sophia Diaz|UX Researcher|LATAM|87;Lucas Brown|DevOps Engineer|NA|92;Olivia Park|SRE|APAC|95;James Wright|Security|NA|84;Amelia Ng|Mobile Engineer|APAC|93;Henry Cho|Platform|EMEA|88"
+    selectable="true"
+    sortable="true"
+    selectedIndex="0"
     headerBackground="#203143"
     rowBackgroundA="#152232"
     rowBackgroundB="#11202F"
+    selectedRowBackground="#2D6CDF"
+    rowHoverBackground="#1E3348"
     gridLineColor="#2A3F53"
     headerTextColor="#EAF4FF"
     textColor="#C5D5E5"
@@ -19,4 +24,19 @@
     rowHeight="32"
     cellPadding="10,6,10,6"
     height="340" />
+
+  <Label text="Static (selectable=false, sortable=false) still renders like v1." fontSize="13" color="#9BB0C3" />
+  <DataTable
+    columns="Item|Qty"
+    columnWidths="200|80"
+    rows="Widgets|12;Gadgets|7;Sprockets|3"
+    selectable="false"
+    sortable="false"
+    height="140"
+    headerBackground="#203143"
+    rowBackgroundA="#152232"
+    rowBackgroundB="#11202F"
+    background="#101B28"
+    borderColor="#30485E"
+    cornerRadius="10" />
 </Panel>

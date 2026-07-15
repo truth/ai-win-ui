@@ -22,6 +22,10 @@ constexpr std::size_t kStyleStateCount = static_cast<std::size_t>(StyleState::Co
 
 struct StyleSpec {
     std::optional<BoxDecoration> decoration;
+    // Sub-decorations for composite controls (Slider track/thumb, Progress fill, etc.).
+    std::optional<BoxDecoration> track;
+    std::optional<BoxDecoration> thumb;
+    std::optional<BoxDecoration> fill;
     std::optional<Thickness>     padding;
     std::optional<Thickness>     margin;
     std::optional<Thickness>     border;

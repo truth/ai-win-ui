@@ -38,7 +38,8 @@ function Get-LayoutList {
         "table-components",
         "seagull-animation",
         "core-controls-v2",
-        "navigation-components"
+        "navigation-components",
+        "advanced-inputs"
     )
 
     if ($ProfileName -eq "smoke") {

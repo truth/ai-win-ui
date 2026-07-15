@@ -40,7 +40,12 @@ WindowChrome::Layered (WS_POPUP | WS_EX_LAYERED, same caption hit-test as custom
 
 ## Exit criteria
 
-- [ ] Layered demo shows rounded window; desktop visible in corners
-- [ ] Drag / min / max / close still work
-- [ ] Clicks on fully transparent pixels pass through (`HTTRANSPARENT`)
-- [ ] System/custom modes unchanged
+- [x] Layered demo shows rounded window; desktop visible in corners
+- [x] Drag / min / max / close still work
+- [x] Clicks on fully transparent pixels pass through (`HTTRANSPARENT`)
+- [x] System/custom modes unchanged
+
+## Status
+
+**Shipped** (2026-07-15). Skia layered present + multi-monitor + present perf landed in
+`doc/plan/2026-07-15-skia-layered-multimon-perf.md` (v2.1 of the Out column above).

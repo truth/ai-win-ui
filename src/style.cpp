@@ -22,6 +22,9 @@ StyleSpec ComponentStyle::Resolve(StyleState state) const {
     }
     const StyleSpec& override_spec = overrides[index];
     MergeOptional(result.decoration, override_spec.decoration);
+    MergeOptional(result.track,      override_spec.track);
+    MergeOptional(result.thumb,      override_spec.thumb);
+    MergeOptional(result.fill,       override_spec.fill);
     MergeOptional(result.padding,    override_spec.padding);
     MergeOptional(result.margin,     override_spec.margin);
     MergeOptional(result.border,     override_spec.border);

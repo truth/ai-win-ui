@@ -122,8 +122,11 @@ Notes:
 - No runtime hot-switch of chrome without restart (style can be reapplied once from layout after load)
 - Custom/layered modes disable the system `WS_VSCROLL` style; use client-area scrolling as before
 - DWM corner preference applies to custom (HWND) mode; layered skips DWM frame extend
-- Skia + layered present not implemented yet
+- Soft shadow is a multi-pass card underlay, not a general filter library
+- Mesh / non-alpha hit-testing is not supported
 
-## Related plan
+## Related plans
 
 - `doc/plan/2026-07-15-custom-chrome-irregular-window-v1.md`
+- `doc/plan/2026-07-15-layered-irregular-window-v2.md`
+- `doc/plan/2026-07-15-skia-layered-multimon-perf.md`

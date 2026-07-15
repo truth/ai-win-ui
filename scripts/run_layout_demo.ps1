@@ -3,6 +3,7 @@ param(
     [ValidateSet("skia", "direct2d")]
     [string]$Renderer = "skia",
     [switch]$BuildIfMissing,
+    [switch]$Rebuild,
     [switch]$NoLaunch
 )
 
@@ -55,6 +56,7 @@ function Resolve-LayoutPath {
         "seagull-animation" = "layouts/seagull_animation.xml"
         "core-controls-v2" = "layouts/core_controls_v2.xml"
         "navigation-components" = "layouts/navigation_components.xml"
+        "advanced-inputs" = "layouts/advanced_inputs.xml"
         "custom-chrome" = "layouts/custom_chrome_demo.xml"
         "layered-chrome" = "layouts/layered_chrome_demo.xml"
     }
@@ -78,13 +80,60 @@ function Resolve-LayoutPath {
     return $layoutPath.Replace("\", "/")
 }
 
+function Get-LatestSourceWriteTime {
+    param([string]$RepoRoot)
+
+    $roots = @(
+        (Join-Path $RepoRoot "src"),
+        (Join-Path $RepoRoot "CMakeLists.txt"),
+        (Join-Path $RepoRoot "CMakePresets.json")
+    )
+
+    $latest = [datetime]::MinValue
+    foreach ($root in $roots) {
+        if (-not (Test-Path $root)) {
+            continue
+        }
+        if (Test-Path $root -PathType Leaf) {
+            $time = (Get-Item $root).LastWriteTime
+            if ($time -gt $latest) {
+                $latest = $time
+            }
+            continue
+        }
+        Get-ChildItem -Path $root -Recurse -File -Include *.cpp,*.h,*.hpp,*.c,*.cc,*.cmake |
+            ForEach-Object {
+                if ($_.LastWriteTime -gt $latest) {
+                    $latest = $_.LastWriteTime
+                }
+            }
+    }
+    return $latest
+}
+
+function Test-ExeNeedsRebuild {
+    param(
+        [string]$RepoRoot,
+        [string]$ExePath
+    )
+
+    if (-not (Test-Path $ExePath)) {
+        return $true
+    }
+
+    $exeTime = (Get-Item $ExePath).LastWriteTime
+    $sourceTime = Get-LatestSourceWriteTime -RepoRoot $RepoRoot
+    return ($sourceTime -gt $exeTime)
+}
+
 function Ensure-Build {
     param(
         [string]$RepoRoot,
-        [hashtable]$Config
+        [hashtable]$Config,
+        [string]$Reason
     )
 
-    Write-Host "Build output missing. Configuring preset '$($Config.ConfigurePreset)'..."
+    Write-Host "Building ($Reason). Configure preset '$($Config.ConfigurePreset)'..."
     & cmake --preset $Config.ConfigurePreset
     if ($LASTEXITCODE -ne 0) {
         throw "Configure failed for preset '$($Config.ConfigurePreset)'."
@@ -119,11 +168,23 @@ $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $config = Resolve-LauncherConfig -RepoRoot $repoRoot -Backend $Renderer
 $resolvedLayout = Resolve-LayoutPath -RepoRoot $repoRoot -RequestedLayout $Layout
 
-if (-not (Test-Path $config.ExePath)) {
-    if (-not $BuildIfMissing) {
-        throw "Executable not found: $($config.ExePath). Re-run with -BuildIfMissing to configure and build automatically."
+$exeExists = Test-Path $config.ExePath
+$needsRebuild = $Rebuild -or (-not $exeExists) -or (Test-ExeNeedsRebuild -RepoRoot $repoRoot -ExePath $config.ExePath)
+
+if ($needsRebuild) {
+    if (-not $Rebuild -and -not $BuildIfMissing -and $exeExists) {
+        Write-Host "WARNING: Executable is older than source files:"
+        Write-Host "  EXE: $($config.ExePath)"
+        Write-Host "  Rebuilding automatically so new controls/behavior are available."
     }
-    Ensure-Build -RepoRoot $repoRoot -Config $config
+    $reason = if ($Rebuild) {
+        "forced -Rebuild"
+    } elseif (-not $exeExists) {
+        "executable missing"
+    } else {
+        "source newer than executable"
+    }
+    Ensure-Build -RepoRoot $repoRoot -Config $config -Reason $reason
 }
 
 if (-not (Test-Path $config.ExePath)) {
@@ -139,6 +200,7 @@ Write-Host "Prepared ai_win_ui launch"
 Write-Host "  Renderer: $Renderer"
 Write-Host "  Layout:   $resolvedLayout"
 Write-Host "  EXE:      $($config.ExePath)"
+Write-Host "  EXE time: $((Get-Item $config.ExePath).LastWriteTime)"
 Write-Host "  Resource: synced to $(Join-Path (Split-Path -Parent $config.ExePath) 'resource')"
 
 if ($NoLaunch) {
