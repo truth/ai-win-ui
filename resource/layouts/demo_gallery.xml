@@ -59,6 +59,11 @@
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/cjk_render_test.xml||900x700" height="32" />
         </Panel>
         <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Text Wrap Cases" fontSize="14" color="#F2F6FB" />
+          <Label text="R2 wrap stress · named labels" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/text_wrap_cases.xml||1000x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
           <Label text="Skia Image Cases" fontSize="14" color="#F2F6FB" />
           <Label text="Bitmap load · clip · scale" fontSize="11" color="#8FA3B8" />
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/skia_image_cases.xml||1000x700" height="32" />

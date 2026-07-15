@@ -1,4 +1,5 @@
-﻿#include "host_options.h"
+﻿#include "application.h"
+#include "host_options.h"
 #include "layout_parser.h"
 #include "layout_engine.h"
 #include "renderer.h"
@@ -89,18 +90,9 @@ UINT GetWindowDpiWithFallback(HWND hwnd) {
 
 } // namespace
 
-// Process-wide multi-host: each App is one HWND + UI tree.
-// Last live host WM_DESTROY posts quit; secondaries are heap-owned (raw ptrs;
-// App must be complete type at delete — see PurgeClosedSecondaryHosts after class).
+// Process-wide multi-host lives in ai_win_ui::Application (src/application.*).
 class App;
-std::vector<App*> g_secondaryHosts;
-int g_liveHostCount = 0;
 void PurgeClosedSecondaryHosts();
-constexpr UINT WM_APP_OPEN_DEMO_HOST = WM_APP + 40;
-
-// Deferred secondary-window open (filled by button handler, consumed on WM_APP_OPEN_DEMO_HOST).
-OpenHostOptions g_pendingDemoHost{};
-bool g_hasPendingDemoHost = false;
 
 class App {
 public:
@@ -202,7 +194,7 @@ public:
             return false;
         }
 
-        ++g_liveHostCount;
+        ai_win_ui::Application::OnHostCreated();
 
         auto fail = [this]() -> bool {
             TeardownWindow();
@@ -374,6 +366,14 @@ public:
         return static_cast<int>(msg.wParam);
     }
 
+    // For Application::PurgeClosedSecondaries type-erased callbacks.
+    static bool HostIsClosed(void* host) {
+        return host && static_cast<App*>(host)->IsClosed();
+    }
+    static void HostDestroy(void* host) {
+        delete static_cast<App*>(host);
+    }
+
     // Open a secondary host from structured options (H2). Prefer this over raw env.
     static bool OpenSecondaryHost(HINSTANCE instance, const OpenHostOptions& options) {
         // Snapshot parent env without mutating globals until the last moment.
@@ -425,7 +425,7 @@ public:
             delete host;
             return false;
         }
-        g_secondaryHosts.push_back(host);
+        ai_win_ui::Application::RegisterSecondary(host);
         return true;
     }
 
@@ -690,18 +690,19 @@ private:
         }
 
         if (!opts.childProcess) {
-            g_pendingDemoHost = opts;
-            if (g_pendingDemoHost.renderer != RendererBackend::Skia &&
-                g_pendingDemoHost.renderer != RendererBackend::Direct2D) {
-                g_pendingDemoHost.renderer = m_activeRendererBackend;
+            auto& pending = ai_win_ui::Application::PendingOpen();
+            pending = opts;
+            if (pending.renderer != RendererBackend::Skia &&
+                pending.renderer != RendererBackend::Direct2D) {
+                pending.renderer = m_activeRendererBackend;
             }
             // Prefer hub's active backend when not explicitly set via process env.
             if (GetEnvironmentValue(L"AI_WIN_UI_RENDERER").empty()) {
-                g_pendingDemoHost.renderer = m_activeRendererBackend;
+                pending.renderer = m_activeRendererBackend;
             }
-            g_hasPendingDemoHost = true;
+            ai_win_ui::Application::HasPendingOpen() = true;
             if (m_hwnd) {
-                PostMessageW(m_hwnd, WM_APP_OPEN_DEMO_HOST, 0, 0);
+                PostMessageW(m_hwnd, ai_win_ui::kMsgOpenDemoHost, 0, 0);
             }
             return;
         }
@@ -1635,9 +1636,10 @@ private:
             return;
         }
 
+        // Caret top-left is the usual composition anchor (CJK IME).
         const POINT caretPoint{
             static_cast<LONG>(std::lround(caret.left)),
-            static_cast<LONG>(std::lround(caret.bottom + 2.0f))
+            static_cast<LONG>(std::lround(caret.top))
         };
 
         COMPOSITIONFORM composition{};
@@ -1645,11 +1647,37 @@ private:
         composition.ptCurrentPos = caretPoint;
         ImmSetCompositionWindow(imc, &composition);
 
-        CANDIDATEFORM candidate{};
-        candidate.dwIndex = 0;
-        candidate.dwStyle = CFS_CANDIDATEPOS;
-        candidate.ptCurrentPos = caretPoint;
-        ImmSetCandidateWindow(imc, &candidate);
+        // Candidate list near caret; also exclude the focused control rect so the
+        // list does not cover the text being edited (C3).
+        CANDIDATEFORM candidatePos{};
+        candidatePos.dwIndex = 0;
+        candidatePos.dwStyle = CFS_CANDIDATEPOS;
+        candidatePos.ptCurrentPos = POINT{
+            static_cast<LONG>(std::lround(caret.left)),
+            static_cast<LONG>(std::lround(caret.bottom + 2.0f))
+        };
+        ImmSetCandidateWindow(imc, &candidatePos);
+
+        const Rect field = m_focusedElement->Bounds();
+        CANDIDATEFORM candidateExclude{};
+        candidateExclude.dwIndex = 0;
+        candidateExclude.dwStyle = CFS_EXCLUDE;
+        candidateExclude.ptCurrentPos = caretPoint;
+        candidateExclude.rcArea = RECT{
+            static_cast<LONG>(std::floor(field.left)),
+            static_cast<LONG>(std::floor(field.top)),
+            static_cast<LONG>(std::ceil(field.right)),
+            static_cast<LONG>(std::ceil(field.bottom))
+        };
+        ImmSetCandidateWindow(imc, &candidateExclude);
+
+        // Prefer a known UI face for composition string metrics.
+        LOGFONTW lf{};
+        lf.lfHeight = -static_cast<LONG>(std::lround(std::max(12.0f, 16.0f * m_uiContext.dpiScale)));
+        lf.lfCharSet = DEFAULT_CHARSET;
+        lf.lfQuality = CLEARTYPE_QUALITY;
+        wcscpy_s(lf.lfFaceName, L"Segoe UI");
+        ImmSetCompositionFontW(imc, &lf);
 
         ImmReleaseContext(m_hwnd, imc);
     }
@@ -1913,13 +1941,14 @@ private:
                 return 0;
             case WM_ERASEBKGND:
                 return 1;
-            case WM_APP_OPEN_DEMO_HOST:
-                if (g_hasPendingDemoHost) {
-                    g_hasPendingDemoHost = false;
-                    const bool ok = OpenSecondaryHost(m_instance, g_pendingDemoHost);
+            case ai_win_ui::kMsgOpenDemoHost:
+                if (ai_win_ui::Application::HasPendingOpen()) {
+                    ai_win_ui::Application::HasPendingOpen() = false;
+                    OpenHostOptions pending = ai_win_ui::Application::PendingOpen();
+                    const bool ok = OpenSecondaryHost(m_instance, pending);
                     if (m_hwnd) {
                         std::wstring title = ok ? L"Opened: " : L"Failed: ";
-                        title += g_pendingDemoHost.layout;
+                        title += pending.layout;
                         SetWindowTextW(m_hwnd, title.c_str());
                     }
                 }
@@ -1933,11 +1962,9 @@ private:
                 m_hwnd = nullptr;
                 m_isInitialized = false;
                 m_closed = true;
-                if (g_liveHostCount > 0) {
-                    --g_liveHostCount;
-                }
+                ai_win_ui::Application::OnHostDestroyed();
                 // Only quit the process when the last host closes.
-                if (g_liveHostCount <= 0) {
+                if (ai_win_ui::Application::LiveHostCount() <= 0) {
                     PostQuitMessage(0);
                 }
                 return 0;
@@ -1983,15 +2010,7 @@ private:
 };
 
 void PurgeClosedSecondaryHosts() {
-    for (auto it = g_secondaryHosts.begin(); it != g_secondaryHosts.end();) {
-        App* host = *it;
-        if (host && host->IsClosed()) {
-            delete host;
-            it = g_secondaryHosts.erase(it);
-        } else {
-            ++it;
-        }
-    }
+    ai_win_ui::Application::PurgeClosedSecondaries(&App::HostIsClosed, &App::HostDestroy);
 }
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {

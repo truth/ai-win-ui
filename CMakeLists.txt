@@ -31,6 +31,7 @@ set(AI_WIN_UI_SKIA_LIBRARY_DIR "" CACHE PATH "Optional override for the director
 
 add_executable(ai_win_ui WIN32
     src/main.cpp
+    src/application.cpp
     src/box_decoration.cpp
     src/style.cpp
     src/style_catalog.cpp

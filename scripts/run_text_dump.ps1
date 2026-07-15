@@ -33,6 +33,8 @@ $layoutRel = switch ($Layout.ToLowerInvariant()) {
     "core_validation" { "layouts/core_validation.xml" }
     "cjk-render" { "layouts/cjk_render_test.xml" }
     "cjk_render" { "layouts/cjk_render_test.xml" }
+    "text-wrap" { "layouts/text_wrap_cases.xml" }
+    "text_wrap" { "layouts/text_wrap_cases.xml" }
     "scroll-viewer" { "layouts/scroll_viewer_cases.xml" }
     default {
         if ($Layout -match '^(layouts/|\w)') { $Layout } else { "layouts/$Layout" }

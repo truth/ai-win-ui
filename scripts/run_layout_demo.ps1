@@ -93,6 +93,9 @@ function Resolve-LayoutPath {
         "demo-gallery" = "layouts/demo_gallery.xml"
         "demo_gallery" = "layouts/demo_gallery.xml"
         "gallery" = "layouts/demo_gallery.xml"
+        "text-wrap" = "layouts/text_wrap_cases.xml"
+        "text_wrap" = "layouts/text_wrap_cases.xml"
+        "text_wrap_cases" = "layouts/text_wrap_cases.xml"
     }
     $aliasKey = $layoutPath.ToLowerInvariant()
     if ($layoutAliases.ContainsKey($aliasKey)) {

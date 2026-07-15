@@ -2,7 +2,8 @@
 param(
     [string]$Layout = "core-validation",
     [float]$TolerancePx = 2.0,
-    [switch]$BuildIfMissing
+    [switch]$BuildIfMissing,
+    [switch]$HeightsOnly  # R2: only compare wrapH/nowrapH
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,9 +37,16 @@ foreach ($key in ($skia.Keys | Sort-Object)) {
     }
     $a = $skia[$key]
     $b = $d2d[$key]
-    foreach ($f in @("wrapH", "nowrapH", "wrapW", "nowrapW")) {
-        $da = [double]$a.$f
-        $db = [double]$b.$f
+    $fields = if ($HeightsOnly) { @("wrapH", "nowrapH") } else { @("wrapH", "nowrapH", "wrapW", "nowrapW") }
+    foreach ($f in $fields) {
+        $pa = $a.PSObject.Properties[$f]
+        $pb = $b.PSObject.Properties[$f]
+        if (-not $pa -or -not $pb) {
+            $fails += "missing field $f on $key"
+            continue
+        }
+        $da = [double]$pa.Value
+        $db = [double]$pb.Value
         $diff = [math]::Abs($da - $db)
         $checked++
         if ($diff > $TolerancePx) {

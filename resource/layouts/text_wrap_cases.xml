@@ -1,0 +1,40 @@
+<!--
+  R2 multi-line wrap stress (Wave1). Named labels for text dump compare.
+  .\scripts\compare_text_dumps.ps1 -Layout text-wrap
+-->
+<Panel name="root" direction="column" padding="24,24,24,24" spacing="16" background="#101418" alignItems="stretch">
+  <Label name="title" text="Text Wrap Cases (R2)" fontSize="22" color="#F7FAFC" />
+  <Label name="hint" text="Compare wrapH between Skia and Direct2D with fixed AI_WIN_UI_SIZE=1000x700." fontSize="13" color="#B8C2CC" />
+
+  <Panel name="cardWide" direction="column" padding="14,14,14,14" spacing="8" background="#1A2430" cornerRadius="10" alignItems="stretch">
+    <Label name="wideTitle" text="Wide card (full width wrap)" fontSize="16" color="#FFFFFF" />
+    <Label
+      name="wideBody"
+      text="The quick brown fox jumps over the lazy dog. 中文换行测试：这是一段足够长的句子用来验证在固定宽度容器中的自动换行高度是否与测量一致，并且 Skia 与 DirectWrite 的 wrapH 应接近。"
+      fontSize="14"
+      color="#E7EEF6" />
+  </Panel>
+
+  <Panel name="row" direction="row" spacing="12" alignItems="stretch">
+    <Panel name="cardNarrow" direction="column" width="220" padding="12,12,12,12" spacing="8" background="#202C38" cornerRadius="10" alignItems="stretch">
+      <Label name="narrowTitle" text="Narrow 220px" fontSize="14" color="#FFFFFF" />
+      <Label
+        name="narrowBody"
+        text="Narrow column wrapping is the stress case for line breaks and measured block height."
+        fontSize="14"
+        color="#E7EEF6" />
+    </Panel>
+    <Panel name="cardMid" direction="column" width="320" padding="12,12,12,12" spacing="8" background="#202C38" cornerRadius="10" alignItems="stretch" flexGrow="1">
+      <Label name="midTitle" text="Mid flex column" fontSize="14" color="#FFFFFF" />
+      <Label
+        name="midBody"
+        text="Flex grow card: remaining width should still wrap cleanly without clipping the last baseline. 再加一行中文混合 English mixed content for CJK fallback."
+        fontSize="14"
+        color="#E7EEF6" />
+    </Panel>
+  </Panel>
+
+  <Panel name="cardTight" direction="column" width="160" padding="10,10,10,10" spacing="6" background="#24303B" cornerRadius="8" alignItems="stretch">
+    <Label name="tightBody" text="Ultra narrow: word-break and longtokenwithoutspaces should not explode layout height inconsistently." fontSize="12" color="#D9E3EE" />
+  </Panel>
+</Panel>
