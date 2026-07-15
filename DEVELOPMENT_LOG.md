@@ -2,6 +2,10 @@
 
 ## 2026-07-15
 
+- 文档：样式/布局规则同步更新
+  - 重写 `doc/layout-spec.md`（XML vs JSON、`$style` 三种写法、嵌套 style、ShapePanel、chrome/events）
+  - 新增 `doc/style-catalog.md`；更新 `doc/window-chrome.md`、`doc/README.md`、根 `README.md`、`doc/resource-packaging.md`
+  - 修正 `style_catalog_demo.json`：`events.onClick`（props 内 onClick 无效）
 - 跨文件样式目录 + 异形 layered 多窗口（选项 3）：
   - `StyleCatalog`：`resource/styles/*.json`，`import[]`，命名样式；布局 `style="$style.name"` / `styleRef` / `extend`
   - 启动加载 `styles/default.json`（可 `AI_WIN_UI_STYLES` 追加）；Panel 绘制应用 catalog decoration

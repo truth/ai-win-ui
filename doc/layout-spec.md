@@ -13,130 +13,202 @@ grammar that:
 - is easy to read and maintain in source control
 - is expressive enough for cards, tool panels, image pages, and validation pages
 
+**Recent rule impact (2026-07):** cross-file **style catalog** (`$style.xxx`),
+nested composite styles, **`ShapePanel`**, and **layered / multi-process
+shaped windows** change how you write `style` and a few root/window attributes.
+See also `doc/style-catalog.md` and `doc/window-chrome.md`.
+
 ## Supported Layout Model
 
-The current DSL is built around a small set of primitives:
+The DSL is built around composition primitives plus leaf controls. Both **XML**
+and **JSON** describe the same tree; property names are largely shared.
 
-- `Panel`
-- `Grid`
-- `Label`
-- `Button`
-- `TextInput`
-- `Image`
-- `SvgIcon`
-- `Checkbox`
-- `RadioButton`
-- `Slider`
-- `Spacer`
+### Containers
 
-### `Panel`
+| Type | Role |
+|------|------|
+| `Panel` | Main row/column composition, cards, shells |
+| `Grid` | Uniform tile matrix |
+| `ShapePanel` / `Shape` | Parametric filled polygon (heart / petal / oval / star) |
 
-`Panel` is the main composition primitive.
+### Text & chrome
 
-Use it for:
+| Type | Role |
+|------|------|
+| `Label` | Short text / headings |
+| `Button` | Actions; caption variants for custom chrome |
+| `TextInput` | Single-line edit |
+| `Spacer` | Elastic gap |
 
-- page shells
-- rows
-- columns
-- cards
-- toolbars
-- stacked content groups
+### Media
 
-Supported layout properties:
+| Type | Role |
+|------|------|
+| `Image` | Raster via WIC / Skia |
+| `SvgIcon` | Vector via Skia `SkSVGDOM` (D2D shows placeholder) |
+
+### Core / nav / advanced (layout-parse supported)
+
+`Checkbox`, `RadioButton`, `Slider`, `ProgressBar`, `ListBox`, `ComboBox`,
+`TabControl`, `ListView`, `TreeView`, `MenuStrip`, `ToolStrip`, `StatusStrip`,
+`ContextMenu`, `StatCard`, `SparklineChart`, `DataTable`, `NumericUpDown`,
+`DateTimePicker`, `RichTextBox`, `SeagullAnimation`.
+
+---
+
+## XML vs JSON grammar
+
+### XML
+
+```xml
+<Panel direction="column" padding="24,24,24,24" spacing="12" background="#0B121A">
+  <Label text="Hello" fontSize="18" color="#F5F8FC" />
+  <Button text="Go" style="$style.primaryButton" onClick="primaryAction" />
+</Panel>
+```
+
+- Element tag = type name (`Panel`, `Button`, …).
+- Attributes = props (strings; numbers parsed with `stof` / tokens).
+- Children = nested elements.
+- **Events:** `onClick="eventId"` on `Button` (attribute).
+
+### JSON
+
+```json
+{
+  "type": "Panel",
+  "props": {
+    "direction": "column",
+    "padding": [24, 24, 24, 24],
+    "spacing": 12,
+    "background": "#0B121A"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": { "text": "Hello", "fontSize": 18, "color": "#F5F8FC" }
+    },
+    {
+      "type": "Button",
+      "props": {
+        "text": "Go",
+        "style": "$style.primaryButton"
+      },
+      "events": {
+        "onClick": "primaryAction"
+      }
+    }
+  ]
+}
+```
+
+- `type` + `props` + optional `children`.
+- Thickness / padding: JSON arrays `[l,t,r,b]`; XML comma strings `"l,t,r,b"`.
+- **Events:** `events.onClick` only — **not** `props.onClick` (ignored if put in props).
+
+### Common properties (both formats)
+
+Applied via `ApplyCommonJsonProps` / `ApplyCommonXmlAttributes` on every element
+type that calls them:
+
+| Property | Notes |
+|----------|--------|
+| `width` / `height` | Fixed size |
+| `minWidth` / `maxWidth` / `minHeight` / `maxHeight` | Also kebab-case in JSON |
+| `margin` | `[l,t,r,b]` |
+| `border` | Box-model border thickness (Yoga) |
+| `flex` / `flexGrow` / `flexShrink` / `flexBasis` | Flex; `flex="1"` shorthand |
+| `alignSelf` | `auto\|stretch\|start\|center\|end` |
+| `disabled` | JSON bool / forces disabled style state |
+| `style` | **Object** (JSON only) **or** **catalog string** (`$style.name`) |
+| `styleRef` | Catalog bare name (no `$style.` required) |
+| `hitTest` | `caption` \| `client` (custom/layered chrome) |
+| `role` | `titleBar` → caption hit region |
+| `chrome` | Root: `system` \| `custom` \| `layered` \| `irregular` |
+
+---
+
+## `Panel`
+
+Main composition primitive for shells, rows, columns, cards, toolbars.
+
+Layout properties:
 
 - `direction="row|column"`
 - `wrap="nowrap|wrap"`
 - `padding="l,t,r,b"`
 - `spacing="n"`
-- `background="#RRGGBB"`
-- `borderColor="#RRGGBB"`
-- `border="[l, t, r, b]"` (participates in the Yoga box model)
-- `cornerRadius="n"`
+- `background="#RRGGBB"` / `#AARRGGBB` / `transparent` / `$color.x`
+- `borderColor`, `border="[l,t,r,b]"` (border participates in Yoga)
+- `cornerRadius`
 - `alignItems="stretch|start|center|end"`
 - `justifyContent="start|center|end|space-between"`
-- `width`
-- `height`
-- `minWidth`
-- `maxWidth`
-- `minHeight`
-- `maxHeight`
-- `margin`
-- `flex="1"` or `flex="1 1 160"`
-- `flexGrow`
-- `flexShrink`
-- `flexBasis`
-- `alignSelf="auto|stretch|start|center|end"`
+- size / margin / flex / `alignSelf` (common props)
 
-### `Grid`
+### Style catalog impact on `Panel`
 
-`Grid` is best for uniform tiles.
+- `style="$style.surfaceCard"` (or JSON string / `styleRef`) assigns a full
+  `ComponentStyle` from `resource/styles/`.
+- On paint, if a layout style was set, **decoration** from `m_style` (background,
+  border color/width, corner radius) is folded into drawing when the panel would
+  otherwise stay transparent / unbordered.
+- Catalog `padding` inside style specs is **not** automatically copied into
+  Yoga padding today — still set `padding` on the element for layout inset.
+- Prefer: shared surface tokens in styles JSON + explicit layout padding on the node.
 
-Use it for:
+---
 
-- icon galleries
-- image matrices
-- repeated fixed-size cards
+## `ShapePanel` (`Shape`)
 
-Supported properties:
+Filled parametric polygon for previews and irregular layered bodies.
+Uses `IRenderer::FillPolygon` (Direct2D + Skia).
 
-- `columns`
-- `spacing`
-- `rowHeight`
-- `padding`
-- `background`
-- `cornerRadius`
-- common size and margin properties
+| Prop | Values / notes |
+|------|----------------|
+| `kind` / `shape` | `heart` (default), `petal` / `flower`, `oval` / `ellipse` / `circle`, `star` |
+| `fill` / `background` | Fill color |
+| `stroke` / `borderColor` | Outline color |
+| `strokeWidth` | Outline width (0 = none) |
+| `segments` | Tessellation 12–256 (default ~96) |
+| `text` | Optional centered label |
+| `textColor` / `color` | Label color |
+| `fontSize` | Label size |
+| common | `width` / `height` / flex / `hitTest` / `style` |
 
-### Leaf Controls
+XML:
 
-Use leaf controls with simple, explicit responsibilities:
+```xml
+<ShapePanel kind="heart" width="120" height="110" fill="#E85D75"
+            stroke="#FFB3C0" strokeWidth="2" text="Heart" hitTest="caption" />
+```
 
-- `Label` for short text blocks and headings
-- `Button` for strong actions, pills, and chips
-- `TextInput` for search bars and editable fields
-- `Image` for illustrations and thumbnails
-- `SvgIcon` for vector icons that stay crisp at any DPI / size
-- `Spacer` for elastic gaps inside row/column containers
-
-### `SvgIcon`
-
-`SvgIcon` renders an SVG file from the resource provider via Skia's
-`SkSVGDOM`. Requires the Skia backend at runtime — under Direct2D the
-icon paints a "SVG" placeholder so the missing dependency is visible
-rather than silent.
-
-Supported properties:
-
-- `source="icons/<name>.svg"` (resource path)
-- `stretch="fill|uniform|uniformToFill"` (default `uniform`)
-- `width`, `height`, plus the common size and margin properties
-
-Example:
+JSON:
 
 ```json
 {
-  "type": "SvgIcon",
-  "props": { "source": "icons/check.svg", "width": 24, "height": 24 }
+  "type": "ShapePanel",
+  "props": {
+    "kind": "petal",
+    "width": 96,
+    "height": 88,
+    "fill": "#7B6CFF",
+    "text": "petal"
+  }
 }
 ```
 
-To see real SVG output:
+For layered windows: root `chrome="layered"` + transparent background + large
+`ShapePanel` as opaque body; see `doc/window-chrome.md`.
 
-```powershell
-$env:AI_WIN_UI_RENDERER = "skia"
-.\build\Debug\ai_win_ui.exe
-```
-
-v1 limits: no tint / colour override, no cross-instance caching, no SMIL
-animation, no external `xlink:href` resources.
+---
 
 ## Style System
 
-Every element accepts an optional `style` object that drives its visual
-state. Each state spec only overrides the fields it sets — missing fields
-inherit from `base`. Recognised states:
-`normal` (== base), `hover`, `pressed`, `focused`, `disabled`,
-`selected`, `readonly`.
+### 1) Inline `style` object (JSON)
+
+Every element accepts an optional `style` object. Each state only overrides
+fields it sets; missing fields inherit from `base`. States:
+`base` (normal), `hover`, `pressed`, `focused`, `disabled`, `selected`, `readonly`.
 
 ```json
 {
@@ -162,46 +234,131 @@ inherit from `base`. Recognised states:
 
 Field summary inside any state spec:
 
-- `background` — solid colour
+- `background` — solid colour (hex / theme token)
 - `border` — `{ "width": n | [l,t,r,b], "color": "#..." }`
 - `cornerRadius` — single radius
 - `foreground` — text / indicator colour
 - `fontSize`
 - `padding`, `margin`, `borderWidth` — `[l,t,r,b]`
 - `opacity` — `0.0..1.0`
+- `track` / `thumb` / `fill` — composite controls (Slider, ProgressBar, …)
 
-`disabled: true` on a component forces the disabled state regardless of
-hover / focus.
+`disabled: true` forces the disabled state regardless of hover / focus.
 
-Components currently driven by `style`: `Button`, `TextInput`, `Panel`,
-`Checkbox`, `RadioButton`. Other components still use their per-field
-quick-set properties (background, cornerRadius, fontSize) which are
-visually equivalent.
+### 2) Nested composite styles (JSON object only, or via catalog)
+
+Inside a `style` object (layout JSON **or** styles JSON file):
+
+| Key | Consumers (examples) |
+|-----|----------------------|
+| `itemStyle` | ListBox, ListView, TreeView, menu items |
+| `tabStyle` | TabControl tabs |
+| `dropdownStyle` | ComboBox dropdown panel / rows |
+
+Nested value is a full `ComponentStyle` (can itself have `base` / `hover` / …).
+
+```json
+"style": {
+  "base": { "background": "#121B25", "cornerRadius": 8 },
+  "itemStyle": {
+    "base": { "background": "#121B25", "foreground": "#E8EEF6" },
+    "hover": { "background": "#1A2838" },
+    "selected": { "background": "#2D6CDF", "foreground": "#FFFFFF" }
+  }
+}
+```
+
+**XML cannot embed nested objects** in attributes. Put nested styles in
+`resource/styles/*.json` and reference with `style="$style.myList"`.
+
+### 3) Style catalog reference (XML + JSON) — **new rule**
+
+Named styles live under `resource/styles/` (see `doc/style-catalog.md`).
+
+| Format | How to reference |
+|--------|------------------|
+| JSON | `"style": "$style.primaryButton"` or `"style": "primaryButton"` or `"styleRef": "primaryButton"` |
+| XML | `style="$style.primaryButton"` or `style="primaryButton"` or `styleRef="primaryButton"` |
+| Inherit in styles file | `"extend": "$style.surfaceCard"` then override `base` / states |
+
+**Rules of thumb:**
+
+1. Prefer `$style.xxx` for shared buttons/cards so layouts stay short.
+2. Prefer inline `style` objects for one-off demos (`test_styles.json`).
+3. Do not mix both on one node expecting merge: string/object forms are **exclusive**
+   (`style` object **or** string **or** `styleRef`).
+4. Catalog loads at startup (`styles/default.json` + optional `AI_WIN_UI_STYLES`).
+5. Theme tokens (`$color.x`) still work **inside** style field values.
+
+### Components that honor `style` / catalog
+
+Broadly: `Button`, `TextInput`, `Checkbox`, `RadioButton`, `Slider`, `ProgressBar`,
+`ListBox`, `ComboBox`, `TabControl`, `ListView`, `TreeView`, shell strips,
+`StatCard`, `SparklineChart`, `DataTable` shell, and **`Panel` decoration** when
+a layout style is set. Others still accept quick-set color fields; many also
+call `DefaultStyle(theme)` when no layout style was provided.
+
+---
 
 ## Theme Tokens
 
 Layouts can reference named values from `resource/themes/default.json`
 instead of hard-coding hex / numbers. The active theme is loaded once at
-startup; override file via env var `AI_WIN_UI_THEME=themes/<name>.json`.
+startup; override via `AI_WIN_UI_THEME=themes/<name>.json`.
 
-Token syntax inside layout JSON:
+Token syntax inside layout JSON (and style/theme-aware string fields):
 
-- Colour fields:    `"$color.<key>"` (e.g. `"$color.surface-1"`)
-- Spacing fields:   `"$spacing.<key>"` — accepted both as the whole value
-  (`"padding": "$spacing.lg"`) and per array element
-  (`"padding": ["$spacing.lg", 12, ...]`)
-- Radius fields:    `"$radius.<key>"`
-- Font size fields: `"$fontSize.<key>"`
-- Border width:     `"$borderWidth.<key>"`
+- Colour: `"$color.<key>"`
+- Spacing: `"$spacing.<key>"` (whole value or array element)
+- Radius: `"$radius.<key>"`
+- Font size: `"$fontSize.<key>"`
+- Border width: `"$borderWidth.<key>"`
 
-Categories live in `resource/themes/default.json` under `colors`,
-`spacings`, `radii`, `fontSizes`, `borderWidths`. Unknown tokens render
-as **magenta `#FF00FF`** plus a debug warning so typos surface
-immediately rather than degrading silently.
+Unknown tokens → magenta `#FF00FF` + debug warning.
 
-`DefaultStyle()` factories on each component keep their hard-coded hex
-values so the framework still runs without any theme file (`new Button()`
-in C++ stays self-sufficient).
+**Do not confuse with catalog:**
+
+| Prefix | Meaning |
+|--------|---------|
+| `$color.` / `$spacing.` / … | Theme scalar |
+| `$style.` | Named `ComponentStyle` in StyleCatalog |
+
+`DefaultStyle()` factories keep hard-coded hex fallbacks so C++ construction
+without a theme still works.
+
+---
+
+## Window chrome & events (layout side)
+
+Root / common:
+
+- `chrome="layered|custom|system"` on root when env `AI_WIN_UI_CHROME` is unset
+- `hitTest="caption|client"`, `role="titleBar"`
+
+Built-in `onClick` ids (wired in `main.cpp`):
+
+| Id | Action |
+|----|--------|
+| `primaryAction` / `secondaryAction` | Demo title feedback |
+| `windowMinimize` / `windowMaximize` / `windowClose` | Window commands |
+| `openHeartWindow` / `openPetalWindow` / `openOvalWindow` / `openStarWindow` | Spawn **child process** with layered shape layout |
+
+Child process also gets `AI_WIN_UI_CHROME=layered` and `AI_WIN_UI_SIZE=WxH`.
+Details: `doc/window-chrome.md`.
+
+Optional env for any process:
+
+| Env | Meaning |
+|-----|---------|
+| `AI_WIN_UI_LAYOUT` | Layout path under resource |
+| `AI_WIN_UI_RENDERER` | `skia` \| `direct2d` |
+| `AI_WIN_UI_THEME` | Theme JSON path |
+| `AI_WIN_UI_STYLES` | Extra styles JSON to merge |
+| `AI_WIN_UI_CHROME` | `system` \| `custom` \| `layered` |
+| `AI_WIN_UI_SIZE` | Client size `420x460` or `420,480` |
+| `AI_WIN_UI_QUIT_AFTER_MS` | Headless auto-close |
+
+---
 
 ## Layout Authoring Rules
 
@@ -209,170 +366,115 @@ in C++ stays self-sufficient).
 
 There is no absolute positioning system in the current DSL.
 
-Build complex screens with:
-
-- a page shell
-- nested rows
-- nested columns
-- cards inside cards
-- `Spacer` for flexible gaps
+Build complex screens with nested rows/columns, cards, and `Spacer`.
 
 ### 2. Use One Container Per Visual Responsibility
 
-Recommended pattern:
-
 - page background panel
 - content shell panel
-- sidebar panel
-- main content panel
-- section panels
-- card panels
-
-Avoid one giant panel with too many mixed concerns.
+- sidebar / main / section / card panels
 
 ### 3. Fixed Width for Landmarks, Flex for Fill Areas
 
-For dashboard and tool layouts:
+- fix widths for sidebars and tool strips
+- `flexGrow="1"` + `flexBasis="0"` for fill columns
+- `wrap="wrap"` for chip rows
+- `minWidth` / `minHeight` to prevent collapse
 
-- fix widths for sidebars, promo cards, and tool strips
-- use `flexGrow="1"` with `flexBasis="0"` for major content columns
-- use `flex="1"` when you want the common grow/shrink/fill pattern without spelling out three properties
-- use `Spacer` to push controls to the edge of a row
-- use `minWidth` and `minHeight` to keep flexible cards from collapsing too far
-- use `alignSelf` when one child needs to opt out of the container's cross-axis rule
-- use `wrap="wrap"` on narrow row containers when chips, pills, or fixed-width cards should flow onto the next line
+### 4. Shared visuals → styles JSON; layout structure → layouts XML/JSON
 
-### 4. Split Long Headlines Into Multiple Labels When Needed
+After the style catalog:
 
-The text system is improving, but it is still not a full design tool.
+- Put brand buttons/cards in `resource/styles/`
+- Keep page structure and copy in `resource/layouts/`
+- Use `$style.xxx` instead of copy-pasting large `style` objects into every JSON layout
 
-For hero headlines or tightly controlled wraps:
+### 5. Split Long Headlines When Needed
 
-- use multiple `Label` rows if exact composition matters
-- do not depend on automatic wrapping for critical art-direction decisions
+Use multiple `Label` rows if exact line breaks matter.
 
-### 5. Treat Cards as Reusable Surface Blocks
+### 6. Cards as Portable Surfaces
 
-A dashboard card should usually define:
+A card usually defines background, radius, padding, spacing — either as
+quick-set props or as `$style.surfaceCard` (+ explicit padding).
 
-- its own `background`
-- its own `cornerRadius`
-- local `padding`
-- local `spacing`
+---
 
-This keeps the outer shell clean and makes card sections portable.
-
-## Visual Tokens
-
-Recommended defaults for dashboard-style pages:
+## Visual Tokens (dashboard defaults)
 
 ### Surface Hierarchy
 
-- page background: soft neutral or tinted background
-- app shell: near-white container
-- section card: white or lightly tinted panel
-- accent card: blue or violet emphasis surface
+- page background: soft neutral or tinted
+- app shell: near-white or dark container
+- section card: white / lightly tinted / dark elevated
+- accent card: blue or violet emphasis
 
-### Radius Scale
+### Radius / Spacing / Type scales
 
-- page shell: `28` to `32`
-- section card: `18` to `22`
-- tile or pill: `10` to `14`
-- compact chip: `8` to `10`
+- page shell radius: `28`–`32`; section card: `18`–`22`; pill: `10`–`14`
+- page padding: `24`–`32`; section gap: `16`–`20`; card padding: `14`–`20`
+- hero: `28`–`36`; section title: `17`–`20`; body: `13`–`15`; meta: `11`–`12`
 
-### Spacing Scale
+---
 
-- page padding: `24` to `32`
-- section gap: `16` to `20`
-- card padding: `14` to `20`
-- internal row spacing: `8` to `12`
-
-### Typography Scale
-
-- page hero: `28` to `36`
-- section title: `17` to `20`
-- body copy: `13` to `15`
-- meta copy: `11` to `12`
-
-## Limits To Keep In Mind
+## Limits
 
 The current DSL does not yet offer:
 
-- absolute positioning
-- z-index layering
-- drop shadows
-- gradients
-- run-time theme switching (theme is read once at startup)
-- token-in-token (a theme entry referencing another theme entry)
-- advanced inputs (`NumericUpDown` / `DateTimePicker` / `RichTextBox`) and
-  chart/stat widgets still lean on per-field colors more than full nested
-  `style` adoption; shell strips and list/nav controls honor `style` +
-  nested `itemStyle` / `tabStyle` / `dropdownStyle`
-- SVG tint / colour override
-- advanced text layout controls
+- absolute positioning / z-index stacking API
+- general-purpose drop shadows / gradients as layout props
+  (layered mode has a special soft card shadow in the app shell)
+- run-time theme or catalog hot-reload
+- token-in-token inside theme files
+- XML inline nested style objects (use catalog instead)
+- JSON `props.onClick` (use `events.onClick`)
+- SVG tint / SMIL / external `xlink:href`
+- mesh geometry hit-testing (layered hits use **alpha** sampling)
 
-Vector icons via `SvgIcon` are now supported on the Skia backend.
-
-Because of that, screenshot recreation should prioritize:
-
-- layout structure
-- surface hierarchy
-- spacing
-- proportions
-- color blocking
+---
 
 ## Workflow
 
-To launch the core validation page:
-
 ```powershell
+# Generic launcher (aliases: style-catalog, shaped-hub, table-components, …)
 powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
   -Renderer skia `
-  -Layout layouts/core_validation.xml
+  -Layout style-catalog
+
+# Irregular multi-window hub
+powershell -ExecutionPolicy Bypass -File .\scripts\run_shaped_windows_demo.ps1
+
+# Headless smoke
+powershell -ExecutionPolicy Bypass -File .\scripts\run_headless_smoke.ps1 `
+  -Profile full -Renderer skia
 ```
 
-To validate the configuration without opening a window:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
-  -Renderer skia `
-  -Layout layouts/core_validation.xml `
-  -BuildIfMissing `
-  -NoLaunch
-```
-
-To launch the dashboard reference page:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\run_dashboard_reference.ps1
-```
+---
 
 ## Recommended Validation Layouts
 
-- `resource/layouts/yoga_measure_cases.xml`
-  - Yoga sizing and row/column checks
-- `resource/layouts/skia_image_cases.xml`
-  - image rendering and clipping checks
-- `resource/layouts/core_validation.xml`
-  - Skia text, Yoga flex, focus, and interaction checks
-- `resource/layouts/dashboard_reference.xml`
-  - reference-driven layout exploration, not the primary MVP gate
-- `resource/layouts/test_styles.json`
-  - `style` block four-state colour cycling (Button hover/pressed/focused/disabled)
-  - exercises the inset-border rule (`Panel border=4`)
-- `resource/layouts/test_theme.json`
-  - theme token resolution across colour, spacing, radius, font size
-  - includes a deliberately broken `$color.does-not-exist` to verify the
-    magenta fallback + warning path
-- `resource/layouts/test_svg.json`
-  - `SvgIcon` intrinsic vs scaled rendering, three stretch modes,
-    16/24/48/96 px scale check (Skia backend only — D2D shows placeholders)
+| Layout | Focus |
+|--------|--------|
+| `yoga_measure_cases.xml` | Yoga sizing / row-column |
+| `skia_image_cases.xml` | Image / clip |
+| `core_validation.xml` | Text, flex, focus |
+| `core_controls_v2.xml` | Progress / List / Combo / Tab |
+| `navigation_components.xml` | ListView / TreeView / strips |
+| `advanced_inputs.xml` | Numeric / DateTime / RichText |
+| `stats_components.xml` | StatCard / Sparkline |
+| `table_components.xml` | DataTable v3 |
+| `test_styles.json` | Inline multi-state `style` |
+| `test_theme.json` | Theme tokens + magenta fallback |
+| `test_svg.json` | SvgIcon |
+| **`style_catalog_demo.xml` / `.json`** | **`$style` catalog + ShapePanel** |
+| **`shaped_windows_hub.xml`** | **Open layered shape children** |
+| `layered_chrome_demo.xml` | Rounded layered card |
+| `shaped_*_window.xml` | Single-shape layered shells |
 
 ## Naming Guidance
 
-Recommended naming patterns:
-
-- `ui.xml` for the default sample
-- `*_cases.xml` for focused regression layouts
-- `*_reference.xml` for image/reference-driven recreations
-- `*_prototype.xml` for exploratory layouts
+- `ui.xml` — default sample
+- `*_cases.xml` — focused regression
+- `*_reference.xml` — image/reference-driven
+- `*_demo.xml` — feature demos (chrome, catalog, shapes)
+- `styles/*.json` — shared named styles (not layouts)

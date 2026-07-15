@@ -37,14 +37,19 @@
 - `doc/`：设计文档与集成说明
 - `lib/`：预编译依赖库存放位置
 - `resource/`：运行时资源目录
-  - `resource/layouts/`：布局定义文件
-  - `resource/images/`：图片资源
+  - `resource/layouts/`：布局定义（XML / JSON）
+  - `resource/styles/`：跨文件命名样式（JSON catalog，`$style.xxx`）
+  - `resource/themes/`：主题 tokens（`$color.x` 等）
+  - `resource/images/` / `resource/icons/`：位图与 SVG
 - `src/`：源代码
 - `build/`：CMake 构建输出
 
 ## 相关文档
 
-- `doc/README.md`：项目设计与实现概览
+- `doc/README.md`：文档索引与现状快照
+- `doc/layout-spec.md`：**布局 XML/JSON 规则**（含 `$style`、ShapePanel、chrome）
+- `doc/style-catalog.md`：样式目录 `import` / `extend` / 引用语法
+- `doc/window-chrome.md`：自定义标题栏与 layered 异形窗
 - `doc/resource-packaging.md`：资源打包与加载方案
 - `doc/skia-integration.md`：Skia 集成分析
 - `doc/mvp-roadmap.md`：MVP 与迭代规划
@@ -78,7 +83,7 @@
 - `.\build.ps1 -Configuration Release -Clean`
 - `.\build.ps1 -Run`
 
-## 自定义标题栏 / 异形窗口
+## 自定义标题栏 / 异形窗口 / 样式目录
 
 默认仍使用系统标题栏。
 
@@ -86,12 +91,28 @@
 # 无边框自绘标题栏（HWND）
 .\scripts\run_custom_chrome_demo.ps1 -Configuration Release -BuildIfMissing
 
-# Layered 真异形（每像素透明；默认 Skia，可切 Direct2D）
+# Layered 圆角卡片（每像素透明；默认 Skia，可切 Direct2D）
 .\scripts\run_layered_chrome_demo.ps1 -Configuration Release -BuildIfMissing
 .\scripts\run_layered_chrome_demo.ps1 -Renderer direct2d
+
+# 样式 catalog（$style.xxx）+ ShapePanel 预览
+.\scripts\run_layout_demo.ps1 -Layout style-catalog -Renderer skia
+
+# 点击打开心形/花瓣等子进程异形窗
+.\scripts\run_shaped_windows_demo.ps1
 ```
 
-环境变量：`AI_WIN_UI_CHROME=custom|layered`，`AI_WIN_UI_RENDERER=skia|direct2d`。说明见 `doc/window-chrome.md`。
+| 环境变量 | 含义 |
+|----------|------|
+| `AI_WIN_UI_CHROME` | `system` \| `custom` \| `layered` |
+| `AI_WIN_UI_RENDERER` | `skia` \| `direct2d` |
+| `AI_WIN_UI_LAYOUT` | 布局路径，如 `layouts/ui.xml` |
+| `AI_WIN_UI_THEME` | 主题 JSON |
+| `AI_WIN_UI_STYLES` | 额外合并的 styles JSON |
+| `AI_WIN_UI_SIZE` | 客户区 `WxH`（异形小窗） |
+
+布局里 `style` 的三种写法与 XML/JSON 差异见 `doc/layout-spec.md`、`doc/style-catalog.md`。
+Chrome / 多进程异形见 `doc/window-chrome.md`。
 
 ## Script Usage
 
@@ -192,11 +213,14 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
 Parameters:
 
 - `-Layout`
-  - relative path under `resource/` or an absolute layout path
+  - relative path under `resource/`, absolute path, or alias
+    (`style-catalog`, `shaped-hub`, `table-components`, `layered-chrome`, …)
 - `-Renderer`
   - `skia` or `direct2d`
 - `-BuildIfMissing`
   - configure and build automatically when the target executable is missing
+- `-Rebuild`
+  - force rebuild
 - `-NoLaunch`
   - validate inputs and prepare the launch without starting the app
 

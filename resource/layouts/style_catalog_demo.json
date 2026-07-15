@@ -52,7 +52,9 @@
               "type": "Button",
               "props": {
                 "text": "Primary",
-                "style": "$style.primaryButton",
+                "style": "$style.primaryButton"
+              },
+              "events": {
                 "onClick": "primaryAction"
               }
             },
@@ -60,7 +62,9 @@
               "type": "Button",
               "props": {
                 "text": "Secondary",
-                "style": "$style.secondaryButton",
+                "style": "$style.secondaryButton"
+              },
+              "events": {
                 "onClick": "secondaryAction"
               }
             },
@@ -68,7 +72,9 @@
               "type": "Button",
               "props": {
                 "text": "Danger",
-                "style": "$style.dangerButton",
+                "style": "$style.dangerButton"
+              },
+              "events": {
                 "onClick": "primaryAction"
               }
             }

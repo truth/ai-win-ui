@@ -12,6 +12,11 @@
 
 ## 2. 布局定义格式
 
+完整语法与 **`$style` / ShapePanel / chrome** 规则见：
+
+- `doc/layout-spec.md`
+- `doc/style-catalog.md`
+
 ### 2.1 JSON 示例
 
 ```json
@@ -34,7 +39,8 @@
     {
       "type": "Button",
       "props": {
-        "text": "Primary Action"
+        "text": "Primary Action",
+        "style": "$style.primaryButton"
       },
       "events": {
         "onClick": "primaryAction"
@@ -44,15 +50,25 @@
 }
 ```
 
+要点：
+
+- 点击事件写在 **`events.onClick`**，不要写在 `props` 里。
+- `style` 可以是内联对象，或 catalog 字符串 `"$style.name"`（见 `resource/styles/`）。
+
 ### 2.2 XML 示例
 
 ```xml
 <Panel padding="24,24,24,24" spacing="10" background="#171717">
   <Label text="DirectUI-style Retained UI Tree" fontSize="18" color="#EDEDED" />
-  <Button text="Primary Action" onClick="primaryAction" />
+  <Button text="Primary Action" style="$style.primaryButton" onClick="primaryAction" />
   <Image source="images/sample.png" />
 </Panel>
 ```
+
+要点：
+
+- `onClick` 是元素属性；`style` 在 XML 中 **只能是字符串引用**（不能内联对象）。
+- 复杂/嵌套样式放在 `resource/styles/*.json`，布局用 `$style.xxx` 引用。
 
 ### 2.3 Image 组件示例
 
@@ -70,12 +86,13 @@
 ### 3.1 ZIP 打包模式
 
 - 程序发布时，将布局描述文件和静态资源打包到单个 `assets.zip` 中。
-- ZIP 内容示例：
-  - `layouts/ui_layout.json`
-  - `layouts/ui_layout.xml`
+- ZIP 内容示例（路径相对 ZIP 根，与 `resource/` 布局一致）：
+  - `layouts/ui.json` / `layouts/ui.xml`
+  - `styles/default.json` / `styles/buttons.json`（StyleCatalog；启动自动加载 `styles/default.json`）
+  - `themes/default.json`（主题 tokens）
   - `images/icon.png`
-  - `fonts/SegoeUI.ttf`
-  - `styles/theme.json`
+  - `icons/check.svg`
+  - `fonts/SegoeUI.ttf`（若使用自定义字体）
 
 ### 3.2 运行时加载逻辑
 
