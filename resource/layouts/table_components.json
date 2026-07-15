@@ -19,7 +19,7 @@
     {
       "type": "Label",
       "props": {
-        "text": "v3: multi-select (Ctrl/Shift), F2/double-click cell edit, drag column edges to resize. Sort + keyboard still work.",
+        "text": "v3: multi-select, F2/dblclick edit, column resize, freeze first column (Ctrl+Left/Right pans). C++ callbacks: OnSelectionChanged / OnCellChanged.",
         "fontSize": "$fontSize.base",
         "color": "#B6C4D5"
       }
@@ -52,6 +52,7 @@
         "multiSelect": true,
         "editable": true,
         "resizableColumns": true,
+        "frozenColumnCount": 1,
         "selectedIndex": 0,
         "headerBackground": "#203143",
         "rowBackgroundA": "#152232",

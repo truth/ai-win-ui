@@ -42,9 +42,9 @@ Open follow-ups (queued for the next sprint):
 - [x] `ProgressBar` uses `track` / `fill` + hover/pressed fill (2026-07-15)
 - [x] `ComboBox` closed-height + overlay dropdown paint/hit pass (2026-07-15)
 - [x] `TabControl` layout leaf + page re-arrange; demo on right column
-- `ListBox` / `ComboBox` / `TabControl` / `ListView` /
-  `TreeView` still need full `itemStyle` (and related parts) before complete
-  `ComponentStyle` adoption.
+- [x] `ListBox` / `ComboBox` / `TabControl` / `ListView` / `TreeView` `itemStyle`
+  (shell + row states). Remaining: shell strips (Menu/Tool/Status/Context)
+  and advanced inputs still need full `ComponentStyle` adoption.
 - `cornerRadius` / `fontSize` token migration of the remaining
   layouts (only the five primary layouts are migrated so far).
 - Layout colour-field migration is intentionally deferred — it requires
@@ -160,7 +160,8 @@ Suggested delivery priority:
 - [x] `ComponentStyle.itemStyle` / `tabStyle` / `dropdownStyle` (JSON style block + deep copy)
 - [x] ListBox paints rows via `itemStyle`; ComboBox dropdown panel + items; TabControl tabs via `tabStyle`
 - [x] `DefaultStyle(const Theme*)` + `ApplyThemeDefaults()` on Button, TextInput, Checkbox, RadioButton, Slider, ProgressBar, ListBox, ComboBox, TabControl
-- [ ] ListView / TreeView `itemStyle` (still open)
+- [x] ListView / TreeView `itemStyle` + shell DefaultStyle / ApplyThemeDefaults (2026-07-15)
+- [x] MenuStrip / ToolStrip / StatusStrip / ContextMenu themed DefaultStyle + itemStyle (2026-07-15)
 
 ### DataTable v2 (2026-07-15)
 
@@ -177,6 +178,14 @@ Suggested delivery priority:
 - [x] Cell edit: `editable=true`, F2 or double-click, Enter commit / Esc cancel
 - [x] Column resize: `resizableColumns=true`, drag vertical grid edge (hot guide)
 - [x] Props: `multiSelect`, `editable`, `resizableColumns`; API `SelectedIndices()`
+- [x] Callbacks: `SetOnSelectionChanged`, `SetOnCellChanged`
+- [x] Frozen columns: `frozenColumnCount` + freeze guide; Ctrl+Left/Right horizontal pan
+
+### Automation / Skia track (started 2026-07-15)
+
+- [x] `AI_WIN_UI_QUIT_AFTER_MS` env auto-close for smoke launches
+- [x] `scripts/run_headless_smoke.ps1` layout load smoke (smoke/full profiles)
+- [ ] Skia ↔ DirectWrite text parity (line metrics, CJK wrap, selection carets) — longer cycle
 
 ## Execution Plan
 

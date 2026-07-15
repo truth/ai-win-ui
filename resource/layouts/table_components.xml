@@ -1,48 +1,58 @@
-<Panel padding="24,24,24,24" spacing="14" cornerRadius="16" background="#0D1520" alignItems="stretch">
-  <Label text="DataTable Component Validation" fontSize="28" color="#F5F9FF" />
-  <Label text="v3: multi-select (Ctrl/Shift), F2/double-click cell edit, drag column edges to resize. Sort + keyboard still work." fontSize="14" color="#B6C4D5" />
+<Panel padding="14,14,14,14" spacing="8" cornerRadius="12" background="#0D1520" alignItems="stretch">
+  <Label text="DataTable" fontSize="20" color="#F5F9FF" />
+  <Label text="Left: multi-select / edit / resize / freeze. Right: static table. Ctrl+Left/Right pans." fontSize="12" color="#B6C4D5" />
 
-  <DataTable
-    columns="Name|Role|Region|Score"
-    columnWidths="170|180|150|110"
-    rows="Ava Carter|Product Designer|APAC|91;Noah Kim|Frontend Engineer|NA|88;Mia Chen|Data Analyst|EMEA|94;Liam Patel|QA Engineer|APAC|86;Emma Garcia|PM|NA|90;Ethan Rossi|Backend Engineer|EMEA|89;Sophia Diaz|UX Researcher|LATAM|87;Lucas Brown|DevOps Engineer|NA|92;Olivia Park|SRE|APAC|95;James Wright|Security|NA|84;Amelia Ng|Mobile Engineer|APAC|93;Henry Cho|Platform|EMEA|88"
-    selectable="true"
-    sortable="true"
-    multiSelect="true"
-    editable="true"
-    resizableColumns="true"
-    selectedIndex="0"
-    headerBackground="#203143"
-    rowBackgroundA="#152232"
-    rowBackgroundB="#11202F"
-    selectedRowBackground="#2D6CDF"
-    rowHoverBackground="#1E3348"
-    gridLineColor="#2A3F53"
-    headerTextColor="#EAF4FF"
-    textColor="#C5D5E5"
-    borderColor="#30485E"
-    background="#101B28"
-    cornerRadius="10"
-    headerHeight="36"
-    rowHeight="32"
-    cellPadding="10,6,10,6"
-    height="340" />
+  <Panel direction="row" spacing="10" background="#0D1520" alignItems="start">
+    <DataTable
+      columns="Name|Role|Region|Score"
+      columnWidths="150|150|120|90"
+      rows="Ava Carter|Product Designer|APAC|91;Noah Kim|Frontend Engineer|NA|88;Mia Chen|Data Analyst|EMEA|94;Liam Patel|QA Engineer|APAC|86;Emma Garcia|PM|NA|90;Ethan Rossi|Backend Engineer|EMEA|89;Sophia Diaz|UX Researcher|LATAM|87;Lucas Brown|DevOps Engineer|NA|92;Olivia Park|SRE|APAC|95;James Wright|Security|NA|84"
+      selectable="true"
+      sortable="true"
+      multiSelect="true"
+      editable="true"
+      resizableColumns="true"
+      frozenColumnCount="1"
+      selectedIndex="0"
+      headerBackground="#203143"
+      rowBackgroundA="#152232"
+      rowBackgroundB="#11202F"
+      selectedRowBackground="#2D6CDF"
+      rowHoverBackground="#1E3348"
+      gridLineColor="#2A3F53"
+      headerTextColor="#EAF4FF"
+      textColor="#C5D5E5"
+      borderColor="#30485E"
+      background="#101B28"
+      cornerRadius="8"
+      headerHeight="30"
+      rowHeight="26"
+      cellPadding="8,4,8,4"
+      height="300"
+      flexGrow="1"
+      minWidth="420" />
 
-  <Label text="Static (selectable=false, sortable=false) still renders like v1." fontSize="13" color="#9BB0C3" />
-  <DataTable
-    columns="Item|Qty"
-    columnWidths="200|80"
-    rows="Widgets|12;Gadgets|7;Sprockets|3"
-    selectable="false"
-    sortable="false"
-    multiSelect="false"
-    editable="false"
-    resizableColumns="false"
-    height="140"
-    headerBackground="#203143"
-    rowBackgroundA="#152232"
-    rowBackgroundB="#11202F"
-    background="#101B28"
-    borderColor="#30485E"
-    cornerRadius="10" />
+    <Panel background="#101B28" cornerRadius="8" padding="10,10,10,10" spacing="6" width="260" flexShrink="0" alignItems="stretch">
+      <Label text="Static (v1)" fontSize="13" color="#EAF4FF" />
+      <DataTable
+        columns="Item|Qty"
+        columnWidths="150|70"
+        rows="Widgets|12;Gadgets|7;Sprockets|3"
+        selectable="false"
+        sortable="false"
+        multiSelect="false"
+        editable="false"
+        resizableColumns="false"
+        height="160"
+        headerBackground="#203143"
+        rowBackgroundA="#152232"
+        rowBackgroundB="#11202F"
+        background="#101B28"
+        borderColor="#30485E"
+        cornerRadius="8"
+        headerHeight="28"
+        rowHeight="26" />
+      <Label text="No select / sort / edit." fontSize="11" color="#9BB0C3" />
+    </Panel>
+  </Panel>
 </Panel>

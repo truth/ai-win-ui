@@ -2,6 +2,20 @@
 
 ## 2026-07-15
 
+- ListView/TreeView：`PaintPillScrollbars` 两端圆角 XY 滚动条；滚轮优先控件（Shift+滚轮水平）
+- navigation：右栏 `wrap` 自动换行；MSVC C4819 修复（`/utf-8` + `/wd4819` + UTF-8 BOM）
+- 验证布局改为左右结构 + 压缩高度（避免底部被挤出视口）：
+  - `navigation_components`：左 shell/ContextMenu，右 ListView|TreeView，取消 wrap
+  - `core_controls_v2` / `advanced_inputs` / `table_components` / `stats_components` / `seagull_animation` 同步紧凑左右布局
+  - 控件默认更矮：ListView/TreeView 测量高度、Menu/Tool stripHeight、ListBox itemHeight 等
+- 壳条主题化 + DataTable 产品增强 + 无头回归：
+  - MenuStrip / ToolStrip / StatusStrip / ContextMenu：`DefaultStyle(theme)` + `itemStyle` + `ApplyThemeDefaults`
+  - DataTable：`OnSelectionChanged` / `OnCellChanged` 回调；`frozenColumnCount` 冻结列；Ctrl+Left/Right 水平平移
+  - dashboard_responsive：任务进度填充条、胶囊 Tag、头像组、环形风格 stat 圆点
+  - `AI_WIN_UI_QUIT_AFTER_MS` + `scripts/run_headless_smoke.ps1` 自动加载布局并退出
+- ListView / TreeView 接入 `itemStyle` + `DefaultStyle(theme)` / `ApplyThemeDefaults`
+  - 行 hover/selected 走嵌套样式；壳层 decoration 同步背景/边框/圆角
+  - 布局 `style.itemStyle` 仍由通用 `ApplyCommonXmlAttributes` / JSON `style` 解析
 - 嵌套样式 + 主题 DefaultStyle + DataTable v3：
   - `ComponentStyle.itemStyle` / `tabStyle` / `dropdownStyle`（布局解析 + 深拷贝）
   - ListBox 行绘制走 `itemStyle`；ComboBox 下拉/行；TabControl tab 条走 `tabStyle`

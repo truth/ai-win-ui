@@ -106,7 +106,7 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
                 continue;
             }
 
-            // Single character exceeds maxWidth — emit it anyway and move on.
+            // Single character exceeds maxWidth - emit it anyway and move on.
             if (candidate.size() == 1) {
                 wrapped.push_back(SkiaTextLayoutLine{candidate, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, candidate)});
                 lineStart = i + 1;
@@ -127,7 +127,7 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
                 }
                 wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, segment)});
             } else {
-                // No whitespace boundary found — break the word at the overflow point.
+                // No whitespace boundary found - break the word at the overflow point.
                 const std::wstring segment = candidate.substr(0, candidate.size() - 1);
                 wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, segment)});
                 lineStart = i;

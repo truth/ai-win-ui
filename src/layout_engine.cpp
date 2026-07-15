@@ -1,4 +1,4 @@
-#include "layout_engine.h"
+﻿#include "layout_engine.h"
 
 #include "ui.h"
 
@@ -331,7 +331,7 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
 
         // Set explicit Yoga node sizes.
         //
-        // When flex is active, do NOT set the main-axis size explicitly —
+        // When flex is active, do NOT set the main-axis size explicitly -
         // Yoga computes it from flexBasis + flexGrow/flexShrink.
         // Cross-axis size is always set when the item is not stretched.
         if (style.direction == StackDirection::Column) {

@@ -1,4 +1,4 @@
-#include "layout_parser.h"
+﻿#include "layout_parser.h"
 #include "resource_provider.h"
 #include "theme.h"
 
@@ -1506,6 +1506,9 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             if (props["resizableColumns"].IsBool()) {
                 table->SetResizableColumns(props["resizableColumns"].boolValue);
             }
+            if (props["frozenColumnCount"].IsNumber()) {
+                table->SetFrozenColumnCount(static_cast<int>(props["frozenColumnCount"].numberValue));
+            }
             if (props["selectedIndex"].IsNumber()) {
                 table->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
             }
@@ -2586,6 +2589,9 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         if (auto it = node.attributes.find("resizableColumns"); it != node.attributes.end()) {
             table->SetResizableColumns(ToLowerAscii(it->second) == "true");
+        }
+        if (auto it = node.attributes.find("frozenColumnCount"); it != node.attributes.end()) {
+            table->SetFrozenColumnCount(std::stoi(it->second));
         }
         if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
             table->SetSelectedIndex(std::stoi(it->second));

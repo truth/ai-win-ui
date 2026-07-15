@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "box_decoration.h"
 #include "graphics_types.h"

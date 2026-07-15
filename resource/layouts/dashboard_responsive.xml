@@ -47,8 +47,9 @@
           <Label text="This platform is designed to revolutionize the way you organize and access your notes." fontSize="11" color="#5C5C68" margin="0,10,0,0" />
         </Panel>
 
-        <Panel flexGrow="1" flexBasis="96" minWidth="84" padding="14,14,14,14" spacing="8" cornerRadius="18" background="#F0EEFF" alignItems="center" justifyContent="center">
+        <Panel flexGrow="1" flexBasis="96" minWidth="84" padding="14,14,14,14" spacing="8" cornerRadius="18" background="#F0EEFF" borderColor="#C8C2FF" alignItems="center" justifyContent="center">
           <Button text="+" width="28" height="28" fontSize="13" background="#7A71FF" foreground="#FFFFFF" cornerRadius="8" />
+          <Label text="New board" fontSize="10" color="#6A63D8" />
         </Panel>
 
         <Panel flexGrow="1" flexBasis="120" minWidth="104" padding="10,10,10,10" spacing="6" cornerRadius="18" background="#FFFFFF" alignItems="stretch">
@@ -107,7 +108,8 @@
           <Label text="Motion design" fontSize="10" color="#8E8E99" />
           <Label text="Design a packaging concept for a new product" fontSize="13" color="#181818" />
           <Panel direction="row" spacing="6" alignItems="center">
-            <Button text="Package design" width="96" height="22" fontSize="9" background="#D0F2D7" foreground="#2D6B45" cornerRadius="7" flexShrink="0" />
+            <Button text="Package design" width="96" height="22" fontSize="9" background="#D0F2D7" foreground="#2D6B45" cornerRadius="11" flexShrink="0" />
+            <Button text="Motion" width="64" height="22" fontSize="9" background="#E8E4FF" foreground="#5A52C8" cornerRadius="11" flexShrink="0" />
             <Spacer flexGrow="1" flexBasis="0" />
             <Label text="High" fontSize="10" color="#F05D7B" />
           </Panel>
@@ -154,6 +156,17 @@
         <Panel flexGrow="2" flexBasis="0" minWidth="260" padding="14,14,14,14" spacing="10" cornerRadius="20" background="#FFFFFF" alignItems="stretch">
           <Panel direction="row" spacing="8" alignItems="center">
             <Label text="Today tasks" fontSize="15" color="#171717" />
+            <Panel direction="row" spacing="4" alignItems="center" flexShrink="0">
+              <Panel width="18" height="18" cornerRadius="9" background="#6B61FF" alignItems="center" justifyContent="center">
+                <Label text="A" fontSize="8" color="#FFFFFF" />
+              </Panel>
+              <Panel width="18" height="18" cornerRadius="9" background="#55C2A8" alignItems="center" justifyContent="center">
+                <Label text="B" fontSize="8" color="#FFFFFF" />
+              </Panel>
+              <Panel width="18" height="18" cornerRadius="9" background="#F0A060" alignItems="center" justifyContent="center">
+                <Label text="C" fontSize="8" color="#FFFFFF" />
+              </Panel>
+            </Panel>
             <Spacer flexGrow="1" flexBasis="0" />
             <Label text="Edit" fontSize="10" color="#8E8E99" />
             <Label text="Share" fontSize="10" color="#8E8E99" />
@@ -165,7 +178,10 @@
               <Label text="90%" fontSize="10" color="#666673" />
               <Label text="02h 45m" fontSize="10" color="#666673" />
             </Panel>
-            <Panel height="4" cornerRadius="2" background="#E8E6FA" />
+            <Panel direction="row" height="5" cornerRadius="3" background="#E8E6FA" alignItems="stretch">
+              <Panel flexGrow="9" height="5" cornerRadius="3" background="#6B61FF" />
+              <Panel flexGrow="1" height="5" background="transparent" />
+            </Panel>
           </Panel>
           <Panel spacing="5" background="#FFFFFF" alignItems="stretch">
             <Panel direction="row" spacing="8" alignItems="center">
@@ -174,7 +190,10 @@
               <Label text="50%" fontSize="10" color="#666673" />
               <Label text="01h 55m" fontSize="10" color="#666673" />
             </Panel>
-            <Panel height="4" cornerRadius="2" background="#ECEAFB" />
+            <Panel direction="row" height="5" cornerRadius="3" background="#ECEAFB" alignItems="stretch">
+              <Panel flexGrow="1" height="5" cornerRadius="3" background="#8B82FF" />
+              <Panel flexGrow="1" height="5" background="transparent" />
+            </Panel>
           </Panel>
           <Panel spacing="5" background="#FFFFFF" alignItems="stretch">
             <Panel direction="row" spacing="8" alignItems="center">
@@ -183,7 +202,10 @@
               <Label text="10%" fontSize="10" color="#666673" />
               <Label text="01h 30m" fontSize="10" color="#666673" />
             </Panel>
-            <Panel height="4" cornerRadius="2" background="#F0EEFB" />
+            <Panel direction="row" height="5" cornerRadius="3" background="#F0EEFB" alignItems="stretch">
+              <Panel flexGrow="1" height="5" cornerRadius="3" background="#B8B2FF" />
+              <Panel flexGrow="9" height="5" background="transparent" />
+            </Panel>
           </Panel>
         </Panel>
 
@@ -197,16 +219,22 @@
 
         <Panel flexGrow="1" flexBasis="240" minWidth="220" padding="14,14,14,14" spacing="10" cornerRadius="20" background="#FFFFFF" alignItems="stretch">
           <Panel direction="row" spacing="8" alignItems="stretch">
-            <Panel flexGrow="1" flexBasis="0" padding="8,8,8,8" spacing="3" cornerRadius="14" background="#F6FCFA" alignItems="center">
-              <Label text="90%" fontSize="13" color="#16956E" />
+            <Panel flexGrow="1" flexBasis="0" padding="8,10,8,10" spacing="4" cornerRadius="20" background="#F6FCFA" alignItems="center">
+              <Panel width="36" height="36" cornerRadius="18" background="#C8F0DF" alignItems="center" justifyContent="center">
+                <Label text="90" fontSize="11" color="#16956E" />
+              </Panel>
               <Label text="Marketing" fontSize="9" color="#5B6966" />
             </Panel>
-            <Panel flexGrow="1" flexBasis="0" padding="8,8,8,8" spacing="3" cornerRadius="14" background="#FFF8F8" alignItems="center">
-              <Label text="65%" fontSize="13" color="#D74D63" />
+            <Panel flexGrow="1" flexBasis="0" padding="8,10,8,10" spacing="4" cornerRadius="20" background="#FFF8F8" alignItems="center">
+              <Panel width="36" height="36" cornerRadius="18" background="#F8D0D6" alignItems="center" justifyContent="center">
+                <Label text="65" fontSize="11" color="#D74D63" />
+              </Panel>
               <Label text="Typography" fontSize="9" color="#7B676B" />
             </Panel>
-            <Panel flexGrow="1" flexBasis="0" padding="8,8,8,8" spacing="3" cornerRadius="14" background="#F4F3FF" alignItems="center">
-              <Label text="42%" fontSize="13" color="#665BFF" />
+            <Panel flexGrow="1" flexBasis="0" padding="8,10,8,10" spacing="4" cornerRadius="20" background="#F4F3FF" alignItems="center">
+              <Panel width="36" height="36" cornerRadius="18" background="#DAD6FF" alignItems="center" justifyContent="center">
+                <Label text="42" fontSize="11" color="#665BFF" />
+              </Panel>
               <Label text="UI design" fontSize="9" color="#656181" />
             </Panel>
           </Panel>

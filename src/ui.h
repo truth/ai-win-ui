@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "box_decoration.h"
 #include "graphics_types.h"
@@ -291,6 +291,16 @@ public:
             changed = child->OnMouseLeave() || changed;
         }
         return changed;
+    }
+
+    // delta: wheel notches (positive = scroll content up / view down). shiftHeld: prefer horizontal.
+    virtual bool OnMouseWheel(float delta, float x, float y, bool shiftHeld) {
+        for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+            if ((*it)->HitTest(x, y) && (*it)->OnMouseWheel(delta, x, y, shiftHeld)) {
+                return true;
+            }
+        }
+        return false;
     }
 
 protected:
@@ -1124,7 +1134,7 @@ private:
     float m_maxValue = 1.0f;
 };
 
-// Interactive data table v2: static display + row selection + header sort + body scroll.
+// Interactive data table: selection, sort, multi-select, edit, resize, freeze, callbacks.
 class DataTable : public UIElement {
 public:
     struct Column {
@@ -1178,6 +1188,19 @@ public:
         }
         m_resizableColumns = resizable;
     }
+    void SetFrozenColumnCount(int count) {
+        m_frozenColumnCount = std::max(0, count);
+        ClampHorizontalScroll();
+    }
+    int FrozenColumnCount() const { return m_frozenColumnCount; }
+
+    void SetOnSelectionChanged(std::function<void(const std::vector<int>&)> callback) {
+        m_onSelectionChanged = std::move(callback);
+    }
+    void SetOnCellChanged(std::function<void(int row, int col, const std::wstring& value)> callback) {
+        m_onCellChanged = std::move(callback);
+    }
+
     bool MultiSelect() const { return m_multiSelect; }
     bool Editable() const { return m_editable; }
     bool ResizableColumns() const { return m_resizableColumns; }
@@ -1186,6 +1209,7 @@ public:
         if (m_rows.empty()) {
             m_selectedIndex = -1;
             m_selectedSet.clear();
+            NotifySelectionChanged();
             return;
         }
         m_selectedIndex = std::clamp(index, 0, static_cast<int>(m_rows.size()) - 1);
@@ -1193,6 +1217,7 @@ public:
         m_selectedSet.insert(m_selectedIndex);
         m_selectionAnchor = m_selectedIndex;
         EnsureSelectedVisible();
+        NotifySelectionChanged();
     }
     int SelectedIndex() const { return m_selectedIndex; }
     std::vector<int> SelectedIndices() const {
@@ -1287,6 +1312,12 @@ public:
         const bool shift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
         const bool ctrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
 
+        // Horizontal pan when columns overflow (Ctrl+Left/Right).
+        if (ctrl && (keyCode == VK_LEFT || keyCode == VK_RIGHT)) {
+            const float step = ScaleValue(48.0f);
+            return ScrollHorizontal(keyCode == VK_LEFT ? -step : step);
+        }
+
         switch (keyCode) {
             case VK_UP:
                 return MoveSelection(-1, shift, ctrl);
@@ -1304,6 +1335,7 @@ public:
             case VK_SPACE:
                 if (m_multiSelect && m_selectedIndex >= 0) {
                     ToggleRowSelection(m_selectedIndex);
+                    NotifySelectionChanged();
                     return true;
                 }
                 return false;
@@ -1480,6 +1512,8 @@ public:
     Color editBackground = ColorFromHex(0x0F2438);
     Color editBorderColor = ColorFromHex(0x4E8FEA);
     Color resizeGuideColor = ColorFromHex(0x6AA8FF);
+    Color freezeGuideColor = ColorFromHex(0x8AB4F8);
+    Color frozenHeaderBackground = ColorFromHex(0x243748);
     float cornerRadius = 10.0f;
     float headerHeight = 34.0f;
     float rowHeight = 30.0f;
@@ -1583,9 +1617,15 @@ public:
             gridLineColor,
             1.0f);
 
-        float currentX = m_bounds.left;
-        for (size_t col = 0; col < m_columns.size(); ++col) {
+        const int frozenCount = std::clamp(m_frozenColumnCount, 0, static_cast<int>(columnWidths.size()));
+        const float frozenWidth = FrozenWidth(columnWidths);
+        // Non-frozen headers first (may scroll under frozen strip).
+        for (size_t col = static_cast<size_t>(frozenCount); col < m_columns.size(); ++col) {
             const float cellWidth = columnWidths[col];
+            const float currentX = ColumnLeftX(columnWidths, col);
+            if (currentX + cellWidth < m_bounds.left || currentX > m_bounds.right) {
+                continue;
+            }
             const Rect headerHit = Rect::Make(currentX, tableTop, currentX + cellWidth, tableTop + scaledHeaderHeight);
             if (m_sortable && m_hoveredHeader == static_cast<int>(col)) {
                 renderer.FillRect(headerHit, headerHoverBackground);
@@ -1593,7 +1633,6 @@ public:
 
             std::wstring headerLabel = m_columns[col].title;
             if (m_sortable && m_sortColumn == static_cast<int>(col)) {
-                // Escape form avoids codepage-dependent source encoding issues (C4819).
                 headerLabel += m_sortAscending ? L"  \u25B2" : L"  \u25BC";
             }
 
@@ -1625,7 +1664,50 @@ public:
                     resizeHot ? resizeGuideColor : gridLineColor,
                     resizeHot ? 2.0f : 1.0f);
             }
-            currentX += cellWidth;
+        }
+
+        // Frozen headers last so they stay above scrolled content.
+        for (size_t col = 0; col < static_cast<size_t>(frozenCount); ++col) {
+            const float cellWidth = columnWidths[col];
+            const float currentX = ColumnLeftX(columnWidths, col);
+            const Rect headerHit = Rect::Make(currentX, tableTop, currentX + cellWidth, tableTop + scaledHeaderHeight);
+            renderer.FillRect(headerHit, frozenHeaderBackground);
+            if (m_sortable && m_hoveredHeader == static_cast<int>(col)) {
+                renderer.FillRect(headerHit, headerHoverBackground);
+            }
+            std::wstring headerLabel = m_columns[col].title;
+            if (m_sortable && m_sortColumn == static_cast<int>(col)) {
+                headerLabel += m_sortAscending ? L"  \u25B2" : L"  \u25BC";
+            }
+            const Rect headerCellRect = Rect::Make(
+                currentX + scaledCellPadding.left,
+                tableTop + scaledCellPadding.top,
+                currentX + cellWidth - scaledCellPadding.right,
+                tableTop + scaledHeaderHeight - scaledCellPadding.bottom);
+            const TextRenderOptions headerTextOptions{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Start,
+                TextVerticalAlign::Center
+            };
+            renderer.DrawTextW(
+                headerLabel.c_str(),
+                static_cast<UINT32>(headerLabel.size()),
+                headerCellRect,
+                headerTextColor,
+                ScaleValue(headerFontSize),
+                headerTextOptions);
+            if (col + 1 < static_cast<size_t>(frozenCount)) {
+                const float x = currentX + cellWidth;
+                renderer.DrawLine(PointF{x, tableTop}, PointF{x, tableBottom}, gridLineColor, 1.0f);
+            }
+        }
+        if (frozenCount > 0 && frozenCount < static_cast<int>(m_columns.size())) {
+            const float freezeX = m_bounds.left + frozenWidth;
+            renderer.DrawLine(
+                PointF{freezeX, tableTop},
+                PointF{freezeX, tableBottom},
+                freezeGuideColor,
+                2.0f);
         }
 
         if (contentHeight > scaledHeaderHeight + 1.0f && !m_rows.empty()) {
@@ -1656,9 +1738,21 @@ public:
 
                 const Color rowTextColor = selected ? selectedTextColor : textColor;
 
-                float rowX = m_bounds.left;
-                for (size_t col = 0; col < m_columns.size(); ++col) {
+                auto paintCell = [&](size_t col, bool frozenPass) {
+                    const bool isFrozen = static_cast<int>(col) < frozenCount;
+                    if (frozenPass != isFrozen) {
+                        return;
+                    }
                     const float cellWidth = columnWidths[col];
+                    const float rowX = ColumnLeftX(columnWidths, col);
+                    if (rowX + cellWidth < m_bounds.left || rowX > m_bounds.right) {
+                        return;
+                    }
+                    if (isFrozen) {
+                        renderer.FillRect(
+                            Rect::Make(rowX, rowTop, rowX + cellWidth, rowBottom),
+                            selected ? selectedRowBackground : frozenHeaderBackground);
+                    }
                     const bool isEditCell =
                         m_editing && dataRow == m_editRow && static_cast<int>(col) == m_editCol;
                     std::wstring cellText =
@@ -1702,7 +1796,12 @@ public:
                             Rect::Make(caretX, textRect.top + 2.0f, caretX + ScaleValue(1.0f), textRect.bottom - 2.0f),
                             selectedTextColor);
                     }
-                    rowX += cellWidth;
+                };
+                for (size_t col = 0; col < m_columns.size(); ++col) {
+                    paintCell(col, false);
+                }
+                for (size_t col = 0; col < m_columns.size(); ++col) {
+                    paintCell(col, true);
                 }
 
                 renderer.DrawLine(
@@ -1751,8 +1850,8 @@ private:
             totalWidth += widths[i];
         }
 
-        // Only shrink-to-fit when not interactively resizing (preserve user widths).
-        if (m_resizingColumn < 0 && totalWidth > tableWidth && totalWidth > 0.0f) {
+        // Only shrink-to-fit when not resizing/freezing (freeze + Ctrl+Left/Right use overflow scroll).
+        if (m_resizingColumn < 0 && m_frozenColumnCount <= 0 && totalWidth > tableWidth && totalWidth > 0.0f) {
             const float ratio = tableWidth / totalWidth;
             for (float& width : widths) {
                 width = std::max(ScaleValue(28.0f), width * ratio);
@@ -1773,12 +1872,11 @@ private:
             return -1;
         }
         const auto widths = ResolveColumnWidths();
-        float currentX = m_bounds.left;
         for (size_t col = 0; col < widths.size(); ++col) {
-            if (x >= currentX && x <= currentX + widths[col]) {
+            const float left = ColumnLeftX(widths, col);
+            if (x >= left && x <= left + widths[col]) {
                 return static_cast<int>(col);
             }
-            currentX += widths[col];
         }
         return -1;
     }
@@ -1793,10 +1891,9 @@ private:
         }
         const auto widths = ResolveColumnWidths();
         const float hitSlop = ScaleValue(4.0f);
-        float currentX = m_bounds.left;
         for (size_t col = 0; col + 1 < widths.size(); ++col) {
-            currentX += widths[col];
-            if (std::abs(x - currentX) <= hitSlop) {
+            const float edgeX = ColumnLeftX(widths, col) + widths[col];
+            if (std::abs(x - edgeX) <= hitSlop) {
                 return static_cast<int>(col);
             }
         }
@@ -1825,13 +1922,12 @@ private:
             return false;
         }
         const auto widths = ResolveColumnWidths();
-        float currentX = m_bounds.left;
         for (size_t col = 0; col < widths.size(); ++col) {
-            if (x >= currentX && x <= currentX + widths[col]) {
+            const float left = ColumnLeftX(widths, col);
+            if (x >= left && x <= left + widths[col]) {
                 outCol = static_cast<int>(col);
                 return true;
             }
-            currentX += widths[col];
         }
         outCol = -1;
         return false;
@@ -1938,6 +2034,7 @@ private:
         if (m_rows.empty()) {
             m_selectedIndex = -1;
             m_selectedSet.clear();
+            NotifySelectionChanged();
             return false;
         }
         dataRow = std::clamp(dataRow, 0, static_cast<int>(m_rows.size()) - 1);
@@ -1946,6 +2043,7 @@ private:
             SelectRange(m_selectionAnchor, dataRow);
             m_selectedIndex = dataRow;
             EnsureSelectedVisible();
+            NotifySelectionChanged();
             return true;
         }
 
@@ -1954,6 +2052,7 @@ private:
             m_selectedIndex = dataRow;
             m_selectionAnchor = dataRow;
             EnsureSelectedVisible();
+            NotifySelectionChanged();
             return true;
         }
 
@@ -1965,7 +2064,65 @@ private:
         m_selectedSet.insert(dataRow);
         m_selectionAnchor = dataRow;
         EnsureSelectedVisible();
+        if (!same) {
+            NotifySelectionChanged();
+        }
         return !same;
+    }
+
+    void NotifySelectionChanged() {
+        if (m_onSelectionChanged) {
+            m_onSelectionChanged(SelectedIndices());
+        }
+    }
+
+    bool ScrollHorizontal(float deltaPx) {
+        const float before = m_hScroll;
+        m_hScroll += deltaPx;
+        ClampHorizontalScroll();
+        return m_hScroll != before;
+    }
+
+    void ClampHorizontalScroll() {
+        const auto widths = ResolveColumnWidths();
+        float total = 0.0f;
+        float frozen = 0.0f;
+        const int frozenCount = std::clamp(m_frozenColumnCount, 0, static_cast<int>(widths.size()));
+        for (size_t i = 0; i < widths.size(); ++i) {
+            total += widths[i];
+            if (static_cast<int>(i) < frozenCount) {
+                frozen += widths[i];
+            }
+        }
+        const float viewport = std::max(0.0f, m_bounds.Width() - frozen);
+        const float scrollable = std::max(0.0f, total - frozen);
+        const float maxScroll = std::max(0.0f, scrollable - viewport);
+        m_hScroll = std::clamp(m_hScroll, 0.0f, maxScroll);
+    }
+
+    float FrozenWidth(const std::vector<float>& widths) const {
+        float w = 0.0f;
+        const int frozenCount = std::clamp(m_frozenColumnCount, 0, static_cast<int>(widths.size()));
+        for (int i = 0; i < frozenCount; ++i) {
+            w += widths[static_cast<size_t>(i)];
+        }
+        return w;
+    }
+
+    float ColumnLeftX(const std::vector<float>& widths, size_t col) const {
+        const int frozenCount = std::clamp(m_frozenColumnCount, 0, static_cast<int>(widths.size()));
+        float x = m_bounds.left;
+        if (static_cast<int>(col) < frozenCount) {
+            for (size_t i = 0; i < col; ++i) {
+                x += widths[i];
+            }
+            return x;
+        }
+        x += FrozenWidth(widths);
+        for (size_t i = static_cast<size_t>(frozenCount); i < col; ++i) {
+            x += widths[i];
+        }
+        return x - m_hScroll;
     }
 
     void ToggleRowSelection(int dataRow) {
@@ -2048,9 +2205,13 @@ private:
             if (cells.size() <= static_cast<size_t>(m_editCol)) {
                 cells.resize(static_cast<size_t>(m_editCol) + 1);
             }
+            const std::wstring previous = cells[static_cast<size_t>(m_editCol)];
             cells[static_cast<size_t>(m_editCol)] = m_editBuffer;
             if (m_sortColumn == m_editCol) {
                 ApplySort();
+            }
+            if (m_onCellChanged && previous != m_editBuffer) {
+                m_onCellChanged(m_editRow, m_editCol, m_editBuffer);
             }
         }
         m_editing = false;
@@ -2097,6 +2258,8 @@ private:
     bool m_multiSelect = false;
     bool m_editable = false;
     bool m_resizableColumns = false;
+    int m_frozenColumnCount = 0;
+    float m_hScroll = 0.0f;
     int m_selectedIndex = -1;
     int m_selectionAnchor = -1;
     int m_hoveredRow = -1;
@@ -2105,6 +2268,8 @@ private:
     int m_sortColumn = -1;
     bool m_sortAscending = true;
     int m_scrollRow = 0;
+    std::function<void(const std::vector<int>&)> m_onSelectionChanged;
+    std::function<void(int, int, const std::wstring&)> m_onCellChanged;
 
     bool m_editing = false;
     int m_editRow = -1;
@@ -2476,7 +2641,7 @@ public:
         }
     }
 
-    // Soft luminous wash — no border, flat against the title bar.
+    // Soft luminous wash - no border, flat against the title bar.
     static ComponentStyle CaptionStyle() {
         ComponentStyle s;
         BoxDecoration normal;
@@ -4251,7 +4416,7 @@ private:
 };
 
 // Spin-box numeric editor: value field + up/down buttons.
-// Keyboard: Up/Down (±step), PageUp/PageDown (±10*step), Home/End.
+// Keyboard: Up/Down (+/-step), PageUp/PageDown (+/-10*step), Home/End.
 class NumericUpDown : public UIElement {
 public:
     explicit NumericUpDown(std::wstring label = L"") : m_label(std::move(label)) {}
@@ -4441,7 +4606,7 @@ private:
     }
 
     Rect ButtonsRect() const {
-        // Wide enough to click reliably at 100–150% DPI.
+        // Wide enough to click reliably at 100-150% DPI.
         const float width = ScaleValue(34.0f);
         return Rect::Make(m_bounds.right - width, m_bounds.top, m_bounds.right, m_bounds.bottom);
     }
@@ -5718,7 +5883,7 @@ private:
             float x0 = content.left + MeasureStyledWidth(line.start, a);
             float x1 = content.left + MeasureStyledWidth(line.start, b);
             if (selEnd > line.end) {
-                // selection continues past this line — paint a small newline gutter
+                // selection continues past this line - paint a small newline gutter
                 x1 = std::max(x1, x0 + ScaleValue(6.0f));
             }
             const Rect sel = Rect::Make(x0, y, std::max(x0 + 2.0f, x1), y + LineHeight());
@@ -6163,7 +6328,7 @@ public:
     Color mutedTextColor = ColorFromHex(0x95A7BA);
     float cornerRadius = 8.0f;
     float fontSize = 13.0f;
-    float itemHeight = 28.0f;
+    float itemHeight = 24.0f;
 
 private:
     void SyncLegacyColorsFromStyle() {
@@ -6447,7 +6612,7 @@ protected:
 
     float MeasurePreferredHeight(float width) const override {
         (void)width;
-        // Closed control only — dropdown is painted as an overlay below the header.
+        // Closed control only - dropdown is painted as an overlay below the header.
         return ScaleValue(headerHeight);
     }
 
@@ -6662,8 +6827,8 @@ public:
     Color arrowColor = ColorFromHex(0xC8D9EC);
     float cornerRadius = 8.0f;
     float fontSize = 13.0f;
-    float headerHeight = 34.0f;
-    float itemHeight = 28.0f;
+    float headerHeight = 30.0f;
+    float itemHeight = 26.0f;
     int maxVisibleItems = 5;
 
 private:
@@ -6698,7 +6863,7 @@ private:
     }
 
     Rect HeaderRect() const {
-        // Always use design header height — layout bounds are header-sized.
+        // Always use design header height - layout bounds are header-sized.
         const float height = ScaleValue(headerHeight);
         return Rect::Make(m_bounds.left, m_bounds.top, m_bounds.right, m_bounds.top + height);
     }
@@ -6849,7 +7014,7 @@ public:
         SyncLegacyColorsFromStyle();
     }
 
-    // Own children (tab pages) are managed internally — Yoga must treat this as a leaf
+    // Own children (tab pages) are managed internally - Yoga must treat this as a leaf
     // so height/width attributes and preferred size are honored.
     bool IsLayoutLeaf() const override { return true; }
 
@@ -7168,7 +7333,7 @@ public:
     Color selectedTabTextColor = ColorFromHex(0xFFFFFF);
     float cornerRadius = 10.0f;
     float fontSize = 13.0f;
-    float headerHeight = 34.0f;
+    float headerHeight = 30.0f;
 
 private:
     void SyncLegacyColorsFromStyle() {
@@ -7255,7 +7420,7 @@ private:
         const float inset = ScaleValue(1.0f);
         const float top = std::min(m_bounds.bottom, header.bottom + inset);
         if (top >= m_bounds.bottom - inset) {
-            // Degenerate: not enough height for a body — still reserve a thin content strip.
+            // Degenerate: not enough height for a body - still reserve a thin content strip.
             return Rect::Make(
                 m_bounds.left + inset,
                 std::max(m_bounds.top, m_bounds.bottom - ScaleValue(8.0f)),
@@ -7321,12 +7486,117 @@ private:
     int m_hoveredTab = -1;
 };
 
+// Shared pill-end scrollbar painter (track + thumb, radius = half thickness).
+inline void PaintPillScrollbars(
+    IRenderer& renderer,
+    const Rect& client,
+    float contentW,
+    float contentH,
+    float viewW,
+    float viewH,
+    float scrollX,
+    float scrollY,
+    Color trackColor,
+    Color thumbColor,
+    float thicknessPx) {
+    const float thick = std::max(4.0f, thicknessPx);
+    const float inset = std::max(1.0f, thick * 0.25f);
+    const float radius = thick * 0.5f;
+    const bool needV = contentH > viewH + 0.5f;
+    const bool needH = contentW > viewW + 0.5f;
+    if (!needV && !needH) {
+        return;
+    }
+
+    const float cornerReserve = (needV && needH) ? (thick + inset) : 0.0f;
+
+    if (needV) {
+        const float trackLeft = client.right - inset - thick;
+        const float trackTop = client.top + inset;
+        const float trackBottom = client.bottom - inset - cornerReserve;
+        const float trackH = std::max(thick, trackBottom - trackTop);
+        const Rect track = Rect::Make(trackLeft, trackTop, trackLeft + thick, trackTop + trackH);
+        renderer.FillRoundedRect(track, trackColor, radius);
+
+        const float thumbH = std::clamp(viewH / std::max(1.0f, contentH) * trackH, thick * 1.6f, trackH);
+        const float maxScroll = std::max(0.0f, contentH - viewH);
+        const float t = maxScroll > 0.0f ? std::clamp(scrollY / maxScroll, 0.0f, 1.0f) : 0.0f;
+        const float thumbTop = trackTop + t * (trackH - thumbH);
+        renderer.FillRoundedRect(
+            Rect::Make(trackLeft, thumbTop, trackLeft + thick, thumbTop + thumbH),
+            thumbColor,
+            radius);
+    }
+
+    if (needH) {
+        const float trackTop = client.bottom - inset - thick;
+        const float trackLeft = client.left + inset;
+        const float trackRight = client.right - inset - cornerReserve;
+        const float trackW = std::max(thick, trackRight - trackLeft);
+        const Rect track = Rect::Make(trackLeft, trackTop, trackLeft + trackW, trackTop + thick);
+        renderer.FillRoundedRect(track, trackColor, radius);
+
+        const float thumbW = std::clamp(viewW / std::max(1.0f, contentW) * trackW, thick * 1.6f, trackW);
+        const float maxScroll = std::max(0.0f, contentW - viewW);
+        const float t = maxScroll > 0.0f ? std::clamp(scrollX / maxScroll, 0.0f, 1.0f) : 0.0f;
+        const float thumbLeft = trackLeft + t * (trackW - thumbW);
+        renderer.FillRoundedRect(
+            Rect::Make(thumbLeft, trackTop, thumbLeft + thumbW, trackTop + thick),
+            thumbColor,
+            radius);
+    }
+}
+
 class ListView : public UIElement {
 public:
     struct Column {
         std::wstring title;
         float width = -1.0f;
     };
+
+    ListView() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-1", ColorFromHex(0x101C29));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x35506A));
+        shell.radius = CornerRadius::Uniform(
+            ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "lg", 10.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xD0DDEC));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+
+        BoxDecoration focused = shell;
+        focused.border.width = Thickness{2, 2, 2, 2};
+        focused.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
+
+        auto item = std::make_unique<ComponentStyle>();
+        item->base.decoration = BoxDecoration{};
+        item->base.decoration->background = Color{0, 0, 0, 0};
+        item->base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xD0DDEC));
+        BoxDecoration hover;
+        hover.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x203B56));
+        item->overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+        BoxDecoration selected;
+        selected.background = ComponentStyle::ThemeColor(theme, "accent-soft", ColorFromHex(0x2D567C));
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].decoration = selected;
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].foreground =
+            ComponentStyle::ThemeColor(theme, "fg-strong", ColorFromHex(0xFFFFFF));
+        s.itemStyle = std::move(item);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
 
     bool IsFocusable() const override { return true; }
 
@@ -7364,9 +7634,31 @@ public:
                 return SetSelectedIndex(m_selectedRow - VisibleRowCount());
             case VK_NEXT:
                 return SetSelectedIndex(m_selectedRow + VisibleRowCount());
+            case VK_LEFT:
+                return ScrollHorizontal(-ScaleValue(40.0f));
+            case VK_RIGHT:
+                return ScrollHorizontal(ScaleValue(40.0f));
             default:
                 return false;
         }
+    }
+
+    bool OnMouseWheel(float delta, float x, float y, bool shiftHeld) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+        if (shiftHeld) {
+            return ScrollHorizontal(-delta * ScaleValue(48.0f));
+        }
+        if (m_rows.empty()) {
+            return false;
+        }
+        const int before = m_scrollOffset;
+        m_scrollOffset = std::clamp(
+            m_scrollOffset - static_cast<int>(std::lround(delta * 3.0f)),
+            0,
+            std::max(0, static_cast<int>(m_rows.size()) - VisibleRowCount()));
+        return m_scrollOffset != before;
     }
 
     bool OnMouseDown(float x, float y) override {
@@ -7448,15 +7740,35 @@ protected:
         (void)width;
         const float header = ScaleValue(headerHeight);
         const float row = ScaleValue(rowHeight);
-        const int rows = std::clamp(static_cast<int>(m_rows.size()), 5, 10);
+        // Prefer a compact default so validation pages fit without huge empty body.
+        const int rows = std::clamp(static_cast<int>(m_rows.size()), 3, 6);
         return header + row * static_cast<float>(rows) + ScaleValue(2.0f);
     }
 
 public:
     void Render(IRenderer& renderer) override {
-        const float scaledCornerRadius = ScaleValue(cornerRadius);
-        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+        const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
+        Color shellBg = background;
+        Color shellBorder = borderColor;
+        float scaledCornerRadius = ScaleValue(cornerRadius);
+        Color shellFg = textColor;
+        float shellFs = fontSize;
+        if (shell.decoration.has_value()) {
+            shellBg = shell.decoration->background;
+            shellBorder = shell.decoration->border.color;
+            if (!shell.decoration->radius.IsZero()) {
+                scaledCornerRadius = ScaleValue(shell.decoration->radius.MaxRadius());
+            }
+        }
+        if (shell.foreground.has_value()) {
+            shellFg = *shell.foreground;
+        }
+        if (shell.fontSize.has_value()) {
+            shellFs = *shell.fontSize;
+        }
+
+        renderer.FillRoundedRect(m_bounds, shellBg, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, shellBorder, 1.0f, scaledCornerRadius);
         if (m_hasFocus) {
             renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
         }
@@ -7472,8 +7784,8 @@ public:
                 message.c_str(),
                 static_cast<UINT32>(message.size()),
                 m_bounds,
-                textColor,
-                ScaleValue(fontSize),
+                shellFg,
+                ScaleValue(shellFs),
                 textOptions);
             return;
         }
@@ -7488,6 +7800,16 @@ public:
         const float scaledHeaderHeight = ScaleValue(headerHeight);
         const float scaledRowHeight = std::max(1.0f, ScaleValue(rowHeight));
         const Thickness scaledCellPadding = ScaleThickness(cellPadding);
+        const ComponentStyle* itemStyle = m_style.itemStyle ? m_style.itemStyle.get() : nullptr;
+
+        float contentW = 0.0f;
+        for (float w : widths) {
+            contentW += w;
+        }
+        const float contentH = scaledRowHeight * static_cast<float>(std::max<size_t>(1, m_rows.size()));
+        const float viewW = std::max(1.0f, m_bounds.Width());
+        const float viewH = std::max(1.0f, bodyRect.Height());
+        ClampHorizontalScroll(contentW, viewW);
 
         renderer.PushRoundedClip(m_bounds, scaledCornerRadius);
         renderer.FillRect(headerRect, headerBackground);
@@ -7497,7 +7819,7 @@ public:
             gridLineColor,
             1.0f);
 
-        float x = m_bounds.left;
+        float x = m_bounds.left - m_hScroll;
         for (size_t col = 0; col < m_columns.size(); ++col) {
             const Rect cellRect = Rect::Make(
                 x + scaledCellPadding.left,
@@ -7537,15 +7859,46 @@ public:
             const float rowBottom = std::min(bodyRect.bottom, rowTop + scaledRowHeight);
             const Rect rowRect = Rect::Make(m_bounds.left, rowTop, m_bounds.right, rowBottom);
 
+            StyleState itemState = StyleState::Normal;
             if (row == m_selectedRow) {
-                renderer.FillRect(rowRect, selectedRowBackground);
+                itemState = StyleState::Selected;
             } else if (row == m_hoveredRow) {
-                renderer.FillRect(rowRect, hoverRowBackground);
-            } else {
-                renderer.FillRect(rowRect, (row % 2 == 0) ? rowBackgroundA : rowBackgroundB);
+                itemState = StyleState::Hover;
             }
 
-            float rowX = m_bounds.left;
+            Color rowBg = (row % 2 == 0) ? rowBackgroundA : rowBackgroundB;
+            Color rowFg = shellFg;
+            float rowRadius = 0.0f;
+            if (itemStyle) {
+                const StyleSpec itemSpec = itemStyle->Resolve(itemState);
+                if (itemSpec.decoration.has_value()) {
+                    if (itemState != StyleState::Normal || itemSpec.decoration->background.a > 0.001f) {
+                        rowBg = itemSpec.decoration->background;
+                    }
+                    if (!itemSpec.decoration->radius.IsZero()) {
+                        rowRadius = ScaleValue(itemSpec.decoration->radius.MaxRadius());
+                    }
+                }
+                if (itemSpec.foreground.has_value()) {
+                    rowFg = *itemSpec.foreground;
+                }
+            } else {
+                if (row == m_selectedRow) {
+                    rowBg = selectedRowBackground;
+                } else if (row == m_hoveredRow) {
+                    rowBg = hoverRowBackground;
+                }
+            }
+
+            if (rowBg.a > 0.001f) {
+                if (rowRadius > 0.5f) {
+                    renderer.FillRoundedRect(rowRect, rowBg, rowRadius);
+                } else {
+                    renderer.FillRect(rowRect, rowBg);
+                }
+            }
+
+            float rowX = m_bounds.left - m_hScroll;
             for (size_t col = 0; col < m_columns.size(); ++col) {
                 const std::wstring value = (col < m_rows[row].size()) ? m_rows[row][col] : L"";
                 const Rect textRect = Rect::Make(
@@ -7562,8 +7915,8 @@ public:
                     value.c_str(),
                     static_cast<UINT32>(value.size()),
                     textRect,
-                    textColor,
-                    ScaleValue(fontSize),
+                    rowFg,
+                    ScaleValue(shellFs),
                     textOptions);
                 rowX += widths[col];
             }
@@ -7575,18 +7928,18 @@ public:
                 1.0f);
         }
 
-        if (visibleRows < static_cast<int>(m_rows.size())) {
-            const float thumbWidth = ScaleValue(4.0f);
-            const float thumbRight = m_bounds.right - ScaleValue(3.0f);
-            const float thumbLeft = thumbRight - thumbWidth;
-            const float ratio = static_cast<float>(visibleRows) / static_cast<float>(m_rows.size());
-            const float thumbHeight = std::max(ScaleValue(16.0f), bodyRect.Height() * ratio);
-            const float maxOffset = static_cast<float>(std::max(1, static_cast<int>(m_rows.size()) - visibleRows));
-            const float offsetRatio = static_cast<float>(m_scrollOffset) / maxOffset;
-            const float thumbTop = bodyRect.top + (bodyRect.Height() - thumbHeight) * offsetRatio;
-            const Rect thumbRect = Rect::Make(thumbLeft, thumbTop, thumbRight, thumbTop + thumbHeight);
-            renderer.FillRoundedRect(thumbRect, scrollThumbColor, ScaleValue(2.0f));
-        }
+        PaintPillScrollbars(
+            renderer,
+            m_bounds,
+            contentW,
+            contentH,
+            viewW,
+            viewH,
+            m_hScroll,
+            static_cast<float>(m_scrollOffset) * scaledRowHeight,
+            scrollTrackColor,
+            scrollThumbColor,
+            ScaleValue(8.0f));
 
         renderer.PopLayer();
         (void)scaledHeaderHeight;
@@ -7643,15 +7996,59 @@ public:
     Color gridLineColor = ColorFromHex(0x2D445A);
     Color headerTextColor = ColorFromHex(0xEAF4FF);
     Color textColor = ColorFromHex(0xD0DDEC);
-    Color scrollThumbColor = ColorFromHex(0x58718C);
+    Color scrollThumbColor = ColorFromHex(0x7A93AD);
+    Color scrollTrackColor = ColorFromHex(0x162433);
     float cornerRadius = 10.0f;
-    float headerHeight = 34.0f;
-    float rowHeight = 30.0f;
+    float headerHeight = 30.0f;
+    float rowHeight = 26.0f;
     float fontSize = 13.0f;
-    float headerFontSize = 13.0f;
+    float headerFontSize = 12.0f;
     Thickness cellPadding{8, 5, 8, 5};
 
 private:
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        if (m_style.itemStyle) {
+            const StyleSpec hover = m_style.itemStyle->Resolve(StyleState::Hover);
+            const StyleSpec selected = m_style.itemStyle->Resolve(StyleState::Selected);
+            if (hover.decoration.has_value()) {
+                hoverRowBackground = hover.decoration->background;
+            }
+            if (selected.decoration.has_value()) {
+                selectedRowBackground = selected.decoration->background;
+            }
+        }
+    }
+
+    bool ScrollHorizontal(float delta) {
+        const float before = m_hScroll;
+        m_hScroll += delta;
+        const auto widths = ResolveColumnWidths();
+        float contentW = 0.0f;
+        for (float w : widths) {
+            contentW += w;
+        }
+        ClampHorizontalScroll(contentW, std::max(1.0f, m_bounds.Width()));
+        return m_hScroll != before;
+    }
+
+    void ClampHorizontalScroll(float contentW, float viewW) {
+        const float maxScroll = std::max(0.0f, contentW - viewW);
+        m_hScroll = std::clamp(m_hScroll, 0.0f, maxScroll);
+    }
+
     Rect HeaderRect() const {
         const float h = std::min(m_bounds.Height(), ScaleValue(headerHeight));
         return Rect::Make(m_bounds.left, m_bounds.top, m_bounds.right, m_bounds.top + h);
@@ -7728,12 +8125,8 @@ private:
             sum += widths[i];
         }
 
-        if (sum > totalWidth && sum > 0.0f) {
-            const float ratio = totalWidth / sum;
-            for (float& w : widths) {
-                w = std::max(ScaleValue(28.0f), w * ratio);
-            }
-        }
+        // Keep natural column widths; horizontal pill scrollbar handles overflow.
+        (void)totalWidth;
         return widths;
     }
 
@@ -7742,10 +8135,58 @@ private:
     int m_selectedRow = -1;
     int m_hoveredRow = -1;
     int m_scrollOffset = 0;
+    float m_hScroll = 0.0f;
 };
 
 class TreeView : public UIElement {
 public:
+    TreeView() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-1", ColorFromHex(0x101B28));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x35506A));
+        shell.radius = CornerRadius::Uniform(
+            ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "lg", 10.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xDCE8F5));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+
+        BoxDecoration focused = shell;
+        focused.border.width = Thickness{2, 2, 2, 2};
+        focused.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
+
+        auto item = std::make_unique<ComponentStyle>();
+        item->base.decoration = BoxDecoration{};
+        item->base.decoration->background = Color{0, 0, 0, 0};
+        item->base.decoration->radius = CornerRadius::Uniform(4.0f);
+        item->base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xDCE8F5));
+        BoxDecoration hover;
+        hover.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x1F3B55));
+        hover.radius = CornerRadius::Uniform(4.0f);
+        item->overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+        BoxDecoration selected;
+        selected.background = ComponentStyle::ThemeColor(theme, "accent-soft", ColorFromHex(0x2E577D));
+        selected.radius = CornerRadius::Uniform(4.0f);
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].decoration = selected;
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].foreground =
+            ComponentStyle::ThemeColor(theme, "fg-strong", ColorFromHex(0xFFFFFF));
+        s.itemStyle = std::move(item);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
+
     bool IsFocusable() const override { return true; }
 
     bool OnFocus() override {
@@ -7919,6 +8360,23 @@ public:
         return true;
     }
 
+    bool OnMouseWheel(float delta, float x, float y, bool /*shiftHeld*/) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+        auto visible = BuildVisibleNodes();
+        if (visible.empty()) {
+            return false;
+        }
+        const int before = m_scrollOffset;
+        const int visibleRows = VisibleRowCount(static_cast<int>(visible.size()));
+        m_scrollOffset = std::clamp(
+            m_scrollOffset - static_cast<int>(std::lround(delta * 3.0f)),
+            0,
+            std::max(0, static_cast<int>(visible.size()) - visibleRows));
+        return m_scrollOffset != before;
+    }
+
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
         float preferred = ScaleValue(320.0f);
@@ -7928,14 +8386,33 @@ protected:
 
     float MeasurePreferredHeight(float width) const override {
         (void)width;
-        return ScaleValue(280.0f);
+        return ScaleValue(200.0f);
     }
 
 public:
     void Render(IRenderer& renderer) override {
-        const float scaledCornerRadius = ScaleValue(cornerRadius);
-        renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
+        const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
+        Color shellBg = background;
+        Color shellBorder = borderColor;
+        float scaledCornerRadius = ScaleValue(cornerRadius);
+        Color shellFg = textColor;
+        float shellFs = fontSize;
+        if (shell.decoration.has_value()) {
+            shellBg = shell.decoration->background;
+            shellBorder = shell.decoration->border.color;
+            if (!shell.decoration->radius.IsZero()) {
+                scaledCornerRadius = ScaleValue(shell.decoration->radius.MaxRadius());
+            }
+        }
+        if (shell.foreground.has_value()) {
+            shellFg = *shell.foreground;
+        }
+        if (shell.fontSize.has_value()) {
+            shellFs = *shell.fontSize;
+        }
+
+        renderer.FillRoundedRect(m_bounds, shellBg, scaledCornerRadius);
+        renderer.DrawRoundedRect(m_bounds, shellBorder, 1.0f, scaledCornerRadius);
         if (m_hasFocus) {
             renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCornerRadius);
         }
@@ -7953,7 +8430,7 @@ public:
                 static_cast<UINT32>(message.size()),
                 m_bounds,
                 mutedTextColor,
-                ScaleValue(fontSize),
+                ScaleValue(shellFs),
                 textOptions);
             return;
         }
@@ -7964,6 +8441,7 @@ public:
         const int maxStart = std::max(0, static_cast<int>(visible.size()) - visibleRows);
         m_scrollOffset = std::clamp(m_scrollOffset, 0, maxStart);
         const int count = std::min(visibleRows, static_cast<int>(visible.size()) - m_scrollOffset);
+        const ComponentStyle* itemStyle = m_style.itemStyle ? m_style.itemStyle.get() : nullptr;
 
         renderer.PushRoundedClip(m_bounds, scaledCornerRadius);
         for (int i = 0; i < count; ++i) {
@@ -7975,10 +8453,36 @@ public:
 
             const bool selected = entry.path == m_selectedPath;
             const bool hovered = m_hasHoveredPath && entry.path == m_hoveredPath;
+            StyleState itemState = StyleState::Normal;
             if (selected) {
-                renderer.FillRoundedRect(rowRect, selectedBackground, ScaleValue(4.0f));
+                itemState = StyleState::Selected;
             } else if (hovered) {
-                renderer.FillRoundedRect(rowRect, hoverBackground, ScaleValue(4.0f));
+                itemState = StyleState::Hover;
+            }
+
+            Color rowBg = Color{0, 0, 0, 0};
+            Color rowFg = shellFg;
+            float rowRadius = ScaleValue(4.0f);
+            if (itemStyle) {
+                const StyleSpec itemSpec = itemStyle->Resolve(itemState);
+                if (itemSpec.decoration.has_value()) {
+                    rowBg = itemSpec.decoration->background;
+                    if (!itemSpec.decoration->radius.IsZero()) {
+                        rowRadius = ScaleValue(itemSpec.decoration->radius.MaxRadius());
+                    }
+                }
+                if (itemSpec.foreground.has_value()) {
+                    rowFg = *itemSpec.foreground;
+                }
+            } else {
+                if (selected) {
+                    rowBg = selectedBackground;
+                } else if (hovered) {
+                    rowBg = hoverBackground;
+                }
+            }
+            if (rowBg.a > 0.001f) {
+                renderer.FillRoundedRect(rowRect, rowBg, rowRadius);
             }
 
             const float indent = ScaleValue(indentWidth) * static_cast<float>(entry.depth);
@@ -8013,23 +8517,24 @@ public:
                 entry.node->label.c_str(),
                 static_cast<UINT32>(entry.node->label.size()),
                 textRect,
-                textColor,
-                ScaleValue(fontSize),
+                rowFg,
+                ScaleValue(shellFs),
                 textOptions);
         }
 
-        if (visibleRows < static_cast<int>(visible.size())) {
-            const float thumbWidth = ScaleValue(4.0f);
-            const float thumbRight = m_bounds.right - ScaleValue(3.0f);
-            const float thumbLeft = thumbRight - thumbWidth;
-            const float ratio = static_cast<float>(visibleRows) / static_cast<float>(visible.size());
-            const float thumbHeight = std::max(ScaleValue(16.0f), content.Height() * ratio);
-            const float maxOffset = static_cast<float>(std::max(1, static_cast<int>(visible.size()) - visibleRows));
-            const float offsetRatio = static_cast<float>(m_scrollOffset) / maxOffset;
-            const float thumbTop = content.top + (content.Height() - thumbHeight) * offsetRatio;
-            const Rect thumbRect = Rect::Make(thumbLeft, thumbTop, thumbRight, thumbTop + thumbHeight);
-            renderer.FillRoundedRect(thumbRect, scrollThumbColor, ScaleValue(2.0f));
-        }
+        const float contentH = row * static_cast<float>(std::max<size_t>(1, visible.size()));
+        PaintPillScrollbars(
+            renderer,
+            m_bounds,
+            content.Width(),
+            contentH,
+            content.Width(),
+            content.Height(),
+            0.0f,
+            static_cast<float>(m_scrollOffset) * row,
+            scrollTrackColor,
+            scrollThumbColor,
+            ScaleValue(8.0f));
 
         renderer.PopLayer();
     }
@@ -8061,13 +8566,40 @@ public:
     Color textColor = ColorFromHex(0xDCE8F5);
     Color mutedTextColor = ColorFromHex(0x96A9BC);
     Color glyphColor = ColorFromHex(0xAFC3D9);
-    Color scrollThumbColor = ColorFromHex(0x59728C);
+    Color scrollThumbColor = ColorFromHex(0x7A93AD);
+    Color scrollTrackColor = ColorFromHex(0x162433);
     float cornerRadius = 10.0f;
     float fontSize = 13.0f;
-    float itemHeight = 28.0f;
+    float itemHeight = 24.0f;
     float indentWidth = 18.0f;
 
 private:
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        if (m_style.itemStyle) {
+            const StyleSpec hover = m_style.itemStyle->Resolve(StyleState::Hover);
+            const StyleSpec selected = m_style.itemStyle->Resolve(StyleState::Selected);
+            if (hover.decoration.has_value()) {
+                hoverBackground = hover.decoration->background;
+            }
+            if (selected.decoration.has_value()) {
+                selectedBackground = selected.decoration->background;
+            }
+        }
+    }
+
     struct Node {
         std::wstring label;
         std::vector<Node> children;
@@ -8284,6 +8816,48 @@ inline void EnsureStripItemSvg(IRenderer& renderer, StripItem& item) {
 
 class MenuStrip : public UIElement {
 public:
+    MenuStrip() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-2", ColorFromHex(0x142131));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3A5064));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xDCE7F4));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+        BoxDecoration focused = shell;
+        focused.border.width = Thickness{2, 2, 2, 2};
+        focused.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
+        auto item = std::make_unique<ComponentStyle>();
+        item->base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xDCE7F4));
+        BoxDecoration hover;
+        hover.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x1F3348));
+        hover.radius = CornerRadius::Uniform(6.0f);
+        item->overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+        BoxDecoration selected;
+        selected.background = ComponentStyle::ThemeColor(theme, "accent-soft", ColorFromHex(0x2C4C70));
+        selected.radius = CornerRadius::Uniform(6.0f);
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].decoration = selected;
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].foreground =
+            ComponentStyle::ThemeColor(theme, "fg-strong", ColorFromHex(0xFFFFFF));
+        s.itemStyle = std::move(item);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
+
+
     bool IsFocusable() const override { return true; }
 
     bool OnFocus() override {
@@ -8413,15 +8987,36 @@ public:
             TextVerticalAlign::Center
         };
         for (size_t i = 0; i < rects.size(); ++i) {
-            Color fill = background;
+            StyleState itemState = StyleState::Normal;
             if (static_cast<int>(i) == m_selectedIndex) {
-                fill = selectedBackground;
+                itemState = StyleState::Selected;
             } else if (static_cast<int>(i) == m_hoveredIndex) {
-                fill = hoverBackground;
+                itemState = StyleState::Hover;
+            }
+            Color fill = background;
+            Color itemFg = (itemState == StyleState::Selected) ? selectedTextColor : textColor;
+            float itemRadius = ScaleValue(std::max(2.0f, cornerRadius - 2.0f));
+            if (m_style.itemStyle) {
+                const StyleSpec itemSpec = m_style.itemStyle->Resolve(itemState);
+                if (itemSpec.decoration.has_value()) {
+                    fill = itemSpec.decoration->background;
+                    if (!itemSpec.decoration->radius.IsZero()) {
+                        itemRadius = ScaleValue(itemSpec.decoration->radius.MaxRadius());
+                    }
+                }
+                if (itemSpec.foreground.has_value()) {
+                    itemFg = *itemSpec.foreground;
+                }
+            } else {
+                if (itemState == StyleState::Selected) {
+                    fill = selectedBackground;
+                } else if (itemState == StyleState::Hover) {
+                    fill = hoverBackground;
+                }
             }
 
             if (fill.a > 0.001f) {
-                renderer.FillRoundedRect(rects[i], fill, ScaleValue(std::max(2.0f, cornerRadius - 2.0f)));
+                renderer.FillRoundedRect(rects[i], fill, itemRadius);
             }
 
             EnsureStripItemSvg(renderer, m_items[i]);
@@ -8447,7 +9042,7 @@ public:
                 m_items[i].text.c_str(),
                 static_cast<UINT32>(m_items[i].text.size()),
                 textRect,
-                static_cast<int>(i) == m_selectedIndex ? selectedTextColor : textColor,
+                itemFg,
                 ScaleValue(fontSize),
                 textOptions);
         }
@@ -8505,13 +9100,43 @@ public:
     Color selectedTextColor = ColorFromHex(0xFFFFFF);
     float cornerRadius = 8.0f;
     float fontSize = 13.0f;
-    float stripHeight = 34.0f;
+    float stripHeight = 30.0f;
     float itemSpacing = 6.0f;
     float itemHorizontalPadding = 12.0f;
     float iconSize = 14.0f;
     float iconGap = 8.0f;
 
 private:
+
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        if (m_style.itemStyle) {
+            const StyleSpec hover = m_style.itemStyle->Resolve(StyleState::Hover);
+            const StyleSpec selected = m_style.itemStyle->Resolve(StyleState::Selected);
+            if (hover.decoration.has_value()) {
+                hoverBackground = hover.decoration->background;
+            }
+            if (selected.decoration.has_value()) {
+                selectedBackground = selected.decoration->background;
+            }
+            if (selected.foreground.has_value()) {
+                selectedTextColor = *selected.foreground;
+            }
+        }
+    }
+
     bool MoveSelectionBy(int delta) {
         if (m_items.empty()) {
             return false;
@@ -8568,6 +9193,52 @@ private:
 
 class ToolStrip : public UIElement {
 public:
+    ToolStrip() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-2", ColorFromHex(0x152132));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x395266));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xDCE6F3));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+        BoxDecoration focused = shell;
+        focused.border.width = Thickness{2, 2, 2, 2};
+        focused.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
+        auto item = std::make_unique<ComponentStyle>();
+        BoxDecoration baseBtn;
+        baseBtn.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x1B2D40));
+        baseBtn.border.width = Thickness{1, 1, 1, 1};
+        baseBtn.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x4A6278));
+        baseBtn.radius = CornerRadius::Uniform(6.0f);
+        item->base.decoration = baseBtn;
+        item->base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xDCE6F3));
+        BoxDecoration hover = baseBtn;
+        hover.background = ComponentStyle::ThemeColor(theme, "surface-4", ColorFromHex(0x23405A));
+        item->overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+        BoxDecoration selected = baseBtn;
+        selected.background = ComponentStyle::ThemeColor(theme, "accent-soft", ColorFromHex(0x315C86));
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].decoration = selected;
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].foreground =
+            ComponentStyle::ThemeColor(theme, "fg-strong", ColorFromHex(0xFFFFFF));
+        s.itemStyle = std::move(item);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
+
+
     bool IsFocusable() const override { return true; }
 
     bool OnFocus() override {
@@ -8697,15 +9368,38 @@ public:
             TextVerticalAlign::Center
         };
         for (size_t i = 0; i < rects.size(); ++i) {
-            Color fill = buttonBackground;
+            StyleState itemState = StyleState::Normal;
             if (static_cast<int>(i) == m_selectedIndex) {
-                fill = selectedBackground;
+                itemState = StyleState::Selected;
             } else if (static_cast<int>(i) == m_hoveredIndex) {
-                fill = hoverBackground;
+                itemState = StyleState::Hover;
+            }
+            Color fill = buttonBackground;
+            Color itemBorder = buttonBorderColor;
+            Color itemFg = (itemState == StyleState::Selected) ? selectedTextColor : textColor;
+            float itemRadius = ScaleValue(std::max(2.0f, buttonCornerRadius));
+            if (m_style.itemStyle) {
+                const StyleSpec itemSpec = m_style.itemStyle->Resolve(itemState);
+                if (itemSpec.decoration.has_value()) {
+                    fill = itemSpec.decoration->background;
+                    itemBorder = itemSpec.decoration->border.color;
+                    if (!itemSpec.decoration->radius.IsZero()) {
+                        itemRadius = ScaleValue(itemSpec.decoration->radius.MaxRadius());
+                    }
+                }
+                if (itemSpec.foreground.has_value()) {
+                    itemFg = *itemSpec.foreground;
+                }
+            } else {
+                if (itemState == StyleState::Selected) {
+                    fill = selectedBackground;
+                } else if (itemState == StyleState::Hover) {
+                    fill = hoverBackground;
+                }
             }
 
-            renderer.FillRoundedRect(rects[i], fill, ScaleValue(std::max(2.0f, buttonCornerRadius)));
-            renderer.DrawRoundedRect(rects[i], buttonBorderColor, 1.0f, ScaleValue(std::max(2.0f, buttonCornerRadius)));
+            renderer.FillRoundedRect(rects[i], fill, itemRadius);
+            renderer.DrawRoundedRect(rects[i], itemBorder, 1.0f, itemRadius);
 
             EnsureStripItemSvg(renderer, m_items[i]);
             Rect textRect = rects[i];
@@ -8729,7 +9423,7 @@ public:
                 m_items[i].text.c_str(),
                 static_cast<UINT32>(m_items[i].text.size()),
                 textRect,
-                static_cast<int>(i) == m_selectedIndex ? selectedTextColor : textColor,
+                itemFg,
                 ScaleValue(fontSize),
                 textOptions);
         }
@@ -8790,13 +9484,51 @@ public:
     float cornerRadius = 8.0f;
     float buttonCornerRadius = 6.0f;
     float fontSize = 13.0f;
-    float stripHeight = 42.0f;
+    float stripHeight = 34.0f;
     float itemSpacing = 8.0f;
     float itemHorizontalPadding = 12.0f;
     float iconSize = 14.0f;
     float iconGap = 8.0f;
 
 private:
+
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        if (m_style.itemStyle) {
+            const StyleSpec normal = m_style.itemStyle->Resolve(StyleState::Normal);
+            const StyleSpec hover = m_style.itemStyle->Resolve(StyleState::Hover);
+            const StyleSpec selected = m_style.itemStyle->Resolve(StyleState::Selected);
+            if (normal.decoration.has_value()) {
+                buttonBackground = normal.decoration->background;
+                buttonBorderColor = normal.decoration->border.color;
+                if (!normal.decoration->radius.IsZero()) {
+                    buttonCornerRadius = normal.decoration->radius.MaxRadius();
+                }
+            }
+            if (hover.decoration.has_value()) {
+                hoverBackground = hover.decoration->background;
+            }
+            if (selected.decoration.has_value()) {
+                selectedBackground = selected.decoration->background;
+            }
+            if (selected.foreground.has_value()) {
+                selectedTextColor = *selected.foreground;
+            }
+        }
+    }
+
     bool MoveSelectionBy(int delta) {
         if (m_items.empty()) {
             return false;
@@ -8853,6 +9585,31 @@ private:
 
 class StatusStrip : public UIElement {
 public:
+    StatusStrip() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-2", ColorFromHex(0x13202E));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x395064));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xE1EAF6));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 12.0f);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
+
+
     bool OnMouseDown(float x, float y) override {
         return HitTest(x, y);
     }
@@ -8949,11 +9706,70 @@ public:
     float itemSpacing = 10.0f;
 
 private:
+
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+    }
+
     std::vector<std::wstring> m_items;
 };
 
 class ContextMenu : public UIElement {
 public:
+    ContextMenu() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-1", ColorFromHex(0x112130));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3A536B));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xE4EEF8));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+        BoxDecoration focused = shell;
+        focused.border.width = Thickness{2, 2, 2, 2};
+        focused.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
+        auto item = std::make_unique<ComponentStyle>();
+        item->base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xE4EEF8));
+        BoxDecoration hover;
+        hover.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x1F3A54));
+        hover.radius = CornerRadius::Uniform(4.0f);
+        item->overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+        BoxDecoration selected;
+        selected.background = ComponentStyle::ThemeColor(theme, "accent-soft", ColorFromHex(0x2F557A));
+        selected.radius = CornerRadius::Uniform(4.0f);
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].decoration = selected;
+        item->overrides[static_cast<std::size_t>(StyleState::Selected)].foreground =
+            ComponentStyle::ThemeColor(theme, "fg-strong", ColorFromHex(0xFFFFFF));
+        s.itemStyle = std::move(item);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
+
+
     bool IsFocusable() const override { return true; }
 
     bool OnFocus() override {
@@ -9111,10 +9927,35 @@ public:
             const float rowBottom = std::min(contentRect.bottom, rowTop + rowHeightPx);
             const Rect rowRect = Rect::Make(contentRect.left, rowTop, contentRect.right, rowBottom);
 
+            StyleState itemState = StyleState::Normal;
             if (i == m_selectedIndex) {
-                renderer.FillRoundedRect(rowRect, selectedBackground, ScaleValue(4.0f));
+                itemState = StyleState::Selected;
             } else if (i == m_hoveredIndex) {
-                renderer.FillRoundedRect(rowRect, hoverBackground, ScaleValue(4.0f));
+                itemState = StyleState::Hover;
+            }
+            Color rowBg = Color{0, 0, 0, 0};
+            Color rowFg = textColor;
+            float rowRadius = ScaleValue(4.0f);
+            if (m_style.itemStyle) {
+                const StyleSpec itemSpec = m_style.itemStyle->Resolve(itemState);
+                if (itemSpec.decoration.has_value()) {
+                    rowBg = itemSpec.decoration->background;
+                    if (!itemSpec.decoration->radius.IsZero()) {
+                        rowRadius = ScaleValue(itemSpec.decoration->radius.MaxRadius());
+                    }
+                }
+                if (itemSpec.foreground.has_value()) {
+                    rowFg = *itemSpec.foreground;
+                }
+            } else {
+                if (itemState == StyleState::Selected) {
+                    rowBg = selectedBackground;
+                } else if (itemState == StyleState::Hover) {
+                    rowBg = hoverBackground;
+                }
+            }
+            if (rowBg.a > 0.001f) {
+                renderer.FillRoundedRect(rowRect, rowBg, rowRadius);
             }
 
             const Rect textRect = Rect::Make(
@@ -9141,7 +9982,7 @@ public:
                 m_items[i].text.c_str(),
                 static_cast<UINT32>(m_items[i].text.size()),
                 drawTextRect,
-                textColor,
+                rowFg,
                 ScaleValue(fontSize),
                 textOptions);
         }
@@ -9223,6 +10064,32 @@ public:
     float iconGap = 8.0f;
 
 private:
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        if (m_style.itemStyle) {
+            const StyleSpec hover = m_style.itemStyle->Resolve(StyleState::Hover);
+            const StyleSpec selected = m_style.itemStyle->Resolve(StyleState::Selected);
+            if (hover.decoration.has_value()) {
+                hoverBackground = hover.decoration->background;
+            }
+            if (selected.decoration.has_value()) {
+                selectedBackground = selected.decoration->background;
+            }
+        }
+    }
+
     int VisibleRowCount() const {
         const float innerHeight = std::max(1.0f, m_bounds.Height() - ScaleValue(8.0f));
         const float rowHeightPx = std::max(1.0f, ScaleValue(itemHeight));

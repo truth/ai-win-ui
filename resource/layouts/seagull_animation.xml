@@ -1,22 +1,26 @@
-<Panel padding="24,24,24,24" spacing="14" cornerRadius="16" background="#0B1320" alignItems="stretch">
-  <Label text="Seagull Animation Validation" fontSize="28" color="#EFF6FF" />
-  <Label text="Global UI timer drives this component even when focus is on other controls." fontSize="14" color="#B3C2D5" />
+<Panel padding="14,14,14,14" spacing="8" cornerRadius="12" background="#0B1320" alignItems="stretch">
+  <Label text="Seagull Animation" fontSize="20" color="#EFF6FF" />
+  <Label text="Main scene left; compact variants right (no wrap)." fontSize="12" color="#B3C2D5" />
 
-  <SeagullAnimation
-    count="6"
-    speed="0.9"
-    wingAmplitude="4.0"
-    pathHeight="24"
-    scale="1.0"
-    opacity="0.85"
-    birdColor="#E3F2FF"
-    background="#0F1B2A"
-    borderColor="#2A3E55"
-    cornerRadius="12"
-    height="210" />
+  <Panel direction="row" spacing="10" background="#0B1320" alignItems="start">
+    <SeagullAnimation
+      count="6"
+      speed="0.9"
+      wingAmplitude="4.0"
+      pathHeight="24"
+      scale="1.0"
+      opacity="0.85"
+      birdColor="#E3F2FF"
+      background="#0F1B2A"
+      borderColor="#2A3E55"
+      cornerRadius="10"
+      height="220"
+      flexGrow="1"
+      minWidth="320" />
 
-  <Panel direction="row" spacing="12" background="#0B1320" alignItems="stretch" wrap="wrap">
-    <SeagullAnimation count="4" speed="0.6" wingAmplitude="2.8" pathHeight="14" scale="0.85" opacity="0.78" background="#122030" borderColor="#30465D" height="140" flexGrow="1" minWidth="280" />
-    <SeagullAnimation count="8" speed="1.2" wingAmplitude="5.0" pathHeight="28" scale="1.1" opacity="0.9" background="#0F1C2C" borderColor="#2D4258" height="140" flexGrow="1" minWidth="280" />
+    <Panel spacing="8" width="280" flexShrink="0" alignItems="stretch">
+      <SeagullAnimation count="4" speed="0.6" wingAmplitude="2.8" pathHeight="14" scale="0.85" opacity="0.78" background="#122030" borderColor="#30465D" height="100" />
+      <SeagullAnimation count="8" speed="1.2" wingAmplitude="5.0" pathHeight="28" scale="1.1" opacity="0.9" background="#0F1C2C" borderColor="#2D4258" height="100" />
+    </Panel>
   </Panel>
 </Panel>

@@ -304,9 +304,10 @@ The current DSL does not yet offer:
 - gradients
 - run-time theme switching (theme is read once at startup)
 - token-in-token (a theme entry referencing another theme entry)
-- styled `Slider` / `ListBox` / `ComboBox` / `TabControl` / `ListView` /
-  `TreeView` (these still use per-field properties — `style` block is
-  ignored on them until sub-style support lands)
+- advanced inputs (`NumericUpDown` / `DateTimePicker` / `RichTextBox`) and
+  chart/stat widgets still lean on per-field colors more than full nested
+  `style` adoption; shell strips and list/nav controls honor `style` +
+  nested `itemStyle` / `tabStyle` / `dropdownStyle`
 - SVG tint / colour override
 - advanced text layout controls
 

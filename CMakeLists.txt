@@ -48,6 +48,12 @@ add_executable(ai_win_ui WIN32
     src/window_chrome.cpp
 )
 
+# Source is UTF-8. On MSVC + CP936, missing this yields C4819 for headers/sources.
+# Apply on the target so every configure preset (build/, build/presets/*) picks it up.
+if(MSVC)
+    target_compile_options(ai_win_ui PRIVATE /utf-8 /wd4819)
+endif()
+
 set(AI_WIN_UI_YOGA_BUILD_DIR "${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1/build" CACHE PATH "Default Yoga build directory used by the app target.")
 set(AI_WIN_UI_YOGA_STATICCRT_BUILD_DIR "${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1/build-staticcrt" CACHE PATH "Yoga build directory compiled with static MSVC runtime for local Skia SDK builds.")
 

@@ -1,4 +1,4 @@
-#include "layout_parser.h"
+﻿#include "layout_parser.h"
 #include "layout_engine.h"
 #include "renderer.h"
 #include "resource_provider.h"
@@ -23,6 +23,7 @@ namespace {
 
 constexpr float kUnboundedLayoutHeight = 100000.0f;
 constexpr UINT_PTR kUiTimerId = 1;
+constexpr UINT_PTR kQuitTimerId = 2;
 constexpr UINT kUiTimerIntervalMs = 16;
 
 std::wstring ToLowerAscii(std::wstring value) {
@@ -206,6 +207,15 @@ public:
         BringAppWindowToForeground(m_hwnd);
 
         SetTimer(m_hwnd, kUiTimerId, kUiTimerIntervalMs, nullptr);
+
+        // Headless/smoke: AI_WIN_UI_QUIT_AFTER_MS=1500 exits after layout paints.
+        const std::wstring quitAfter = GetEnvironmentValue(L"AI_WIN_UI_QUIT_AFTER_MS");
+        if (!quitAfter.empty()) {
+            const int ms = _wtoi(quitAfter.c_str());
+            if (ms > 0) {
+                SetTimer(m_hwnd, kQuitTimerId, static_cast<UINT>(ms), nullptr);
+            }
+        }
         return true;
     }
 
@@ -870,12 +880,27 @@ private:
         }
     }
 
-    void OnMouseWheel(WPARAM wParam) {
-        const float wheelStep = std::max(24.0f, 56.0f * m_uiContext.dpiScale);
+    void OnMouseWheel(WPARAM wParam, LPARAM lParam) {
         const float delta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wParam)) / static_cast<float>(WHEEL_DELTA);
-        if (delta != 0.0f) {
-            ScrollBy(-delta * wheelStep);
+        if (delta == 0.0f) {
+            return;
         }
+
+        // Prefer scrolling the control under the cursor (ListView/TreeView pill bars).
+        POINT screen{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+        POINT client = screen;
+        ScreenToClient(m_hwnd, &client);
+        const float x = static_cast<float>(client.x);
+        const float y = static_cast<float>(client.y);
+        const bool shiftHeld = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+
+        if (m_root && m_root->OnMouseWheel(delta, x, y, shiftHeld)) {
+            InvalidateRect(m_hwnd, nullptr, FALSE);
+            return;
+        }
+
+        const float wheelStep = std::max(24.0f, 56.0f * m_uiContext.dpiScale);
+        ScrollBy(-delta * wheelStep);
     }
 
     void EnsureElementVisible(UIElement* element) {
@@ -1242,7 +1267,7 @@ private:
                 OnMouseLeave();
                 return 0;
             case WM_MOUSEWHEEL:
-                OnMouseWheel(wParam);
+                OnMouseWheel(wParam, lParam);
                 return 0;
             case WM_VSCROLL:
                 if (OnVerticalScroll(wParam)) {
@@ -1302,6 +1327,11 @@ private:
                     }
                     return 0;
                 }
+                if (wParam == kQuitTimerId) {
+                    KillTimer(hwnd, kQuitTimerId);
+                    PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    return 0;
+                }
                 break;
             case WM_PAINT:
                 OnPaint();
@@ -1310,6 +1340,7 @@ private:
                 return 1;
             case WM_DESTROY:
                 KillTimer(hwnd, kUiTimerId);
+                KillTimer(hwnd, kQuitTimerId);
                 PostQuitMessage(0);
                 return 0;
             default:
