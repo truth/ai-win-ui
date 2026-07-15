@@ -103,6 +103,8 @@ Notes:
 - Layered mode currently forces the **Direct2D** backend (Skia layered present is future work).
 - Clear color is fully transparent; UI must paint opaque content where the window should be solid.
 - Resize borders remain active on the HWND rect even over transparent margins; caption/client hits honor alpha.
+- App paints a soft multi-pass drop shadow under the first child card of the root panel.
+- When maximized, floating padding and card corner radius collapse so the shell fills the work area.
 
 ## Limits
 

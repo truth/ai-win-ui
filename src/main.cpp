@@ -532,8 +532,89 @@ private:
         if (m_renderer) {
             m_renderer->Resize(static_cast<UINT>(m_viewportWidth), static_cast<UINT>(m_viewportHeight));
         }
+        SyncLayeredShellForWindowState();
         UpdateLayout();
         InvalidateRect(m_hwnd, nullptr, FALSE);
+    }
+
+    // When layered is maximized, collapse floating margins / radius so the card
+    // fills the work area cleanly; restore the floating shell when restored.
+    void SyncLayeredShellForWindowState() {
+        if (!m_windowChrome.IsLayered() || !m_root) {
+            return;
+        }
+        auto* rootPanel = dynamic_cast<Panel*>(m_root.get());
+        if (!rootPanel) {
+            return;
+        }
+        if (!m_layeredShellCaptured) {
+            m_layeredRootPadding = rootPanel->padding;
+            if (!rootPanel->Children().empty()) {
+                if (auto* card = dynamic_cast<Panel*>(rootPanel->Children().front().get())) {
+                    m_layeredCardRadius = card->cornerRadius;
+                }
+            }
+            m_layeredShellCaptured = true;
+        }
+
+        const bool maximized = m_hwnd && IsZoomed(m_hwnd);
+        if (maximized) {
+            rootPanel->padding = Thickness{};
+            if (!rootPanel->Children().empty()) {
+                if (auto* card = dynamic_cast<Panel*>(rootPanel->Children().front().get())) {
+                    card->cornerRadius = 0.0f;
+                }
+            }
+        } else {
+            rootPanel->padding = m_layeredRootPadding;
+            if (!rootPanel->Children().empty()) {
+                if (auto* card = dynamic_cast<Panel*>(rootPanel->Children().front().get())) {
+                    card->cornerRadius = m_layeredCardRadius;
+                }
+            }
+        }
+    }
+
+    static Rect ExpandRect(const Rect& rect, float amount) {
+        return Rect::Make(
+            rect.left - amount,
+            rect.top - amount,
+            rect.right + amount,
+            rect.bottom + amount);
+    }
+
+    // Soft multi-pass shadow under the floating card (layered present only).
+    void DrawLayeredCardShadow(IRenderer& renderer) const {
+        if (!m_root || m_root->Children().empty()) {
+            return;
+        }
+        const UIElement* card = m_root->Children().front().get();
+        if (!card) {
+            return;
+        }
+        const Rect bounds = card->Bounds();
+        if (bounds.Width() <= 1.0f || bounds.Height() <= 1.0f) {
+            return;
+        }
+
+        float radius = 18.0f * m_uiContext.dpiScale;
+        if (const auto* cardPanel = dynamic_cast<const Panel*>(card)) {
+            radius = cardPanel->cornerRadius * m_uiContext.dpiScale;
+        }
+        // Skip shadow when maximized (full-bleed card).
+        if (radius < 0.5f) {
+            return;
+        }
+
+        for (int i = 5; i >= 1; --i) {
+            const float expand = static_cast<float>(i) * 3.0f * m_uiContext.dpiScale;
+            const float drop = static_cast<float>(i) * 1.2f * m_uiContext.dpiScale;
+            const float alpha = 0.035f * static_cast<float>(6 - i);
+            Rect shadow = ExpandRect(bounds, expand);
+            shadow.top += drop;
+            shadow.bottom += drop;
+            renderer.FillRoundedRect(shadow, Color{0.0f, 0.0f, 0.0f, alpha}, radius + expand * 0.35f);
+        }
     }
 
     void UpdateLayout() {
@@ -565,15 +646,26 @@ private:
                 ? Color{0.0f, 0.0f, 0.0f, 0.0f}
                 : ColorFromHex(0x101010);
             m_renderer->BeginFrame(clearColor);
+            if (m_windowChrome.IsLayered()) {
+                DrawLayeredCardShadow(*m_renderer);
+            }
             if (m_root) {
                 m_root->Render(*m_renderer);
             }
             if (m_windowChrome.IsCustom() && m_viewportWidth > 1.0f && m_viewportHeight > 1.0f) {
-                // Dim the caption band when inactive (Fluent-like inactive chrome).
+                // Dim caption on inactive windows. Prefer the card title strip when layered
+                // so transparent margins stay clear.
                 if (!m_uiContext.windowActive && m_captionBandHeight > 0.0f) {
-                    m_renderer->FillRect(
-                        Rect::Make(0.0f, 0.0f, m_viewportWidth, m_captionBandHeight),
-                        Color{0.0f, 0.0f, 0.0f, 0.28f});
+                    Rect dimRect = Rect::Make(0.0f, 0.0f, m_viewportWidth, m_captionBandHeight);
+                    if (m_windowChrome.IsLayered() && m_root && !m_root->Children().empty()) {
+                        const Rect card = m_root->Children().front()->Bounds();
+                        dimRect = Rect::Make(
+                            card.left,
+                            card.top,
+                            card.right,
+                            std::min(card.bottom, card.top + m_captionBandHeight));
+                    }
+                    m_renderer->FillRect(dimRect, Color{0.0f, 0.0f, 0.0f, 0.28f});
                 }
                 // Opaque custom chrome needs an edge; layered shapes define their own outline in UI.
                 if (!m_windowChrome.IsLayered()) {
@@ -1109,6 +1201,9 @@ private:
     WindowChrome m_windowChrome;
     bool m_chromeEnvForced = false;
     float m_captionBandHeight = 44.0f;
+    bool m_layeredShellCaptured = false;
+    Thickness m_layeredRootPadding{28.0f, 28.0f, 28.0f, 28.0f};
+    float m_layeredCardRadius = 18.0f;
     std::unique_ptr<IRenderer> m_renderer;
     std::unique_ptr<ITextMeasurer> m_textMeasurer;
     std::unique_ptr<ILayoutEngine> m_layoutEngine;
