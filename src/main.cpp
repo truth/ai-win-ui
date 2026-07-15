@@ -1,5 +1,6 @@
-﻿#include "application.h"
+#include "application.h"
 #include "host_options.h"
+#include "ui_host.h"
 #include "layout_parser.h"
 #include "layout_engine.h"
 #include "renderer.h"
@@ -91,13 +92,13 @@ UINT GetWindowDpiWithFallback(HWND hwnd) {
 } // namespace
 
 // Process-wide multi-host lives in ai_win_ui::Application (src/application.*).
-class App;
+class UiHost;
 void PurgeClosedSecondaryHosts();
 
-class App {
+class UiHost {
 public:
-    ~App() {
-        // Never leave a live HWND with USERDATA pointing at a destroyed App.
+    ~UiHost() {
+        // Never leave a live HWND with USERDATA pointing at a destroyed UiHost.
         TeardownWindow();
     }
 
@@ -105,7 +106,7 @@ public:
         m_instance = instance;
         m_cmdShow = cmdShow;
 
-        // AI_WIN_UI_IGNORE_ENV=1|true → ignore sticky layout/chrome/size/theme/styles
+        // AI_WIN_UI_IGNORE_ENV=1|true �� ignore sticky layout/chrome/size/theme/styles
         // (keeps RENDERER so scripts can still pick backend).
         ApplyIgnoreEnvIfRequested();
         // Legacy window-level vertical scroll (root content taller than client).
@@ -113,7 +114,7 @@ public:
         m_windowScrollEnabled = !EnvTruthy(GetEnvironmentValue(L"AI_WIN_UI_DISABLE_WINDOW_SCROLL"));
 
         WNDCLASSW wc{};
-        wc.lpfnWndProc = &App::WndProcSetup;
+        wc.lpfnWndProc = &UiHost::WndProcSetup;
         wc.hInstance = instance;
         wc.lpszClassName = kWindowClassName;
         wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
@@ -368,10 +369,10 @@ public:
 
     // For Application::PurgeClosedSecondaries type-erased callbacks.
     static bool HostIsClosed(void* host) {
-        return host && static_cast<App*>(host)->IsClosed();
+        return host && static_cast<UiHost*>(host)->IsClosed();
     }
     static void HostDestroy(void* host) {
-        delete static_cast<App*>(host);
+        delete static_cast<UiHost*>(host);
     }
 
     // Open a secondary host from structured options (H2). Prefer this over raw env.
@@ -404,7 +405,7 @@ public:
         // Never auto-quit secondary hosts.
         SetEnvironmentVariableW(L"AI_WIN_UI_QUIT_AFTER_MS", nullptr);
 
-        App* host = new App();
+        UiHost* host = new UiHost();
         host->m_isSecondary = true;
         const bool ok = host->Initialize(instance, SW_SHOWNORMAL);
 
@@ -1255,8 +1256,8 @@ private:
         UpdateScrollBar();
     }
 
-    // AI_WIN_UI_MEASURE_DUMP=1 → measure_dump.ndjson next to exe
-    // AI_WIN_UI_MEASURE_DUMP=path\to\out.ndjson → explicit path
+    // AI_WIN_UI_MEASURE_DUMP=1 �� measure_dump.ndjson next to exe
+    // AI_WIN_UI_MEASURE_DUMP=path\to\out.ndjson �� explicit path
     void MaybeDumpMeasureTree() {
         const std::wstring dumpEnv = GetEnvironmentValue(L"AI_WIN_UI_MEASURE_DUMP");
         if (dumpEnv.empty() || !m_root) {
@@ -1307,7 +1308,7 @@ private:
         OutputDebugStringW((L"[MeasureDump] wrote " + outPathW + L"\n").c_str());
     }
 
-    // AI_WIN_UI_TEXT_DUMP=1|path → NDJSON of Label measure sizes (Wave1 R/A6).
+    // AI_WIN_UI_TEXT_DUMP=1|path �� NDJSON of Label measure sizes (Wave1 R/A6).
     void MaybeDumpTextMetrics() {
         const std::wstring dumpEnv = GetEnvironmentValue(L"AI_WIN_UI_TEXT_DUMP");
         if (dumpEnv.empty() || !m_root || !m_uiContext.textMeasurer) {
@@ -1461,7 +1462,7 @@ private:
         // Expanded popups (ComboBox list) win over normal tree z-order.
         UIElement* overlayHit = m_root->FindOverlayHitAt(x, y);
 
-        // Click outside any open overlay → dismiss (keep header clicks for toggle).
+        // Click outside any open overlay �� dismiss (keep header clicks for toggle).
         if (!overlayHit) {
             if (m_root->DismissOverlaysAt(x, y)) {
                 InvalidateRect(m_hwnd, nullptr, FALSE);
@@ -1542,7 +1543,7 @@ private:
             return;
         }
 
-        // Legacy host scroll — opt out with AI_WIN_UI_DISABLE_WINDOW_SCROLL=1
+        // Legacy host scroll �� opt out with AI_WIN_UI_DISABLE_WINDOW_SCROLL=1
         if (!m_windowScrollEnabled) {
             return;
         }
@@ -1623,6 +1624,12 @@ private:
 
         if (m_focusedElement && m_focusedElement->OnKeyDown(wParam, lParam)) {
             UpdateImeWindow();
+            return true;
+        }
+
+        // Host-level Esc: collapse any remaining open overlays (C2).
+        if (wParam == VK_ESCAPE && m_root && m_root->DismissAllOverlays()) {
+            InvalidateRect(m_hwnd, nullptr, FALSE);
             return true;
         }
 
@@ -1845,16 +1852,16 @@ private:
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         if (msg == WM_NCCREATE) {
             const auto* cs = reinterpret_cast<CREATESTRUCTW*>(lParam);
-            auto* app = static_cast<App*>(cs->lpCreateParams);
+            auto* app = static_cast<UiHost*>(cs->lpCreateParams);
             SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(app));
-            SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&App::WndProcThunk));
+            SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&UiHost::WndProcThunk));
             return app->HandleMessage(hwnd, msg, wParam, lParam);
         }
         return DefWindowProcW(hwnd, msg, wParam, lParam);
     }
 
     static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
-        auto* app = reinterpret_cast<App*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
+        auto* app = reinterpret_cast<UiHost*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
         return app ? app->HandleMessage(hwnd, msg, wParam, lParam) : DefWindowProcW(hwnd, msg, wParam, lParam);
     }
 
@@ -2091,16 +2098,33 @@ private:
 };
 
 void PurgeClosedSecondaryHosts() {
-    ai_win_ui::Application::PurgeClosedSecondaries(&App::HostIsClosed, &App::HostDestroy);
+    ai_win_ui::Application::PurgeClosedSecondaries(&UiHost::HostIsClosed, &UiHost::HostDestroy);
 }
+
+namespace ai_win_ui {
+
+bool OpenSecondaryUiHost(HINSTANCE instance, const OpenHostOptions& options) {
+    return UiHost::OpenSecondaryHost(instance, options);
+}
+
+bool OpenSecondaryUiHost(
+    HINSTANCE instance,
+    const wchar_t* layoutRelPath,
+    const wchar_t* chromeMode,
+    const wchar_t* sizeWh,
+    RendererBackend renderer) {
+    return UiHost::OpenSecondaryHost(instance, layoutRelPath, chromeMode, sizeWh, renderer);
+}
+
+} // namespace ai_win_ui
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {
     InitializeDpiAwareness();
 
-    App app;
-    if (!app.Initialize(instance, cmdShow)) {
-        MessageBoxW(nullptr, L"Failed to initialize app.", L"Error", MB_ICONERROR);
+    UiHost host;
+    if (!host.Initialize(instance, cmdShow)) {
+        MessageBoxW(nullptr, L"Failed to initialize UiHost.", L"Error", MB_ICONERROR);
         return -1;
     }
-    return app.Run();
+    return host.Run();
 }

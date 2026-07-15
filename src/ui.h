@@ -163,6 +163,16 @@ public:
         return changed;
     }
 
+    // Close every open overlay regardless of pointer (Esc / host-level cancel).
+    // Default: walk children. Overlay owners (ComboBox, future Popup) override.
+    virtual bool DismissAllOverlays() {
+        bool changed = false;
+        for (auto& child : m_children) {
+            changed = child->DismissAllOverlays() || changed;
+        }
+        return changed;
+    }
+
     virtual bool IsFocusable() const { return false; }
     bool HasFocus() const { return m_hasFocus; }
     bool IsHovered() const { return m_hovered; }
@@ -7499,6 +7509,16 @@ public:
         if (m_expanded &&
             !HeaderRect().Contains(x, y) &&
             !DropdownRect().Contains(x, y)) {
+            m_expanded = false;
+            m_hoveredIndex = -1;
+            changed = true;
+        }
+        return changed;
+    }
+
+    bool DismissAllOverlays() override {
+        bool changed = UIElement::DismissAllOverlays();
+        if (m_expanded) {
             m_expanded = false;
             m_hoveredIndex = -1;
             changed = true;

@@ -22,7 +22,11 @@ older design snapshot.
 - `doc/mvp-execution-plan.md`
   - ordered next-step work plan with phase goals and exit criteria
 - `doc/mvp-acceptance.md`
-  - repeatable manual validation checklist for MVP sign-off
+  - repeatable manual validation checklist for MVP sign-off (+ Gallery Q4 表)
+- `doc/overlay-popup-contract.md`
+  - overlay z-order / 点外关闭 / Esc（C2→C4）
+- `doc/keyboard-matrix.md`
+  - 控件键盘操作矩阵
 - `doc/advanced-rendering-workplan.md`
   - phased plan for statistics components, table component, and seagull animation
 - `doc/yoga-integration.md`
@@ -56,6 +60,8 @@ abstractions:
 | Theme tokens | `src/theme.*` |
 | Window chrome | `src/window_chrome.*` |
 | Layout parse | `src/layout_parser.*` |
+| **UiHost / multi-host** | **`src/ui_host.h`**, `src/application.*`, `src/host_options.h` |
+| Host impl (TU) | `src/main.cpp` (`class UiHost`) |
 
 The app currently supports:
 

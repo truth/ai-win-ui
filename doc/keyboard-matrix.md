@@ -11,7 +11,7 @@
 | Slider | 是 | 调值 | — | — | min/max? | 大步? | | partial |
 | ProgressBar | 否 | — | — | — | — | — | 只读 | ok |
 | ListBox | 是 | 上下选 | 确认? | — | 首/末 | 翻页 | | ok |
-| ComboBox | 是 | 开列表后上下 | 开/选 | 关列表 | — | — | | partial |
+| ComboBox | 是 | 开列表后上下 | 开/选 | 关列表 | — | — | 点外关闭 | ok |
 | TabControl | 是 | 左右 tab? | 激活 | — | — | — | | partial |
 | ListView | 是 | 上下选 | — | — | 首/末 | 翻页 | 左右横滚 | ok |
 | TreeView | 是 | 上下/左右展开 | — | — | — | — | | ok |
@@ -27,9 +27,9 @@
 
 ## 已知缺口（C2/C3 后续）
 
-1. Combo 下拉 **点外部关闭**：已用 `DismissOverlaysAt`（2026-07-15）；完整 Popup 层仍待 C4。  
+1. Combo 下拉 **点外 + Esc 关闭**：`DismissOverlaysAt` / `DismissAllOverlays`（见 `overlay-popup-contract.md`）；通用 Popup 宿主仍待 **C4**。  
 2. Radio 组内箭头键切换未强制。  
-3. **IME**：合成窗位置随 caret（R3 caret 已改为最近边界；IME 窗跟随待验）。  
+3. **IME**：caret 锚点 + candidate exclude + composition font 已加；CJK 实机仍建议手测。  
 4. DataTable 编辑态 Esc 取消需验收。
 
 ## 相关页面

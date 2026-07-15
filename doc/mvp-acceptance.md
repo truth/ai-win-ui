@@ -191,3 +191,44 @@ The current build can be considered ready for MVP sign-off when:
 3. Yoga validation is stable on `yoga_measure_cases.xml`
 4. image and clipping validation is stable on `skia_image_cases.xml`
 5. remaining backend differences are documented and judged non-blocking for MVP
+
+---
+
+## Gallery 手工验收表（Wave1 · Q4）
+
+入口：`layouts/demo_gallery.xml`（别名 `gallery` / `demo-gallery`）。
+
+```powershell
+.\scripts\clear_ai_win_env.ps1   # 建议先清粘连 env
+.\scripts\run_layout_demo.ps1 -Layout gallery -Renderer skia
+# 或 headless 仅冒烟：
+.\scripts\run_headless_smoke.ps1 -Profile full -Renderer skia -SkipBuild
+.\scripts\check_gallery_coverage.ps1
+```
+
+对 **每一张卡** 勾选（打开子窗 → 关子窗 → 主窗仍活）：
+
+| 卡 / 布局 | 打开 OK | 关子窗 OK | 无崩 | 备注 |
+|-----------|---------|-----------|------|------|
+| Core Validation | ☐ | ☐ | ☐ | |
+| Yoga Measure | ☐ | ☐ | ☐ | |
+| Core Controls V2 | ☐ | ☐ | ☐ | Combo 点外/Esc 关列表 |
+| Navigation | ☐ | ☐ | ☐ | |
+| Advanced Inputs | ☐ | ☐ | ☐ | |
+| Table | ☐ | ☐ | ☐ | |
+| Stats | ☐ | ☐ | ☐ | |
+| Scroll Viewer | ☐ | ☐ | ☐ | 拖拽 + 滚轮 |
+| Text Wrap Cases | ☐ | ☐ | ☐ | R2 |
+| CJK Render | ☐ | ☐ | ☐ | |
+| Skia Image | ☐ | ☐ | ☐ | |
+| Style Catalog | ☐ | ☐ | ☐ | |
+| Shaped Hub | ☐ | ☐ | ☐ | layered 子窗 |
+| Custom / Layered Chrome | ☐ | ☐ | ☐ | |
+| Dashboard | ☐ | ☐ | ☐ | |
+| Seagull | ☐ | ☐ | ☐ | |
+| demo_gallery 自身 | ☐ | — | ☐ | 滚到底无裁切错乱 |
+
+**进程内多窗：** 默认 in-process；关子窗不得 `PostQuit` 整个进程。  
+**粘连 env：** 异常启动先 `clear_ai_win_env` 或 `AI_WIN_UI_IGNORE_ENV=1`。
+
+覆盖脚本（路径存在性，非交互）：`scripts/check_gallery_coverage.ps1` 必须 PASS。

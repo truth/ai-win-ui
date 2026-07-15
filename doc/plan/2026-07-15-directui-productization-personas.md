@@ -322,7 +322,7 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 |----|------|------|
 | H3 | **done** | 启动 `LogEffectiveEnv`；标题显示 chrome；`AI_WIN_UI_IGNORE_ENV` |
 | H2 | **done** | `OpenHostOptions` in `host_options.h` + `OpenSecondaryHost(options)` |
-| H1 | **partial** | `application.h/cpp` 多 host 注册表；`App` 仍主写，完整 UiHost 类后续 |
+| H1 | **done** | `UiHost`（原 App）+ `ui_host.h` 公开 `OpenSecondaryUiHost`；`Application` 进程注册 |
 | Q5 | **done** | `scripts/clear_ai_win_env.ps1` |
 | Q1 | **done** | `scripts/check_gallery_coverage.ps1` |
 | Q2 | **done** | `core-validation` skia+d2d + scroll-viewer skia（`tests/golden/`） |
@@ -333,8 +333,9 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 | L1 | **done** | `AI_WIN_UI_DISABLE_WINDOW_SCROLL=1` |
 | L6 | **done** | GridPanel → Yoga flex-wrap MeasureGrid |
 | C1 | **done** | `doc/keyboard-matrix.md` |
-| C2 | **partial** | Combo `DismissOverlaysAt` 点外关闭；完整 Popup 仍 open |
+| C2 | **done** | Combo 点外 + Esc `DismissAllOverlays`；`doc/overlay-popup-contract.md`（C4 Popup 仍 open） |
 | C3 | **partial** | IME：caret 顶锚点 + candidate exclude 输入框 + Segoe UI composition font |
+| Q4 | **done** | `mvp-acceptance.md` Gallery 手工验收表 |
 | S1 | **done** | `doc/plan/token-migration-strategy.md` |
 | S2 | **done** | `style-catalog.md` Theme vs Catalog 职责边界表 |
 | S3 | **done** | 启动 `[Theme]/`/`[Styles]` 路径 + styleCount；`LogEffectiveEnv` themeFile/stylesFiles |

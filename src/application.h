@@ -6,9 +6,8 @@
 #include <vector>
 
 // Process-wide multi-host registry (Wave1 H1).
-// Each top-level UI window is one host; last destroy posts quit.
-// Full UiHost class extraction from App remains incremental — this module owns
-// shared process state and message ids.
+// Each top-level UI window is one UiHost (see ui_host.h / main.cpp);
+// last destroy posts quit. This module owns shared process state and message ids.
 namespace ai_win_ui {
 
 constexpr UINT kMsgOpenDemoHost = WM_APP + 40;

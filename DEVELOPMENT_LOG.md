@@ -1,5 +1,9 @@
 # 开发日志
 
+## 2026-07-16
+
+- Wave1 续 7：H1 `App`→`UiHost` + `ui_host.h`/`OpenSecondaryUiHost`；C2 `DismissAllOverlays` + Esc；overlay 契约文档；Q4 gallery 验收表
+
 ## 2026-07-15
 
 - Wave1 续 6：R2 Skia CJK soft-break 对齐 DWrite wrapH；修复 compare/golden 脚本 PowerShell `>` 误用为重定向
