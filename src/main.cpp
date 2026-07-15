@@ -89,14 +89,30 @@ UINT GetWindowDpiWithFallback(HWND hwnd) {
 } // namespace
 
 // Process-wide multi-host: each App is one HWND + UI tree.
-// Last live host WM_DESTROY posts quit; secondaries are heap-owned.
+// Last live host WM_DESTROY posts quit; secondaries are heap-owned (raw ptrs;
+// App must be complete type at delete — see PurgeClosedSecondaryHosts after class).
 class App;
-std::vector<std::unique_ptr<App>> g_secondaryHosts;
+std::vector<App*> g_secondaryHosts;
 int g_liveHostCount = 0;
 void PurgeClosedSecondaryHosts();
+constexpr UINT WM_APP_OPEN_SHAPED_HOST = WM_APP + 40;
+
+struct PendingShapedHost {
+    std::wstring layout;
+    std::wstring size;
+    RendererBackend renderer = RendererBackend::Direct2D;
+};
+// One deferred open request (filled by button handler, consumed on WM_APP_OPEN_SHAPED_HOST).
+PendingShapedHost g_pendingShapedHost{};
+bool g_hasPendingShapedHost = false;
 
 class App {
 public:
+    ~App() {
+        // Never leave a live HWND with USERDATA pointing at a destroyed App.
+        TeardownWindow();
+    }
+
     bool Initialize(HINSTANCE instance, int cmdShow) {
         m_instance = instance;
         m_cmdShow = cmdShow;
@@ -185,6 +201,11 @@ public:
 
         ++g_liveHostCount;
 
+        auto fail = [this]() -> bool {
+            TeardownWindow();
+            return false;
+        };
+
         UpdateDpiContext(GetWindowDpiWithFallback(m_hwnd));
         m_windowChrome.SetDpi(m_uiContext.dpi);
         if (m_windowChrome.IsCustom()) {
@@ -193,19 +214,19 @@ public:
 
         m_requestedRendererBackend = ParseRendererBackend(GetEnvironmentValue(L"AI_WIN_UI_RENDERER"));
         if (!InitializeRenderer()) {
-            return false;
+            return fail();
         }
         m_uiContext.renderer = m_renderer.get();
 
         m_textMeasurer = CreateTextMeasurer(m_activeRendererBackend);
         if (!m_textMeasurer) {
-            return false;
+            return fail();
         }
         m_uiContext.textMeasurer = m_textMeasurer.get();
 
         m_layoutEngine = CreateDefaultLayoutEngine();
         if (!m_layoutEngine) {
-            return false;
+            return fail();
         }
         m_uiContext.layoutEngine = m_layoutEngine.get();
 
@@ -242,14 +263,40 @@ public:
         SetTimer(m_hwnd, kUiTimerId, kUiTimerIntervalMs, nullptr);
 
         // Headless/smoke: AI_WIN_UI_QUIT_AFTER_MS=1500 exits after layout paints.
-        const std::wstring quitAfter = GetEnvironmentValue(L"AI_WIN_UI_QUIT_AFTER_MS");
-        if (!quitAfter.empty()) {
-            const int ms = _wtoi(quitAfter.c_str());
-            if (ms > 0) {
-                SetTimer(m_hwnd, kQuitTimerId, static_cast<UINT>(ms), nullptr);
+        // Do not apply quit timer to secondary hosts (would close them unexpectedly).
+        if (!m_isSecondary) {
+            const std::wstring quitAfter = GetEnvironmentValue(L"AI_WIN_UI_QUIT_AFTER_MS");
+            if (!quitAfter.empty()) {
+                const int ms = _wtoi(quitAfter.c_str());
+                if (ms > 0) {
+                    SetTimer(m_hwnd, kQuitTimerId, static_cast<UINT>(ms), nullptr);
+                }
             }
         }
         return true;
+    }
+
+    void TeardownWindow() {
+        m_isInitialized = false;
+        if (m_hwnd) {
+            KillTimer(m_hwnd, kUiTimerId);
+            KillTimer(m_hwnd, kQuitTimerId);
+            SetWindowLongPtrW(m_hwnd, GWLP_USERDATA, 0);
+            const HWND hwnd = m_hwnd;
+            m_hwnd = nullptr;
+            // DestroyWindow may re-enter WM_DESTROY; guard with m_tearingDown.
+            if (!m_tearingDown && IsWindow(hwnd)) {
+                m_tearingDown = true;
+                DestroyWindow(hwnd);
+                m_tearingDown = false;
+            }
+        }
+        m_renderer.reset();
+        m_textMeasurer.reset();
+        m_layoutEngine.reset();
+        m_root.reset();
+        m_focusedElement = nullptr;
+        m_mouseCaptureTarget = nullptr;
     }
 
     // Windows blocks SetForegroundWindow when launched from another process
@@ -314,20 +361,22 @@ public:
         return static_cast<int>(msg.wParam);
     }
 
-    // In-process secondary host (shaped / extra windows). Owned by g_secondaryHosts.
+    // In-process secondary host (shaped / extra windows). Heap-owned via g_secondaryHosts.
     static bool OpenSecondaryHost(
         HINSTANCE instance,
         const wchar_t* layoutRelPath,
         const wchar_t* chromeMode,
         const wchar_t* sizeWh,
         RendererBackend renderer) {
-        auto host = std::make_unique<App>();
-        host->m_isSecondary = true;
-
-        const std::wstring prevLayout = host->GetEnvironmentValue(L"AI_WIN_UI_LAYOUT");
-        const std::wstring prevChrome = host->GetEnvironmentValue(L"AI_WIN_UI_CHROME");
-        const std::wstring prevSize = host->GetEnvironmentValue(L"AI_WIN_UI_SIZE");
-        const std::wstring prevRenderer = host->GetEnvironmentValue(L"AI_WIN_UI_RENDERER");
+        // Snapshot parent env without mutating globals until the last moment.
+        wchar_t prevLayoutBuf[512] = {};
+        wchar_t prevChromeBuf[512] = {};
+        wchar_t prevSizeBuf[512] = {};
+        wchar_t prevRendererBuf[512] = {};
+        const DWORD nLayout = GetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", prevLayoutBuf, 512);
+        const DWORD nChrome = GetEnvironmentVariableW(L"AI_WIN_UI_CHROME", prevChromeBuf, 512);
+        const DWORD nSize = GetEnvironmentVariableW(L"AI_WIN_UI_SIZE", prevSizeBuf, 512);
+        const DWORD nRenderer = GetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", prevRendererBuf, 512);
 
         SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", layoutRelPath);
         if (chromeMode && chromeMode[0] != L'\0') {
@@ -339,25 +388,31 @@ public:
         SetEnvironmentVariableW(
             L"AI_WIN_UI_RENDERER",
             renderer == RendererBackend::Skia ? L"skia" : L"direct2d");
+        // Never auto-quit secondary hosts.
+        SetEnvironmentVariableW(L"AI_WIN_UI_QUIT_AFTER_MS", nullptr);
 
+        App* host = new App();
+        host->m_isSecondary = true;
         const bool ok = host->Initialize(instance, SW_SHOWNORMAL);
 
-        auto restore = [](const wchar_t* name, const std::wstring& value) {
-            if (value.empty()) {
+        auto restore = [](const wchar_t* name, DWORD n, const wchar_t* buf) {
+            if (n == 0 || n >= 512) {
                 SetEnvironmentVariableW(name, nullptr);
             } else {
-                SetEnvironmentVariableW(name, value.c_str());
+                SetEnvironmentVariableW(name, buf);
             }
         };
-        restore(L"AI_WIN_UI_LAYOUT", prevLayout);
-        restore(L"AI_WIN_UI_CHROME", prevChrome);
-        restore(L"AI_WIN_UI_SIZE", prevSize);
-        restore(L"AI_WIN_UI_RENDERER", prevRenderer);
+        restore(L"AI_WIN_UI_LAYOUT", nLayout, prevLayoutBuf);
+        restore(L"AI_WIN_UI_CHROME", nChrome, prevChromeBuf);
+        restore(L"AI_WIN_UI_SIZE", nSize, prevSizeBuf);
+        restore(L"AI_WIN_UI_RENDERER", nRenderer, prevRendererBuf);
 
         if (!ok) {
+            // Initialize already tore down the HWND on failure.
+            delete host;
             return false;
         }
-        g_secondaryHosts.push_back(std::move(host));
+        g_secondaryHosts.push_back(host);
         return true;
     }
 
@@ -596,21 +651,19 @@ private:
     }
 
     // Default: same-process secondary host. Set AI_WIN_UI_CHILD_PROCESS=1 for CreateProcess.
+    // Deferred via PostMessage so we never CreateWindow re-entrantly inside mouse handlers.
     void LaunchShapedChild(const wchar_t* layoutRelPath, const wchar_t* sizeWh) {
         const std::wstring forceProcess = GetEnvironmentValue(L"AI_WIN_UI_CHILD_PROCESS");
         const bool useProcess =
             forceProcess == L"1" || forceProcess == L"true" || forceProcess == L"TRUE";
 
         if (!useProcess) {
-            if (OpenSecondaryHost(
-                    m_instance,
-                    layoutRelPath,
-                    L"layered",
-                    sizeWh,
-                    m_activeRendererBackend)) {
-                SetWindowTextW(m_hwnd, L"Opened shaped window (in-process)");
-            } else {
-                SetWindowTextW(m_hwnd, L"Failed to open in-process shaped window");
+            g_pendingShapedHost.layout = layoutRelPath ? layoutRelPath : L"";
+            g_pendingShapedHost.size = sizeWh ? sizeWh : L"";
+            g_pendingShapedHost.renderer = m_activeRendererBackend;
+            g_hasPendingShapedHost = true;
+            if (m_hwnd) {
+                PostMessageW(m_hwnd, WM_APP_OPEN_SHAPED_HOST, 0, 0);
             }
             return;
         }
@@ -957,7 +1010,7 @@ private:
         UpdateScrollBar();
     }
 
-    // AI_WIN_UI_MEASURE_DUMP=1 → measure_dump.json next to exe
+    // AI_WIN_UI_MEASURE_DUMP=1 → measure_dump.ndjson next to exe
     // AI_WIN_UI_MEASURE_DUMP=path\to\out.ndjson → explicit path
     void MaybeDumpMeasureTree() {
         const std::wstring dumpEnv = GetEnvironmentValue(L"AI_WIN_UI_MEASURE_DUMP");
@@ -965,15 +1018,17 @@ private:
             return;
         }
 
-        std::wstring outPath = dumpEnv;
+        std::wstring outPathW = dumpEnv;
         if (dumpEnv == L"1" || dumpEnv == L"true" || dumpEnv == L"TRUE") {
             const std::wstring dir = GetExecutableDirectory();
-            outPath = dir.empty() ? L"measure_dump.ndjson" : (dir + L"\\measure_dump.ndjson");
+            outPathW = dir.empty() ? L"measure_dump.ndjson" : (dir + L"\\measure_dump.ndjson");
         }
 
-        std::ofstream out(outPath, std::ios::binary | std::ios::trunc);
+        // Prefer narrow path for ofstream portability (ACP on Windows is fine for ASCII paths).
+        const std::string outPath = Utf16ToUtf8(outPathW);
+        std::ofstream out(outPath.empty() ? "measure_dump.ndjson" : outPath, std::ios::binary | std::ios::trunc);
         if (!out) {
-            OutputDebugStringW((L"[MeasureDump] failed to open " + outPath + L"\n").c_str());
+            OutputDebugStringW((L"[MeasureDump] failed to open " + outPathW + L"\n").c_str());
             return;
         }
 
@@ -1004,7 +1059,7 @@ private:
         };
         walk(m_root.get(), "", 0);
         out.flush();
-        OutputDebugStringW((L"[MeasureDump] wrote " + outPath + L"\n").c_str());
+        OutputDebugStringW((L"[MeasureDump] wrote " + outPathW + L"\n").c_str());
     }
 
     void OnPaint() {
@@ -1608,11 +1663,31 @@ private:
                 return 0;
             case WM_ERASEBKGND:
                 return 1;
+            case WM_APP_OPEN_SHAPED_HOST:
+                if (g_hasPendingShapedHost) {
+                    g_hasPendingShapedHost = false;
+                    const bool ok = OpenSecondaryHost(
+                        m_instance,
+                        g_pendingShapedHost.layout.c_str(),
+                        L"layered",
+                        g_pendingShapedHost.size.empty() ? nullptr : g_pendingShapedHost.size.c_str(),
+                        g_pendingShapedHost.renderer);
+                    if (m_hwnd) {
+                        SetWindowTextW(
+                            m_hwnd,
+                            ok ? L"Opened shaped window (in-process)"
+                               : L"Failed to open in-process shaped window");
+                    }
+                }
+                return 0;
             case WM_DESTROY:
-                KillTimer(hwnd, kUiTimerId);
-                KillTimer(hwnd, kQuitTimerId);
+                if (!m_tearingDown) {
+                    KillTimer(hwnd, kUiTimerId);
+                    KillTimer(hwnd, kQuitTimerId);
+                }
                 SetWindowLongPtrW(hwnd, GWLP_USERDATA, 0);
                 m_hwnd = nullptr;
+                m_isInitialized = false;
                 m_closed = true;
                 if (g_liveHostCount > 0) {
                     --g_liveHostCount;
@@ -1632,6 +1707,7 @@ private:
     int m_cmdShow = SW_SHOWNORMAL;
     bool m_isSecondary = false;
     bool m_closed = false;
+    bool m_tearingDown = false;
     HWND m_hwnd = nullptr;
     UIContext m_uiContext{};
     WindowChrome m_windowChrome;
@@ -1661,14 +1737,15 @@ private:
 };
 
 void PurgeClosedSecondaryHosts() {
-    g_secondaryHosts.erase(
-        std::remove_if(
-            g_secondaryHosts.begin(),
-            g_secondaryHosts.end(),
-            [](const std::unique_ptr<App>& host) {
-                return host && host->IsClosed();
-            }),
-        g_secondaryHosts.end());
+    for (auto it = g_secondaryHosts.begin(); it != g_secondaryHosts.end();) {
+        App* host = *it;
+        if (host && host->IsClosed()) {
+            delete host;
+            it = g_secondaryHosts.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {

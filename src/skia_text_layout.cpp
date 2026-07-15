@@ -184,8 +184,14 @@ struct FontBundle {
 FontBundle CreateFontBundle(float fontSize, bool bold, bool italic) {
     FontBundle bundle;
     static sk_sp<SkFontMgr> s_fontMgr = skia_font::CreateDefaultFontManager();
+    if (!s_fontMgr) {
+        return bundle;
+    }
     bundle.fontMgr = s_fontMgr;
     bundle.typeface = skia_font::CreateDefaultTypeface(s_fontMgr.get(), bold, italic);
+    if (!bundle.typeface) {
+        return bundle;
+    }
     bundle.font = skia_font::CreateSkiaFont(fontSize, bundle.typeface.get());
     return bundle;
 }
