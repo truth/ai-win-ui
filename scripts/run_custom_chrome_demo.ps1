@@ -29,5 +29,5 @@ Write-Host "Layout : layouts/custom_chrome_demo.xml"
 Write-Host "Exe    : $exePath"
 
 if (-not $NoLaunch) {
-    Start-Process -FilePath $exePath -WorkingDirectory (Split-Path -Parent $exePath) | Out-Null
+    Start-Process -FilePath $exePath -WorkingDirectory (Split-Path -Parent $exePath) -WindowStyle Normal
 }

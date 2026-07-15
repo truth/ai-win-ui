@@ -107,6 +107,7 @@ Notes:
 - When maximized, floating padding and card corner radius collapse so the shell fills the work area.
 - Placement centers on the **monitor under the cursor** (not always the primary).
 - Skia layered uses a shared DIB backing (zero-copy ULW); minimized windows skip presents.
+- Startup forces an initial layered present + foreground raise (`AttachThreadInput`) so command-line / script launches do not leave the window only on the taskbar.
 
 ```powershell
 # Skia layered (default for the script)

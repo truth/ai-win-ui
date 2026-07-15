@@ -183,10 +183,82 @@ public:
         ApplyChromeFromRootIfNeeded();
         m_isInitialized = true;
         OnResize();
-        ShowWindow(m_hwnd, cmdShow);
+
+        // Layered windows stay invisible until the first UpdateLayeredWindow.
+        // Force an initial paint while still hidden so the first ShowWindow has
+        // real per-pixel content (otherwise the window only "appears" after
+        // taskbar activation triggers a later paint).
+        if (m_windowChrome.IsLayered()) {
+            RedrawWindow(
+                m_hwnd,
+                nullptr,
+                nullptr,
+                RDW_INVALIDATE | RDW_UPDATENOW | RDW_INTERNALPAINT);
+        }
+
+        // Normalize shell show commands that would hide the window.
+        int showCmd = cmdShow;
+        if (showCmd == SW_HIDE || showCmd == 0) {
+            showCmd = SW_SHOWNORMAL;
+        }
+        ShowWindow(m_hwnd, showCmd);
         UpdateWindow(m_hwnd);
+        BringAppWindowToForeground(m_hwnd);
+
         SetTimer(m_hwnd, kUiTimerId, kUiTimerIntervalMs, nullptr);
         return true;
+    }
+
+    // Windows blocks SetForegroundWindow when launched from another process
+    // (console / PowerShell Start-Process). AttachThreadInput is the usual
+    // way to still raise our window so it does not sit only on the taskbar.
+    static void BringAppWindowToForeground(HWND hwnd) {
+        if (!hwnd) {
+            return;
+        }
+
+        if (IsIconic(hwnd)) {
+            ShowWindow(hwnd, SW_RESTORE);
+        } else {
+            ShowWindow(hwnd, SW_SHOW);
+        }
+
+        SetWindowPos(
+            hwnd,
+            HWND_TOP,
+            0,
+            0,
+            0,
+            0,
+            SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+
+        const HWND foreground = GetForegroundWindow();
+        const DWORD thisThread = GetCurrentThreadId();
+        DWORD foregroundThread = 0;
+        if (foreground) {
+            foregroundThread = GetWindowThreadProcessId(foreground, nullptr);
+        }
+
+        BOOL attached = FALSE;
+        if (foregroundThread != 0 && foregroundThread != thisThread) {
+            attached = AttachThreadInput(foregroundThread, thisThread, TRUE);
+        }
+
+        BringWindowToTop(hwnd);
+        SetForegroundWindow(hwnd);
+        SetActiveWindow(hwnd);
+        SetFocus(hwnd);
+
+        if (attached) {
+            AttachThreadInput(foregroundThread, thisThread, FALSE);
+        }
+
+        // Layered: ensure one more present after becoming visible/foreground.
+        RedrawWindow(
+            hwnd,
+            nullptr,
+            nullptr,
+            RDW_INVALIDATE | RDW_UPDATENOW | RDW_INTERNALPAINT);
     }
 
     int Run() {

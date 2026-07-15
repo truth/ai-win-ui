@@ -33,5 +33,12 @@ Write-Host "Layout   : layouts/layered_chrome_demo.xml"
 Write-Host "Exe      : $exePath"
 
 if (-not $NoLaunch) {
-    Start-Process -FilePath $exePath -WorkingDirectory (Split-Path -Parent $exePath) | Out-Null
+    # Prefer direct invocation so the new process can take foreground focus.
+    # Start-Process often leaves layered windows only on the taskbar until clicked.
+    Push-Location (Split-Path -Parent $exePath)
+    try {
+        Start-Process -FilePath $exePath -WorkingDirectory (Get-Location) -WindowStyle Normal
+    } finally {
+        Pop-Location
+    }
 }
