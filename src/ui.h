@@ -1142,6 +1142,45 @@ public:
         float width = -1.0f;
     };
 
+    DataTable() {
+        m_style = DefaultStyle(nullptr);
+    }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-1", ColorFromHex(0x121A24));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x304053));
+        shell.radius = CornerRadius::Uniform(
+            ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "lg", 10.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xC7D4E2));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+    }
+
     void SetColumns(std::vector<Column> columns) {
         CommitEdit(false);
         m_columns = std::move(columns);
@@ -4419,7 +4458,45 @@ private:
 // Keyboard: Up/Down (+/-step), PageUp/PageDown (+/-10*step), Home/End.
 class NumericUpDown : public UIElement {
 public:
-    explicit NumericUpDown(std::wstring label = L"") : m_label(std::move(label)) {}
+    explicit NumericUpDown(std::wstring label = L"") : m_label(std::move(label)) {
+        m_style = DefaultStyle(nullptr);
+    }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "input-bg", ColorFromHex(0x1A2431));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3A4B5D));
+        shell.radius = CornerRadius::Uniform(
+            ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xEAF3FF));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+
+        BoxDecoration focused = shell;
+        focused.border.width = Thickness{2, 2, 2, 2};
+        focused.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
+
+        BoxDecoration hover;
+        hover.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x2F4258));
+        s.overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+
+        BoxDecoration pressed;
+        pressed.background = ComponentStyle::ThemeColor(theme, "surface-4", ColorFromHex(0x3A5470));
+        s.overrides[static_cast<std::size_t>(StyleState::Pressed)].decoration = pressed;
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
 
     bool IsFocusable() const override { return true; }
 
@@ -4522,9 +4599,28 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
-        const float scaledCorner = ScaleValue(cornerRadius);
-        renderer.FillRoundedRect(m_bounds, background, scaledCorner);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCorner);
+        const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
+        Color shellBg = background;
+        Color shellBorder = borderColor;
+        float scaledCorner = ScaleValue(cornerRadius);
+        Color shellFg = textColor;
+        float shellFs = fontSize;
+        if (shell.decoration.has_value()) {
+            shellBg = shell.decoration->background;
+            shellBorder = shell.decoration->border.color;
+            if (!shell.decoration->radius.IsZero()) {
+                scaledCorner = ScaleValue(shell.decoration->radius.MaxRadius());
+            }
+        }
+        if (shell.foreground.has_value()) {
+            shellFg = *shell.foreground;
+        }
+        if (shell.fontSize.has_value()) {
+            shellFs = *shell.fontSize;
+        }
+
+        renderer.FillRoundedRect(m_bounds, shellBg, scaledCorner);
+        renderer.DrawRoundedRect(m_bounds, shellBorder, 1.0f, scaledCorner);
         if (m_hasFocus) {
             renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCorner);
         }
@@ -4535,7 +4631,7 @@ public:
         renderer.DrawLine(
             PointF{buttons.left, m_bounds.top + 1.0f},
             PointF{buttons.left, m_bounds.bottom - 1.0f},
-            borderColor,
+            shellBorder,
             1.0f);
         const float midY = (buttons.top + buttons.bottom) * 0.5f;
         renderer.DrawLine(
@@ -4566,8 +4662,8 @@ public:
             display.c_str(),
             static_cast<UINT32>(display.size()),
             field,
-            textColor,
-            ScaleValue(fontSize),
+            shellFg,
+            ScaleValue(shellFs),
             textOptions);
     }
 
@@ -4594,6 +4690,31 @@ public:
     float fontSize = 13.0f;
 
 private:
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+            glyphColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        const StyleSpec hover = m_style.Resolve(StyleState::Hover);
+        const StyleSpec pressed = m_style.Resolve(StyleState::Pressed);
+        if (hover.decoration.has_value()) {
+            buttonHoverBackground = hover.decoration->background;
+        }
+        if (pressed.decoration.has_value()) {
+            buttonPressedBackground = pressed.decoration->background;
+        }
+    }
+
     // 0 = none, 1 = up, 2 = down
     int ButtonFromPoint(float x, float y) const {
         if (UpButtonRect().Contains(x, y)) {
@@ -4711,6 +4832,7 @@ public:
     };
 
     explicit DateTimePicker(std::wstring label = L"") : m_label(std::move(label)) {
+        m_style = DefaultStyle(nullptr);
         SYSTEMTIME now = {};
         GetLocalTime(&now);
         m_year = now.wYear;
@@ -4721,6 +4843,42 @@ public:
         m_second = now.wSecond;
         ClampDay();
         EnsureActiveFieldValid();
+    }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "input-bg", ColorFromHex(0x1A2431));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3A4B5D));
+        shell.radius = CornerRadius::Uniform(
+            ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xEAF3FF));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+
+        BoxDecoration focused = shell;
+        focused.border.width = Thickness{2, 2, 2, 2};
+        focused.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
+
+        BoxDecoration hover;
+        hover.background = ComponentStyle::ThemeColor(theme, "surface-3", ColorFromHex(0x2F4258));
+        s.overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+
+        BoxDecoration pressed;
+        pressed.background = ComponentStyle::ThemeColor(theme, "surface-4", ColorFromHex(0x3A5470));
+        s.overrides[static_cast<std::size_t>(StyleState::Pressed)].decoration = pressed;
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
     }
 
     bool IsFocusable() const override { return true; }
@@ -4855,9 +5013,26 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
-        const float scaledCorner = ScaleValue(cornerRadius);
-        renderer.FillRoundedRect(m_bounds, background, scaledCorner);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCorner);
+        const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
+        Color shellBg = background;
+        Color shellBorder = borderColor;
+        float scaledCorner = ScaleValue(cornerRadius);
+        if (shell.decoration.has_value()) {
+            shellBg = shell.decoration->background;
+            shellBorder = shell.decoration->border.color;
+            if (!shell.decoration->radius.IsZero()) {
+                scaledCorner = ScaleValue(shell.decoration->radius.MaxRadius());
+            }
+        }
+        if (shell.foreground.has_value()) {
+            textColor = *shell.foreground;
+        }
+        if (shell.fontSize.has_value()) {
+            fontSize = *shell.fontSize;
+        }
+
+        renderer.FillRoundedRect(m_bounds, shellBg, scaledCorner);
+        renderer.DrawRoundedRect(m_bounds, shellBorder, 1.0f, scaledCorner);
         if (m_hasFocus) {
             renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCorner);
         }
@@ -4867,13 +5042,13 @@ public:
         renderer.DrawLine(
             PointF{buttons.left, m_bounds.top + 1.0f},
             PointF{buttons.left, m_bounds.bottom - 1.0f},
-            borderColor,
+            shellBorder,
             1.0f);
         const float midY = (buttons.top + buttons.bottom) * 0.5f;
         renderer.DrawLine(
             PointF{buttons.left + 1.0f, midY},
             PointF{buttons.right - 1.0f, midY},
-            borderColor,
+            shellBorder,
             1.0f);
 
         DrawSpinButton(renderer, UpButtonRect(), true, m_hoveredButton == 1, m_pressedButton == 1);
@@ -5033,6 +5208,32 @@ public:
     float fontSize = 13.0f;
 
 private:
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+            glyphColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        const StyleSpec hover = m_style.Resolve(StyleState::Hover);
+        const StyleSpec pressed = m_style.Resolve(StyleState::Pressed);
+        if (hover.decoration.has_value()) {
+            buttonHoverBackground = hover.decoration->background;
+            hoverFieldBackground = hover.decoration->background;
+        }
+        if (pressed.decoration.has_value()) {
+            buttonPressedBackground = pressed.decoration->background;
+        }
+    }
+
     std::vector<Field> ActiveFields() const {
         std::vector<Field> fields;
         if (m_mode == Mode::Date || m_mode == Mode::DateTime) {
@@ -5357,7 +5558,36 @@ private:
 class RichTextBox : public UIElement {
 public:
     explicit RichTextBox(std::wstring text = L"") {
+        m_style = DefaultStyle(nullptr);
         SetText(std::move(text));
+    }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "input-bg", ColorFromHex(0x1A2431));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x3A4B5D));
+        shell.radius = CornerRadius::Uniform(
+            ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xEAF3FF));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+
+        BoxDecoration focused = shell;
+        focused.border.width = Thickness{2, 2, 2, 2};
+        focused.border.color = ComponentStyle::ThemeColor(theme, "border-focus", ColorFromHex(0xFFFFFF));
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
     }
 
     bool IsFocusable() const override { return true; }
@@ -5591,10 +5821,28 @@ protected:
 public:
     void Render(IRenderer& renderer) override {
         const float scaledCorner = ScaleValue(cornerRadius);
-        renderer.FillRoundedRect(m_bounds, background, scaledCorner);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCorner);
+        const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
+        Color shellBg = background;
+        Color shellBorder = borderColor;
+        float scaledR = scaledCorner;
+        if (shell.decoration.has_value()) {
+            shellBg = shell.decoration->background;
+            shellBorder = shell.decoration->border.color;
+            if (!shell.decoration->radius.IsZero()) {
+                scaledR = ScaleValue(shell.decoration->radius.MaxRadius());
+            }
+        }
+        if (shell.foreground.has_value()) {
+            textColor = *shell.foreground;
+        }
+        if (shell.fontSize.has_value()) {
+            fontSize = *shell.fontSize;
+        }
+
+        renderer.FillRoundedRect(m_bounds, shellBg, scaledR);
+        renderer.DrawRoundedRect(m_bounds, shellBorder, 1.0f, scaledR);
         if (m_hasFocus) {
-            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledCorner);
+            renderer.DrawRoundedRect(m_bounds, focusBorderColor, 2.0f, scaledR);
         }
 
         const Rect content = ContentRect();
@@ -5658,6 +5906,22 @@ public:
     float preferredHeight = 120.0f;
 
 private:
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+    }
+
     struct LineInfo {
         size_t start = 0;
         size_t end = 0; // exclusive

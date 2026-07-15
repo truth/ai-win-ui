@@ -43,14 +43,12 @@ Open follow-ups (queued for the next sprint):
 - [x] `ComboBox` closed-height + overlay dropdown paint/hit pass (2026-07-15)
 - [x] `TabControl` layout leaf + page re-arrange; demo on right column
 - [x] `ListBox` / `ComboBox` / `TabControl` / `ListView` / `TreeView` `itemStyle`
-  (shell + row states). Remaining: shell strips (Menu/Tool/Status/Context)
-  and advanced inputs still need full `ComponentStyle` adoption.
-- `cornerRadius` / `fontSize` token migration of the remaining
-  layouts (only the five primary layouts are migrated so far).
+- [x] Shell strips + advanced inputs (`NumericUpDown` / `DateTimePicker` / `RichTextBox`)
+  themed `DefaultStyle` + `ApplyThemeDefaults`
+- `cornerRadius` / `fontSize` token migration of remaining layouts (partial)
 - Layout colour-field migration is intentionally deferred — it requires
   a colour-naming decision separate from the token mechanic itself.
-- `DefaultStyle()` factories still hard-code hex so they work without
-  any theme; lazy theme resolution at `SetContext` time is a v2 task.
+- [x] Lazy theme resolution at `SetContext` (DefaultStyle v2) for core controls
 
 ## Current Baseline And Constraint Notes
 
@@ -162,6 +160,8 @@ Suggested delivery priority:
 - [x] `DefaultStyle(const Theme*)` + `ApplyThemeDefaults()` on Button, TextInput, Checkbox, RadioButton, Slider, ProgressBar, ListBox, ComboBox, TabControl
 - [x] ListView / TreeView `itemStyle` + shell DefaultStyle / ApplyThemeDefaults (2026-07-15)
 - [x] MenuStrip / ToolStrip / StatusStrip / ContextMenu themed DefaultStyle + itemStyle (2026-07-15)
+- [x] NumericUpDown / DateTimePicker / RichTextBox themed DefaultStyle + ApplyThemeDefaults
+- [x] DataTable shell DefaultStyle (background/border/fg tokens)
 
 ### DataTable v2 (2026-07-15)
 
