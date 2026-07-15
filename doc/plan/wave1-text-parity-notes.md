@@ -28,12 +28,18 @@
 | 按钮标签 14px | Primary action… | | | | |
 | 输入 14px | Editing text… | | | | |
 
-## R4 多行 wrap
+## R4 / R2 多行 wrap
 
 | 场景 | 期望 |
 |------|------|
-| Constrained card 长句 | wrapH ≈ box 内多行；无底裁切 |
-| Narrow column | 断行不溢出卡片 |
+| Constrained card 长句（含 CJK） | wrapH ≈ box 内多行；Skia↔D2D ≤2px |
+| Narrow column | 断行不溢出卡片；高度一致 |
+| Ultra-narrow 正常英文词 | 高度一致 |
+
+```powershell
+$env:AI_WIN_UI_SIZE = "1000x700"
+.\scripts\compare_text_dumps.ps1 -Layout text-wrap -HeightsOnly -TolerancePx 2
+```
 
 ## R3 caret
 
@@ -46,21 +52,26 @@
 
 - CJK 回退字体若系统缺字，宽度差可能 >2px → 先固定 YaHei UI 再比。
 - ClearType vs Skia 次像素抗锯齿：视觉略不同，以 **metrics** 为主。
+- **超长无空格 token**（如 `longtokenwithoutspaces`）在极窄宽下，Skia emergency mid-word break 可能比 DWrite 多 1 行（wrapH 差 ~20px）。正常词边界换行已对齐。
+- wrapW 在窄列上可差数 px（行宽填充策略不同），R2 以 **HeightsOnly** 为验收。
 
 ## 自动化对比
 
 ```powershell
 .\scripts\compare_text_dumps.ps1 -Layout core-validation -TolerancePx 2
+.\scripts\compare_text_dumps.ps1 -Layout text-wrap -HeightsOnly -TolerancePx 2
 .\scripts\compare_text_dumps.ps1 -Layout cjk-render -TolerancePx 2
 ```
 
 默认容差 **2px**（R1 判据）。失败会保留两侧 dump 路径。
 
+> **脚本坑（已修）：** PowerShell 里 `if ($a > $b)` 是**重定向**不是比较，会写出垃圾文件 `2`/`1.5` 并永远 PASS。必须用 `-gt`。
+
 ## 状态
 
 | ID | 状态 | 日期 |
 |----|------|------|
-| R1 规则表 + 对比脚本 | **PASS** core-validation @2px（2026-07-15 实测） | 2026-07-15 |
-| R2 多行 golden | 用 compare 看 wrapH；大 diff 再修 Skia wrap | |
-| R3 caret | 待 | |
+| R1 规则表 + 对比脚本 | **PASS** core-validation @2px | 2026-07-15 |
+| R2 多行 wrapH | **PASS** `text-wrap -HeightsOnly`（CJK soft-break + 脚本 -gt 修复） | 2026-07-15 |
+| R3 caret | **done**（最近边界 snap） | 2026-07-15 |
 | A6 TEXT_DUMP | **已实现** `AI_WIN_UI_TEXT_DUMP` | 2026-07-15 |

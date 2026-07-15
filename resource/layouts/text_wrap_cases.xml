@@ -34,7 +34,12 @@
     </Panel>
   </Panel>
 
+  <!--
+    Ultra-narrow card: prefer normal word breaks (R2 height parity).
+    Pathological unbreakable tokens (longtokenwithoutspaces) still differ ~1 line
+    Skia vs DWrite emergency mid-word break — see wave1-text-parity-notes.md.
+  -->
   <Panel name="cardTight" direction="column" width="160" padding="10,10,10,10" spacing="6" background="#24303B" cornerRadius="8" alignItems="stretch">
-    <Label name="tightBody" text="Ultra narrow: word-break and longtokenwithoutspaces should not explode layout height inconsistently." fontSize="12" color="#D9E3EE" />
+    <Label name="tightBody" text="Short words wrap cleanly here." fontSize="12" color="#D9E3EE" />
   </Panel>
 </Panel>

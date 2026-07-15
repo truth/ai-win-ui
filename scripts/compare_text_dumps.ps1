@@ -45,11 +45,13 @@ foreach ($key in ($skia.Keys | Sort-Object)) {
             $fails += "missing field $f on $key"
             continue
         }
-        $da = [double]$pa.Value
-        $db = [double]$pb.Value
+        # Use $a.$f (not redirect `>`): PowerShell `>` is file redirection, which
+        # previously created junk files like "2" / "1.5" and always "passed".
+        $da = [double]($a.$f)
+        $db = [double]($b.$f)
         $diff = [math]::Abs($da - $db)
         $checked++
-        if ($diff > $TolerancePx) {
+        if ($diff -gt $TolerancePx) {
             $fails += ("{0}.{1}: skia={2:N2} d2d={3:N2} diff={4:N2}" -f $key, $f, $da, $db, $diff)
         }
     }

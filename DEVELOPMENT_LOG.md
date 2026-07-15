@@ -2,6 +2,7 @@
 
 ## 2026-07-15
 
+- Wave1 续 6：R2 Skia CJK soft-break 对齐 DWrite wrapH；修复 compare/golden 脚本 PowerShell `>` 误用为重定向
 - Wave1 续 5：Q3 headless smoke 扩页 + 最新 exe 回退；L4 `yoga-measure` skia/d2d golden
 - Wave1 续 4：S2 Theme/Catalog 边界文档；S3 启动日志 theme/styles 路径；L3 yoga space-between + min/max 段
 - Wave1 续 3：`application.h/cpp` 多 host 注册；IME 候选 exclude + composition font；`text_wrap_cases` R2 页

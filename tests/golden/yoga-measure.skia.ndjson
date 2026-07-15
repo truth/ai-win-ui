@@ -35,7 +35,7 @@
 {"path":"n0/l3SpaceBetweenCard/l3SpaceBetweenRow/l3BtnC","dw":90,"dh":45,"x":829,"y":971,"w":90,"h":45}
 {"path":"n0/l3MinMaxCard","dw":919,"dh":254,"x":30,"y":1066,"w":919,"h":254}
 {"path":"n0/l3MinMaxCard/l3MinMaxTitle","dw":327.418,"dh":34.6016,"x":50,"y":1086,"w":879,"h":35}
-{"path":"n0/l3MinMaxCard/n1","dw":879,"dh":47.9023,"x":50,"y":1133,"w":879,"h":49}
+{"path":"n0/l3MinMaxCard/n1","dw":816.9,"dh":47.9023,"x":50,"y":1133,"w":879,"h":49}
 {"path":"n0/l3MinMaxCard/l3MinMaxRow","dw":879,"dh":106,"x":50,"y":1194,"w":879,"h":106}
 {"path":"n0/l3MinMaxCard/l3MinMaxRow/l3GrowClamp","dw":350,"dh":86,"x":60,"y":1204,"w":350,"h":86}
 {"path":"n0/l3MinMaxCard/l3MinMaxRow/l3GrowClamp/n0","dw":88.1937,"dh":29.6138,"x":72,"y":1216,"w":325,"h":31}

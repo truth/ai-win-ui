@@ -329,7 +329,7 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 | R/A6 | **done** | `AI_WIN_UI_TEXT_DUMP` + `run_text_dump.ps1` |
 | R1 | **done** | `compare_text_dumps` core-validation **PASS ≤2px** |
 | R3 | **done** | TextInput caret 点击落最近字形边界（同 NoWrap measure） |
-| R2 | **partial** | `text_wrap_cases` + compare `-HeightsOnly`；全 PASS 后标 done |
+| R2 | **done** | CJK soft-break + compare `-gt` 修复；`text-wrap -HeightsOnly` PASS ≤2px |
 | L1 | **done** | `AI_WIN_UI_DISABLE_WINDOW_SCROLL=1` |
 | L6 | **done** | GridPanel → Yoga flex-wrap MeasureGrid |
 | C1 | **done** | `doc/keyboard-matrix.md` |

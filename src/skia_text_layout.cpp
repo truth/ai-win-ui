@@ -65,6 +65,50 @@ std::vector<std::wstring> SplitWideLines(const wchar_t* text, uint32_t len) {
     return lines;
 }
 
+// Soft break after CJK / fullwidth ideographs (closer to DirectWrite WRAP / UAX#14 ID).
+bool IsCjkOrFullwidth(wchar_t ch) {
+    if (ch >= 0x3400 && ch <= 0x4DBF) {
+        return true; // CJK Extension A
+    }
+    if (ch >= 0x4E00 && ch <= 0x9FFF) {
+        return true; // CJK Unified
+    }
+    if (ch >= 0xF900 && ch <= 0xFAFF) {
+        return true; // CJK Compatibility
+    }
+    if (ch >= 0x3000 && ch <= 0x303F) {
+        return true; // CJK punctuation / ideographic space
+    }
+    if (ch >= 0xFF00 && ch <= 0xFFEF) {
+        return true; // Fullwidth forms
+    }
+    // Common CJK punctuation outside the blocks above.
+    switch (ch) {
+    case L'，':
+    case L'。':
+    case L'、':
+    case L'；':
+    case L'：':
+    case L'？':
+    case L'！':
+    case L'（':
+    case L'）':
+    case L'【':
+    case L'】':
+    case L'「':
+    case L'」':
+    case L'『':
+    case L'』':
+    case L'《':
+    case L'》':
+    case L'—':
+    case L'…':
+        return true;
+    default:
+        return false;
+    }
+}
+
 std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
                                              SkFontMgr* fontMgr,
                                              SkTypeface* defaultTypeface,
@@ -79,11 +123,25 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
         return {SkiaTextLayoutLine{line, unwrappedWidth}};
     }
 
+    auto measureRange = [&](size_t begin, size_t end) -> float {
+        if (end <= begin || begin >= line.size()) {
+            return 0.0f;
+        }
+        end = std::min(end, line.size());
+        return MeasureWideTextWidth(
+            fontMgr,
+            defaultTypeface,
+            fontSize,
+            line.substr(begin, end - begin));
+    };
+
+    // Small slack so Skia emergency mid-word breaks match DirectWrite packing
+    // (hinting / subpixel measure can read ~0.5–1px wider per line).
+    const float fitLimit = maxWidth + 1.0f;
+
     std::vector<SkiaTextLayoutLine> wrapped;
     size_t lineStart = 0;
     while (lineStart < line.size()) {
-        // Skip leading whitespace at the start of each wrapped segment
-        // to avoid empty or whitespace-only lines.
         while (lineStart < line.size() && std::iswspace(line[lineStart]) != 0) {
             ++lineStart;
         }
@@ -91,56 +149,62 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
             break;
         }
 
-        std::wstring candidate;
-        candidate.reserve(line.size() - lineStart);
-        size_t lastWhitespaceBreak = std::wstring::npos;
+        // lastSoftEnd: exclusive end of the latest soft-break that still fits.
+        // Soft breaks: after whitespace, hyphen, or CJK/fullwidth (DWrite-like).
+        // Only updated while the prefix still fits — never on the overflowing glyph.
+        size_t lastSoftEnd = std::wstring::npos;
+        size_t lastFitEnd = lineStart; // exclusive end of longest fitting prefix
         bool emitted = false;
 
         for (size_t i = lineStart; i < line.size(); ++i) {
-            candidate.push_back(line[i]);
-            if (std::iswspace(line[i]) != 0) {
-                lastWhitespaceBreak = i;
-            }
-
-            if (MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, candidate) <= maxWidth) {
+            const size_t tryEnd = i + 1;
+            const float width = measureRange(lineStart, tryEnd);
+            if (width <= fitLimit) {
+                lastFitEnd = tryEnd;
+                const wchar_t ch = line[i];
+                // Soft opportunities ≈ DWrite WRAP / common Western + CJK breaks.
+                const bool soft =
+                    std::iswspace(ch) != 0 ||
+                    ch == L'-' || ch == L'/' ||
+                    ch == L'.' || ch == L',' || ch == L';' || ch == L':' ||
+                    ch == L'!' || ch == L'?' || ch == L')' || ch == L']' ||
+                    IsCjkOrFullwidth(ch);
+                if (soft) {
+                    lastSoftEnd = tryEnd;
+                }
                 continue;
             }
 
-            // Single character exceeds maxWidth - emit it anyway and move on.
-            if (candidate.size() == 1) {
-                wrapped.push_back(SkiaTextLayoutLine{candidate, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, candidate)});
-                lineStart = i + 1;
-                emitted = true;
-                break;
+            // Overflow at character i.
+            size_t cutEnd = lastSoftEnd;
+            if (cutEnd == std::wstring::npos || cutEnd <= lineStart) {
+                // No soft break in the fitting prefix: hard-break after last fit.
+                cutEnd = (lastFitEnd > lineStart) ? lastFitEnd : tryEnd;
             }
 
-            if (lastWhitespaceBreak != std::wstring::npos && lastWhitespaceBreak >= lineStart) {
-                // Break at the last whitespace boundary within the line.
-                std::wstring segment = TrimTrailingWhitespace(
-                    line.substr(lineStart, lastWhitespaceBreak - lineStart + 1));
-                // After trimming, if segment is empty it means only whitespace
-                // was found. Skip to the next non-whitespace character.
-                if (segment.empty()) {
-                    lineStart = lastWhitespaceBreak + 1;
-                } else {
-                    lineStart = lastWhitespaceBreak + 1;
-                }
-                wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, segment)});
-            } else {
-                // No whitespace boundary found - break the word at the overflow point.
-                const std::wstring segment = candidate.substr(0, candidate.size() - 1);
-                wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, segment)});
-                lineStart = i;
+            if (cutEnd <= lineStart) {
+                // Pathological: single glyph wider than maxWidth.
+                cutEnd = tryEnd;
             }
 
+            std::wstring segment = TrimTrailingWhitespace(line.substr(lineStart, cutEnd - lineStart));
+            if (!segment.empty()) {
+                wrapped.push_back(SkiaTextLayoutLine{
+                    segment,
+                    MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, segment)});
+            }
+            lineStart = cutEnd;
             emitted = true;
             break;
         }
 
         if (!emitted) {
-            // Remaining text fits within maxWidth.
             std::wstring segment = TrimTrailingWhitespace(line.substr(lineStart));
-            wrapped.push_back(SkiaTextLayoutLine{segment, MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, segment)});
+            if (!segment.empty()) {
+                wrapped.push_back(SkiaTextLayoutLine{
+                    segment,
+                    MeasureWideTextWidth(fontMgr, defaultTypeface, fontSize, segment)});
+            }
             break;
         }
     }

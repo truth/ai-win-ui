@@ -39,7 +39,8 @@ function Compare-Maps($actual, $golden, [float]$tol) {
         foreach ($field in @("dw", "dh", "w", "h")) {
             $av = [double]$a.$field
             $gv = [double]$g.$field
-            if ([math]::Abs($av - $gv) > $tol) {
+            # PowerShell `>` is redirect — always use -gt for numeric compare.
+            if ([math]::Abs($av - $gv) -gt $tol) {
                 $failures += ("{0}.{1}: actual={2:N2} golden={3:N2} (tol={4})" -f $key, $field, $av, $gv, $tol)
             }
         }
