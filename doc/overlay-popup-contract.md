@@ -27,31 +27,39 @@
 | 控件 | RenderOverlay | FindOverlayHit | DismissAt | DismissAll |
 |------|---------------|----------------|-----------|------------|
 | **ComboBox** | 是 | 是 | 是 | 是 |
+| **Popup** (C4) | 是 | 是 | 是 | 是 |
 | ContextMenu | 否（常驻面板） | — | — | — |
 | MenuStrip | 否（无 flyout） | — | — | — |
 
-## C4 目标：通用 Popup
+## Popup（C4）
 
-计划形态（尚未实现）：
-
-```text
-PopupHost (UiElement 或 UiHost 服务)
-  - Anchor rect / placement (below, above, flip)
-  - content root
-  - light-dismiss + Esc
-  - z 序：统一走 RenderOverlay
+```xml
+<Popup name="demoPopup" triggerText="Open" width="150" height="36"
+       popupWidth="280" popupHeight="150" placement="below|above">
+  <Label text="Body…" />
+</Popup>
 ```
 
-Combo / 未来 Context flyout 迁入或适配该宿主，而不是再复制命中逻辑。
+| 属性 | 含义 |
+|------|------|
+| `triggerText` / `text` | 触发按钮文案 |
+| `popupWidth` / `popupHeight` | 浮层逻辑尺寸 |
+| `placement` | `below`（默认）或 `above`（不足时翻面） |
+| `open` | 初始是否打开 |
+
+事件：`togglePopup:elementName`（可选；直接点 trigger 也可切换）。
+
+Demo：`layouts/popup_theme_demo.xml`（别名 `popup-theme`）。
 
 ## 验收
 
 - Gallery → Core Controls V2：打开 Combo → 点页面空白处关闭；Esc 关闭  
-- 打开 Combo → 点另一控件：列表关且焦点可转移  
+- Gallery → Popup + Theme：打开 flyout → 点外/Esc 关闭；Theme Light/Dark 切换标题与 token 控件  
 - `doc/keyboard-matrix.md` Combo Esc 行可标 ok  
 
 ## 相关代码
 
-- `src/ui.h` — `UIElement` 钩子 + `ComboBox` 覆盖  
-- `src/main.cpp` — `UiHost` 鼠标/键盘路径  
+- `src/ui.h` — `UIElement` 钩子 + `ComboBox` / `Popup`  
+- `src/main.cpp` — `UiHost` 鼠标/键盘路径；`applyTheme:` / `togglePopup:`  
 - `src/ui_host.h` — 宿主公开 API 入口  
+

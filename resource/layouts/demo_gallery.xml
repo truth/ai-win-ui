@@ -79,6 +79,11 @@
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/core_controls_v2.xml||1100x720" height="32" />
         </Panel>
         <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Popup + Theme" fontSize="14" color="#F2F6FB" />
+          <Label text="C4 flyout · S4 light/dark switch" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/popup_theme_demo.xml||900x560" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
           <Label text="Navigation" fontSize="14" color="#F2F6FB" />
           <Label text="ListView · TreeView · shell strips" fontSize="11" color="#8FA3B8" />
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/navigation_components.xml||1200x750" height="32" />

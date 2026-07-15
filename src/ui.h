@@ -52,6 +52,22 @@ public:
     void SetName(std::string name) { m_name = std::move(name); }
     const std::string& Name() const { return m_name; }
 
+    // Depth-first name lookup (Wave1 host events: togglePopup / applyTheme).
+    UIElement* FindElementByName(const std::string& name) {
+        if (!name.empty() && m_name == name) {
+            return this;
+        }
+        for (auto& child : m_children) {
+            if (!child) {
+                continue;
+            }
+            if (UIElement* hit = child->FindElementByName(name)) {
+                return hit;
+            }
+        }
+        return nullptr;
+    }
+
     void SetBounds(const Rect& rect) { m_bounds = rect; }
     Rect Bounds() const { return m_bounds; }
     void SetHitTestRole(HitTestRole role) { m_hitTestRole = role; }
@@ -7717,6 +7733,350 @@ private:
     int m_selectedIndex = -1;
     int m_hoveredIndex = -1;
     bool m_expanded = false;
+};
+
+// Generic light-dismiss flyout (Wave1 C4). Layout size = trigger chip only;
+// body children paint/hit in RenderOverlay above siblings (same contract as ComboBox).
+class Popup : public UIElement {
+public:
+    enum class Placement : uint8_t { Below = 0, Above = 1 };
+
+    Popup() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-2", ColorFromHex(0x1B2C3D));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x36506A));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xE9F2FD));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+
+        auto dropdown = std::make_unique<ComponentStyle>();
+        BoxDecoration drop;
+        drop.background = ComponentStyle::ThemeColor(theme, "surface-1", ColorFromHex(0x112130));
+        drop.border.width = Thickness{1, 1, 1, 1};
+        drop.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x36506A));
+        drop.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        dropdown->base.decoration = drop;
+        s.dropdownStyle = std::move(dropdown);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyFromStyle();
+        for (auto& child : m_children) {
+            if (child) {
+                child->ApplyThemeDefaults();
+            }
+        }
+    }
+
+    void SetTriggerText(std::wstring text) { m_triggerText = std::move(text); }
+    void SetPopupWidth(float w) { m_popupWidth = std::max(40.0f, w); }
+    void SetPopupHeight(float h) { m_popupHeight = std::max(40.0f, h); }
+    void SetPlacement(Placement p) { m_placement = p; }
+    void SetOpen(bool open) {
+        m_open = open;
+        if (m_open) {
+            LayoutPopupChildren();
+        }
+    }
+    bool IsOpen() const { return m_open; }
+    void ToggleOpen() { SetOpen(!m_open); }
+
+    bool IsFocusable() const override { return true; }
+
+    bool HitTest(float x, float y) const override {
+        if (UIElement::HitTest(x, y)) {
+            return true;
+        }
+        return m_open && PopupRect().Contains(x, y);
+    }
+
+    bool OnFocus() override {
+        if (!m_hasFocus) {
+            m_hasFocus = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnBlur() override {
+        bool changed = false;
+        if (m_hasFocus) {
+            m_hasFocus = false;
+            changed = true;
+        }
+        if (m_open) {
+            m_open = false;
+            changed = true;
+        }
+        return changed;
+    }
+
+    bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
+        if (keyCode == VK_ESCAPE && m_open) {
+            m_open = false;
+            return true;
+        }
+        if (keyCode == VK_RETURN || keyCode == VK_SPACE) {
+            ToggleOpen();
+            return true;
+        }
+        return false;
+    }
+
+    bool OnMouseDown(float x, float y) override {
+        if (TriggerRect().Contains(x, y)) {
+            ToggleOpen();
+            return true;
+        }
+        if (m_open && PopupRect().Contains(x, y)) {
+            for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+                if (*it && (*it)->HitTest(x, y) && (*it)->OnMouseDown(x, y)) {
+                    return true;
+                }
+            }
+            return true;
+        }
+        return false;
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        bool changed = false;
+        const bool overTrigger = TriggerRect().Contains(x, y);
+        if (overTrigger != m_hovered) {
+            m_hovered = overTrigger;
+            changed = true;
+        }
+        if (m_open && PopupRect().Contains(x, y)) {
+            for (auto& child : m_children) {
+                if (child && child->OnMouseMove(x, y)) {
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    void Measure(float availableWidth, float /*availableHeight*/) override {
+        float w = HasFixedWidth() ? ScaleValue(m_fixedWidth) : ScaleValue(140.0f);
+        float h = HasFixedHeight() ? ScaleValue(m_fixedHeight) : ScaleValue(m_triggerHeight);
+        w = ClampWidth(std::min(w, std::max(0.0f, availableWidth)));
+        h = ClampHeight(h);
+        m_desiredSize = Size{w, h};
+    }
+
+    void Arrange(const Rect& finalRect) override {
+        m_bounds = finalRect;
+        if (m_open) {
+            LayoutPopupChildren();
+        }
+    }
+
+    void Render(IRenderer& renderer) override {
+        const Rect trigger = TriggerRect();
+        Color bg = background;
+        Color fg = textColor;
+        Color border = borderColor;
+        if (m_style.base.decoration.has_value()) {
+            bg = m_style.base.decoration->background;
+            border = m_style.base.decoration->border.color;
+        }
+        if (m_style.base.foreground.has_value()) {
+            fg = *m_style.base.foreground;
+        }
+        if (m_hovered || m_open) {
+            bg = hoverBackground;
+        }
+        renderer.FillRoundedRect(trigger, bg, ScaleValue(cornerRadius));
+        renderer.DrawRoundedRect(trigger, border, 1.0f, ScaleValue(cornerRadius));
+
+        const std::wstring label = m_triggerText.empty() ? L"Popup" : m_triggerText;
+        const Rect textRect = Rect::Make(
+            trigger.left + ScaleValue(10.0f),
+            trigger.top,
+            trigger.right - ScaleValue(10.0f),
+            trigger.bottom);
+        const TextRenderOptions opts{
+            TextWrapMode::NoWrap,
+            TextHorizontalAlign::Center,
+            TextVerticalAlign::Center
+        };
+        renderer.DrawTextW(label.c_str(), static_cast<UINT32>(label.size()), textRect, fg, ScaleValue(fontSize), opts);
+        // Children only in overlay when open.
+    }
+
+    void RenderOverlay(IRenderer& renderer) override {
+        // Nested overlays first (children may own their own).
+        for (auto& child : m_children) {
+            if (child) {
+                child->RenderOverlay(renderer);
+            }
+        }
+        if (!m_open) {
+            return;
+        }
+
+        const Rect popup = PopupRect();
+        Color bg = popupBackground;
+        Color border = borderColor;
+        float radius = cornerRadius;
+        if (m_style.dropdownStyle && m_style.dropdownStyle->base.decoration.has_value()) {
+            bg = m_style.dropdownStyle->base.decoration->background;
+            border = m_style.dropdownStyle->base.decoration->border.color;
+            if (!m_style.dropdownStyle->base.decoration->radius.IsZero()) {
+                radius = m_style.dropdownStyle->base.decoration->radius.MaxRadius();
+            }
+        }
+        renderer.FillRoundedRect(popup, bg, ScaleValue(radius));
+        renderer.DrawRoundedRect(popup, border, 1.0f, ScaleValue(radius));
+
+        for (auto& child : m_children) {
+            if (child) {
+                child->Render(renderer);
+            }
+        }
+    }
+
+    UIElement* FindOverlayHitAt(float x, float y) override {
+        if (m_open) {
+            if (PopupRect().Contains(x, y)) {
+                for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+                    if (!*it) {
+                        continue;
+                    }
+                    if (UIElement* nested = (*it)->FindOverlayHitAt(x, y)) {
+                        return nested;
+                    }
+                    if ((*it)->HitTest(x, y)) {
+                        if (UIElement* focusable = (*it)->FindFocusableAt(x, y)) {
+                            return focusable;
+                        }
+                        return it->get();
+                    }
+                }
+                return this;
+            }
+            if (TriggerRect().Contains(x, y)) {
+                return this;
+            }
+        }
+        return UIElement::FindOverlayHitAt(x, y);
+    }
+
+    bool DismissOverlaysAt(float x, float y) override {
+        bool changed = UIElement::DismissOverlaysAt(x, y);
+        if (m_open && !TriggerRect().Contains(x, y) && !PopupRect().Contains(x, y)) {
+            m_open = false;
+            changed = true;
+        }
+        return changed;
+    }
+
+    bool DismissAllOverlays() override {
+        bool changed = UIElement::DismissAllOverlays();
+        if (m_open) {
+            m_open = false;
+            changed = true;
+        }
+        return changed;
+    }
+
+    Color background = ColorFromHex(0x1B2C3D);
+    Color hoverBackground = ColorFromHex(0x24384C);
+    Color popupBackground = ColorFromHex(0x112130);
+    Color borderColor = ColorFromHex(0x36506A);
+    Color textColor = ColorFromHex(0xE9F2FD);
+    float cornerRadius = 8.0f;
+    float fontSize = 13.0f;
+    float m_triggerHeight = 36.0f;
+
+private:
+    void SyncLegacyFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+        if (m_style.dropdownStyle && m_style.dropdownStyle->base.decoration.has_value()) {
+            popupBackground = m_style.dropdownStyle->base.decoration->background;
+        }
+        const StyleSpec hover = m_style.Resolve(StyleState::Hover);
+        if (hover.decoration.has_value()) {
+            hoverBackground = hover.decoration->background;
+        }
+    }
+
+    Rect TriggerRect() const { return m_bounds; }
+
+    Rect PopupRect() const {
+        const float w = ScaleValue(m_popupWidth);
+        const float h = ScaleValue(m_popupHeight);
+        const float gap = ScaleValue(4.0f);
+        float left = m_bounds.left;
+        float top = (m_placement == Placement::Above)
+            ? (m_bounds.top - gap - h)
+            : (m_bounds.bottom + gap);
+
+        const float viewportW = (m_context && m_context->viewportWidth > 1.0f) ? m_context->viewportWidth : left + w;
+        const float viewportH = (m_context && m_context->viewportHeight > 1.0f) ? m_context->viewportHeight : top + h;
+        if (left + w > viewportW - 4.0f) {
+            left = std::max(4.0f, viewportW - w - 4.0f);
+        }
+        if (top < 4.0f) {
+            top = m_bounds.bottom + gap; // flip down if clipped above
+        }
+        if (top + h > viewportH - 4.0f && m_placement == Placement::Below) {
+            const float above = m_bounds.top - gap - h;
+            if (above >= 4.0f) {
+                top = above;
+            }
+        }
+        return Rect::Make(left, top, left + w, top + h);
+    }
+
+    void LayoutPopupChildren() {
+        const Rect popup = PopupRect();
+        const float pad = ScaleValue(12.0f);
+        const float spacing = ScaleValue(8.0f);
+        float y = popup.top + pad;
+        const float contentLeft = popup.left + pad;
+        const float contentRight = popup.right - pad;
+        const float contentW = std::max(1.0f, contentRight - contentLeft);
+        for (auto& child : m_children) {
+            if (!child) {
+                continue;
+            }
+            child->SetContext(m_context);
+            child->Measure(contentW, 4096.0f);
+            const float ch = std::max(1.0f, child->DesiredSize().height);
+            child->Arrange(Rect::Make(contentLeft, y, contentRight, y + ch));
+            y += ch + spacing;
+        }
+    }
+
+    std::wstring m_triggerText = L"Popup";
+    float m_popupWidth = 240.0f;
+    float m_popupHeight = 140.0f;
+    Placement m_placement = Placement::Below;
+    bool m_open = false;
 };
 
 class TabControl : public UIElement {

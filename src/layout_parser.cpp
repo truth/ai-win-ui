@@ -1892,6 +1892,31 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*comboBox, props);
         }
         element = std::move(comboBox);
+    } else if (type == "Popup") {
+        auto popup = std::make_unique<Popup>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["triggerText"].IsString()) {
+                popup->SetTriggerText(LayoutParser::Utf8ToUtf16(props["triggerText"].stringValue));
+            } else if (props["text"].IsString()) {
+                popup->SetTriggerText(LayoutParser::Utf8ToUtf16(props["text"].stringValue));
+            }
+            if (props["popupWidth"].IsNumber()) {
+                popup->SetPopupWidth(static_cast<float>(props["popupWidth"].numberValue));
+            }
+            if (props["popupHeight"].IsNumber()) {
+                popup->SetPopupHeight(static_cast<float>(props["popupHeight"].numberValue));
+            }
+            if (props["placement"].IsString()) {
+                const std::string p = ToLowerAscii(props["placement"].stringValue);
+                popup->SetPlacement(p == "above" ? Popup::Placement::Above : Popup::Placement::Below);
+            }
+            if (props["open"].IsBool()) {
+                popup->SetOpen(props["open"].boolValue);
+            }
+            ApplyCommonJsonProps(*popup, props);
+        }
+        element = std::move(popup);
     } else if (type == "TabControl") {
         auto tabControl = std::make_unique<TabControl>();
         if (node["props"].IsObject()) {
@@ -3040,6 +3065,28 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*comboBox, node);
         element = std::move(comboBox);
+    } else if (node.name == "Popup") {
+        auto popup = std::make_unique<Popup>();
+        if (auto it = node.attributes.find("triggerText"); it != node.attributes.end()) {
+            popup->SetTriggerText(LayoutParser::Utf8ToUtf16(it->second));
+        } else if (auto it2 = node.attributes.find("text"); it2 != node.attributes.end()) {
+            popup->SetTriggerText(LayoutParser::Utf8ToUtf16(it2->second));
+        }
+        if (auto it = node.attributes.find("popupWidth"); it != node.attributes.end()) {
+            popup->SetPopupWidth(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("popupHeight"); it != node.attributes.end()) {
+            popup->SetPopupHeight(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("placement"); it != node.attributes.end()) {
+            const std::string p = ToLowerAscii(it->second);
+            popup->SetPlacement(p == "above" ? Popup::Placement::Above : Popup::Placement::Below);
+        }
+        if (auto it = node.attributes.find("open"); it != node.attributes.end()) {
+            popup->SetOpen(ToLowerAscii(it->second) == "true");
+        }
+        ApplyCommonXmlAttributes(*popup, node);
+        element = std::move(popup);
     } else if (node.name == "TabControl") {
         auto tabControl = std::make_unique<TabControl>();
         if (auto it = node.attributes.find("tabs"); it != node.attributes.end()) {

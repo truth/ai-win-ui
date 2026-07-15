@@ -664,16 +664,11 @@ private:
         return w;
     }
 
-    void LoadTheme() {
-        m_loadedThemePath.clear();
+    void LoadThemeFromPath(const std::string& themePath) {
         if (!m_uiContext.resourceProvider) {
             OutputDebugStringW(L"[Theme] skipped (no resource provider)\n");
             return;
         }
-        const std::wstring requestedTheme = GetEnvironmentValue(L"AI_WIN_UI_THEME");
-        const std::string themePath = requestedTheme.empty()
-            ? std::string("themes/default.json")
-            : Utf16ToUtf8(requestedTheme);
         if (themePath.empty() || !m_uiContext.resourceProvider->Exists(themePath)) {
             LogUtf8Debug("[Theme] missing path=", themePath.empty() ? std::string("(empty)") : themePath);
             return;
@@ -682,7 +677,6 @@ private:
         m_theme = Theme::LoadFromJson(text);
         m_uiContext.theme = m_theme.get();
         m_loadedThemePath = themePath;
-        // S3: visible path for sticky-env debugging.
         {
             std::wstring msg = L"[Theme] loaded=";
             msg += Utf8ToWide(themePath);
@@ -694,6 +688,39 @@ private:
             }
             msg += L"\n";
             OutputDebugStringW(msg.c_str());
+        }
+    }
+
+    void LoadTheme() {
+        m_loadedThemePath.clear();
+        const std::wstring requestedTheme = GetEnvironmentValue(L"AI_WIN_UI_THEME");
+        const std::string themePath = requestedTheme.empty()
+            ? std::string("themes/default.json")
+            : Utf16ToUtf8(requestedTheme);
+        LoadThemeFromPath(themePath);
+    }
+
+    // S4 runtime switch: reload theme JSON and re-apply DefaultStyle where allowed.
+    void ApplyThemePath(const std::string& themePath) {
+        LoadThemeFromPath(themePath);
+        if (m_root) {
+            WalkApplyThemeDefaults(m_root.get());
+            m_root->SetContext(&m_uiContext);
+            OnResize(); // remeasure / rearrange
+            InvalidateRect(m_hwnd, nullptr, FALSE);
+            std::wstring title = L"Theme: ";
+            title += Utf8ToWide(themePath);
+            SetWindowTextW(m_hwnd, title.c_str());
+        }
+    }
+
+    void WalkApplyThemeDefaults(UIElement* element) {
+        if (!element) {
+            return;
+        }
+        element->ApplyThemeDefaults();
+        for (const auto& child : element->Children()) {
+            WalkApplyThemeDefaults(child.get());
         }
     }
 
@@ -886,6 +913,26 @@ private:
             }
             if (eventId == "secondaryAction") {
                 return [this]() { SetWindowTextW(m_hwnd, L"Clicked: Secondary Action"); };
+            }
+            // S4: applyTheme:themes/default.json | themes/light.json
+            if (eventId.rfind("applyTheme:", 0) == 0) {
+                const std::string path = eventId.substr(11);
+                return [this, path]() { ApplyThemePath(path); };
+            }
+            // C4: togglePopup:elementName
+            if (eventId.rfind("togglePopup:", 0) == 0) {
+                const std::string name = eventId.substr(12);
+                return [this, name]() {
+                    if (!m_root) {
+                        return;
+                    }
+                    if (UIElement* el = m_root->FindElementByName(name)) {
+                        if (auto* popup = dynamic_cast<Popup*>(el)) {
+                            popup->ToggleOpen();
+                            InvalidateRect(m_hwnd, nullptr, FALSE);
+                        }
+                    }
+                };
             }
             if (eventId == "windowMinimize") {
                 return [this]() { ShowWindow(m_hwnd, SW_MINIMIZE); };

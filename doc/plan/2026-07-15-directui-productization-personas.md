@@ -333,9 +333,11 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 | L1 | **done** | `AI_WIN_UI_DISABLE_WINDOW_SCROLL=1` |
 | L6 | **done** | GridPanel → Yoga flex-wrap MeasureGrid |
 | C1 | **done** | `doc/keyboard-matrix.md` |
-| C2 | **done** | Combo 点外 + Esc `DismissAllOverlays`；`doc/overlay-popup-contract.md`（C4 Popup 仍 open） |
+| C2 | **done** | Combo 点外 + Esc `DismissAllOverlays`；`doc/overlay-popup-contract.md` |
 | C3 | **partial** | IME：caret 顶锚点 + candidate exclude 输入框 + Segoe UI composition font |
+| C4 | **partial** | `Popup` 控件 + light-dismiss + demo；Combo 尚未迁入共用基类 |
 | Q4 | **done** | `mvp-acceptance.md` Gallery 手工验收表 |
+| S4 | **partial** | `applyTheme:` 运行时加载 + `themes/light.json`；硬编码色页不换肤 |
 | S1 | **done** | `doc/plan/token-migration-strategy.md` |
 | S2 | **done** | `style-catalog.md` Theme vs Catalog 职责边界表 |
 | S3 | **done** | 启动 `[Theme]/`/`[Styles]` 路径 + styleCount；`LogEffectiveEnv` themeFile/stylesFiles |

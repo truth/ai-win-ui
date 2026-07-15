@@ -2,6 +2,7 @@
 
 ## 2026-07-16
 
+- Wave1 续 8：C4 `Popup` 控件 + demo；S4 `applyTheme:` + `themes/light.json`；gallery 卡 Popup+Theme
 - Wave1 续 7：H1 `App`→`UiHost` + `ui_host.h`/`OpenSecondaryUiHost`；C2 `DismissAllOverlays` + Esc；overlay 契约文档；Q4 gallery 验收表
 
 ## 2026-07-15

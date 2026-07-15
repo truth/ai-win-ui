@@ -1,0 +1,32 @@
+<!--
+  C4 Popup + S4 runtime theme switch demo.
+  .\scripts\run_layout_demo.ps1 -Layout popup-theme
+-->
+<Panel name="root" direction="column" padding="24,24,24,24" spacing="16" background="#101418" alignItems="stretch">
+  <Label name="title" text="Popup + Theme Demo (C4 / S4)" fontSize="22" color="#F7FAFC" />
+  <Label name="hint" text="Popup uses RenderOverlay + light-dismiss (click outside / Esc). Theme buttons reload tokens and ApplyThemeDefaults on the tree." fontSize="13" color="#A0AEC0" />
+
+  <Panel name="row" direction="row" spacing="12" alignItems="center">
+    <Popup
+      name="demoPopup"
+      triggerText="Open flyout"
+      width="150"
+      height="36"
+      popupWidth="280"
+      popupHeight="150"
+      placement="below">
+      <Label text="Generic Popup body (C4)" fontSize="15" color="#E2E8F0" />
+      <Label text="Children layout in the overlay panel. Click outside or press Esc to dismiss." fontSize="12" color="#A0AEC0" />
+    </Popup>
+
+    <Button name="themeDark" text="Theme: Dark" style="$style.primaryButton" onClick="applyTheme:themes/default.json" height="36" width="130" />
+    <Button name="themeLight" text="Theme: Light" style="$style.primaryButton" onClick="applyTheme:themes/light.json" height="36" width="130" />
+  </Panel>
+
+  <Panel name="card" direction="column" padding="14,14,14,14" spacing="8" background="#1A2430" cornerRadius="10" alignItems="stretch">
+    <Label name="cardTitle" text="Notes" fontSize="16" color="#FFFFFF" />
+    <Label text="• Popup trigger is layout-sized; body is overlay (does not push siblings)." fontSize="13" color="#CBD5E0" />
+    <Label text="• applyTheme:* reloads Theme JSON and walks ApplyThemeDefaults (inline hard-coded colors stay)." fontSize="13" color="#CBD5E0" />
+    <Label text="• Prefer $color.* / DefaultStyle for skins that switch at runtime." fontSize="13" color="#CBD5E0" />
+  </Panel>
+</Panel>
