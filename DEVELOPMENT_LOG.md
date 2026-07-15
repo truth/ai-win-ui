@@ -1,5 +1,18 @@
 # 开发日志
 
+## 2026-07-15
+
+- 分支：`feature/custom-window-chrome-v1`
+- 落地自定义窗口 chrome（计划见 `doc/plan/2026-07-15-custom-chrome-irregular-window-v1.md`）
+- 新增 `src/window_chrome.*`：`WM_NCCALCSIZE` / `WM_NCHITTEST` / `WM_GETMINMAXINFO`、DPI 边框、DWM 圆角
+- `main.cpp`：opt-in custom 样式、命中区域刷新、min/max/close 事件
+- 布局属性：`chrome`、`hitTest`、`role=titleBar`（XML/JSON common props）
+- Demo：`resource/layouts/custom_chrome_demo.xml` + `scripts/run_custom_chrome_demo.ps1`
+- 文档：`doc/window-chrome.md`
+- 默认仍为系统标题栏；`AI_WIN_UI_CHROME=custom` 或根布局 `chrome="custom"` 启用
+- 附带修复：Skia Release 链接按配置收集 `.lib`（避免 Debug 独有的 `spvtools` 在 Release 失败）
+- 验证：`.\build.ps1 -Configuration Release` 通过
+
 ## 2026-04-16
 
 - 当前工作分支：`feat/resource-layout-mvp`

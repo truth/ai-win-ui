@@ -45,6 +45,7 @@ add_executable(ai_win_ui WIN32
     src/resource_provider.cpp
     src/zip_resource_provider.cpp
     src/layout_parser.cpp
+    src/window_chrome.cpp
 )
 
 set(AI_WIN_UI_YOGA_BUILD_DIR "${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1/build" CACHE PATH "Default Yoga build directory used by the app target.")
@@ -93,23 +94,42 @@ if(AI_WIN_UI_ENABLE_SKIA)
         )
 
         if(EXISTS "${_ai_win_ui_skia_library_dir}/Debug-x64/skia.lib" AND EXISTS "${_ai_win_ui_skia_library_dir}/Release-x64/skia.lib")
+            # Collect .lib names per configuration. Debug may ship extra SPIR-V
+            # tooling libs (spvtools*) that are absent from Release builds.
             file(GLOB _ai_win_ui_skia_debug_libs LIST_DIRECTORIES false "${_ai_win_ui_skia_library_dir}/Debug-x64/*.lib")
+            file(GLOB _ai_win_ui_skia_release_libs LIST_DIRECTORIES false "${_ai_win_ui_skia_library_dir}/Release-x64/*.lib")
             if(NOT _ai_win_ui_skia_debug_libs)
                 message(FATAL_ERROR "No .lib files found in ${_ai_win_ui_skia_library_dir}/Debug-x64 for AI_WIN_UI_SKIA_PROVIDER=local-sdk.")
             endif()
+            if(NOT _ai_win_ui_skia_release_libs)
+                message(FATAL_ERROR "No .lib files found in ${_ai_win_ui_skia_library_dir}/Release-x64 for AI_WIN_UI_SKIA_PROVIDER=local-sdk.")
+            endif()
 
-            set(_ai_win_ui_skia_lib_names "")
+            set(_ai_win_ui_skia_debug_lib_names "")
             foreach(_ai_win_ui_skia_lib_path IN LISTS _ai_win_ui_skia_debug_libs)
                 get_filename_component(_ai_win_ui_skia_lib_name "${_ai_win_ui_skia_lib_path}" NAME_WE)
-                list(APPEND _ai_win_ui_skia_lib_names "${_ai_win_ui_skia_lib_name}")
+                list(APPEND _ai_win_ui_skia_debug_lib_names "${_ai_win_ui_skia_lib_name}")
             endforeach()
-            list(REMOVE_DUPLICATES _ai_win_ui_skia_lib_names)
+            list(REMOVE_DUPLICATES _ai_win_ui_skia_debug_lib_names)
+
+            set(_ai_win_ui_skia_release_lib_names "")
+            foreach(_ai_win_ui_skia_lib_path IN LISTS _ai_win_ui_skia_release_libs)
+                get_filename_component(_ai_win_ui_skia_lib_name "${_ai_win_ui_skia_lib_path}" NAME_WE)
+                list(APPEND _ai_win_ui_skia_release_lib_names "${_ai_win_ui_skia_lib_name}")
+            endforeach()
+            list(REMOVE_DUPLICATES _ai_win_ui_skia_release_lib_names)
 
             target_link_directories(ai_win_ui PRIVATE
                 "$<$<CONFIG:Debug>:${_ai_win_ui_skia_library_dir}/Debug-x64>"
                 "$<$<NOT:$<CONFIG:Debug>>:${_ai_win_ui_skia_library_dir}/Release-x64>"
             )
-            target_link_libraries(ai_win_ui PRIVATE ${_ai_win_ui_skia_lib_names})
+            # Generator expressions require semicolon-separated lists as single args.
+            string(REPLACE ";" "$<SEMICOLON>" _ai_win_ui_skia_debug_libs_genex "${_ai_win_ui_skia_debug_lib_names}")
+            string(REPLACE ";" "$<SEMICOLON>" _ai_win_ui_skia_release_libs_genex "${_ai_win_ui_skia_release_lib_names}")
+            target_link_libraries(ai_win_ui PRIVATE
+                "$<$<CONFIG:Debug>:${_ai_win_ui_skia_debug_libs_genex}>"
+                "$<$<NOT:$<CONFIG:Debug>>:${_ai_win_ui_skia_release_libs_genex}>"
+            )
         elseif(EXISTS "${_ai_win_ui_skia_library_dir}/skia.lib")
             target_link_libraries(ai_win_ui PRIVATE
                 "${_ai_win_ui_skia_library_dir}/skia.lib"
@@ -143,6 +163,7 @@ target_link_libraries(ai_win_ui PRIVATE
     "$<$<NOT:$<CONFIG:Debug>>:${_ai_win_ui_yoga_build_dir}/yoga/Release/yogacore.lib>"
     d2d1
     dwrite
+    dwmapi
     imm32
     windowscodecs
 )

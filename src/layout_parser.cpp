@@ -951,6 +951,28 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
     } else if (props["align-self"].IsString()) {
         element.SetAlignSelf(ParseSelfAlign(props["align-self"].stringValue));
     }
+    if (props["hitTest"].IsString()) {
+        const std::string value = ToLowerAscii(props["hitTest"].stringValue);
+        if (value == "caption") {
+            element.SetHitTestRole(UIElement::HitTestRole::Caption);
+        } else if (value == "client") {
+            element.SetHitTestRole(UIElement::HitTestRole::Client);
+        }
+    }
+    if (props["role"].IsString()) {
+        const std::string value = ToLowerAscii(props["role"].stringValue);
+        if (value == "titlebar" || value == "title-bar") {
+            element.SetHitTestRole(UIElement::HitTestRole::Caption);
+        }
+    }
+    if (props["chrome"].IsString()) {
+        const std::string value = ToLowerAscii(props["chrome"].stringValue);
+        if (value == "custom") {
+            element.SetWindowChromeRequest(UIElement::WindowChromeRequest::Custom);
+        } else if (value == "system") {
+            element.SetWindowChromeRequest(UIElement::WindowChromeRequest::System);
+        }
+    }
 }
 
 void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
@@ -1009,6 +1031,28 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
         element.SetAlignSelf(ParseSelfAlign(TrimString(it->second)));
     } else if (auto it2 = node.attributes.find("align-self"); it2 != node.attributes.end()) {
         element.SetAlignSelf(ParseSelfAlign(TrimString(it2->second)));
+    }
+    if (auto it = node.attributes.find("hitTest"); it != node.attributes.end()) {
+        const std::string value = ToLowerAscii(TrimString(it->second));
+        if (value == "caption") {
+            element.SetHitTestRole(UIElement::HitTestRole::Caption);
+        } else if (value == "client") {
+            element.SetHitTestRole(UIElement::HitTestRole::Client);
+        }
+    }
+    if (auto it = node.attributes.find("role"); it != node.attributes.end()) {
+        const std::string value = ToLowerAscii(TrimString(it->second));
+        if (value == "titlebar" || value == "title-bar") {
+            element.SetHitTestRole(UIElement::HitTestRole::Caption);
+        }
+    }
+    if (auto it = node.attributes.find("chrome"); it != node.attributes.end()) {
+        const std::string value = ToLowerAscii(TrimString(it->second));
+        if (value == "custom") {
+            element.SetWindowChromeRequest(UIElement::WindowChromeRequest::Custom);
+        } else if (value == "system") {
+            element.SetWindowChromeRequest(UIElement::WindowChromeRequest::System);
+        }
     }
 }
 
@@ -1962,6 +2006,16 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
                 button->foreground = LayoutParser::ColorFromString(props["foreground"].stringValue);
             }
             TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, button->cornerRadius);
+            if (props["variant"].IsString()) {
+                const std::string value = ToLowerAscii(props["variant"].stringValue);
+                if (value == "captionminimize" || value == "caption-minimize" || value == "minimize") {
+                    button->SetVariant(Button::Variant::CaptionMinimize);
+                } else if (value == "captionmaximize" || value == "caption-maximize" || value == "maximize") {
+                    button->SetVariant(Button::Variant::CaptionMaximize);
+                } else if (value == "captionclose" || value == "caption-close" || value == "close") {
+                    button->SetVariant(Button::Variant::CaptionClose);
+                }
+            }
             ApplyCommonJsonProps(*button, props);
         }
         if (node["events"].IsObject() && node["events"]["onClick"].IsString()) {
@@ -2845,6 +2899,16 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
             button->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("variant"); it != node.attributes.end()) {
+            const std::string value = ToLowerAscii(TrimString(it->second));
+            if (value == "captionminimize" || value == "caption-minimize" || value == "minimize") {
+                button->SetVariant(Button::Variant::CaptionMinimize);
+            } else if (value == "captionmaximize" || value == "caption-maximize" || value == "maximize") {
+                button->SetVariant(Button::Variant::CaptionMaximize);
+            } else if (value == "captionclose" || value == "caption-close" || value == "close") {
+                button->SetVariant(Button::Variant::CaptionClose);
+            }
         }
         ApplyCommonXmlAttributes(*button, node);
         if (auto it = node.attributes.find("onClick"); it != node.attributes.end()) {

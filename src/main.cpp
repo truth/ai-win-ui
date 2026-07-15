@@ -6,6 +6,7 @@
 #include "theme.h"
 #include "ui_context.h"
 #include "ui.h"
+#include "window_chrome.h"
 #include "zip_resource_provider.h"
 
 #include <imm.h>
@@ -93,20 +94,28 @@ public:
         wc.lpszClassName = kClassName;
         wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
         wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
+        wc.style = CS_DBLCLKS;
 
         if (!RegisterClassW(&wc)) {
             return false;
         }
 
+        // Env wins for initial create; layout chrome= can promote system -> custom later.
+        m_chromeEnvForced = !GetEnvironmentValue(L"AI_WIN_UI_CHROME").empty();
+        m_windowChrome.SetMode(WindowChrome::ParseMode(GetEnvironmentValue(L"AI_WIN_UI_CHROME").c_str()));
+
         const UINT initialDpi = GetDpiForSystem();
+        m_windowChrome.SetDpi(initialDpi);
         RECT initialRect{0, 0, 1000, 700};
-        AdjustWindowRectExForDpi(&initialRect, WS_OVERLAPPEDWINDOW, FALSE, 0, initialDpi);
+        const DWORD style = m_windowChrome.WindowStyle();
+        const DWORD exStyle = m_windowChrome.WindowExStyle();
+        AdjustWindowRectExForDpi(&initialRect, style, FALSE, exStyle, initialDpi);
 
         m_hwnd = CreateWindowExW(
-            0,
+            exStyle,
             kClassName,
             L"AI WinUI Renderer (DirectUI-style)",
-            WS_OVERLAPPEDWINDOW | WS_VSCROLL,
+            style,
             CW_USEDEFAULT,
             CW_USEDEFAULT,
             initialRect.right - initialRect.left,
@@ -122,6 +131,10 @@ public:
         }
 
         UpdateDpiContext(GetWindowDpiWithFallback(m_hwnd));
+        m_windowChrome.SetDpi(m_uiContext.dpi);
+        if (m_windowChrome.IsCustom()) {
+            m_windowChrome.InitializeDwm(m_hwnd);
+        }
 
         m_requestedRendererBackend = ParseRendererBackend(GetEnvironmentValue(L"AI_WIN_UI_RENDERER"));
         if (!InitializeRenderer()) {
@@ -145,6 +158,7 @@ public:
         if (m_root) {
             m_root->SetContext(&m_uiContext);
         }
+        ApplyChromeFromRootIfNeeded();
         m_isInitialized = true;
         OnResize();
         ShowWindow(m_hwnd, cmdShow);
@@ -185,6 +199,64 @@ private:
     void UpdateDpiContext(UINT dpi) {
         m_uiContext.dpi = dpi > 0 ? dpi : 96;
         m_uiContext.dpiScale = static_cast<float>(m_uiContext.dpi) / 96.0f;
+        m_windowChrome.SetDpi(m_uiContext.dpi);
+    }
+
+    void ApplyChromeFromRootIfNeeded() {
+        if (!m_root || m_chromeEnvForced) {
+            return;
+        }
+        const auto request = m_root->GetWindowChromeRequest();
+        if (request == UIElement::WindowChromeRequest::Unspecified) {
+            return;
+        }
+        const WindowChromeMode desired = (request == UIElement::WindowChromeRequest::Custom)
+            ? WindowChromeMode::Custom
+            : WindowChromeMode::System;
+        if (desired == m_windowChrome.Mode()) {
+            return;
+        }
+        m_windowChrome.SetMode(desired);
+        m_windowChrome.ApplyWindowStyle(m_hwnd);
+        if (m_windowChrome.IsCustom()) {
+            m_windowChrome.InitializeDwm(m_hwnd);
+        }
+    }
+
+    static RECT ToGdiRect(const Rect& bounds) {
+        return RECT{
+            static_cast<LONG>(std::floor(bounds.left)),
+            static_cast<LONG>(std::floor(bounds.top)),
+            static_cast<LONG>(std::ceil(bounds.right)),
+            static_cast<LONG>(std::ceil(bounds.bottom)),
+        };
+    }
+
+    void RefreshChromeHitRegions() {
+        if (!m_windowChrome.IsCustom() || !m_root) {
+            m_windowChrome.ClearHitRegions();
+            return;
+        }
+
+        std::vector<std::pair<Rect, UIElement::HitTestRole>> captionRegions;
+        std::vector<Rect> clientOnlyRegions;
+        m_root->CollectChromeHitRegions(captionRegions, clientOnlyRegions);
+
+        std::vector<WindowChromeHitRegion> regions;
+        regions.reserve(captionRegions.size() + clientOnlyRegions.size());
+        for (const auto& entry : captionRegions) {
+            WindowChromeHitRegion region{};
+            region.rect = ToGdiRect(entry.first);
+            region.caption = true;
+            regions.push_back(region);
+        }
+        for (const auto& bounds : clientOnlyRegions) {
+            WindowChromeHitRegion region{};
+            region.rect = ToGdiRect(bounds);
+            region.clientOnly = true;
+            regions.push_back(region);
+        }
+        m_windowChrome.SetHitRegions(std::move(regions));
     }
 
     std::wstring GetEnvironmentValue(const wchar_t* name) const {
@@ -255,6 +327,17 @@ private:
             }
             if (eventId == "secondaryAction") {
                 return [this]() { SetWindowTextW(m_hwnd, L"Clicked: Secondary Action"); };
+            }
+            if (eventId == "windowMinimize") {
+                return [this]() { ShowWindow(m_hwnd, SW_MINIMIZE); };
+            }
+            if (eventId == "windowMaximize") {
+                return [this]() {
+                    ShowWindow(m_hwnd, IsZoomed(m_hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+                };
+            }
+            if (eventId == "windowClose") {
+                return [this]() { PostMessageW(m_hwnd, WM_CLOSE, 0, 0); };
             }
             return UIEventHandler();
         };
@@ -382,8 +465,10 @@ private:
                 m_viewportWidth,
                 m_contentHeight - m_scrollOffset));
             UpdateImeWindow();
+            RefreshChromeHitRegions();
         } else {
             m_contentHeight = m_viewportHeight;
+            m_windowChrome.ClearHitRegions();
         }
         UpdateScrollBar();
     }
@@ -753,6 +838,30 @@ private:
 
     LRESULT HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
         switch (msg) {
+            case WM_NCCALCSIZE: {
+                bool handled = false;
+                const LRESULT result = m_windowChrome.HandleNcCalcSize(hwnd, wParam, lParam, handled);
+                if (handled) {
+                    return result;
+                }
+                break;
+            }
+            case WM_NCHITTEST: {
+                bool handled = false;
+                const LRESULT result = m_windowChrome.HandleNcHitTest(hwnd, lParam, handled);
+                if (handled) {
+                    return result;
+                }
+                break;
+            }
+            case WM_GETMINMAXINFO: {
+                bool handled = false;
+                const LRESULT result = m_windowChrome.HandleGetMinMaxInfo(hwnd, lParam, handled);
+                if (handled) {
+                    return result;
+                }
+                break;
+            }
             case WM_DPICHANGED: {
                 UpdateDpiContext(HIWORD(wParam));
                 const auto* suggestedRect = reinterpret_cast<RECT*>(lParam);
@@ -857,6 +966,8 @@ private:
 
     HWND m_hwnd = nullptr;
     UIContext m_uiContext{};
+    WindowChrome m_windowChrome;
+    bool m_chromeEnvForced = false;
     std::unique_ptr<IRenderer> m_renderer;
     std::unique_ptr<ITextMeasurer> m_textMeasurer;
     std::unique_ptr<ILayoutEngine> m_layoutEngine;

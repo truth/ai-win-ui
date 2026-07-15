@@ -1,0 +1,108 @@
+<!--
+  Custom chrome demo — refined dark instrument shell.
+  Caption buttons use geometric glyphs + Fluent-like hover (close goes crimson).
+-->
+<Panel chrome="custom" direction="column" background="#070B12" alignItems="stretch" spacing="0">
+
+  <!-- Title bar: left cluster + right caption buttons (flush top-right) -->
+  <Panel
+    role="titleBar"
+    hitTest="caption"
+    direction="row"
+    height="44"
+    background="#0E1622"
+    padding="0,0,0,0"
+    spacing="0"
+    alignItems="stretch"
+    justifyContent="spaceBetween">
+
+    <!-- Left: brand + title (caption drag) -->
+    <Panel
+      direction="row"
+      height="44"
+      padding="14,0,12,0"
+      spacing="0"
+      alignItems="center"
+      hitTest="caption"
+      flexGrow="1"
+      flexShrink="1"
+      flexBasis="0">
+      <Panel
+        width="10"
+        height="10"
+        background="#5B8CFF"
+        cornerRadius="3"
+        margin="0,0,10,0" />
+      <Label text="AI WinUI" fontSize="13" color="#F2F6FB" margin="0,0,8,0" />
+      <Label text="Custom Chrome" fontSize="12" color="#7F93A8" />
+    </Panel>
+
+    <!-- Right: window controls pinned to top-right corner -->
+    <Panel
+      direction="row"
+      height="44"
+      width="138"
+      spacing="0"
+      alignItems="stretch"
+      flexGrow="0"
+      flexShrink="0">
+      <Button
+        variant="caption-minimize"
+        width="46"
+        height="44"
+        hitTest="client"
+        onClick="windowMinimize" />
+      <Button
+        variant="caption-maximize"
+        width="46"
+        height="44"
+        hitTest="client"
+        onClick="windowMaximize" />
+      <Button
+        variant="caption-close"
+        width="46"
+        height="44"
+        hitTest="client"
+        onClick="windowClose" />
+    </Panel>
+  </Panel>
+
+  <!-- Hairline under chrome -->
+  <Panel height="1" background="#1A2838" />
+
+  <!-- Content -->
+  <Panel
+    flexGrow="1"
+    direction="column"
+    padding="28,28,28,28"
+    spacing="16"
+    background="#0A121C"
+    alignItems="stretch">
+
+    <Label text="Window chrome, refined" fontSize="24" color="#F5F8FC" />
+    <Label
+      text="Drag the title bar · resize edges · double-click caption to maximize. Caption buttons use stroked glyphs with soft hover; close turns crimson."
+      fontSize="14"
+      color="#9AADC0" />
+
+    <Panel
+      direction="column"
+      padding="16,16,16,16"
+      spacing="12"
+      background="#121C2A"
+      cornerRadius="12"
+      alignItems="stretch">
+      <Label text="Client region" fontSize="12" color="#6F8499" />
+      <TextInput text="Inputs stay fully interactive under custom chrome" />
+      <Panel direction="row" spacing="10">
+        <Button text="Primary Action" onClick="primaryAction" />
+        <Button text="Secondary Action" onClick="secondaryAction" />
+      </Panel>
+    </Panel>
+
+    <Label
+      text="Launch: scripts/run_custom_chrome_demo.ps1  ·  AI_WIN_UI_CHROME=custom"
+      fontSize="12"
+      color="#5C7085" />
+  </Panel>
+</Panel>

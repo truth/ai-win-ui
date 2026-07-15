@@ -55,6 +55,7 @@ function Resolve-LayoutPath {
         "seagull-animation" = "layouts/seagull_animation.xml"
         "core-controls-v2" = "layouts/core_controls_v2.xml"
         "navigation-components" = "layouts/navigation_components.xml"
+        "custom-chrome" = "layouts/custom_chrome_demo.xml"
     }
     $aliasKey = $layoutPath.ToLowerInvariant()
     if ($layoutAliases.ContainsKey($aliasKey)) {

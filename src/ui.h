@@ -15,6 +15,7 @@
 #include <memory>
 #include <map>
 #include <string>
+#include <utility>
 #include <vector>
 
 class UIElement {
@@ -27,10 +28,28 @@ public:
         End
     };
 
+    // Window hit-test role for custom chrome (WM_NCHITTEST bridging).
+    enum class HitTestRole : uint8_t {
+        Default = 0,
+        Caption = 1, // draggable title-bar region
+        Client = 2,  // force client hit (buttons, inputs)
+    };
+
+    // Optional root-level preference; Unspecified keeps App / env defaults.
+    enum class WindowChromeRequest : uint8_t {
+        Unspecified = 0,
+        System = 1,
+        Custom = 2,
+    };
+
     virtual ~UIElement() = default;
 
     void SetBounds(const Rect& rect) { m_bounds = rect; }
     Rect Bounds() const { return m_bounds; }
+    void SetHitTestRole(HitTestRole role) { m_hitTestRole = role; }
+    HitTestRole GetHitTestRole() const { return m_hitTestRole; }
+    void SetWindowChromeRequest(WindowChromeRequest request) { m_windowChromeRequest = request; }
+    WindowChromeRequest GetWindowChromeRequest() const { return m_windowChromeRequest; }
     Size DesiredSize() const { return m_desiredSize; }
     void SetMargin(const Thickness& margin) { m_margin = margin; }
     const Thickness& Margin() const { return m_margin; }
@@ -191,6 +210,23 @@ public:
         }
     }
 
+    // Collect caption / client-only rectangles for custom window chrome hit testing.
+    // clientOnly is recorded for explicit Client role or focusable controls.
+    void CollectChromeHitRegions(
+        std::vector<std::pair<Rect, HitTestRole>>& captionRegions,
+        std::vector<Rect>& clientOnlyRegions) const {
+        const HitTestRole role = m_hitTestRole;
+        if (role == HitTestRole::Caption) {
+            captionRegions.emplace_back(m_bounds, role);
+        }
+        if (role == HitTestRole::Client || IsFocusable()) {
+            clientOnlyRegions.push_back(m_bounds);
+        }
+        for (const auto& child : m_children) {
+            child->CollectChromeHitRegions(captionRegions, clientOnlyRegions);
+        }
+    }
+
     virtual bool OnMouseMove(float x, float y) {
         bool changed = false;
         bool hitChild = false;
@@ -325,6 +361,8 @@ protected:
     bool m_hovered = false;
     bool m_pressed = false;
     bool m_disabled = false;
+    HitTestRole m_hitTestRole = HitTestRole::Default;
+    WindowChromeRequest m_windowChromeRequest = WindowChromeRequest::Unspecified;
     ComponentStyle m_style{};
     UIContext* m_context = nullptr;
 };
@@ -1559,12 +1597,44 @@ private:
 
 class Button : public UIElement {
 public:
+    // Default: filled action button. Caption*: window chrome controls with
+    // geometric glyphs (min / max / close) and Fluent-like hover washes.
+    enum class Variant {
+        Default,
+        CaptionMinimize,
+        CaptionMaximize,
+        CaptionClose,
+    };
+
     explicit Button(std::wstring text) : m_text(std::move(text)) {
         m_style = DefaultStyle();
     }
 
     void SetOnClick(std::function<void()> onClick) { m_onClick = std::move(onClick); }
     void SetText(std::wstring text) { m_text = std::move(text); }
+    void SetVariant(Variant variant) {
+        m_variant = variant;
+        switch (variant) {
+            case Variant::CaptionMinimize:
+            case Variant::CaptionMaximize:
+                m_style = CaptionStyle();
+                cornerRadius = 0.0f;
+                background = Color{0, 0, 0, 0};
+                foreground = ColorFromHex(0xD7E2EE);
+                break;
+            case Variant::CaptionClose:
+                m_style = CaptionCloseStyle();
+                cornerRadius = 0.0f;
+                background = Color{0, 0, 0, 0};
+                foreground = ColorFromHex(0xD7E2EE);
+                break;
+            case Variant::Default:
+            default:
+                m_style = DefaultStyle();
+                break;
+        }
+    }
+    Variant GetVariant() const { return m_variant; }
 
     float cornerRadius = 4.0f;
     float fontSize = 14.0f;
@@ -1600,6 +1670,51 @@ public:
         s.overrides[static_cast<std::size_t>(StyleState::Disabled)].decoration = disabledDeco;
         s.overrides[static_cast<std::size_t>(StyleState::Disabled)].opacity = 0.6f;
 
+        return s;
+    }
+
+    // Soft luminous wash — no border, flat against the title bar.
+    static ComponentStyle CaptionStyle() {
+        ComponentStyle s;
+        BoxDecoration normal;
+        normal.background = Color{0.0f, 0.0f, 0.0f, 0.0f};
+        normal.border.width = Thickness{};
+        normal.radius = CornerRadius::Uniform(0.0f);
+        s.base.decoration = normal;
+        s.base.foreground = ColorFromHex(0xD7E2EE);
+
+        BoxDecoration hover = normal;
+        hover.background = Color{1.0f, 1.0f, 1.0f, 0.08f};
+        s.overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+        s.overrides[static_cast<std::size_t>(StyleState::Hover)].foreground = ColorFromHex(0xF4F8FC);
+
+        BoxDecoration pressed = normal;
+        pressed.background = Color{1.0f, 1.0f, 1.0f, 0.14f};
+        s.overrides[static_cast<std::size_t>(StyleState::Pressed)].decoration = pressed;
+        s.overrides[static_cast<std::size_t>(StyleState::Pressed)].foreground = ColorFromHex(0xFFFFFF);
+
+        BoxDecoration focused = normal;
+        focused.background = Color{1.0f, 1.0f, 1.0f, 0.05f};
+        s.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration = focused;
+        return s;
+    }
+
+    // Close: warm crimson hover (desktop OS convention), white glyph.
+    static ComponentStyle CaptionCloseStyle() {
+        ComponentStyle s = CaptionStyle();
+        BoxDecoration hover;
+        hover.background = ColorFromHex(0xE81123);
+        hover.border.width = Thickness{};
+        hover.radius = CornerRadius::Uniform(0.0f);
+        s.overrides[static_cast<std::size_t>(StyleState::Hover)].decoration = hover;
+        s.overrides[static_cast<std::size_t>(StyleState::Hover)].foreground = ColorFromHex(0xFFFFFF);
+
+        BoxDecoration pressed;
+        pressed.background = ColorFromHex(0xF1707A);
+        pressed.border.width = Thickness{};
+        pressed.radius = CornerRadius::Uniform(0.0f);
+        s.overrides[static_cast<std::size_t>(StyleState::Pressed)].decoration = pressed;
+        s.overrides[static_cast<std::size_t>(StyleState::Pressed)].foreground = ColorFromHex(0xFFFFFF);
         return s;
     }
 
@@ -1666,31 +1781,41 @@ public:
         SyncQuickSetToStyle();
         const StyleSpec resolved = m_style.Resolve(GetCurrentState());
         BoxDecoration deco = resolved.decoration.value_or(BoxDecoration{});
-        deco.radius = CornerRadius::Uniform(ScaleValue(cornerRadius));
-        deco.border.width = Thickness{
-            ScaleValue(deco.border.width.left),
-            ScaleValue(deco.border.width.top),
-            ScaleValue(deco.border.width.right),
-            ScaleValue(deco.border.width.bottom)
-        };
+        if (IsCaptionVariant()) {
+            // Caption controls stay sharp-edged and borderless.
+            deco.radius = CornerRadius::Uniform(0.0f);
+            deco.border.width = Thickness{};
+        } else {
+            deco.radius = CornerRadius::Uniform(ScaleValue(cornerRadius));
+            deco.border.width = Thickness{
+                ScaleValue(deco.border.width.left),
+                ScaleValue(deco.border.width.top),
+                ScaleValue(deco.border.width.right),
+                ScaleValue(deco.border.width.bottom)
+            };
+        }
         if (resolved.opacity.has_value()) {
             deco.opacity = *resolved.opacity;
         }
         DrawBoxDecoration(renderer, m_bounds, deco);
 
-        Rect textRect = m_bounds;
-        textRect.left += ScaleValue(10.0f);
+        const Color fg = resolved.foreground.value_or(foreground);
+        if (IsCaptionVariant()) {
+            DrawCaptionGlyph(renderer, fg);
+            return;
+        }
+
+        // Center label properly (no left padding bias).
         const TextRenderOptions textOptions{
             TextWrapMode::NoWrap,
             TextHorizontalAlign::Center,
             TextVerticalAlign::Center
         };
-        const Color fg = resolved.foreground.value_or(foreground);
         const float fs = resolved.fontSize.value_or(fontSize);
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
-            textRect,
+            m_bounds,
             fg,
             ScaleValue(fs),
             textOptions
@@ -1698,7 +1823,58 @@ public:
     }
 
 private:
+    bool IsCaptionVariant() const {
+        return m_variant == Variant::CaptionMinimize
+            || m_variant == Variant::CaptionMaximize
+            || m_variant == Variant::CaptionClose;
+    }
+
+    void DrawCaptionGlyph(IRenderer& renderer, const Color& color) const {
+        const float cx = (m_bounds.left + m_bounds.right) * 0.5f;
+        const float cy = (m_bounds.top + m_bounds.bottom) * 0.5f;
+        // Icon optical size ~10dip; stroke slightly thicker than hairline for clarity.
+        const float half = ScaleValue(5.0f);
+        const float stroke = std::max(1.0f, ScaleValue(1.15f));
+
+        switch (m_variant) {
+            case Variant::CaptionMinimize: {
+                renderer.DrawLine(
+                    PointF{cx - half, cy},
+                    PointF{cx + half, cy},
+                    color,
+                    stroke);
+                break;
+            }
+            case Variant::CaptionMaximize: {
+                const Rect box = Rect::Make(cx - half, cy - half, cx + half, cy + half);
+                renderer.DrawRect(box, color, stroke);
+                break;
+            }
+            case Variant::CaptionClose: {
+                // Slightly larger X for balance against the square glyph.
+                const float xHalf = ScaleValue(4.6f);
+                renderer.DrawLine(
+                    PointF{cx - xHalf, cy - xHalf},
+                    PointF{cx + xHalf, cy + xHalf},
+                    color,
+                    stroke);
+                renderer.DrawLine(
+                    PointF{cx + xHalf, cy - xHalf},
+                    PointF{cx - xHalf, cy + xHalf},
+                    color,
+                    stroke);
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
     void SyncQuickSetToStyle() {
+        // Caption variants own their state palette; don't clobber with quick-set colors.
+        if (IsCaptionVariant()) {
+            return;
+        }
         if (!m_style.base.decoration.has_value()) {
             m_style.base.decoration = BoxDecoration{};
         }
@@ -1748,6 +1924,7 @@ public:
 private:
     std::wstring m_text;
     std::function<void()> m_onClick;
+    Variant m_variant = Variant::Default;
 };
 
 class TextInput : public UIElement {
