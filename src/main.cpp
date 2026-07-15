@@ -528,6 +528,11 @@ private:
             if (m_root) {
                 m_root->Render(*m_renderer);
             }
+            // Subtle outer edge so borderless chrome stays visible on dark desktops.
+            if (m_windowChrome.IsCustom() && m_viewportWidth > 1.0f && m_viewportHeight > 1.0f) {
+                const Rect edge = Rect::Make(0.5f, 0.5f, m_viewportWidth - 0.5f, m_viewportHeight - 0.5f);
+                m_renderer->DrawRect(edge, ColorFromHex(0x2A3A4C), 1.0f);
+            }
             m_renderer->EndFrame();
         }
 

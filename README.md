@@ -78,6 +78,22 @@
 - `.\build.ps1 -Configuration Release -Clean`
 - `.\build.ps1 -Run`
 
+## 自定义标题栏（Custom Chrome）
+
+默认仍使用系统标题栏。可选启用无边框自绘 chrome（拖动、缩放、min/max/close）：
+
+```powershell
+# 一键 demo
+.\scripts\run_custom_chrome_demo.ps1 -Configuration Release -BuildIfMissing
+
+# 或手动
+$env:AI_WIN_UI_CHROME = "custom"
+$env:AI_WIN_UI_LAYOUT = "layouts/custom_chrome_demo.xml"
+.\build\Release\ai_win_ui.exe
+```
+
+也可在根布局写 `chrome="custom"`。说明见 `doc/window-chrome.md`。
+
 ## Script Usage
 
 The repository includes a few helper scripts for building the app, preparing
