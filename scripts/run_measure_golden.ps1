@@ -53,8 +53,13 @@ $layoutRel = switch ($Layout.ToLowerInvariant()) {
     "scroll_viewer" { "layouts/scroll_viewer_cases.xml" }
     "core-validation" { "layouts/core_validation.xml" }
     "core_validation" { "layouts/core_validation.xml" }
+    "yoga-measure" { "layouts/yoga_measure_cases.xml" }
+    "yoga_measure" { "layouts/yoga_measure_cases.xml" }
+    "yoga_measure_cases" { "layouts/yoga_measure_cases.xml" }
     "demo-gallery" { "layouts/demo_gallery.xml" }
     "demo_gallery" { "layouts/demo_gallery.xml" }
+    "text-wrap" { "layouts/text_wrap_cases.xml" }
+    "text_wrap" { "layouts/text_wrap_cases.xml" }
     default { $Layout }
 }
 

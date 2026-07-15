@@ -15,24 +15,40 @@ function Resolve-LauncherConfig {
         [string]$Backend
     )
 
-    switch ($Backend) {
+    $presetExe = switch ($Backend) {
         "skia" {
-            return @{
-                ExePath = Join-Path $RepoRoot "build\presets\dev-debug-skia-local-sdk\Debug\ai_win_ui.exe"
-                ConfigurePreset = "dev-debug-skia-local-sdk"
-                BuildPreset = "build-dev-debug-skia-local-sdk"
-            }
+            Join-Path $RepoRoot "build\presets\dev-debug-skia-local-sdk\Debug\ai_win_ui.exe"
         }
         "direct2d" {
-            return @{
-                ExePath = Join-Path $RepoRoot "build\presets\dev-debug\Debug\ai_win_ui.exe"
-                ConfigurePreset = "dev-debug"
-                BuildPreset = "build-dev-debug"
-            }
+            Join-Path $RepoRoot "build\presets\dev-debug\Debug\ai_win_ui.exe"
         }
         default {
             throw "Unsupported renderer: $Backend"
         }
+    }
+
+    $configurePreset = if ($Backend -eq "skia") { "dev-debug-skia-local-sdk" } else { "dev-debug" }
+    $buildPreset = if ($Backend -eq "skia") { "build-dev-debug-skia-local-sdk" } else { "build-dev-debug" }
+
+    # Prefer the newest existing binary so Release (cmake --build build) is not ignored
+    # when preset Debug trees are stale. Runtime backend still comes from AI_WIN_UI_RENDERER.
+    $candidates = @(
+        $presetExe,
+        (Join-Path $RepoRoot "build\Release\ai_win_ui.exe"),
+        (Join-Path $RepoRoot "build\Debug\ai_win_ui.exe")
+    )
+    $existing = @($candidates | Where-Object { Test-Path -LiteralPath $_ })
+    $exePath = if ($existing.Count -gt 0) {
+        ($existing | Sort-Object { (Get-Item -LiteralPath $_).LastWriteTime } -Descending | Select-Object -First 1)
+    } else {
+        $presetExe
+    }
+
+    return @{
+        ExePath = $exePath
+        PreferredExePath = $presetExe
+        ConfigurePreset = $configurePreset
+        BuildPreset = $buildPreset
     }
 }
 
@@ -96,6 +112,9 @@ function Resolve-LayoutPath {
         "text-wrap" = "layouts/text_wrap_cases.xml"
         "text_wrap" = "layouts/text_wrap_cases.xml"
         "text_wrap_cases" = "layouts/text_wrap_cases.xml"
+        "cjk-render" = "layouts/cjk_render_test.xml"
+        "cjk_render" = "layouts/cjk_render_test.xml"
+        "cjk_render_test" = "layouts/cjk_render_test.xml"
     }
     $aliasKey = $layoutPath.ToLowerInvariant()
     if ($layoutAliases.ContainsKey($aliasKey)) {

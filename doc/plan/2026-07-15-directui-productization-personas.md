@@ -338,7 +338,9 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 | S1 | **done** | `doc/plan/token-migration-strategy.md` |
 | S2 | **done** | `style-catalog.md` Theme vs Catalog 职责边界表 |
 | S3 | **done** | 启动 `[Theme]/`/`[Styles]` 路径 + styleCount；`LogEffectiveEnv` themeFile/stylesFiles |
-| L3 | **partial** | `yoga_measure_cases` 增 space-between + min/max 段；measure golden 待扩 |
+| L3 | **done** | `yoga_measure_cases` space-between + min/max 段 |
+| L4 | **partial** | `yoga-measure` skia+d2d golden 已入库；core-validation 已有 |
+| Q3 | **done** | `run_headless_smoke` 扩 gallery 代表页 + 选最新 exe（含 Release） |
 
 ## 10. 修订记录
 
