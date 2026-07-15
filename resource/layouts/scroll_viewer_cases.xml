@@ -1,0 +1,56 @@
+<!--
+  ScrollViewer cases (P0): nested vertical scroll inside a fixed viewport.
+  Wheel over the scroller moves content; window-level scroll still works outside.
+-->
+<Panel
+  name="root"
+  direction="column"
+  background="#0B121A"
+  padding="20,20,20,20"
+  spacing="12"
+  alignItems="stretch">
+
+  <Label name="title" text="ScrollViewer cases" fontSize="20" color="#F5F8FC" />
+  <Label
+    name="hint"
+    text="Roll the wheel over the dark scroller. Content is taller than the viewport."
+    fontSize="13"
+    color="#8FA3B8" />
+
+  <ScrollViewer
+    name="scroller"
+    height="280"
+    scrollY="true"
+    scrollX="false"
+    showScrollbars="true"
+    background="#121B25"
+    barThickness="10">
+    <Panel
+      name="scrollContent"
+      direction="column"
+      padding="12,12,12,12"
+      spacing="8"
+      background="#152033"
+      alignItems="stretch">
+      <Label name="line0" text="Line 0 — top of scroll content" fontSize="14" color="#E8EEF6" />
+      <Label name="line1" text="Line 1 — keep rolling" fontSize="14" color="#E8EEF6" />
+      <Label name="line2" text="Line 2" fontSize="14" color="#E8EEF6" />
+      <Label name="line3" text="Line 3" fontSize="14" color="#E8EEF6" />
+      <Label name="line4" text="Line 4" fontSize="14" color="#E8EEF6" />
+      <Label name="line5" text="Line 5" fontSize="14" color="#E8EEF6" />
+      <Label name="line6" text="Line 6" fontSize="14" color="#E8EEF6" />
+      <Label name="line7" text="Line 7" fontSize="14" color="#E8EEF6" />
+      <Label name="line8" text="Line 8" fontSize="14" color="#E8EEF6" />
+      <Label name="line9" text="Line 9" fontSize="14" color="#E8EEF6" />
+      <Label name="line10" text="Line 10" fontSize="14" color="#E8EEF6" />
+      <Label name="line11" text="Line 11" fontSize="14" color="#E8EEF6" />
+      <Label name="line12" text="Line 12" fontSize="14" color="#E8EEF6" />
+      <Label name="line13" text="Line 13" fontSize="14" color="#E8EEF6" />
+      <Label name="line14" text="Line 14 — near bottom" fontSize="14" color="#E8EEF6" />
+      <Label name="line15" text="Line 15 — end of scroll content" fontSize="14" color="#7B6CFF" />
+      <Button name="bottomAction" text="Bottom action" style="$style.primaryButton" onClick="primaryAction" />
+    </Panel>
+  </ScrollViewer>
+
+  <Label name="footer" text="Alias: scroll-viewer  ·  measure: AI_WIN_UI_MEASURE_DUMP=1" fontSize="12" color="#5C7085" />
+</Panel>

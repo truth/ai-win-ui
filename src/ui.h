@@ -48,6 +48,10 @@ public:
 
     virtual ~UIElement() = default;
 
+    // Optional stable id for measure dumps / automation (layout name= / id=).
+    void SetName(std::string name) { m_name = std::move(name); }
+    const std::string& Name() const { return m_name; }
+
     void SetBounds(const Rect& rect) { m_bounds = rect; }
     Rect Bounds() const { return m_bounds; }
     void SetHitTestRole(HitTestRole role) { m_hitTestRole = role; }
@@ -317,6 +321,8 @@ public:
         return x >= m_bounds.left && x <= m_bounds.right && y >= m_bounds.top && y <= m_bounds.bottom;
     }
 
+    const std::vector<std::unique_ptr<UIElement>>& Children() const { return m_children; }
+
     void AddChild(std::unique_ptr<UIElement> child) {
         if (child) {
             child->SetContext(m_context);
@@ -384,6 +390,7 @@ protected:
     Rect m_bounds{};
     Size m_desiredSize{};
     std::vector<std::unique_ptr<UIElement>> m_children;
+    std::string m_name;
     Thickness m_margin{};
     Thickness m_border{};
     float m_fixedWidth = -1.0f;
@@ -8170,6 +8177,158 @@ inline void PaintPillScrollbars(
             radius);
     }
 }
+
+// Clip viewport + offset content. Prefer over App-level window scroll for nested regions.
+class ScrollViewer : public UIElement {
+public:
+    bool scrollY = true;
+    bool scrollX = false;
+    bool showScrollbars = true;
+    float barThickness = 10.0f;
+    Color trackColor = ColorFromHex(0x1A2430, 0.85f);
+    Color thumbColor = ColorFromHex(0x5A6F86, 0.9f);
+    Color background = ColorFromHex(0x000000, 0.0f);
+
+    void SetScrollOffset(float x, float y) {
+        m_scrollX = x;
+        m_scrollY = y;
+        ClampScroll();
+    }
+    float ScrollX() const { return m_scrollX; }
+    float ScrollY() const { return m_scrollY; }
+    float ContentWidth() const { return m_contentSize.width; }
+    float ContentHeight() const { return m_contentSize.height; }
+
+    void Measure(float availableWidth, float availableHeight) override {
+        const float viewportW = GetPreferredWidth(availableWidth);
+        float viewportH = HasFixedHeight()
+            ? GetPreferredHeight(availableWidth)
+            : std::max(0.0f, availableHeight);
+        if (viewportH <= 0.0f && !HasFixedHeight()) {
+            viewportH = ScaleValue(200.0f);
+        }
+
+        const float childAvailW = scrollX ? 100000.0f : viewportW;
+        const float childAvailH = scrollY ? 100000.0f : viewportH;
+
+        float contentW = 0.0f;
+        float contentH = 0.0f;
+        for (auto& child : m_children) {
+            child->Measure(childAvailW, childAvailH);
+            contentW = std::max(contentW, child->DesiredSize().width);
+            contentH = std::max(contentH, child->DesiredSize().height);
+        }
+        m_contentSize = Size{contentW, contentH};
+
+        m_desiredSize.width = viewportW;
+        m_desiredSize.height = HasFixedHeight()
+            ? GetPreferredHeight(availableWidth)
+            : (availableHeight > 0.0f && availableHeight < 100000.0f
+                ? viewportH
+                : std::min(contentH, ScaleValue(400.0f)));
+        ClampScroll();
+    }
+
+    void Arrange(const Rect& finalRect) override {
+        UIElement::Arrange(finalRect);
+        ClampScroll();
+        const float viewW = m_bounds.Width();
+        const float viewH = m_bounds.Height();
+        for (auto& child : m_children) {
+            const float cw = scrollX
+                ? std::max(child->DesiredSize().width, viewW)
+                : viewW;
+            const float ch = scrollY
+                ? std::max(child->DesiredSize().height, viewH)
+                : viewH;
+            child->Arrange(Rect::Make(
+                m_bounds.left - m_scrollX,
+                m_bounds.top - m_scrollY,
+                m_bounds.left - m_scrollX + cw,
+                m_bounds.top - m_scrollY + ch));
+        }
+    }
+
+    void Render(IRenderer& renderer) override {
+        if (background.a > 0.0f) {
+            renderer.FillRect(m_bounds, background);
+        }
+        renderer.PushRoundedClip(m_bounds, 0.0f);
+        for (auto& child : m_children) {
+            child->Render(renderer);
+        }
+        renderer.PopLayer();
+
+        if (showScrollbars) {
+            PaintPillScrollbars(
+                renderer,
+                m_bounds,
+                m_contentSize.width,
+                m_contentSize.height,
+                m_bounds.Width(),
+                m_bounds.Height(),
+                m_scrollX,
+                m_scrollY,
+                trackColor,
+                thumbColor,
+                ScaleValue(barThickness));
+        }
+    }
+
+    bool OnMouseWheel(float delta, float x, float y, bool shiftHeld) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+        for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+            if ((*it)->HitTest(x, y) && (*it)->OnMouseWheel(delta, x, y, shiftHeld)) {
+                return true;
+            }
+        }
+        const float step = ScaleValue(48.0f);
+        bool changed = false;
+        if (shiftHeld || (!scrollY && scrollX)) {
+            if (scrollX) {
+                const float prev = m_scrollX;
+                m_scrollX = std::clamp(m_scrollX - delta * step, 0.0f, MaxScrollX());
+                changed = std::abs(m_scrollX - prev) > 0.5f;
+            }
+        } else if (scrollY) {
+            const float prev = m_scrollY;
+            m_scrollY = std::clamp(m_scrollY - delta * step, 0.0f, MaxScrollY());
+            changed = std::abs(m_scrollY - prev) > 0.5f;
+        }
+        if (changed) {
+            Arrange(m_bounds);
+        }
+        return changed;
+    }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        return availableWidth;
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        return ScaleValue(200.0f);
+    }
+
+private:
+    float MaxScrollX() const {
+        return std::max(0.0f, m_contentSize.width - m_bounds.Width());
+    }
+    float MaxScrollY() const {
+        return std::max(0.0f, m_contentSize.height - m_bounds.Height());
+    }
+    void ClampScroll() {
+        m_scrollX = std::clamp(m_scrollX, 0.0f, MaxScrollX());
+        m_scrollY = std::clamp(m_scrollY, 0.0f, MaxScrollY());
+    }
+
+    Size m_contentSize{};
+    float m_scrollX = 0.0f;
+    float m_scrollY = 0.0f;
+};
 
 class ListView : public UIElement {
 public:

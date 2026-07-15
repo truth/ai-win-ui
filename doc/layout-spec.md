@@ -28,6 +28,7 @@ and **JSON** describe the same tree; property names are largely shared.
 | Type | Role |
 |------|------|
 | `Panel` | Main row/column composition, cards, shells |
+| `ScrollViewer` | Clipped viewport + scroll offset (prefer over window scroll for nested regions) |
 | `Grid` | Uniform tile matrix |
 | `ShapePanel` / `Shape` | Parametric filled polygon (heart / petal / oval / star) |
 
@@ -113,6 +114,7 @@ type that calls them:
 
 | Property | Notes |
 |----------|--------|
+| `name` / `id` | Stable id for measure dumps (`AI_WIN_UI_MEASURE_DUMP`) |
 | `width` / `height` | Fixed size |
 | `minWidth` / `maxWidth` / `minHeight` / `maxHeight` | Also kebab-case in JSON |
 | `margin` | `[l,t,r,b]` |
@@ -144,6 +146,30 @@ Layout properties:
 - `alignItems="stretch|start|center|end"`
 - `justifyContent="start|center|end|space-between"`
 - size / margin / flex / `alignSelf` (common props)
+
+### `ScrollViewer`
+
+Nested scroll region (P0). Children are measured with unbounded height when
+`scrollY` is true, then clipped to the viewer bounds.
+
+| Prop | Default | Notes |
+|------|---------|--------|
+| `scrollY` | true | Vertical wheel scroll |
+| `scrollX` | false | Horizontal; Shift+wheel when both axes exist |
+| `showScrollbars` | true | Pill scrollbars |
+| `barThickness` | 10 | DIP |
+| `background` / `trackColor` / `thumbColor` | optional | |
+| `height` / `flexGrow` | — | Give the viewport a finite size |
+
+Demo: `resource/layouts/scroll_viewer_cases.xml` (alias `scroll-viewer`).
+
+Measure dump after layout:
+
+```powershell
+$env:AI_WIN_UI_MEASURE_DUMP = "1"   # or path to .ndjson
+$env:AI_WIN_UI_QUIT_AFTER_MS = "800"
+# or: .\scripts\run_measure_dump.ps1 -Layout scroll-viewer
+```
 
 ### Style catalog impact on `Panel`
 

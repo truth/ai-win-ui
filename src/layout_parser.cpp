@@ -939,6 +939,12 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
         return;
     }
 
+    if (props["name"].IsString()) {
+        element.SetName(props["name"].stringValue);
+    } else if (props["id"].IsString()) {
+        element.SetName(props["id"].stringValue);
+    }
+
     if (props["flex"].IsNumber()) {
         element.SetFlexGrow(static_cast<float>(props["flex"].numberValue));
         element.SetFlexShrink(1.0f);
@@ -1052,6 +1058,12 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
 }
 
 void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
+    if (auto it = node.attributes.find("name"); it != node.attributes.end()) {
+        element.SetName(it->second);
+    } else if (auto itId = node.attributes.find("id"); itId != node.attributes.end()) {
+        element.SetName(itId->second);
+    }
+
     if (auto it = node.attributes.find("style"); it != node.attributes.end()) {
         std::string name = StyleCatalog::ParseStyleToken(it->second);
         if (name.empty()) {
@@ -1365,6 +1377,32 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*panel, props);
         }
         element = std::move(panel);
+    } else if (type == "ScrollViewer") {
+        auto viewer = std::make_unique<ScrollViewer>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["scrollY"].IsBool()) {
+                viewer->scrollY = props["scrollY"].boolValue;
+            }
+            if (props["scrollX"].IsBool()) {
+                viewer->scrollX = props["scrollX"].boolValue;
+            }
+            if (props["showScrollbars"].IsBool()) {
+                viewer->showScrollbars = props["showScrollbars"].boolValue;
+            }
+            TryAssignNumber(props["barThickness"], Theme::NumberCategory::Spacing, viewer->barThickness);
+            if (props["background"].IsString()) {
+                viewer->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["trackColor"].IsString()) {
+                viewer->trackColor = LayoutParser::ColorFromString(props["trackColor"].stringValue);
+            }
+            if (props["thumbColor"].IsString()) {
+                viewer->thumbColor = LayoutParser::ColorFromString(props["thumbColor"].stringValue);
+            }
+            ApplyCommonJsonProps(*viewer, props);
+        }
+        element = std::move(viewer);
     } else if (type == "Label") {
         std::wstring text = L"";
         auto label = std::make_unique<Label>(std::move(text));
@@ -2532,6 +2570,34 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*panel, node);
         element = std::move(panel);
+    } else if (node.name == "ScrollViewer") {
+        auto viewer = std::make_unique<ScrollViewer>();
+        if (auto it = node.attributes.find("scrollY"); it != node.attributes.end()) {
+            const std::string v = ToLowerAscii(TrimString(it->second));
+            viewer->scrollY = !(v == "false" || v == "0" || v == "no");
+        }
+        if (auto it = node.attributes.find("scrollX"); it != node.attributes.end()) {
+            const std::string v = ToLowerAscii(TrimString(it->second));
+            viewer->scrollX = (v == "true" || v == "1" || v == "yes");
+        }
+        if (auto it = node.attributes.find("showScrollbars"); it != node.attributes.end()) {
+            const std::string v = ToLowerAscii(TrimString(it->second));
+            viewer->showScrollbars = !(v == "false" || v == "0" || v == "no");
+        }
+        if (auto it = node.attributes.find("barThickness"); it != node.attributes.end()) {
+            viewer->barThickness = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            viewer->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("trackColor"); it != node.attributes.end()) {
+            viewer->trackColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("thumbColor"); it != node.attributes.end()) {
+            viewer->thumbColor = LayoutParser::ColorFromString(it->second);
+        }
+        ApplyCommonXmlAttributes(*viewer, node);
+        element = std::move(viewer);
     } else if (node.name == "Label") {
         std::wstring text = L"";
         auto label = std::make_unique<Label>(std::move(text));

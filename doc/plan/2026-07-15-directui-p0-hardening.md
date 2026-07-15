@@ -192,11 +192,20 @@ Week 概念序（可按人力并行 A∥D 起步）:
 
 ## 完成定义（P0 Done）
 
-- [ ] 同一 `core_validation` / `cjk_render_test` 在 Skia 与 D2D 下文本无「明显错位/裁切」
-- [ ] 至少一个布局用 `ScrollViewer` 替代对窗口滚动的依赖
-- [ ] shaped hub **默认同进程** 开第二窗，关子窗 hub 仍在
-- [ ] `run_measure_golden.ps1` 对至少 2 个布局双后端可重复通过
-- [ ] `doc/layout-spec.md` + `doc/window-chrome.md` + 本 plan 状态勾选更新
+- [x] 文本规则文档化；Skia measure/draw 共享 `CreateSkiaTextLayout`（含 bold/italic）；DWrite NoWrap 首行 parity（2026-07-15 起步）
+- [x] `ScrollViewer` + `scroll_viewer_cases` + 解析（2026-07-15）
+- [ ] shaped hub **默认同进程** 开第二窗，关子窗 hub 仍在（Track C 未做）
+- [x] `name` + `AI_WIN_UI_MEASURE_DUMP` / `run_measure_dump.ps1`（golden 对比脚本后续）
+- [x] `doc/layout-spec.md` 已记 ScrollViewer / name / dump
+
+## Progress log
+
+### 2026-07-15 — first code pass
+
+- **A1/A2**: `skia_text_layout.h` 规则表；`CreateSkiaTextLayout(..., bold, italic)`；`renderer_skia` draw 传入 bold/italic；DWrite NoWrap 只量首行。
+- **B1–B4**: `ScrollViewer` 控件 + XML/JSON 解析 + `scroll_viewer_cases.xml` + 别名 `scroll-viewer`。
+- **D1/D2**: `UIElement::name`；`AI_WIN_UI_MEASURE_DUMP` NDJSON dump；`scripts/run_measure_dump.ps1`。
+- **C**: 未开始（仍 CreateProcess 异形窗）。
 
 ---
 

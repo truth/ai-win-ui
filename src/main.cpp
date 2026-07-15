@@ -16,6 +16,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <fstream>
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -200,6 +202,7 @@ public:
         ApplyChromeFromRootIfNeeded();
         m_isInitialized = true;
         OnResize();
+        MaybeDumpMeasureTree();
 
         // Layered windows stay invisible until the first UpdateLayeredWindow.
         // Force an initial paint while still hidden so the first ShowWindow has
@@ -873,6 +876,56 @@ private:
             m_windowChrome.ClearHitRegions();
         }
         UpdateScrollBar();
+    }
+
+    // AI_WIN_UI_MEASURE_DUMP=1 → measure_dump.json next to exe
+    // AI_WIN_UI_MEASURE_DUMP=path\to\out.ndjson → explicit path
+    void MaybeDumpMeasureTree() {
+        const std::wstring dumpEnv = GetEnvironmentValue(L"AI_WIN_UI_MEASURE_DUMP");
+        if (dumpEnv.empty() || !m_root) {
+            return;
+        }
+
+        std::wstring outPath = dumpEnv;
+        if (dumpEnv == L"1" || dumpEnv == L"true" || dumpEnv == L"TRUE") {
+            const std::wstring dir = GetExecutableDirectory();
+            outPath = dir.empty() ? L"measure_dump.ndjson" : (dir + L"\\measure_dump.ndjson");
+        }
+
+        std::ofstream out(outPath, std::ios::binary | std::ios::trunc);
+        if (!out) {
+            OutputDebugStringW((L"[MeasureDump] failed to open " + outPath + L"\n").c_str());
+            return;
+        }
+
+        // One JSON object per line (NDJSON), stable path + desired + arranged bounds.
+        std::function<void(const UIElement*, const std::string&, int)> walk;
+        walk = [&](const UIElement* el, const std::string& parentPath, int index) {
+            if (!el) {
+                return;
+            }
+            const std::string segment = el->Name().empty()
+                ? ("n" + std::to_string(index))
+                : el->Name();
+            const std::string path = parentPath.empty() ? segment : (parentPath + "/" + segment);
+            const Size desired = el->DesiredSize();
+            const Rect bounds = el->Bounds();
+            out << "{\"path\":\"" << path
+                << "\",\"dw\":" << desired.width
+                << ",\"dh\":" << desired.height
+                << ",\"x\":" << bounds.left
+                << ",\"y\":" << bounds.top
+                << ",\"w\":" << bounds.Width()
+                << ",\"h\":" << bounds.Height()
+                << "}\n";
+            int childIndex = 0;
+            for (const auto& child : el->Children()) {
+                walk(child.get(), path, childIndex++);
+            }
+        };
+        walk(m_root.get(), "", 0);
+        out.flush();
+        OutputDebugStringW((L"[MeasureDump] wrote " + outPath + L"\n").c_str());
     }
 
     void OnPaint() {

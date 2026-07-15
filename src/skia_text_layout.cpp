@@ -175,16 +175,19 @@ std::vector<SkiaTextLayoutLine> LayoutTextLines(const wchar_t* text,
     return wrappedLines;
 }
 
-SkFont CreateDefaultFont(float fontSize, SkFontMgr** fontMgrOut = nullptr, SkTypeface** typefaceOut = nullptr) {
+struct FontBundle {
+    sk_sp<SkFontMgr> fontMgr;
+    sk_sp<SkTypeface> typeface;
+    SkFont font;
+};
+
+FontBundle CreateFontBundle(float fontSize, bool bold, bool italic) {
+    FontBundle bundle;
     static sk_sp<SkFontMgr> s_fontMgr = skia_font::CreateDefaultFontManager();
-    static sk_sp<SkTypeface> s_typeface = skia_font::CreateDefaultTypeface(s_fontMgr.get());
-    if (fontMgrOut) {
-        *fontMgrOut = s_fontMgr.get();
-    }
-    if (typefaceOut) {
-        *typefaceOut = s_typeface.get();
-    }
-    return skia_font::CreateSkiaFont(fontSize, s_typeface.get());
+    bundle.fontMgr = s_fontMgr;
+    bundle.typeface = skia_font::CreateDefaultTypeface(s_fontMgr.get(), bold, italic);
+    bundle.font = skia_font::CreateSkiaFont(fontSize, bundle.typeface.get());
+    return bundle;
 }
 
 } // namespace
@@ -194,7 +197,9 @@ bool CreateSkiaTextLayout(const wchar_t* text,
                           float fontSize,
                           float maxWidth,
                           TextWrapMode wrapMode,
-                          SkiaTextLayout* layout) {
+                          SkiaTextLayout* layout,
+                          bool bold,
+                          bool italic) {
     if (!layout) {
         return false;
     }
@@ -204,21 +209,26 @@ bool CreateSkiaTextLayout(const wchar_t* text,
         return true;
     }
 
-    SkFontMgr* fontMgr = nullptr;
-    SkTypeface* defaultTypeface = nullptr;
-    SkFont font = CreateDefaultFont(fontSize, &fontMgr, &defaultTypeface);
-    if (!font.getTypeface()) {
+    FontBundle fonts = CreateFontBundle(fontSize, bold, italic);
+    if (!fonts.font.getTypeface()) {
         return false;
     }
 
-    layout->lines = LayoutTextLines(text, len, fontMgr, defaultTypeface, fontSize, std::max(1.0f, maxWidth), wrapMode);
+    layout->lines = LayoutTextLines(
+        text,
+        len,
+        fonts.fontMgr.get(),
+        fonts.typeface.get(),
+        fontSize,
+        std::max(1.0f, maxWidth),
+        wrapMode);
 
     SkFontMetrics metrics{};
-    font.getMetrics(&metrics);
+    fonts.font.getMetrics(&metrics);
 
     layout->ascent = std::isfinite(metrics.fAscent) ? -metrics.fAscent : fontSize * 0.8f;
     layout->descent = std::isfinite(metrics.fDescent) ? metrics.fDescent : fontSize * 0.25f;
-    layout->lineHeight = std::max(font.getSpacing(), layout->ascent + layout->descent);
+    layout->lineHeight = std::max(fonts.font.getSpacing(), layout->ascent + layout->descent);
     layout->textHeight = layout->ascent + layout->descent;
     layout->maxLineWidth = 0.0f;
     for (const auto& line : layout->lines) {
@@ -243,9 +253,11 @@ Size MeasureSkiaTextLayout(const wchar_t* text,
                            uint32_t len,
                            float fontSize,
                            float maxWidth,
-                           TextWrapMode wrapMode) {
+                           TextWrapMode wrapMode,
+                           bool bold,
+                           bool italic) {
     SkiaTextLayout layout;
-    if (!CreateSkiaTextLayout(text, len, fontSize, maxWidth, wrapMode, &layout)) {
+    if (!CreateSkiaTextLayout(text, len, fontSize, maxWidth, wrapMode, &layout, bold, italic)) {
         return {};
     }
     return Size{layout.maxLineWidth, layout.blockHeight};
@@ -258,7 +270,9 @@ bool CreateSkiaTextLayout(const wchar_t*,
                           float,
                           float,
                           TextWrapMode,
-                          SkiaTextLayout* layout) {
+                          SkiaTextLayout* layout,
+                          bool,
+                          bool) {
     if (layout) {
         *layout = SkiaTextLayout{};
     }
@@ -269,7 +283,9 @@ Size MeasureSkiaTextLayout(const wchar_t*,
                            uint32_t,
                            float,
                            float,
-                           TextWrapMode) {
+                           TextWrapMode,
+                           bool,
+                           bool) {
     return {};
 }
 

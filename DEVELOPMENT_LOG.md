@@ -2,6 +2,10 @@
 
 ## 2026-07-15
 
+- P0 硬化首批代码（A/B/D；C 多根未做）：
+  - 文本：`CreateSkiaTextLayout` 规则表 + bold/italic 与 draw 共用；DWrite NoWrap 首行
+  - `ScrollViewer` + `scroll_viewer_cases`（别名 `scroll-viewer`）
+  - `name`/`id` + `AI_WIN_UI_MEASURE_DUMP` NDJSON + `scripts/run_measure_dump.ps1`
 - DirectUI 差距评估 → P0 硬化计划：`doc/plan/2026-07-15-directui-p0-hardening.md`
   - Track A 文本 parity / B ScrollViewer / C 进程内多根 / D measure golden
 - 文档：样式/布局规则同步更新

@@ -87,6 +87,9 @@ function Resolve-LayoutPath {
         "shaped_heart" = "layouts/shaped_heart_window.xml"
         "shaped-petal" = "layouts/shaped_petal_window.xml"
         "shaped_petal" = "layouts/shaped_petal_window.xml"
+        "scroll-viewer" = "layouts/scroll_viewer_cases.xml"
+        "scroll_viewer" = "layouts/scroll_viewer_cases.xml"
+        "scroll_viewer_cases" = "layouts/scroll_viewer_cases.xml"
     }
     $aliasKey = $layoutPath.ToLowerInvariant()
     if ($layoutAliases.ContainsKey($aliasKey)) {

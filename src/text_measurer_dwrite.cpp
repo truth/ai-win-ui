@@ -25,7 +25,22 @@ public:
             return Size{};
         }
 
+        // Parity with Skia NoWrap: only the first hard line participates.
+        const wchar_t* measureText = text;
+        UINT32 measureLen = len;
+        if (wrapMode == TextWrapMode::NoWrap) {
+            uint32_t cut = len;
+            for (uint32_t i = 0; i < len; ++i) {
+                if (text[i] == L'\n' || text[i] == L'\r') {
+                    cut = i;
+                    break;
+                }
+            }
+            measureLen = cut;
+        }
+
         ComPtr<IDWriteTextFormat> textFormat;
+        // Family chain matches skia_font::CreateDefaultTypeface (Segoe UI first).
         if (FAILED(m_dwriteFactory->CreateTextFormat(
                 L"Segoe UI",
                 nullptr,
@@ -47,8 +62,8 @@ public:
 
         ComPtr<IDWriteTextLayout> textLayout;
         if (FAILED(m_dwriteFactory->CreateTextLayout(
-                text,
-                static_cast<UINT32>(len),
+                measureText,
+                static_cast<UINT32>(measureLen),
                 textFormat.Get(),
                 std::max(1.0f, maxWidth),
                 4096.0f,

@@ -357,6 +357,7 @@ public:
 
             SkFont font = skia_font::CreateSkiaFont(fontSize, styleFace.get());
 
+            // Measure and draw share CreateSkiaTextLayout (incl. bold/italic face).
             SkiaTextLayout layout;
             if (!CreateSkiaTextLayout(
                 text,
@@ -364,7 +365,9 @@ public:
                 fontSize,
                 std::max(1.0f, rect.Width()),
                 options.wrap,
-                &layout)) {
+                &layout,
+                options.bold,
+                options.italic)) {
                 return;
             }
             if (layout.lines.empty()) {
