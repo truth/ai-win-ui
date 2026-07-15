@@ -2,6 +2,7 @@
 
 ## 2026-07-15
 
+- StatCard / SparklineChart 主题化 DefaultStyle（shell/accent/line tokens）；布局显式色保留
 - 高级输入主题化：`NumericUpDown` / `DateTimePicker` / `RichTextBox` DefaultStyle + ApplyThemeDefaults；DataTable 壳层 token
 - ListView/TreeView：`PaintPillScrollbars` 两端圆角 XY 滚动条；滚轮优先控件（Shift+滚轮水平）
 - navigation：右栏 `wrap` 自动换行；MSVC C4819 修复（`/utf-8` + `/wd4819` + UTF-8 BOM）

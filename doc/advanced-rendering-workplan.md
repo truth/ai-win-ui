@@ -162,6 +162,7 @@ Suggested delivery priority:
 - [x] MenuStrip / ToolStrip / StatusStrip / ContextMenu themed DefaultStyle + itemStyle (2026-07-15)
 - [x] NumericUpDown / DateTimePicker / RichTextBox themed DefaultStyle + ApplyThemeDefaults
 - [x] DataTable shell DefaultStyle (background/border/fg tokens)
+- [x] StatCard / SparklineChart themed DefaultStyle (layout color overrides preserved)
 
 ### DataTable v2 (2026-07-15)
 

@@ -930,6 +930,40 @@ private:
 
 class StatCard : public UIElement {
 public:
+    StatCard() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-2", ColorFromHex(0x1E2630));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x2F3A46));
+        shell.radius = CornerRadius::Uniform(
+            ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "lg", 10.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg-strong", ColorFromHex(0xFFFFFF));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "2xl", 24.0f);
+        // Accent bar uses fill; muted title uses hover.foreground convention.
+        BoxDecoration accent;
+        accent.background = ComponentStyle::ThemeColor(theme, "accent", ColorFromHex(0x4E7BFF));
+        s.base.fill = accent;
+        s.overrides[static_cast<std::size_t>(StyleState::Hover)].foreground =
+            ComponentStyle::ThemeColor(theme, "fg-muted", ColorFromHex(0xBFD1E3));
+        s.overrides[static_cast<std::size_t>(StyleState::Selected)].foreground =
+            ComponentStyle::ThemeColor(theme, "success", ColorFromHex(0x8ED1A5));
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        // Keep layout-authored colors (e.g. per-card accent); only fill still-default fields.
+        SyncDefaultsFromStyle();
+    }
+
     void SetTitle(std::wstring text) { m_title = std::move(text); }
     void SetValue(std::wstring text) { m_value = std::move(text); }
     void SetDeltaText(std::wstring text) { m_deltaText = std::move(text); }
@@ -965,6 +999,7 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        // Public color fields are authoritative (theme-filled when still default; layout may override).
         const float scaledCornerRadius = ScaleValue(cornerRadius);
         renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
         renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
@@ -1035,6 +1070,50 @@ public:
     }
 
 private:
+    static bool ColorsNearlyEqual(const Color& a, const Color& b) {
+        return std::abs(a.r - b.r) < 0.002f && std::abs(a.g - b.g) < 0.002f &&
+               std::abs(a.b - b.b) < 0.002f && std::abs(a.a - b.a) < 0.002f;
+    }
+
+    void SyncDefaultsFromStyle() {
+        // Factory (pre-theme) defaults used to detect layout overrides.
+        static const Color kBg = ColorFromHex(0x1E2630);
+        static const Color kBorder = ColorFromHex(0x2F3A46);
+        static const Color kAccent = ColorFromHex(0x4E7BFF);
+        static const Color kTitle = ColorFromHex(0xBFD1E3);
+        static const Color kValue = ColorFromHex(0xFFFFFF);
+        static const Color kDelta = ColorFromHex(0x8ED1A5);
+
+        const StyleSpec shell = m_style.Resolve(StyleState::Normal);
+        const StyleSpec titleSpec = m_style.Resolve(StyleState::Hover);
+        const StyleSpec deltaSpec = m_style.Resolve(StyleState::Selected);
+
+        if (ColorsNearlyEqual(background, kBg) && shell.decoration.has_value()) {
+            background = shell.decoration->background;
+            borderColor = shell.decoration->border.color;
+            if (!shell.decoration->radius.IsZero()) {
+                cornerRadius = shell.decoration->radius.MaxRadius();
+            }
+        } else if (ColorsNearlyEqual(borderColor, kBorder) && shell.decoration.has_value()) {
+            borderColor = shell.decoration->border.color;
+        }
+        if (ColorsNearlyEqual(accentColor, kAccent) && shell.fill.has_value()) {
+            accentColor = shell.fill->background;
+        }
+        if (ColorsNearlyEqual(valueColor, kValue) && shell.foreground.has_value()) {
+            valueColor = *shell.foreground;
+        }
+        if (shell.fontSize.has_value() && std::abs(valueFontSize - 24.0f) < 0.01f) {
+            valueFontSize = *shell.fontSize;
+        }
+        if (ColorsNearlyEqual(titleColor, kTitle) && titleSpec.foreground.has_value()) {
+            titleColor = *titleSpec.foreground;
+        }
+        if (ColorsNearlyEqual(deltaColor, kDelta) && deltaSpec.foreground.has_value()) {
+            deltaColor = *deltaSpec.foreground;
+        }
+    }
+
     std::wstring m_title = L"Metric";
     std::wstring m_value = L"0";
     std::wstring m_deltaText = L"+0%";
@@ -1042,6 +1121,36 @@ private:
 
 class SparklineChart : public UIElement {
 public:
+    SparklineChart() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-1", ColorFromHex(0x121B25));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x2C3A47));
+        shell.radius = CornerRadius::Uniform(
+            ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "lg", 10.0f));
+        s.base.decoration = shell;
+        // Line series uses fill; baseline uses track.
+        BoxDecoration line;
+        line.background = ComponentStyle::ThemeColor(theme, "accent", ColorFromHex(0x53B3FF));
+        s.base.fill = line;
+        BoxDecoration baseline;
+        baseline.background = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x314252));
+        s.base.track = baseline;
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncDefaultsFromStyle();
+    }
+
     void SetPoints(std::vector<float> points) { m_points = std::move(points); }
     void SetRange(float minValue, float maxValue) {
         m_manualRange = true;
@@ -1128,6 +1237,35 @@ public:
     }
 
 private:
+    static bool ColorsNearlyEqual(const Color& a, const Color& b) {
+        return std::abs(a.r - b.r) < 0.002f && std::abs(a.g - b.g) < 0.002f &&
+               std::abs(a.b - b.b) < 0.002f && std::abs(a.a - b.a) < 0.002f;
+    }
+
+    void SyncDefaultsFromStyle() {
+        static const Color kBg = ColorFromHex(0x121B25);
+        static const Color kBorder = ColorFromHex(0x2C3A47);
+        static const Color kLine = ColorFromHex(0x53B3FF);
+        static const Color kBase = ColorFromHex(0x314252);
+
+        const StyleSpec shell = m_style.Resolve(StyleState::Normal);
+        if (ColorsNearlyEqual(background, kBg) && shell.decoration.has_value()) {
+            background = shell.decoration->background;
+            borderColor = shell.decoration->border.color;
+            if (!shell.decoration->radius.IsZero()) {
+                cornerRadius = shell.decoration->radius.MaxRadius();
+            }
+        } else if (ColorsNearlyEqual(borderColor, kBorder) && shell.decoration.has_value()) {
+            borderColor = shell.decoration->border.color;
+        }
+        if (ColorsNearlyEqual(lineColor, kLine) && shell.fill.has_value()) {
+            lineColor = shell.fill->background;
+        }
+        if (ColorsNearlyEqual(baselineColor, kBase) && shell.track.has_value()) {
+            baselineColor = shell.track->background;
+        }
+    }
+
     std::vector<float> m_points;
     bool m_manualRange = false;
     float m_minValue = 0.0f;
