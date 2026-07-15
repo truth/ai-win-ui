@@ -279,6 +279,7 @@ private:
     void RefreshChromeHitRegions() {
         if (!m_windowChrome.IsCustom() || !m_root) {
             m_windowChrome.ClearHitRegions();
+            m_windowChrome.ClearContentBounds();
             return;
         }
 
@@ -301,6 +302,16 @@ private:
             regions.push_back(region);
         }
         m_windowChrome.SetHitRegions(std::move(regions));
+
+        // Layered floating card: resize grips follow the first child card, not
+        // the transparent outer padding of the HWND.
+        if (m_windowChrome.IsLayered() && !m_root->Children().empty()) {
+            m_windowChrome.SetContentBounds(
+                ToGdiRect(m_root->Children().front()->Bounds()),
+                true);
+        } else {
+            m_windowChrome.ClearContentBounds();
+        }
 
         // Caption band used for inactive dim overlay.
         float band = static_cast<float>(m_windowChrome.FallbackCaptionHeightPx());
@@ -1060,8 +1071,9 @@ private:
                 bool handled = false;
                 const LRESULT result = m_windowChrome.HandleNcHitTest(hwnd, lParam, handled);
                 if (handled) {
-                    // Keep resize borders usable even on transparent margins; only
-                    // caption/client hits honor per-pixel alpha pass-through.
+                    // Resize grips always win. Caption / system buttons are interactive
+                    // even when drawn with transparent fills (glyph-only caption buttons).
+                    // Only empty transparent pixels outside chrome regions pass through.
                     const bool isResizeBorder =
                         result == HTLEFT || result == HTRIGHT || result == HTTOP || result == HTBOTTOM ||
                         result == HTTOPLEFT || result == HTTOPRIGHT || result == HTBOTTOMLEFT ||
@@ -1070,7 +1082,8 @@ private:
                         POINT screenPt{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
                         POINT clientPt = screenPt;
                         ScreenToClient(hwnd, &clientPt);
-                        if (!m_renderer->SampleOpaque(clientPt.x, clientPt.y, 16)) {
+                        if (!m_windowChrome.IsChromeInteractiveHit(clientPt) &&
+                            !m_renderer->SampleOpaque(clientPt.x, clientPt.y, 16)) {
                             return HTTRANSPARENT;
                         }
                     }

@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cstring>
 
+// std::max/min vs Windows min/max macros
+
 #ifndef DWMWA_WINDOW_CORNER_PREFERENCE
 #define DWMWA_WINDOW_CORNER_PREFERENCE 33
 #endif
@@ -39,6 +41,25 @@ void WindowChrome::SetHitRegions(std::vector<WindowChromeHitRegion> regions) {
 
 void WindowChrome::ClearHitRegions() {
     m_hitRegions.clear();
+}
+
+void WindowChrome::SetContentBounds(const RECT& bounds, bool enabled) {
+    m_contentBounds = bounds;
+    m_contentBoundsEnabled = enabled;
+}
+
+void WindowChrome::ClearContentBounds() {
+    m_contentBounds = {};
+    m_contentBoundsEnabled = false;
+}
+
+bool WindowChrome::IsChromeInteractiveHit(POINT clientPt) const {
+    for (const auto& region : m_hitRegions) {
+        if ((region.clientOnly || region.caption) && PointInRect(region.rect, clientPt)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 DWORD WindowChrome::WindowStyle() const {
@@ -105,16 +126,26 @@ bool WindowChrome::PointInRect(const RECT& rc, POINT pt) {
     return pt.x >= rc.left && pt.x < rc.right && pt.y >= rc.top && pt.y < rc.bottom;
 }
 
-LRESULT WindowChrome::HitTestResizeBorder(const RECT& client, POINT pt, bool maximized) const {
+LRESULT WindowChrome::HitTestResizeBorder(const RECT& bounds, POINT pt, bool maximized) const {
     if (maximized) {
         return HTCLIENT;
     }
 
+    // Point must be on/near the content (or window) rectangle.
     const int border = ResizeBorderPx();
-    const bool left = pt.x < client.left + border;
-    const bool right = pt.x >= client.right - border;
-    const bool top = pt.y < client.top + border;
-    const bool bottom = pt.y >= client.bottom - border;
+    const RECT hitBounds{
+        bounds.left - border,
+        bounds.top - border,
+        bounds.right + border,
+        bounds.bottom + border};
+    if (!PointInRect(hitBounds, pt)) {
+        return HTCLIENT;
+    }
+
+    const bool left = pt.x < bounds.left + border;
+    const bool right = pt.x >= bounds.right - border;
+    const bool top = pt.y < bounds.top + border;
+    const bool bottom = pt.y >= bounds.bottom - border;
 
     if (top && left) {
         return HTTOPLEFT;
@@ -185,12 +216,25 @@ LRESULT WindowChrome::HandleNcHitTest(HWND hwnd, LPARAM lParam, bool& handled) c
     GetClientRect(hwnd, &client);
     const bool maximized = IsZoomed(hwnd) != FALSE;
 
-    const LRESULT borderHit = HitTestResizeBorder(client, pt, maximized);
+    // Prefer visual content bounds for resize grips (layered floating card).
+    // Fall back to full client for non-layered / missing content.
+    RECT resizeBounds = client;
+    if (m_contentBoundsEnabled && !maximized) {
+        resizeBounds = m_contentBounds;
+        // Keep grips usable: clamp to client so they never leave the HWND.
+        resizeBounds.left = std::max(client.left, resizeBounds.left);
+        resizeBounds.top = std::max(client.top, resizeBounds.top);
+        resizeBounds.right = std::min(client.right, resizeBounds.right);
+        resizeBounds.bottom = std::min(client.bottom, resizeBounds.bottom);
+    }
+
+    const LRESULT borderHit = HitTestResizeBorder(resizeBounds, pt, maximized);
     if (borderHit != HTCLIENT) {
         handled = true;
         return borderHit;
     }
 
+    // Interactive chrome regions (buttons / caption) take priority over alpha.
     for (const auto& region : m_hitRegions) {
         if (region.clientOnly && PointInRect(region.rect, pt)) {
             handled = true;
@@ -206,7 +250,10 @@ LRESULT WindowChrome::HandleNcHitTest(HWND hwnd, LPARAM lParam, bool& handled) c
     }
 
     // Fallback top strip when UI regions are not ready yet.
-    if (!maximized && pt.y >= client.top && pt.y < client.top + FallbackCaptionHeightPx()) {
+    // Prefer content-top for layered cards so the strip aligns with the title bar.
+    const LONG captionTop = m_contentBoundsEnabled ? resizeBounds.top : client.top;
+    if (!maximized && pt.y >= captionTop && pt.y < captionTop + FallbackCaptionHeightPx() &&
+        pt.x >= resizeBounds.left && pt.x < resizeBounds.right) {
         handled = true;
         return HTCAPTION;
     }

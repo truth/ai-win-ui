@@ -34,6 +34,16 @@ public:
     void SetHitRegions(std::vector<WindowChromeHitRegion> regions);
     void ClearHitRegions();
 
+    // Optional visual content bounds (client coords). Layered windows use this
+    // for resize-border hit-testing so grips follow the floating card, not the
+    // transparent outer HWND padding.
+    void SetContentBounds(const RECT& bounds, bool enabled);
+    void ClearContentBounds();
+
+    // True if pt lands on caption or clientOnly chrome regions (must stay clickable
+    // even when painted with transparent fills, e.g. caption buttons).
+    bool IsChromeInteractiveHit(POINT clientPt) const;
+
     DWORD WindowStyle() const;
     DWORD WindowExStyle() const;
 
@@ -53,10 +63,12 @@ public:
 
 private:
     static bool PointInRect(const RECT& rc, POINT pt);
-    LRESULT HitTestResizeBorder(const RECT& client, POINT pt, bool maximized) const;
+    LRESULT HitTestResizeBorder(const RECT& bounds, POINT pt, bool maximized) const;
 
     WindowChromeMode m_mode = WindowChromeMode::System;
     UINT m_dpi = 96;
     int m_fallbackCaptionHeightDip = 40;
     std::vector<WindowChromeHitRegion> m_hitRegions;
+    RECT m_contentBounds{};
+    bool m_contentBoundsEnabled = false;
 };
