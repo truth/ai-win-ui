@@ -1,5 +1,6 @@
 ﻿#include "layout_parser.h"
 #include "resource_provider.h"
+#include "style_catalog.h"
 #include "theme.h"
 
 #include <algorithm>
@@ -13,6 +14,7 @@
 namespace {
 
 const Theme* g_activeTheme = nullptr;
+const StyleCatalog* g_activeStyleCatalog = nullptr;
 
 bool StartsWith(const std::string& s, const char* prefix) {
     const size_t n = std::char_traits<char>::length(prefix);
@@ -647,6 +649,17 @@ ComponentStyle ParseComponentStyle(const JsonValue& value) {
     if (!value.IsObject()) {
         return style;
     }
+    // Optional inheritance: { "extend": "$style.card", ...overrides }
+    if (value["extend"].IsString() && g_activeStyleCatalog) {
+        const std::string token = value["extend"].stringValue;
+        std::string name = StyleCatalog::ParseStyleToken(token);
+        if (name.empty()) {
+            name = token;
+        }
+        if (auto base = g_activeStyleCatalog->Resolve(name)) {
+            style = *base;
+        }
+    }
     if (value["base"].IsObject()) {
         style.base = ParseStyleSpec(value["base"]);
     }
@@ -968,6 +981,26 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
     }
     if (props["style"].IsObject()) {
         element.SetStyle(ParseComponentStyle(props["style"]));
+    } else if (props["style"].IsString()) {
+        // "$style.name" or bare catalog name
+        std::string name = StyleCatalog::ParseStyleToken(props["style"].stringValue);
+        if (name.empty()) {
+            name = props["style"].stringValue;
+        }
+        if (g_activeStyleCatalog) {
+            if (auto s = g_activeStyleCatalog->Resolve(name)) {
+                element.SetStyle(*s);
+            } else {
+                OutputDebugStringA(("[Style] Unknown $style." + name + "\n").c_str());
+            }
+        }
+    } else if (props["styleRef"].IsString()) {
+        const std::string name = props["styleRef"].stringValue;
+        if (g_activeStyleCatalog) {
+            if (auto s = g_activeStyleCatalog->Resolve(name)) {
+                element.SetStyle(*s);
+            }
+        }
     }
     if (props["disabled"].IsBool() && props["disabled"].boolValue) {
         element.SetEnabled(false);
@@ -1019,6 +1052,24 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
 }
 
 void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
+    if (auto it = node.attributes.find("style"); it != node.attributes.end()) {
+        std::string name = StyleCatalog::ParseStyleToken(it->second);
+        if (name.empty()) {
+            name = it->second;
+        }
+        if (g_activeStyleCatalog) {
+            if (auto s = g_activeStyleCatalog->Resolve(name)) {
+                element.SetStyle(*s);
+            }
+        }
+    } else if (auto itRef = node.attributes.find("styleRef"); itRef != node.attributes.end()) {
+        if (g_activeStyleCatalog) {
+            if (auto s = g_activeStyleCatalog->Resolve(itRef->second)) {
+                element.SetStyle(*s);
+            }
+        }
+    }
+
     if (auto it = node.attributes.find("flex"); it != node.attributes.end()) {
         ApplyFlexShorthand(it->second, element);
     }
@@ -1179,6 +1230,16 @@ Color LayoutParser::ColorFromString(const std::string& value) {
     return ParseHexColor(value);
 }
 
+ComponentStyle LayoutParser::ParseComponentStylePublic(const JsonValue& value) {
+    return ParseComponentStyle(value);
+}
+
+const StyleCatalog* LayoutParser::SetActiveStyleCatalog(const StyleCatalog* catalog) {
+    const StyleCatalog* previous = g_activeStyleCatalog;
+    g_activeStyleCatalog = catalog;
+    return previous;
+}
+
 float LayoutParser::ParseNumberValue(const JsonValue& value,
                                      Theme::NumberCategory category,
                                      float fallback) {
@@ -1203,6 +1264,7 @@ std::unique_ptr<UIElement> LayoutParser::BuildFromFile(UIContext& context,
     }
 
     g_activeTheme = context.theme;
+    g_activeStyleCatalog = context.styleCatalog;
 
     IResourceProvider& provider = *context.resourceProvider;
     std::string path = resourcePath;
@@ -2377,6 +2439,41 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*spacer, node["props"]);
         }
         element = std::move(spacer);
+    } else if (type == "ShapePanel" || type == "Shape") {
+        auto shape = std::make_unique<ShapePanel>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["kind"].IsString()) {
+                shape->SetKindFromString(props["kind"].stringValue);
+            } else if (props["shape"].IsString()) {
+                shape->SetKindFromString(props["shape"].stringValue);
+            }
+            if (props["fill"].IsString()) {
+                shape->fill = LayoutParser::ColorFromString(props["fill"].stringValue);
+            } else if (props["background"].IsString()) {
+                shape->fill = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["stroke"].IsString()) {
+                shape->stroke = LayoutParser::ColorFromString(props["stroke"].stringValue);
+            } else if (props["borderColor"].IsString()) {
+                shape->stroke = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            TryAssignNumber(props["strokeWidth"], Theme::NumberCategory::Spacing, shape->strokeWidth);
+            if (props["segments"].IsNumber()) {
+                shape->segments = static_cast<int>(props["segments"].numberValue);
+            }
+            if (props["text"].IsString()) {
+                shape->SetText(LayoutParser::Utf8ToUtf16(props["text"].stringValue));
+            }
+            if (props["textColor"].IsString()) {
+                shape->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            } else if (props["color"].IsString()) {
+                shape->textColor = LayoutParser::ColorFromString(props["color"].stringValue);
+            }
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, shape->fontSize);
+            ApplyCommonJsonProps(*shape, props);
+        }
+        element = std::move(shape);
     }
 
     if (!element) {
@@ -3371,6 +3468,42 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         auto spacer = std::make_unique<Spacer>();
         ApplyCommonXmlAttributes(*spacer, node);
         element = std::move(spacer);
+    } else if (node.name == "ShapePanel" || node.name == "Shape") {
+        auto shape = std::make_unique<ShapePanel>();
+        if (auto it = node.attributes.find("kind"); it != node.attributes.end()) {
+            shape->SetKindFromString(it->second);
+        } else if (auto it2 = node.attributes.find("shape"); it2 != node.attributes.end()) {
+            shape->SetKindFromString(it2->second);
+        }
+        if (auto it = node.attributes.find("fill"); it != node.attributes.end()) {
+            shape->fill = LayoutParser::ColorFromString(it->second);
+        } else if (auto it2 = node.attributes.find("background"); it2 != node.attributes.end()) {
+            shape->fill = LayoutParser::ColorFromString(it2->second);
+        }
+        if (auto it = node.attributes.find("stroke"); it != node.attributes.end()) {
+            shape->stroke = LayoutParser::ColorFromString(it->second);
+        } else if (auto it2 = node.attributes.find("borderColor"); it2 != node.attributes.end()) {
+            shape->stroke = LayoutParser::ColorFromString(it2->second);
+        }
+        if (auto it = node.attributes.find("strokeWidth"); it != node.attributes.end()) {
+            shape->strokeWidth = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("segments"); it != node.attributes.end()) {
+            shape->segments = std::stoi(it->second);
+        }
+        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
+            shape->SetText(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            shape->textColor = LayoutParser::ColorFromString(it->second);
+        } else if (auto it2 = node.attributes.find("color"); it2 != node.attributes.end()) {
+            shape->textColor = LayoutParser::ColorFromString(it2->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            shape->fontSize = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*shape, node);
+        element = std::move(shape);
     }
 
     if (!element) {

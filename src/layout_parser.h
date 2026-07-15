@@ -48,6 +48,13 @@ public:
 
     static JsonValue ParseJson(const std::string& text);
 
+    // Public entry for style catalog / external tools (same rules as layout style blocks).
+    static ComponentStyle ParseComponentStylePublic(const JsonValue& value);
+
+    // Temporarily set the active StyleCatalog used by $style / extend while parsing.
+    // Returns the previous catalog pointer.
+    static const StyleCatalog* SetActiveStyleCatalog(const StyleCatalog* catalog);
+
     // Resolve a single number JSON value, accepting either a literal number
     // (e.g. 12) or a "$category.key" string token (e.g. "$spacing.lg").
     // Pass the natural category of the field; unknown tokens return fallback + warning.

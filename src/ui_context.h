@@ -9,6 +9,7 @@ class ITextMeasurer;
 class IResourceProvider;
 class ILayoutEngine;
 class Theme;
+class StyleCatalog;
 
 using UIEventHandler = std::function<void()>;
 using UIEventResolver = std::function<UIEventHandler(const std::string&)>;
@@ -19,6 +20,7 @@ struct UIContext {
     IResourceProvider* resourceProvider = nullptr;
     ILayoutEngine* layoutEngine = nullptr;
     Theme* theme = nullptr;
+    StyleCatalog* styleCatalog = nullptr;
     UIEventResolver eventResolver;
     UINT dpi = 96;
     float dpiScale = 1.0f;

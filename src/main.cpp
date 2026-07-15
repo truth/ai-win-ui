@@ -2,6 +2,7 @@
 #include "layout_engine.h"
 #include "renderer.h"
 #include "resource_provider.h"
+#include "style_catalog.h"
 #include "text_measurer.h"
 #include "theme.h"
 #include "ui_context.h"
@@ -107,7 +108,22 @@ public:
 
         const UINT initialDpi = GetDpiForSystem();
         m_windowChrome.SetDpi(initialDpi);
-        RECT initialRect{0, 0, 1000, 700};
+        int clientW = 1000;
+        int clientH = 700;
+        // Optional: AI_WIN_UI_SIZE=420x480 or 420,480
+        const std::wstring sizeEnv = GetEnvironmentValue(L"AI_WIN_UI_SIZE");
+        if (!sizeEnv.empty()) {
+            int w = 0;
+            int h = 0;
+            if (swscanf_s(sizeEnv.c_str(), L"%dx%d", &w, &h) == 2 ||
+                swscanf_s(sizeEnv.c_str(), L"%d,%d", &w, &h) == 2) {
+                if (w >= 200 && w <= 4000 && h >= 160 && h <= 3000) {
+                    clientW = w;
+                    clientH = h;
+                }
+            }
+        }
+        RECT initialRect{0, 0, clientW, clientH};
         const DWORD style = m_windowChrome.WindowStyle();
         const DWORD exStyle = m_windowChrome.WindowExStyle();
         AdjustWindowRectExForDpi(&initialRect, style, FALSE, exStyle, initialDpi);
@@ -488,6 +504,105 @@ private:
         m_uiContext.theme = m_theme.get();
     }
 
+    void LoadStyleCatalog() {
+        m_styleCatalog = std::make_unique<StyleCatalog>();
+        m_uiContext.styleCatalog = m_styleCatalog.get();
+        if (!m_uiContext.resourceProvider) {
+            return;
+        }
+
+        // Default shared catalog (import-aware).
+        if (m_uiContext.resourceProvider->Exists("styles/default.json")) {
+            m_styleCatalog->LoadFromResource(*m_uiContext.resourceProvider, "styles/default.json");
+        }
+
+        // Optional override / extra styles: AI_WIN_UI_STYLES=styles/app.json
+        const std::wstring requested = GetEnvironmentValue(L"AI_WIN_UI_STYLES");
+        if (!requested.empty()) {
+            const std::string path = Utf16ToUtf8(requested);
+            if (!path.empty() && m_uiContext.resourceProvider->Exists(path)) {
+                m_styleCatalog->MergeFile(*m_uiContext.resourceProvider, path);
+            }
+        }
+    }
+
+    // Spawn a sibling process with layered chrome + layout (independent message loop).
+    void LaunchShapedChild(const wchar_t* layoutRelPath, const wchar_t* sizeWh) {
+        wchar_t exePath[MAX_PATH] = {};
+        if (GetModuleFileNameW(nullptr, exePath, ARRAYSIZE(exePath)) == 0) {
+            return;
+        }
+
+        const std::wstring prevLayout = GetEnvironmentValue(L"AI_WIN_UI_LAYOUT");
+        const std::wstring prevChrome = GetEnvironmentValue(L"AI_WIN_UI_CHROME");
+        const std::wstring prevSize = GetEnvironmentValue(L"AI_WIN_UI_SIZE");
+        const std::wstring prevRenderer = GetEnvironmentValue(L"AI_WIN_UI_RENDERER");
+
+        SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", layoutRelPath);
+        SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", L"layered");
+        if (sizeWh && sizeWh[0] != L'\0') {
+            SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", sizeWh);
+        }
+        // Keep the same renderer backend as the hub when possible.
+        if (prevRenderer.empty()) {
+            SetEnvironmentVariableW(
+                L"AI_WIN_UI_RENDERER",
+                m_activeRendererBackend == RendererBackend::Skia ? L"skia" : L"direct2d");
+        }
+
+        std::wstring cmdLine = L"\"";
+        cmdLine += exePath;
+        cmdLine += L"\"";
+        std::vector<wchar_t> mutableCmd(cmdLine.begin(), cmdLine.end());
+        mutableCmd.push_back(L'\0');
+
+        STARTUPINFOW si{};
+        si.cb = sizeof(si);
+        PROCESS_INFORMATION pi{};
+        const BOOL ok = CreateProcessW(
+            exePath,
+            mutableCmd.data(),
+            nullptr,
+            nullptr,
+            FALSE,
+            0,
+            nullptr,
+            nullptr,
+            &si,
+            &pi);
+        if (ok) {
+            if (pi.hThread) {
+                CloseHandle(pi.hThread);
+            }
+            if (pi.hProcess) {
+                CloseHandle(pi.hProcess);
+            }
+            SetWindowTextW(m_hwnd, L"Opened shaped layered child window");
+        } else {
+            SetWindowTextW(m_hwnd, L"Failed to launch shaped child window");
+        }
+
+        // Restore parent env so subsequent relaunches of this process stay stable.
+        auto restore = [](const wchar_t* name, const std::wstring& value) {
+            if (value.empty()) {
+                SetEnvironmentVariableW(name, nullptr);
+            } else {
+                SetEnvironmentVariableW(name, value.c_str());
+            }
+        };
+        restore(L"AI_WIN_UI_LAYOUT", prevLayout);
+        restore(L"AI_WIN_UI_CHROME", prevChrome);
+        restore(L"AI_WIN_UI_SIZE", prevSize);
+        if (prevRenderer.empty()) {
+            // Only clear if we temporarily set it for the child.
+            // Leave existing hub value alone if parent already had one.
+            // (prevRenderer empty means we may have written renderer — restore to empty.)
+            SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", nullptr);
+        } else {
+            SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", prevRenderer.c_str());
+        }
+    }
+
     void BuildUI() {
         const std::wstring baseDir = GetExecutableDirectory();
         const std::wstring zipPath = baseDir.empty() ? L"assets.zip" : baseDir + L"\\assets.zip";
@@ -520,10 +635,33 @@ private:
             if (eventId == "windowClose") {
                 return [this]() { PostMessageW(m_hwnd, WM_CLOSE, 0, 0); };
             }
+            // Open irregular layered child process windows (separate process so
+            // WM_DESTROY/PostQuitMessage does not tear down the hub).
+            if (eventId == "openHeartWindow") {
+                return [this]() {
+                    LaunchShapedChild(L"layouts/shaped_heart_window.xml", L"420x460");
+                };
+            }
+            if (eventId == "openPetalWindow") {
+                return [this]() {
+                    LaunchShapedChild(L"layouts/shaped_petal_window.xml", L"440x440");
+                };
+            }
+            if (eventId == "openOvalWindow") {
+                return [this]() {
+                    LaunchShapedChild(L"layouts/shaped_oval_window.xml", L"400x320");
+                };
+            }
+            if (eventId == "openStarWindow") {
+                return [this]() {
+                    LaunchShapedChild(L"layouts/shaped_star_window.xml", L"400x400");
+                };
+            }
             return UIEventHandler();
         };
 
         LoadTheme();
+        LoadStyleCatalog();
 
         std::vector<std::string> layoutCandidates;
         const std::wstring requestedLayout = GetEnvironmentValue(L"AI_WIN_UI_LAYOUT");
@@ -1362,6 +1500,7 @@ private:
     std::unique_ptr<ILayoutEngine> m_layoutEngine;
     std::unique_ptr<IResourceProvider> m_resourceProvider;
     std::unique_ptr<Theme> m_theme;
+    std::unique_ptr<StyleCatalog> m_styleCatalog;
     std::string m_activeLayoutPath;
     RendererBackend m_requestedRendererBackend = RendererBackend::Direct2D;
     RendererBackend m_activeRendererBackend = RendererBackend::Direct2D;

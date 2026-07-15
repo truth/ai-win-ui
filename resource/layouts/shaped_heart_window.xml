@@ -1,0 +1,30 @@
+<!-- Layered heart window — transparent outside the heart body. -->
+<Panel
+  chrome="layered"
+  direction="column"
+  background="transparent"
+  padding="12,12,12,12"
+  spacing="0"
+  alignItems="stretch">
+
+  <ShapePanel
+    kind="heart"
+    fill="#E85D75"
+    stroke="#FFB3C0"
+    strokeWidth="2"
+    flexGrow="1"
+    hitTest="caption"
+    text="Heart"
+    fontSize="18"
+    textColor="#FFF5F7" />
+
+  <Panel
+    direction="row"
+    height="40"
+    spacing="8"
+    padding="8,0,8,0"
+    justifyContent="center"
+    alignItems="center">
+    <Button text="Close" style="$style.dangerButton" onClick="windowClose" width="100" hitTest="client" />
+  </Panel>
+</Panel>

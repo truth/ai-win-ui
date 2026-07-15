@@ -1,0 +1,58 @@
+{
+  "styles": {
+    "primaryButton": {
+      "base": {
+        "background": "#2D6CDF",
+        "cornerRadius": 8,
+        "border": { "width": 1, "color": "#4C8DFF" },
+        "foreground": "#F5F8FC",
+        "fontSize": 14,
+        "padding": [14, 8, 14, 8]
+      },
+      "hover": {
+        "background": "#3B7AE8"
+      },
+      "pressed": {
+        "background": "#1F54B5"
+      },
+      "focused": {
+        "border": { "width": 2, "color": "#A8C8FF" }
+      },
+      "disabled": {
+        "background": "#2A3340",
+        "foreground": "#7A8796",
+        "opacity": 0.7
+      }
+    },
+    "secondaryButton": {
+      "base": {
+        "background": "#1A2433",
+        "cornerRadius": 8,
+        "border": { "width": 1, "color": "#334556" },
+        "foreground": "#D5E0EC",
+        "fontSize": 14,
+        "padding": [14, 8, 14, 8]
+      },
+      "hover": {
+        "background": "#243144"
+      },
+      "pressed": {
+        "background": "#121A24"
+      }
+    },
+    "dangerButton": {
+      "extend": "$style.primaryButton",
+      "base": {
+        "background": "#C23B4A",
+        "border": { "width": 1, "color": "#E85D6C" },
+        "foreground": "#FFF5F6"
+      },
+      "hover": {
+        "background": "#D64A59"
+      },
+      "pressed": {
+        "background": "#9E2C39"
+      }
+    }
+  }
+}

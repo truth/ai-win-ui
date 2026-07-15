@@ -670,16 +670,42 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
-        const Thickness scaledBorder = ScaleThickness(Border());
+        Color drawBackground = background;
+        Color drawBorderColor = borderColor;
+        float drawCornerRadius = cornerRadius;
+        Thickness drawBorder = Border();
+
+        // Catalog / layout styles: style="$style.surfaceCard" stores decoration in
+        // m_style; fold it into paint when the panel was given a layout style.
+        if (m_styleFromLayout) {
+            const StyleSpec shell = m_style.Resolve(StyleState::Normal);
+            if (shell.decoration.has_value()) {
+                if (shell.decoration->background.a > 0.0f || drawBackground.a <= 0.0f) {
+                    drawBackground = shell.decoration->background;
+                }
+                if (shell.decoration->border.color.a > 0.0f) {
+                    drawBorderColor = shell.decoration->border.color;
+                }
+                const Thickness bw = shell.decoration->border.width;
+                if (bw.left > 0.0f || bw.top > 0.0f || bw.right > 0.0f || bw.bottom > 0.0f) {
+                    drawBorder = bw;
+                }
+                if (!shell.decoration->radius.IsZero()) {
+                    drawCornerRadius = shell.decoration->radius.MaxRadius();
+                }
+            }
+        }
+
+        const Thickness scaledBorder = ScaleThickness(drawBorder);
         const bool hasBorder =
             scaledBorder.left > 0.0f || scaledBorder.top > 0.0f ||
             scaledBorder.right > 0.0f || scaledBorder.bottom > 0.0f;
-        const float scaledRadius = ScaleValue(cornerRadius);
-        if (background.a > 0.0f || hasBorder) {
+        const float scaledRadius = ScaleValue(drawCornerRadius);
+        if (drawBackground.a > 0.0f || hasBorder) {
             BoxDecoration deco;
-            deco.background = background;
+            deco.background = drawBackground;
             deco.border.width = scaledBorder;
-            deco.border.color = borderColor;
+            deco.border.color = drawBorderColor;
             deco.radius = CornerRadius::Uniform(scaledRadius);
             DrawBoxDecoration(renderer, m_bounds, deco);
         }
@@ -1270,6 +1296,202 @@ private:
     bool m_manualRange = false;
     float m_minValue = 0.0f;
     float m_maxValue = 1.0f;
+};
+
+// Filled parametric polygon (heart / petal / oval / star) for decorative shapes
+// and irregular layered window bodies. Uses IRenderer::FillPolygon.
+class ShapePanel : public UIElement {
+public:
+    enum class Kind {
+        Heart,
+        Petal,
+        Oval,
+        Star
+    };
+
+    Kind kind = Kind::Heart;
+    Color fill = ColorFromHex(0xE85D75);
+    Color stroke = ColorFromHex(0x000000, 0.0f);
+    float strokeWidth = 0.0f;
+    int segments = 96;
+    Color textColor = ColorFromHex(0xFFFFFF);
+    float fontSize = 14.0f;
+
+    void SetText(std::wstring text) { m_text = std::move(text); }
+    const std::wstring& Text() const { return m_text; }
+
+    void SetKindFromString(const std::string& value) {
+        std::string lower = value;
+        for (char& ch : lower) {
+            if (ch >= 'A' && ch <= 'Z') {
+                ch = static_cast<char>(ch - 'A' + 'a');
+            }
+        }
+        if (lower == "petal" || lower == "flower") {
+            kind = Kind::Petal;
+        } else if (lower == "oval" || lower == "ellipse" || lower == "circle") {
+            kind = Kind::Oval;
+        } else if (lower == "star") {
+            kind = Kind::Star;
+        } else {
+            kind = Kind::Heart;
+        }
+    }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        return std::min(availableWidth, ScaleValue(220.0f));
+    }
+
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        return ScaleValue(200.0f);
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        if (m_bounds.Width() <= 1.0f || m_bounds.Height() <= 1.0f) {
+            return;
+        }
+
+        const int count = std::clamp(segments, 12, 256);
+        std::vector<PointF> poly = BuildPolygon(m_bounds, kind, count);
+        if (poly.size() >= 3 && fill.a > 0.0f) {
+            renderer.FillPolygon(poly, fill);
+        }
+        if (strokeWidth > 0.0f && stroke.a > 0.0f && poly.size() >= 2) {
+            // Close the outline for DrawPolyline consumers.
+            poly.push_back(poly.front());
+            renderer.DrawPolyline(poly, stroke, ScaleValue(strokeWidth));
+        }
+
+        if (!m_text.empty()) {
+            const float scaledFont = ScaleValue(fontSize);
+            const float textH = scaledFont * 1.35f;
+            const float pad = ScaleValue(12.0f);
+            const Rect textRect = Rect::Make(
+                m_bounds.left + pad,
+                m_bounds.top + (m_bounds.Height() - textH) * 0.5f,
+                m_bounds.right - pad,
+                m_bounds.top + (m_bounds.Height() - textH) * 0.5f + textH);
+            const TextRenderOptions opts{
+                TextWrapMode::NoWrap,
+                TextHorizontalAlign::Center,
+                TextVerticalAlign::Center,
+                false,
+                false
+            };
+            renderer.DrawTextW(m_text.c_str(), static_cast<UINT32>(m_text.size()), textRect, textColor, scaledFont, opts);
+        }
+
+        for (auto& child : m_children) {
+            child->Render(renderer);
+        }
+    }
+
+private:
+    static std::vector<PointF> BuildPolygon(const Rect& bounds, Kind kind, int segments) {
+        std::vector<PointF> points;
+        points.reserve(static_cast<size_t>(segments) + 2);
+
+        const float cx = bounds.left + bounds.Width() * 0.5f;
+        const float cy = bounds.top + bounds.Height() * 0.5f;
+        const float halfW = bounds.Width() * 0.5f;
+        const float halfH = bounds.Height() * 0.5f;
+        constexpr float kPi = 3.14159265358979323846f;
+
+        auto push = [&](float nx, float ny) {
+            // nx, ny in [-1, 1] relative to center.
+            points.push_back(PointF{cx + nx * halfW, cy + ny * halfH});
+        };
+
+        if (kind == Kind::Oval) {
+            for (int i = 0; i < segments; ++i) {
+                const float t = (static_cast<float>(i) / static_cast<float>(segments)) * 2.0f * kPi;
+                push(std::cos(t), std::sin(t));
+            }
+            return points;
+        }
+
+        if (kind == Kind::Heart) {
+            // Classic heart parametric curve, normalized into [-1, 1].
+            float minX = 0.0f, maxX = 0.0f, minY = 0.0f, maxY = 0.0f;
+            std::vector<PointF> raw;
+            raw.reserve(static_cast<size_t>(segments));
+            for (int i = 0; i < segments; ++i) {
+                const float t = (static_cast<float>(i) / static_cast<float>(segments)) * 2.0f * kPi;
+                const float st = std::sin(t);
+                const float x = 16.0f * st * st * st;
+                const float y = 13.0f * std::cos(t) - 5.0f * std::cos(2.0f * t)
+                    - 2.0f * std::cos(3.0f * t) - std::cos(4.0f * t);
+                raw.push_back(PointF{x, -y}); // flip Y so tip points down-ish like a card
+                if (i == 0) {
+                    minX = maxX = x;
+                    minY = maxY = -y;
+                } else {
+                    minX = std::min(minX, x);
+                    maxX = std::max(maxX, x);
+                    minY = std::min(minY, -y);
+                    maxY = std::max(maxY, -y);
+                }
+            }
+            const float spanX = std::max(0.001f, maxX - minX);
+            const float spanY = std::max(0.001f, maxY - minY);
+            for (const auto& p : raw) {
+                const float nx = ((p.x - minX) / spanX) * 2.0f - 1.0f;
+                const float ny = ((p.y - minY) / spanY) * 2.0f - 1.0f;
+                push(nx * 0.92f, ny * 0.92f);
+            }
+            return points;
+        }
+
+        if (kind == Kind::Petal) {
+            // 5-petal rose: r = cos(k theta), mapped into unit box.
+            constexpr int kPetals = 5;
+            float minX = 0.0f, maxX = 0.0f, minY = 0.0f, maxY = 0.0f;
+            std::vector<PointF> raw;
+            raw.reserve(static_cast<size_t>(segments));
+            for (int i = 0; i < segments; ++i) {
+                const float t = (static_cast<float>(i) / static_cast<float>(segments)) * 2.0f * kPi;
+                const float r = std::cos(static_cast<float>(kPetals) * t);
+                const float x = r * std::cos(t);
+                const float y = r * std::sin(t);
+                raw.push_back(PointF{x, y});
+                if (i == 0) {
+                    minX = maxX = x;
+                    minY = maxY = y;
+                } else {
+                    minX = std::min(minX, x);
+                    maxX = std::max(maxX, x);
+                    minY = std::min(minY, y);
+                    maxY = std::max(maxY, y);
+                }
+            }
+            const float spanX = std::max(0.001f, maxX - minX);
+            const float spanY = std::max(0.001f, maxY - minY);
+            for (const auto& p : raw) {
+                const float nx = ((p.x - minX) / spanX) * 2.0f - 1.0f;
+                const float ny = ((p.y - minY) / spanY) * 2.0f - 1.0f;
+                push(nx * 0.95f, ny * 0.95f);
+            }
+            return points;
+        }
+
+        // Star (5-point)
+        {
+            constexpr int kPoints = 5;
+            const float outer = 1.0f;
+            const float inner = 0.42f;
+            for (int i = 0; i < kPoints * 2; ++i) {
+                const float ang = -kPi * 0.5f + (static_cast<float>(i) * kPi / static_cast<float>(kPoints));
+                const float r = (i % 2 == 0) ? outer : inner;
+                push(std::cos(ang) * r, std::sin(ang) * r);
+            }
+            return points;
+        }
+    }
+
+    std::wstring m_text;
 };
 
 // Interactive data table: selection, sort, multi-select, edit, resize, freeze, callbacks.

@@ -2,6 +2,12 @@
 
 ## 2026-07-15
 
+- 跨文件样式目录 + 异形 layered 多窗口（选项 3）：
+  - `StyleCatalog`：`resource/styles/*.json`，`import[]`，命名样式；布局 `style="$style.name"` / `styleRef` / `extend`
+  - 启动加载 `styles/default.json`（可 `AI_WIN_UI_STYLES` 追加）；Panel 绘制应用 catalog decoration
+  - `IRenderer::FillPolygon`（D2D + Skia）；`ShapePanel`（heart / petal / oval / star）
+  - Hub 按钮 `CreateProcess` 打开独立 layered 异形窗（心形/花瓣/椭圆/星形）；`AI_WIN_UI_SIZE=WxH`
+  - Demo：`style-catalog`、`shaped-hub`；脚本 `run_shaped_windows_demo.ps1`
 - StatCard / SparklineChart 主题化 DefaultStyle（shell/accent/line tokens）；布局显式色保留
 - 高级输入主题化：`NumericUpDown` / `DateTimePicker` / `RichTextBox` DefaultStyle + ApplyThemeDefaults；DataTable 壳层 token
 - ListView/TreeView：`PaintPillScrollbars` 两端圆角 XY 滚动条；滚轮优先控件（Shift+滚轮水平）

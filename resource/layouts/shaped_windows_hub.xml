@@ -1,0 +1,46 @@
+<!--
+  Hub: open irregular layered child windows (heart / petal / oval / star).
+  Each button spawns a separate process so closing a shape does not quit the hub.
+-->
+<Panel
+  direction="column"
+  background="#0B121A"
+  padding="28,28,28,28"
+  spacing="14"
+  alignItems="stretch">
+
+  <Label text="Irregular Layered Windows" fontSize="22" color="#F5F8FC" />
+  <Label
+    text="Click a button to open a per-pixel-alpha shaped window (CreateProcess child). Transparent pixels click through; drag near the shape body."
+    fontSize="13"
+    color="#8FA3B8" />
+
+  <Panel direction="row" spacing="12" wrap="wrap" alignItems="start">
+    <Panel direction="column" spacing="8" style="$style.shapePreview" width="160" alignItems="center">
+      <ShapePanel kind="heart" width="120" height="110" fill="#E85D75" />
+      <Button text="Open Heart" style="$style.primaryButton" onClick="openHeartWindow" width="130" />
+    </Panel>
+    <Panel direction="column" spacing="8" style="$style.shapePreview" width="160" alignItems="center">
+      <ShapePanel kind="petal" width="120" height="110" fill="#7B6CFF" />
+      <Button text="Open Petal" style="$style.primaryButton" onClick="openPetalWindow" width="130" />
+    </Panel>
+    <Panel direction="column" spacing="8" style="$style.shapePreview" width="160" alignItems="center">
+      <ShapePanel kind="oval" width="120" height="90" fill="#3DBE8B" />
+      <Button text="Open Oval" style="$style.secondaryButton" onClick="openOvalWindow" width="130" />
+    </Panel>
+    <Panel direction="column" spacing="8" style="$style.shapePreview" width="160" alignItems="center">
+      <ShapePanel kind="star" width="110" height="110" fill="#F0B429" />
+      <Button text="Open Star" style="$style.secondaryButton" onClick="openStarWindow" width="130" />
+    </Panel>
+  </Panel>
+
+  <Panel direction="row" spacing="10" wrap="wrap">
+    <Button text="Primary (catalog)" style="$style.primaryButton" onClick="primaryAction" />
+    <Button text="Style catalog demo" style="$style.secondaryButton" onClick="secondaryAction" />
+  </Panel>
+
+  <Label
+    text="Also: scripts/run_layout_demo.ps1 -Layout shaped-hub  ·  style-catalog for $style only"
+    fontSize="12"
+    color="#5C7085" />
+</Panel>

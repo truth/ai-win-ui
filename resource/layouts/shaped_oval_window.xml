@@ -1,0 +1,24 @@
+<!-- Layered oval / pill window. -->
+<Panel
+  chrome="layered"
+  direction="column"
+  background="transparent"
+  padding="20,20,20,20"
+  spacing="0"
+  alignItems="stretch">
+
+  <ShapePanel
+    kind="oval"
+    fill="#1E3A2F"
+    stroke="#3DBE8B"
+    strokeWidth="3"
+    flexGrow="1"
+    hitTest="caption"
+    text="Oval window"
+    fontSize="16"
+    textColor="#E8FFF4" />
+
+  <Panel direction="row" height="40" spacing="8" padding="8,0,8,0" justifyContent="center" alignItems="center">
+    <Button text="Close" style="$style.primaryButton" onClick="windowClose" width="100" hitTest="client" />
+  </Panel>
+</Panel>

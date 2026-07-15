@@ -300,6 +300,25 @@ public:
         }
     }
 
+    void FillPolygon(const std::vector<PointF>& points, const Color& color) override {
+        if (points.size() < 3) {
+            return;
+        }
+        if (SkCanvas* canvas = Canvas()) {
+            SkPaint paint;
+            paint.setColor(ToSkColor(color));
+            paint.setStyle(SkPaint::kFill_Style);
+            paint.setAntiAlias(true);
+            SkPath path;
+            path.moveTo(points.front().x, points.front().y);
+            for (size_t i = 1; i < points.size(); ++i) {
+                path.lineTo(points[i].x, points[i].y);
+            }
+            path.close();
+            canvas->drawPath(path, paint);
+        }
+    }
+
     void PushRoundedClip(const Rect& rect, float radius) override {
         if (SkCanvas* canvas = Canvas()) {
             canvas->save();

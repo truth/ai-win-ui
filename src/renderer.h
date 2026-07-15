@@ -73,6 +73,8 @@ public:
     virtual void DrawRoundedRect(const Rect& rect, const Color& color, float strokeWidth, float radius) = 0;
     virtual void DrawLine(const PointF& start, const PointF& end, const Color& color, float strokeWidth = 1.0f) = 0;
     virtual void DrawPolyline(const std::vector<PointF>& points, const Color& color, float strokeWidth = 1.0f) = 0;
+    // Filled closed polygon (first point connected to last). Empty / single-point is a no-op.
+    virtual void FillPolygon(const std::vector<PointF>& points, const Color& color) = 0;
     virtual void PushRoundedClip(const Rect& rect, float radius) = 0;
     virtual void PopLayer() = 0;
     virtual void DrawTextW(const wchar_t* text,

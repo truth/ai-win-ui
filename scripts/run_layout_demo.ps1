@@ -77,6 +77,16 @@ function Resolve-LayoutPath {
         "layered-chrome" = "layouts/layered_chrome_demo.xml"
         "layered_chrome" = "layouts/layered_chrome_demo.xml"
         "layered_chrome_demo" = "layouts/layered_chrome_demo.xml"
+        "style-catalog" = "layouts/style_catalog_demo.xml"
+        "style_catalog" = "layouts/style_catalog_demo.xml"
+        "style_catalog_demo" = "layouts/style_catalog_demo.xml"
+        "shaped-hub" = "layouts/shaped_windows_hub.xml"
+        "shaped_hub" = "layouts/shaped_windows_hub.xml"
+        "shaped_windows_hub" = "layouts/shaped_windows_hub.xml"
+        "shaped-heart" = "layouts/shaped_heart_window.xml"
+        "shaped_heart" = "layouts/shaped_heart_window.xml"
+        "shaped-petal" = "layouts/shaped_petal_window.xml"
+        "shaped_petal" = "layouts/shaped_petal_window.xml"
     }
     $aliasKey = $layoutPath.ToLowerInvariant()
     if ($layoutAliases.ContainsKey($aliasKey)) {

@@ -339,6 +339,39 @@ public:
         m_renderTarget->DrawGeometry(geometry.Get(), m_solidBrush.Get(), strokeWidth);
     }
 
+    void FillPolygon(const std::vector<PointF>& points, const Color& color) override {
+        if (!m_renderTarget || !m_solidBrush || !m_d2dFactory || points.size() < 3) {
+            return;
+        }
+
+        ComPtr<ID2D1PathGeometry> geometry;
+        if (FAILED(m_d2dFactory->CreatePathGeometry(geometry.ReleaseAndGetAddressOf()))) {
+            return;
+        }
+
+        ComPtr<ID2D1GeometrySink> sink;
+        if (FAILED(geometry->Open(sink.ReleaseAndGetAddressOf()))) {
+            return;
+        }
+
+        sink->BeginFigure(D2D1::Point2F(points.front().x, points.front().y), D2D1_FIGURE_BEGIN_FILLED);
+        std::vector<D2D1_POINT_2F> segmentPoints;
+        segmentPoints.reserve(points.size() - 1);
+        for (size_t i = 1; i < points.size(); ++i) {
+            segmentPoints.push_back(D2D1::Point2F(points[i].x, points[i].y));
+        }
+        if (!segmentPoints.empty()) {
+            sink->AddLines(segmentPoints.data(), static_cast<UINT32>(segmentPoints.size()));
+        }
+        sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+        if (FAILED(sink->Close())) {
+            return;
+        }
+
+        m_solidBrush->SetColor(ToD2DColor(color));
+        m_renderTarget->FillGeometry(geometry.Get(), m_solidBrush.Get());
+    }
+
     void PushRoundedClip(const Rect& rect, float radius) override {
         if (!m_renderTarget || !m_d2dFactory) {
             return;

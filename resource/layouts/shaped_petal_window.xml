@@ -1,0 +1,24 @@
+<!-- Layered 5-petal rose window. -->
+<Panel
+  chrome="layered"
+  direction="column"
+  background="transparent"
+  padding="16,16,16,16"
+  spacing="0"
+  alignItems="stretch">
+
+  <ShapePanel
+    kind="petal"
+    fill="#7B6CFF"
+    stroke="#C4BCFF"
+    strokeWidth="2"
+    flexGrow="1"
+    hitTest="caption"
+    text="Petal"
+    fontSize="16"
+    textColor="#F4F2FF" />
+
+  <Panel direction="row" height="40" spacing="8" padding="8,0,8,0" justifyContent="center" alignItems="center">
+    <Button text="Close" style="$style.secondaryButton" onClick="windowClose" width="100" hitTest="client" />
+  </Panel>
+</Panel>

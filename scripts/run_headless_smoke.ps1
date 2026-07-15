@@ -29,7 +29,9 @@ $layoutsFull = $layoutsSmoke + @(
     "skia-image",
     "stats-components",
     "seagull-animation",
-    "advanced-inputs"
+    "advanced-inputs",
+    "style-catalog",
+    "shaped-hub"
 )
 $layouts = if ($Profile -eq "full") { $layoutsFull } else { $layoutsSmoke }
 
@@ -46,6 +48,8 @@ function Resolve-LayoutRelPath([string]$alias) {
         "stats-components" { return "layouts/stats_components.xml" }
         "seagull-animation" { return "layouts/seagull_animation.xml" }
         "advanced-inputs" { return "layouts/advanced_inputs.xml" }
+        "style-catalog" { return "layouts/style_catalog_demo.xml" }
+        "shaped-hub" { return "layouts/shaped_windows_hub.xml" }
         default { return "layouts/$alias.xml" }
     }
 }

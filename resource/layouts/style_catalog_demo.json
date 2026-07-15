@@ -1,0 +1,111 @@
+{
+  "type": "Panel",
+  "props": {
+    "direction": "column",
+    "background": "#0B121A",
+    "padding": [28, 28, 28, 28],
+    "spacing": 16,
+    "alignItems": "stretch"
+  },
+  "children": [
+    {
+      "type": "Label",
+      "props": {
+        "text": "Style Catalog · $style.xxx (JSON)",
+        "fontSize": 22,
+        "color": "#F5F8FC"
+      }
+    },
+    {
+      "type": "Label",
+      "props": {
+        "text": "JSON layout referencing cross-file styles via style: \"$style.primaryButton\".",
+        "fontSize": 13,
+        "color": "#8FA3B8"
+      }
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "column",
+        "style": "$style.surfaceCard",
+        "spacing": 12
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "Buttons from styles/buttons.json",
+            "fontSize": 15,
+            "color": "#E8EEF6"
+          }
+        },
+        {
+          "type": "Panel",
+          "props": {
+            "direction": "row",
+            "spacing": 10,
+            "wrap": "wrap"
+          },
+          "children": [
+            {
+              "type": "Button",
+              "props": {
+                "text": "Primary",
+                "style": "$style.primaryButton",
+                "onClick": "primaryAction"
+              }
+            },
+            {
+              "type": "Button",
+              "props": {
+                "text": "Secondary",
+                "style": "$style.secondaryButton",
+                "onClick": "secondaryAction"
+              }
+            },
+            {
+              "type": "Button",
+              "props": {
+                "text": "Danger",
+                "style": "$style.dangerButton",
+                "onClick": "primaryAction"
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "row",
+        "spacing": 16,
+        "wrap": "wrap",
+        "style": "$style.accentCard"
+      },
+      "children": [
+        {
+          "type": "ShapePanel",
+          "props": {
+            "kind": "heart",
+            "width": 96,
+            "height": 88,
+            "fill": "#E85D75",
+            "text": "heart"
+          }
+        },
+        {
+          "type": "ShapePanel",
+          "props": {
+            "kind": "petal",
+            "width": 96,
+            "height": 88,
+            "fill": "#7B6CFF",
+            "text": "petal"
+          }
+        }
+      ]
+    }
+  ]
+}

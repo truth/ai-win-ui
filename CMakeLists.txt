@@ -33,6 +33,7 @@ add_executable(ai_win_ui WIN32
     src/main.cpp
     src/box_decoration.cpp
     src/style.cpp
+    src/style_catalog.cpp
     src/theme.cpp
     src/layout_engine.cpp
     src/renderer.cpp

@@ -1,0 +1,47 @@
+<!--
+  Style catalog demo: cross-file import + $style.xxx references.
+  Loads styles/default.json (imports buttons.json + cards.json).
+-->
+<Panel
+  direction="column"
+  background="#0B121A"
+  padding="28,28,28,28"
+  spacing="16"
+  alignItems="stretch">
+
+  <Label text="Style Catalog · $style.xxx" fontSize="22" color="#F5F8FC" />
+  <Label
+    text="Named styles loaded from styles/default.json (import buttons.json + cards.json). Buttons use style='$style.primaryButton' etc."
+    fontSize="13"
+    color="#8FA3B8" />
+
+  <Panel
+    direction="column"
+    style="$style.surfaceCard"
+    spacing="12"
+    alignItems="stretch">
+    <Label text="Surface card via $style.surfaceCard" fontSize="15" color="#E8EEF6" />
+    <Label text="extend + import: dangerButton extends primaryButton from buttons.json" fontSize="12" color="#8FA3B8" />
+    <Panel direction="row" spacing="10" wrap="wrap">
+      <Button text="Primary" style="$style.primaryButton" onClick="primaryAction" />
+      <Button text="Secondary" style="$style.secondaryButton" onClick="secondaryAction" />
+      <Button text="Danger" style="$style.dangerButton" onClick="primaryAction" />
+    </Panel>
+  </Panel>
+
+  <Panel
+    direction="column"
+    style="$style.accentCard"
+    spacing="10"
+    alignItems="stretch">
+    <Label text="Accent card via $style.accentCard (extends surfaceCard)" fontSize="15" color="#E8EEF6" />
+    <Panel direction="row" spacing="16" wrap="wrap" alignItems="center">
+      <ShapePanel kind="heart" width="96" height="88" fill="#E85D75" text="♥" fontSize="18" />
+      <ShapePanel kind="petal" width="96" height="88" fill="#7B6CFF" text="petal" fontSize="12" />
+      <ShapePanel kind="oval" width="96" height="72" fill="#3DBE8B" text="oval" fontSize="12" />
+      <ShapePanel kind="star" width="88" height="88" fill="#F0B429" text="★" fontSize="16" textColor="#1A1408" />
+    </Panel>
+  </Panel>
+
+  <Label text="Launch hub: scripts/run_layout_demo.ps1 -Layout style-catalog" fontSize="12" color="#5C7085" />
+</Panel>
