@@ -2,6 +2,7 @@
 
 ## 2026-07-15
 
+- Wave1 续 4：S2 Theme/Catalog 边界文档；S3 启动日志 theme/styles 路径；L3 yoga space-between + min/max 段
 - Wave1 续 3：`application.h/cpp` 多 host 注册；IME 候选 exclude + composition font；`text_wrap_cases` R2 页
 - Wave1 续 2：`host_options.h`；Combo 点外关闭 `DismissOverlaysAt`；TextInput caret 最近边界；`token-migration-strategy.md`
 - Wave1 续：`OpenHostOptions`；`AI_WIN_UI_DISABLE_WINDOW_SCROLL`；`compare_text_dumps.ps1`（core-validation skia/d2d **PASS ≤2px**）；`doc/keyboard-matrix.md`

@@ -35,4 +35,35 @@
     <Label text="Exact-height footer" fontSize="16" color="#FFFFFF" />
     <Button text="Primary Action" height="42" fontSize="15" background="#2D6CDF" cornerRadius="8" />
   </Panel>
+
+  <!-- L3: space-between + spacing(gap) -->
+  <Panel name="l3SpaceBetweenCard" padding="16,16,16,16" spacing="10" cornerRadius="12" background="#1E2A36" alignItems="stretch">
+    <Label name="l3SpaceBetweenTitle" text="L3 space-between + gap" fontSize="16" color="#FFFFFF" />
+    <Label text="Three fixed-width buttons should pin to start / mid distribution / end; spacing=12 is the cross-axis gap between them when packed." fontSize="12" color="#A8B6C4" />
+    <Panel name="l3SpaceBetweenRow" direction="row" justifyContent="space-between" spacing="12" padding="8,8,8,8" background="#16202A" cornerRadius="8" alignItems="center" height="52">
+      <Button name="l3BtnA" text="A" width="72" height="36" fontSize="13" cornerRadius="8" background="#2D6CDF" />
+      <Button name="l3BtnB" text="B" width="72" height="36" fontSize="13" cornerRadius="8" background="#3B7AE8" />
+      <Button name="l3BtnC" text="C" width="72" height="36" fontSize="13" cornerRadius="8" background="#1F54B5" />
+    </Panel>
+  </Panel>
+
+  <!-- L3: minWidth / maxWidth + flexGrow -->
+  <Panel name="l3MinMaxCard" padding="16,16,16,16" spacing="10" cornerRadius="12" background="#24303B" alignItems="stretch">
+    <Label name="l3MinMaxTitle" text="L3 minWidth / maxWidth + flexGrow" fontSize="16" color="#FFFFFF" />
+    <Label text="Left grows between 120–280; middle is fixed 100; right grows with min 80. Resize the window and confirm neither flex child collapses under min or exceeds max." fontSize="12" color="#A8B6C4" />
+    <Panel name="l3MinMaxRow" direction="row" spacing="10" padding="8,8,8,8" background="#16202A" cornerRadius="8" alignItems="stretch">
+      <Panel name="l3GrowClamp" direction="column" flexGrow="1" flexBasis="0" minWidth="120" maxWidth="280" padding="10,10,10,10" spacing="4" background="#32414D" cornerRadius="8" alignItems="stretch">
+        <Label text="grow clamp" fontSize="13" color="#FFFFFF" />
+        <Label text="min 120 · max 280" fontSize="11" color="#C5D0DB" />
+      </Panel>
+      <Panel name="l3FixedMid" direction="column" width="100" padding="10,10,10,10" spacing="4" background="#3A4A58" cornerRadius="8" alignItems="stretch">
+        <Label text="fixed" fontSize="13" color="#FFFFFF" />
+        <Label text="w=100" fontSize="11" color="#C5D0DB" />
+      </Panel>
+      <Panel name="l3GrowMin" direction="column" flexGrow="1" flexBasis="0" minWidth="80" padding="10,10,10,10" spacing="4" background="#2A3846" cornerRadius="8" alignItems="stretch">
+        <Label text="grow min80" fontSize="13" color="#FFFFFF" />
+        <Label text="no max" fontSize="11" color="#C5D0DB" />
+      </Panel>
+    </Panel>
+  </Panel>
 </Panel>

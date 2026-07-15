@@ -154,6 +154,8 @@ Yoga 不直接进入 `UI` 公共接口，而是挂在：
 - 横向 `row` 容器里的文本、按钮、输入框混排
 - 固定高度按钮与普通自适应文本的组合
 - `Spacer` 在测量回调接入后的主轴扩展行为
+- **L3** `justifyContent=space-between` + `spacing`（gap）三钮行（`name=l3SpaceBetweenRow`）
+- **L3** `minWidth` / `maxWidth` + `flexGrow` 夹紧行（`name=l3MinMaxRow`）
 
 运行时可以通过环境变量切换到这组样例，而不必改默认布局文件：
 

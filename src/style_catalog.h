@@ -25,6 +25,7 @@ public:
 
     void Clear();
     bool Empty() const { return m_styles.empty(); }
+    size_t Count() const { return m_styles.size(); }
 
     // name without "$style." prefix.
     std::optional<ComponentStyle> Resolve(const std::string& name) const;

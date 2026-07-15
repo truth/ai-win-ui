@@ -639,8 +639,34 @@ private:
         return pos != std::wstring::npos ? exePath.substr(0, pos) : exePath;
     }
 
+    void LogUtf8Debug(const char* prefix, const std::string& path) const {
+        std::wstring msg = prefix ? Utf8ToWide(prefix) : L"";
+        if (!path.empty()) {
+            msg += Utf8ToWide(path);
+        } else {
+            msg += L"(none)";
+        }
+        msg += L"\n";
+        OutputDebugStringW(msg.c_str());
+    }
+
+    static std::wstring Utf8ToWide(const std::string& utf8) {
+        if (utf8.empty()) {
+            return {};
+        }
+        const int n = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, nullptr, 0);
+        if (n <= 1) {
+            return {};
+        }
+        std::wstring w(static_cast<size_t>(n - 1), L'\0');
+        MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, w.data(), n);
+        return w;
+    }
+
     void LoadTheme() {
+        m_loadedThemePath.clear();
         if (!m_uiContext.resourceProvider) {
+            OutputDebugStringW(L"[Theme] skipped (no resource provider)\n");
             return;
         }
         const std::wstring requestedTheme = GetEnvironmentValue(L"AI_WIN_UI_THEME");
@@ -648,23 +674,42 @@ private:
             ? std::string("themes/default.json")
             : Utf16ToUtf8(requestedTheme);
         if (themePath.empty() || !m_uiContext.resourceProvider->Exists(themePath)) {
+            LogUtf8Debug("[Theme] missing path=", themePath.empty() ? std::string("(empty)") : themePath);
             return;
         }
         const std::string text = m_uiContext.resourceProvider->LoadText(themePath);
         m_theme = Theme::LoadFromJson(text);
         m_uiContext.theme = m_theme.get();
+        m_loadedThemePath = themePath;
+        // S3: visible path for sticky-env debugging.
+        {
+            std::wstring msg = L"[Theme] loaded=";
+            msg += Utf8ToWide(themePath);
+            if (m_theme) {
+                msg += L" colors=";
+                msg += std::to_wstring(static_cast<unsigned long long>(m_theme->colors.size()));
+                msg += L" spacings=";
+                msg += std::to_wstring(static_cast<unsigned long long>(m_theme->spacings.size()));
+            }
+            msg += L"\n";
+            OutputDebugStringW(msg.c_str());
+        }
     }
 
     void LoadStyleCatalog() {
+        m_loadedStylesPaths.clear();
         m_styleCatalog = std::make_unique<StyleCatalog>();
         m_uiContext.styleCatalog = m_styleCatalog.get();
         if (!m_uiContext.resourceProvider) {
+            OutputDebugStringW(L"[Styles] skipped (no resource provider)\n");
             return;
         }
 
         // Default shared catalog (import-aware).
         if (m_uiContext.resourceProvider->Exists("styles/default.json")) {
-            m_styleCatalog->LoadFromResource(*m_uiContext.resourceProvider, "styles/default.json");
+            if (m_styleCatalog->LoadFromResource(*m_uiContext.resourceProvider, "styles/default.json")) {
+                m_loadedStylesPaths.push_back("styles/default.json");
+            }
         }
 
         // Optional override / extra styles: AI_WIN_UI_STYLES=styles/app.json
@@ -672,8 +717,34 @@ private:
         if (!requested.empty()) {
             const std::string path = Utf16ToUtf8(requested);
             if (!path.empty() && m_uiContext.resourceProvider->Exists(path)) {
-                m_styleCatalog->MergeFile(*m_uiContext.resourceProvider, path);
+                if (m_styleCatalog->MergeFile(*m_uiContext.resourceProvider, path)) {
+                    m_loadedStylesPaths.push_back(path);
+                } else {
+                    LogUtf8Debug("[Styles] merge failed path=", path);
+                }
+            } else {
+                LogUtf8Debug("[Styles] AI_WIN_UI_STYLES not found path=", path);
             }
+        }
+
+        // S3: print resolved catalog sources + style count.
+        {
+            std::wstring msg = L"[Styles] files=";
+            if (m_loadedStylesPaths.empty()) {
+                msg += L"(none)";
+            } else {
+                for (size_t i = 0; i < m_loadedStylesPaths.size(); ++i) {
+                    if (i) {
+                        msg += L";";
+                    }
+                    msg += Utf8ToWide(m_loadedStylesPaths[i]);
+                }
+            }
+            msg += L" styleCount=";
+            msg += std::to_wstring(static_cast<unsigned long long>(
+                m_styleCatalog ? m_styleCatalog->Count() : 0));
+            msg += L"\n";
+            OutputDebugStringW(msg.c_str());
         }
     }
 
@@ -1006,18 +1077,26 @@ private:
             if (m_activeLayoutPath.empty()) {
                 msg += L"(none)";
             } else {
-                const int n = MultiByteToWideChar(CP_UTF8, 0, m_activeLayoutPath.c_str(), -1, nullptr, 0);
-                if (n > 1) {
-                    std::wstring w(static_cast<size_t>(n - 1), L'\0');
-                    MultiByteToWideChar(CP_UTF8, 0, m_activeLayoutPath.c_str(), -1, w.data(), n);
-                    msg += w;
-                }
+                msg += Utf8ToWide(m_activeLayoutPath);
             }
             msg += L" chromeMode=";
             msg += m_windowChrome.IsLayered() ? L"layered"
                 : (m_windowChrome.IsCustom() ? L"custom" : L"system");
             msg += L" backend=";
             msg += RendererBackendDisplayName(m_activeRendererBackend);
+            msg += L" themeFile=";
+            msg += m_loadedThemePath.empty() ? L"(none)" : Utf8ToWide(m_loadedThemePath);
+            msg += L" stylesFiles=";
+            if (m_loadedStylesPaths.empty()) {
+                msg += L"(none)";
+            } else {
+                for (size_t i = 0; i < m_loadedStylesPaths.size(); ++i) {
+                    if (i) {
+                        msg += L";";
+                    }
+                    msg += Utf8ToWide(m_loadedStylesPaths[i]);
+                }
+            }
             msg += L"\n";
             OutputDebugStringW(msg.c_str());
         }
@@ -1993,6 +2072,8 @@ private:
     std::unique_ptr<IResourceProvider> m_resourceProvider;
     std::unique_ptr<Theme> m_theme;
     std::unique_ptr<StyleCatalog> m_styleCatalog;
+    std::string m_loadedThemePath;
+    std::vector<std::string> m_loadedStylesPaths;
     std::string m_activeLayoutPath;
     RendererBackend m_requestedRendererBackend = RendererBackend::Direct2D;
     RendererBackend m_activeRendererBackend = RendererBackend::Direct2D;

@@ -336,7 +336,9 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 | C2 | **partial** | Combo `DismissOverlaysAt` 点外关闭；完整 Popup 仍 open |
 | C3 | **partial** | IME：caret 顶锚点 + candidate exclude 输入框 + Segoe UI composition font |
 | S1 | **done** | `doc/plan/token-migration-strategy.md` |
-| S2–S3 | **partial** | S3≈H3 日志 |
+| S2 | **done** | `style-catalog.md` Theme vs Catalog 职责边界表 |
+| S3 | **done** | 启动 `[Theme]/`/`[Styles]` 路径 + styleCount；`LogEffectiveEnv` themeFile/stylesFiles |
+| L3 | **partial** | `yoga_measure_cases` 增 space-between + min/max 段；measure golden 待扩 |
 
 ## 10. 修订记录
 
