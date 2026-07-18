@@ -455,31 +455,44 @@ protected:
             wrapMode);
     }
 
-    Rect m_bounds{};
-    Size m_desiredSize{};
+    // Tree & Identity
+    std::string                             m_name;
     std::vector<std::unique_ptr<UIElement>> m_children;
-    std::string m_name;
-    Thickness m_margin{};
-    Thickness m_border{};
-    float m_fixedWidth = -1.0f;
-    float m_fixedHeight = -1.0f;
-    float m_minWidth = -1.0f;
-    float m_maxWidth = -1.0f;
-    float m_minHeight = -1.0f;
-    float m_maxHeight = -1.0f;
-    float m_flexGrow = 0.0f;
-    float m_flexShrink = 0.0f;
-    float m_flexBasis = -1.0f;
-    SelfAlign m_alignSelf = SelfAlign::Auto;
-    bool m_hasFocus = false;
-    bool m_hovered = false;
-    bool m_pressed = false;
-    bool m_disabled = false;
-    HitTestRole m_hitTestRole = HitTestRole::Default;
-    WindowChromeRequest m_windowChromeRequest = WindowChromeRequest::Unspecified;
-    ComponentStyle m_style{};
-    bool m_styleFromLayout = false;
-    std::string m_styleCatalogName;
-    UIContext* m_context = nullptr;
+    UIContext*                              m_context = nullptr;
+
+    // Layout Core
+    Rect                                    m_bounds{};
+    Size                                    m_desiredSize{};
+    Thickness                               m_margin{};
+    Thickness                               m_border{};
+
+    // Sizing Constraints
+    float                                   m_fixedWidth  = -1.0f;
+    float                                   m_fixedHeight = -1.0f;
+    float                                   m_minWidth    = -1.0f;
+    float                                   m_maxWidth    = -1.0f;
+    float                                   m_minHeight   = -1.0f;
+    float                                   m_maxHeight   = -1.0f;
+
+    // Flexbox Config
+    float                                   m_flexGrow   = 0.0f;
+    float                                   m_flexShrink = 0.0f;
+    float                                   m_flexBasis  = -1.0f;
+    SelfAlign                               m_alignSelf  = SelfAlign::Auto;
+
+    // State & Interaction
+    bool                                    m_hasFocus = false;
+    bool                                    m_hovered  = false;
+    bool                                    m_pressed  = false;
+    bool                                    m_disabled = false;
+
+    // Window & Chrome Integration
+    HitTestRole                             m_hitTestRole = HitTestRole::Default;
+    WindowChromeRequest                     m_windowChromeRequest = WindowChromeRequest::Unspecified;
+
+    // Styling
+    ComponentStyle                          m_style{};
+    bool                                    m_styleFromLayout = false;
+    std::string                             m_styleCatalogName;
 };
 

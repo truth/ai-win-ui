@@ -11,6 +11,12 @@
 #include <sstream>
 #include <windows.h>
 
+// ==============================================================================
+// SECTION 1: Internal helpers (anonymous namespace)
+//   JSON parser, XML parser, color/thickness parsers, string utilities,
+//   flex shorthand, panel visual-effect appliers, style/theme resolvers.
+// ==============================================================================
+
 namespace {
 
 const Theme* g_activeTheme = nullptr;
@@ -1069,6 +1075,13 @@ void ApplyFlexShorthand(const std::string& rawValue, UIElement& element) {
     }
 }
 
+// ==============================================================================
+// SECTION 2: Common prop appliers
+//   ApplyCommonJsonProps    - shared UIElement props from JSON
+//   ApplyCommonXmlAttributes - shared UIElement props from XML
+//   Called at the end of every per-component block in sections 4 and 5.
+// ==============================================================================
+
 void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
     if (!props.IsObject()) {
         return;
@@ -1393,6 +1406,11 @@ const Theme* LayoutParser::SetActiveTheme(const Theme* theme) {
     return previous;
 }
 
+// ==============================================================================
+// SECTION 3: Public LayoutParser API
+//   BuildFromFile, ParseJson, ParseXml, ColorFromString, ParseNumberValue, etc.
+// ==============================================================================
+
 float LayoutParser::ParseNumberValue(const JsonValue& value,
                                      Theme::NumberCategory category,
                                      float fallback) {
@@ -1478,6 +1496,12 @@ std::wstring MakeUtf16(const std::string& text) {
     }
     return result;
 }
+
+// ==============================================================================
+// SECTION 4: JSON element factory  (CreateElementFromJson)
+//   Main factory: each `else if (type == ...)` block handles one component.
+//   Calls ApplyCommonJsonProps() at the end of each block for shared props.
+// ==============================================================================
 
 std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourceProvider& provider, UIEventResolver eventResolver) {
     if (!node.IsObject()) {
@@ -2758,6 +2782,12 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
 
     return element;
 }
+
+// ==============================================================================
+// SECTION 5: XML element factory  (CreateElementFromXml)
+//   Mirrors the JSON factory above. Each `else if (node.name == ...)` block
+//   handles one component type.
+// ==============================================================================
 
 std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourceProvider& provider, UIEventResolver eventResolver) {
     if (node.name.empty()) {
