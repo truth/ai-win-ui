@@ -42,6 +42,9 @@ struct TextRenderOptions {
     TextVerticalAlign verticalAlign = TextVerticalAlign::Start;
     bool bold = false;
     bool italic = false;
+    // Wave2 R6: when wrap==NoWrap and text exceeds rect width, show "…" (draw+measure).
+    // Ignored for TextWrapMode::Wrap (multi-line ellipsis not in v1).
+    bool ellipsis = false;
 };
 
 const char* RendererBackendId(RendererBackend backend);
@@ -69,6 +72,19 @@ public:
 
     virtual void FillRect(const Rect& rect, const Color& color) = 0;
     virtual void FillRoundedRect(const Rect& rect, const Color& color, float radius) = 0;
+    // Wave2 R7: two-stop linear gradient fill (optional rounded). angleDegrees: 0=L→R, 90=T→B.
+    virtual void FillLinearGradient(const Rect& rect,
+                                    float cornerRadius,
+                                    const Color& start,
+                                    const Color& end,
+                                    float angleDegrees) = 0;
+    // Soft shadow under a rounded rect (drawn around bounds + offset; multi-pass approx).
+    virtual void FillSoftShadow(const Rect& rect,
+                                float cornerRadius,
+                                float offsetX,
+                                float offsetY,
+                                float blur,
+                                const Color& color) = 0;
     virtual void DrawRect(const Rect& rect, const Color& color, float strokeWidth = 1.0f) = 0;
     virtual void DrawRoundedRect(const Rect& rect, const Color& color, float strokeWidth, float radius) = 0;
     virtual void DrawLine(const PointF& start, const PointF& end, const Color& color, float strokeWidth = 1.0f) = 0;
@@ -87,9 +103,14 @@ public:
     virtual BitmapHandle CreateBitmapFromBytes(const uint8_t* data, size_t size) = 0;
     virtual void DrawBitmap(BitmapHandle bitmap, const Rect& rect) = 0;
 
-    virtual SvgHandle CreateSvgFromBytes(const uint8_t* data, size_t size) = 0;
+    // Wave2 R8: optional cacheKey (e.g. resource path) reuses parsed DOM; nullptr hashes content.
+    virtual SvgHandle CreateSvgFromBytes(const uint8_t* data, size_t size, const char* cacheKey = nullptr) = 0;
     virtual Size GetSvgSize(SvgHandle svg) = 0;
-    virtual void DrawSvg(SvgHandle svg, const Rect& rect) = 0;
+    // tint: if hasTint, recolor non-transparent pixels (SrcIn) — monochrome icons.
+    virtual void DrawSvg(SvgHandle svg, const Rect& rect) {
+        DrawSvg(svg, rect, false, Color{});
+    }
+    virtual void DrawSvg(SvgHandle svg, const Rect& rect, bool hasTint, const Color& tint) = 0;
 };
 
 std::unique_ptr<IRenderer> CreateDirect2DRenderer();

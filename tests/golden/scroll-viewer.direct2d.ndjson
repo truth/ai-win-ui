@@ -1,7 +1,7 @@
 {"path":"root","dw":979,"dh":1029,"x":0,"y":-0,"w":979,"h":1029}
 {"path":"root/title","dw":403.561,"dh":41.252,"x":20,"y":20,"w":939,"h":42}
 {"path":"root/hint","dw":747.262,"dh":27.9512,"x":20,"y":73,"w":939,"h":29}
-{"path":"root/secA","dw":185.298,"dh":31.2764,"x":20,"y":114,"w":939,"h":32}
+{"path":"root/secA","dw":184.187,"dh":31.2764,"x":20,"y":114,"w":939,"h":32}
 {"path":"root/scroller","dw":939,"dh":250,"x":20,"y":158,"w":939,"h":250}
 {"path":"root/scroller/scrollContent","dw":939,"dh":691,"x":20,"y":158,"w":939,"h":691}
 {"path":"root/scroller/scrollContent/line0","dw":232.91,"dh":31.2764,"x":35,"y":173,"w":909,"h":32}
@@ -37,11 +37,11 @@
 {"path":"root/secC","dw":340.533,"dh":31.2764,"x":20,"y":751,"w":939,"h":33}
 {"path":"root/dualAxis","dw":939,"dh":175,"x":20,"y":796,"w":939,"h":175}
 {"path":"root/dualAxis/dualContent","dw":1750,"dh":282,"x":20,"y":796,"w":1750,"h":282}
-{"path":"root/dualAxis/dualContent/wide0","dw":782.611,"dh":29.6138,"x":35,"y":811,"w":783,"h":30}
-{"path":"root/dualAxis/dualContent/wide1","dw":333.229,"dh":29.6138,"x":35,"y":848,"w":334,"h":30}
-{"path":"root/dualAxis/dualContent/wide2","dw":97.9294,"dh":29.6138,"x":35,"y":885,"w":98,"h":30}
-{"path":"root/dualAxis/dualContent/wide3","dw":97.9294,"dh":29.6138,"x":35,"y":922,"w":98,"h":30}
-{"path":"root/dualAxis/dualContent/wide4","dw":97.9294,"dh":29.6138,"x":35,"y":959,"w":98,"h":31}
-{"path":"root/dualAxis/dualContent/wide5","dw":97.9294,"dh":29.6138,"x":35,"y":996,"w":98,"h":31}
-{"path":"root/dualAxis/dualContent/wide6","dw":218.821,"dh":29.6138,"x":35,"y":1033,"w":219,"h":31}
+{"path":"root/dualAxis/dualContent/wide0","dw":782.056,"dh":29.6138,"x":35,"y":811,"w":783,"h":30}
+{"path":"root/dualAxis/dualContent/wide1","dw":332.674,"dh":29.6138,"x":35,"y":848,"w":333,"h":30}
+{"path":"root/dualAxis/dualContent/wide2","dw":97.374,"dh":29.6138,"x":35,"y":885,"w":98,"h":30}
+{"path":"root/dualAxis/dualContent/wide3","dw":97.374,"dh":29.6138,"x":35,"y":922,"w":98,"h":30}
+{"path":"root/dualAxis/dualContent/wide4","dw":97.374,"dh":29.6138,"x":35,"y":959,"w":98,"h":31}
+{"path":"root/dualAxis/dualContent/wide5","dw":97.374,"dh":29.6138,"x":35,"y":996,"w":98,"h":31}
+{"path":"root/dualAxis/dualContent/wide6","dw":218.265,"dh":29.6138,"x":35,"y":1033,"w":219,"h":31}
 {"path":"root/footer","dw":583.098,"dh":26.2886,"x":20,"y":983,"w":939,"h":27}

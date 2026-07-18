@@ -36,7 +36,9 @@ $layoutsFull = $layoutsSmoke + @(
     "style-catalog",
     "shaped-hub",
     "text-wrap",
-    "cjk-render"
+    "cjk-render",
+    "popup-theme",
+    "virtual-list"
 )
 $layouts = if ($Profile -eq "full") { $layoutsFull } else { $layoutsSmoke }
 
@@ -59,6 +61,8 @@ function Resolve-LayoutRelPath([string]$alias) {
         "shaped-hub" { return "layouts/shaped_windows_hub.xml" }
         "text-wrap" { return "layouts/text_wrap_cases.xml" }
         "cjk-render" { return "layouts/cjk_render_test.xml" }
+        "popup-theme" { return "layouts/popup_theme_demo.xml" }
+        "virtual-list" { return "layouts/virtual_list_demo.xml" }
         default { return "layouts/$alias.xml" }
     }
 }

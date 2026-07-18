@@ -12,4 +12,5 @@ struct OpenHostOptions {
     std::wstring size;       // empty => default; e.g. 1100x750
     RendererBackend renderer = RendererBackend::Direct2D;
     bool childProcess = false; // true => CreateProcess instead of in-process
+    HWND parent = nullptr;   // Wave3: WS_CHILD host when non-null
 };

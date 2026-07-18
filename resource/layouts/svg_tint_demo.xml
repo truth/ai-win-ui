@@ -1,0 +1,35 @@
+<!--
+  Wave2 R8: SvgIcon tint + path-keyed handle cache.
+  .\scripts\run_layout_demo.ps1 -Layout svg-tint -Renderer skia
+-->
+<Panel name="root" direction="column" padding="24,24,24,24" spacing="16" background="#0B121A" alignItems="stretch">
+  <Label name="title" text="SVG Tint + Cache (R8)" fontSize="22" color="#F5F8FC" />
+  <Label name="hint" text="Same source path reuses one SkSVGDOM. tint recolors with SrcIn (Skia). Direct2D shows tinted placeholder." fontSize="13" color="#8FA3B8" />
+
+  <Label text="Original icons (no tint)" fontSize="14" color="#C5D4E6" />
+  <Panel name="row0" direction="row" spacing="16" background="#152033" cornerRadius="12" padding="16,16,16,16" alignItems="center">
+    <SvgIcon source="icons/check.svg" width="40" height="40" />
+    <SvgIcon source="icons/arrow-right.svg" width="40" height="40" />
+    <SvgIcon source="icons/star.svg" width="40" height="40" />
+    <Label text="check · arrow · star" fontSize="13" color="#A0B0C0" />
+  </Panel>
+
+  <Label text="Tinted (same paths → cache hit)" fontSize="14" color="#C5D4E6" />
+  <Panel name="row1" direction="row" spacing="16" background="#152033" cornerRadius="12" padding="16,16,16,16" alignItems="center">
+    <SvgIcon source="icons/check.svg" width="40" height="40" tint="#3A86FF" />
+    <SvgIcon source="icons/check.svg" width="40" height="40" tint="#2A8C57" />
+    <SvgIcon source="icons/check.svg" width="40" height="40" tint="#E0B341" />
+    <SvgIcon source="icons/check.svg" width="40" height="40" tint="#D14545" />
+    <Label text="one parse, four tints" fontSize="13" color="#A0B0C0" />
+  </Panel>
+
+  <Panel name="row2" direction="row" spacing="16" background="#152033" cornerRadius="12" padding="16,16,16,16" alignItems="center">
+    <SvgIcon source="icons/star.svg" width="48" height="48" tint="#7B6CFF" />
+    <SvgIcon source="icons/star.svg" width="48" height="48" tint="#53B3FF" />
+    <SvgIcon source="icons/arrow-right.svg" width="48" height="48" tint="#FFFFFF" />
+    <SvgIcon source="icons/arrow-right.svg" width="48" height="48" tint="#FF8A65" />
+    <Label text="star + arrow tints" fontSize="13" color="#A0B0C0" />
+  </Panel>
+
+  <Label name="footer" text="Alias: svg-tint · Skia recommended · style color= also accepted as tint" fontSize="12" color="#5C7085" />
+</Panel>

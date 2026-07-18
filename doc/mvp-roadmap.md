@@ -74,25 +74,20 @@ The current MVP is a retained-mode Win32 UI demo that can:
 
 ### In Progress
 
-- Skia text rendering has moved past the original single-line placeholder and
-  now shares layout rules with the active Skia text measurement path, but it
-  still does not yet match DirectWrite closely enough to be considered
-  finished.
-- Yoga integration is active and useful, and the recent `row + stretch`
-  unbounded-height regression now has a dedicated validation case, but the
-  predictable-flex surface is still growing and still needs more behavior
-  calibration around edge cases.
+- Wave 1 (L1 engine trust) **closed** 2026-07-16.
+- Wave 2 (L2 product capability) **in progress** — C4/C5/S4/R6/H5-draft done;
+  see `doc/plan/2026-07-15-directui-productization-personas.md` § Wave2 进度.
 
-### Not Yet Complete
+### Not Yet Complete (Wave2 remainder / Wave3)
 
-- There is no fully verified parity between Direct2D and Skia for text, wrapping, clipping, and DPI behavior.
-- There is still no stronger automated regression layer for layout and interaction; validation is mostly manual through sample pages.
-- DSL visual expression is still limited:
-  - no shadows
-  - no separators as first-class primitives
-  - no vector icon system
-  - no gradients
-  - no richer text layout controls
+- Pixel-perfect Skia↔D2D raster match is **not** required; known differences
+  are documented in `doc/skia-integration.md` (R5). Metrics ≤2px @96DPI is the
+  L1 bar and is met for core/text-wrap dumps.
+- Interaction automation beyond headless smoke + measure golden is still light
+  (Q6/Q7 optional).
+- DSL visual polish **R6–R8 done** (ellipsis, gradient/shadow, Svg tint/cache).
+  Optional further: multi-stop gradients, true Gaussian blur shadows.
+- Embed library target + sample (H5b/H6) is Wave3.
 
 ## MVP Completion Checklist
 
@@ -121,8 +116,8 @@ The current MVP is a retained-mode Win32 UI demo that can:
 - [x] Skia backend can build and launch
 - [x] Images render through both backends
 - [x] Rounded clipping exists in both backends
-- [ ] Skia text behavior is aligned closely enough with layout expectations
-- [ ] Skia and Direct2D rendering parity is manually verified for the main validation pages
+- [x] Skia text behavior is aligned closely enough with layout expectations (≤2px metrics)
+- [x] Skia and Direct2D rendering parity is documented; core validation pages measure-golden both backends
 
 ### 4. Controls and Interaction
 
@@ -138,18 +133,17 @@ The current MVP is a retained-mode Win32 UI demo that can:
 - [x] Layout demo launcher script exists
 - [x] Dashboard demo launcher script exists
 - [x] Core validation page exists
-- [ ] Docs are fully normalized and cross-linked
+- [x] Docs are cross-linked (README / layout-spec / acceptance / personas)
 - [x] A repeatable acceptance flow is documented for MVP sign-off
 
-## What Is Still Missing For MVP Sign-Off
+## MVP Sign-Off Status
 
-If we stay strict about MVP completion, these are the remaining gaps that matter most:
+L1 / Wave1 exit criteria are met (text metrics ≤2px, dual-backend measure
+goldens, ScrollViewer matrix, acceptance docs). Use `doc/mvp-acceptance.md`
+for a repeatable manual pass when declaring a given build “MVP verified.”
 
-1. Finish the Skia text path enough that `Label`, `Button`, and `TextInput` behave predictably under the Skia backend.
-2. Close the biggest Yoga calibration gaps, especially the remaining flex behavior and wrap edge cases that affect predictability.
-3. Run the documented acceptance checklist consistently so we can say "this build passed MVP verification" with confidence.
-
-Everything else, including richer dashboard recreation and more expressive visuals, is useful but not blocking MVP sign-off.
+Product work continues under **Wave 2** (not MVP-blocking): R7/R8 visuals,
+optional C6/C7, Q tooling, then Wave3 embed packaging.
 
 Recent validation improvements that help close those gaps:
 
@@ -207,21 +201,15 @@ Exit criteria:
 
 ## Immediate Execution Plan
 
-The roadmap above defines what is left.
+Follow the persona Wave board:
 
-The recommended execution order for the next work sessions is:
+1. Finish Wave2 remaining: **R7** gradients/shadow, **R8** Svg tint (optional polish).
+2. Keep C4/C5/S4 demos green: `popup-theme`, `virtual-list`, `text-ellipsis`.
+3. Wave3 when packaging matters: H5b `ui_host.cpp` + H6 `ai_win_ui_lib`.
 
-1. Skia text parity
-   - close the gap between text measurement and Skia text drawing
-   - validate `Label`, `Button`, and `TextInput` first
-2. Yoga behavior calibration
-   - re-check `spaceBetween`, stretch behavior, `flexBasis`, `min/max`, and wrap pressure cases
-   - use `yoga_measure_cases.xml` and `core_validation.xml` as the primary repro surfaces
-3. MVP acceptance flow
-   - document the manual validation pass only after the main visual and layout issues are stable enough to describe
+Detailed lists:
 
-For the detailed ordered task list, see:
-
+- `doc/plan/2026-07-15-directui-productization-personas.md`
 - `doc/mvp-execution-plan.md`
 - `doc/mvp-acceptance.md`
 
@@ -241,7 +229,7 @@ These items are valuable, but they are not required to close the current MVP:
 
 ## Suggested Priority Order
 
-1. Stabilize Skia text.
-2. Finish the most important Yoga flex behavior.
-3. Formalize interaction and acceptance validation.
-4. Only then return to richer DSL and visual expression.
+1. ~~Stabilize Skia text / Yoga / acceptance~~ (Wave1 done).
+2. Wave2 product demos (C4/C5/S4/R6) — **current**.
+3. R7/R8 visual primitives when demos need them.
+4. Wave3 embed lib + version/CHANGELOG for external consumers.

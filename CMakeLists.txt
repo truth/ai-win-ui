@@ -5,8 +5,11 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(AI_WIN_UI_RESOURCE_DIR "${CMAKE_SOURCE_DIR}/resource")
 
-# Auto-detect bundled Skia SDK so SVG support works zero-config when
-# third_party/skia-m124 is present with prebuilt libs.
+set(AI_WIN_UI_VERSION_MAJOR 0)
+set(AI_WIN_UI_VERSION_MINOR 3)
+set(AI_WIN_UI_VERSION_PATCH 1)
+
+# Auto-detect bundled Skia SDK (gitignored; present on local dev machines).
 set(_ai_win_ui_default_skia_dir "${CMAKE_SOURCE_DIR}/third_party/skia-m124")
 set(_ai_win_ui_skia_autodetected OFF)
 if(EXISTS "${_ai_win_ui_default_skia_dir}/out/Debug-x64/skia.lib"
@@ -17,6 +20,7 @@ if(EXISTS "${_ai_win_ui_default_skia_dir}/out/Debug-x64/skia.lib"
 endif()
 
 option(AI_WIN_UI_ENABLE_SKIA "Build with Skia renderer backend (required for SVG)." ${_ai_win_ui_skia_autodetected})
+option(AI_WIN_UI_BUILD_SAMPLES "Build samples/embed_host" ON)
 set(AI_WIN_UI_SKIA_PROVIDER "none" CACHE STRING "How Skia should be discovered when AI_WIN_UI_ENABLE_SKIA is ON.")
 set_property(CACHE AI_WIN_UI_SKIA_PROVIDER PROPERTY STRINGS none vcpkg local-sdk)
 set(AI_WIN_UI_SKIA_DIR "" CACHE PATH "Optional root directory of a local Skia SDK or prebuilt package.")
@@ -29,8 +33,16 @@ endif()
 set(AI_WIN_UI_SKIA_INCLUDE_DIR "" CACHE PATH "Optional override for the Skia include root when using AI_WIN_UI_SKIA_PROVIDER=local-sdk.")
 set(AI_WIN_UI_SKIA_LIBRARY_DIR "" CACHE PATH "Optional override for the directory containing skia.lib when using AI_WIN_UI_SKIA_PROVIDER=local-sdk.")
 
-add_executable(ai_win_ui WIN32
-    src/main.cpp
+set(AI_WIN_UI_YOGA_BUILD_DIR "${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1/build" CACHE PATH "Default Yoga build directory.")
+set(AI_WIN_UI_YOGA_STATICCRT_BUILD_DIR "${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1/build-staticcrt" CACHE PATH "Yoga /MT build for local Skia.")
+
+set(_ai_win_ui_yoga_build_dir "${AI_WIN_UI_YOGA_BUILD_DIR}")
+if(AI_WIN_UI_ENABLE_SKIA AND AI_WIN_UI_SKIA_PROVIDER STREQUAL "local-sdk")
+    set(_ai_win_ui_yoga_build_dir "${AI_WIN_UI_YOGA_STATICCRT_BUILD_DIR}")
+endif()
+
+set(AI_WIN_UI_LIB_SOURCES
+    src/ui_host.cpp
     src/application.cpp
     src/box_decoration.cpp
     src/style.cpp
@@ -50,123 +62,97 @@ add_executable(ai_win_ui WIN32
     src/window_chrome.cpp
 )
 
-# Source is UTF-8. On MSVC + CP936, missing this yields C4819 for headers/sources.
-# Apply on the target so every configure preset (build/, build/presets/*) picks it up.
-if(MSVC)
-    target_compile_options(ai_win_ui PRIVATE /utf-8 /wd4819)
-endif()
+add_library(ai_win_ui_lib STATIC ${AI_WIN_UI_LIB_SOURCES})
+add_library(ai_win_ui::lib ALIAS ai_win_ui_lib)
 
-set(AI_WIN_UI_YOGA_BUILD_DIR "${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1/build" CACHE PATH "Default Yoga build directory used by the app target.")
-set(AI_WIN_UI_YOGA_STATICCRT_BUILD_DIR "${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1/build-staticcrt" CACHE PATH "Yoga build directory compiled with static MSVC runtime for local Skia SDK builds.")
-
-target_include_directories(ai_win_ui PRIVATE
-    src
-    third_party/yoga-3.2.1
+target_include_directories(ai_win_ui_lib
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    PRIVATE
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1
 )
 
+target_compile_definitions(ai_win_ui_lib PUBLIC
+    UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN
+)
+
+if(MSVC)
+    target_compile_options(ai_win_ui_lib PRIVATE /utf-8 /wd4819)
+endif()
+
 if(AI_WIN_UI_ENABLE_SKIA)
-    target_compile_definitions(ai_win_ui PRIVATE AI_WIN_UI_ENABLE_SKIA=1)
+    target_compile_definitions(ai_win_ui_lib PUBLIC AI_WIN_UI_ENABLE_SKIA=1)
 
     if(AI_WIN_UI_SKIA_PROVIDER STREQUAL "vcpkg")
         find_package(unofficial-skia CONFIG REQUIRED)
-        target_link_libraries(ai_win_ui PRIVATE unofficial::skia::skia)
-        target_compile_definitions(ai_win_ui PRIVATE AI_WIN_UI_HAS_VCPKG_SKIA=1)
-        message(STATUS "AI_WIN_UI_ENABLE_SKIA is ON and Skia will be resolved from vcpkg via unofficial::skia::skia.")
+        target_link_libraries(ai_win_ui_lib PUBLIC unofficial::skia::skia)
+        target_compile_definitions(ai_win_ui_lib PUBLIC AI_WIN_UI_HAS_VCPKG_SKIA=1)
+        message(STATUS "Skia: vcpkg")
     elseif(AI_WIN_UI_SKIA_PROVIDER STREQUAL "local-sdk")
         if(NOT AI_WIN_UI_SKIA_DIR)
-            message(FATAL_ERROR "AI_WIN_UI_SKIA_PROVIDER=local-sdk requires AI_WIN_UI_SKIA_DIR to point at an unpacked Skia package root.")
+            message(FATAL_ERROR "AI_WIN_UI_SKIA_PROVIDER=local-sdk requires AI_WIN_UI_SKIA_DIR.")
+        endif()
+        set(_skia_inc "${AI_WIN_UI_SKIA_INCLUDE_DIR}")
+        if(NOT _skia_inc)
+            set(_skia_inc "${AI_WIN_UI_SKIA_DIR}")
+        endif()
+        set(_skia_libdir "${AI_WIN_UI_SKIA_LIBRARY_DIR}")
+        if(NOT _skia_libdir)
+            set(_skia_libdir "${AI_WIN_UI_SKIA_DIR}/out")
         endif()
 
-        set(_ai_win_ui_skia_include_dir "${AI_WIN_UI_SKIA_INCLUDE_DIR}")
-        if(NOT _ai_win_ui_skia_include_dir)
-            set(_ai_win_ui_skia_include_dir "${AI_WIN_UI_SKIA_DIR}")
-        endif()
-
-        set(_ai_win_ui_skia_library_dir "${AI_WIN_UI_SKIA_LIBRARY_DIR}")
-        if(NOT _ai_win_ui_skia_library_dir)
-            set(_ai_win_ui_skia_library_dir "${AI_WIN_UI_SKIA_DIR}/out")
-        endif()
-
-        target_include_directories(ai_win_ui PRIVATE
-            "${_ai_win_ui_skia_include_dir}"
-        )
-
-        # The published aseprite/skia Windows packages are built with /MT and /MTd.
-        set_property(TARGET ai_win_ui PROPERTY
+        target_include_directories(ai_win_ui_lib PRIVATE "${_skia_inc}")
+        set_property(TARGET ai_win_ui_lib PROPERTY
             MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-        target_link_options(ai_win_ui PRIVATE
+        target_link_options(ai_win_ui_lib INTERFACE
             "/alternatename:inflate=Cr_z_inflate"
             "/alternatename:inflateEnd=Cr_z_inflateEnd"
             "/alternatename:inflateInit2_=Cr_z_inflateInit2_"
             "/alternatename:inflateReset=Cr_z_inflateReset"
         )
 
-        if(EXISTS "${_ai_win_ui_skia_library_dir}/Debug-x64/skia.lib" AND EXISTS "${_ai_win_ui_skia_library_dir}/Release-x64/skia.lib")
-            # Collect .lib names per configuration. Debug may ship extra SPIR-V
-            # tooling libs (spvtools*) that are absent from Release builds.
-            file(GLOB _ai_win_ui_skia_debug_libs LIST_DIRECTORIES false "${_ai_win_ui_skia_library_dir}/Debug-x64/*.lib")
-            file(GLOB _ai_win_ui_skia_release_libs LIST_DIRECTORIES false "${_ai_win_ui_skia_library_dir}/Release-x64/*.lib")
-            if(NOT _ai_win_ui_skia_debug_libs)
-                message(FATAL_ERROR "No .lib files found in ${_ai_win_ui_skia_library_dir}/Debug-x64 for AI_WIN_UI_SKIA_PROVIDER=local-sdk.")
-            endif()
-            if(NOT _ai_win_ui_skia_release_libs)
-                message(FATAL_ERROR "No .lib files found in ${_ai_win_ui_skia_library_dir}/Release-x64 for AI_WIN_UI_SKIA_PROVIDER=local-sdk.")
-            endif()
-
-            set(_ai_win_ui_skia_debug_lib_names "")
-            foreach(_ai_win_ui_skia_lib_path IN LISTS _ai_win_ui_skia_debug_libs)
-                get_filename_component(_ai_win_ui_skia_lib_name "${_ai_win_ui_skia_lib_path}" NAME_WE)
-                list(APPEND _ai_win_ui_skia_debug_lib_names "${_ai_win_ui_skia_lib_name}")
+        if(EXISTS "${_skia_libdir}/Debug-x64/skia.lib" AND EXISTS "${_skia_libdir}/Release-x64/skia.lib")
+            file(GLOB _skia_dbg LIST_DIRECTORIES false "${_skia_libdir}/Debug-x64/*.lib")
+            file(GLOB _skia_rel LIST_DIRECTORIES false "${_skia_libdir}/Release-x64/*.lib")
+            set(_dbg_names "")
+            foreach(_p IN LISTS _skia_dbg)
+                get_filename_component(_n "${_p}" NAME_WE)
+                list(APPEND _dbg_names "${_n}")
             endforeach()
-            list(REMOVE_DUPLICATES _ai_win_ui_skia_debug_lib_names)
-
-            set(_ai_win_ui_skia_release_lib_names "")
-            foreach(_ai_win_ui_skia_lib_path IN LISTS _ai_win_ui_skia_release_libs)
-                get_filename_component(_ai_win_ui_skia_lib_name "${_ai_win_ui_skia_lib_path}" NAME_WE)
-                list(APPEND _ai_win_ui_skia_release_lib_names "${_ai_win_ui_skia_lib_name}")
+            list(REMOVE_DUPLICATES _dbg_names)
+            set(_rel_names "")
+            foreach(_p IN LISTS _skia_rel)
+                get_filename_component(_n "${_p}" NAME_WE)
+                list(APPEND _rel_names "${_n}")
             endforeach()
-            list(REMOVE_DUPLICATES _ai_win_ui_skia_release_lib_names)
-
-            target_link_directories(ai_win_ui PRIVATE
-                "$<$<CONFIG:Debug>:${_ai_win_ui_skia_library_dir}/Debug-x64>"
-                "$<$<NOT:$<CONFIG:Debug>>:${_ai_win_ui_skia_library_dir}/Release-x64>"
+            list(REMOVE_DUPLICATES _rel_names)
+            target_link_directories(ai_win_ui_lib PUBLIC
+                "$<$<CONFIG:Debug>:${_skia_libdir}/Debug-x64>"
+                "$<$<NOT:$<CONFIG:Debug>>:${_skia_libdir}/Release-x64>"
             )
-            # Generator expressions require semicolon-separated lists as single args.
-            string(REPLACE ";" "$<SEMICOLON>" _ai_win_ui_skia_debug_libs_genex "${_ai_win_ui_skia_debug_lib_names}")
-            string(REPLACE ";" "$<SEMICOLON>" _ai_win_ui_skia_release_libs_genex "${_ai_win_ui_skia_release_lib_names}")
-            target_link_libraries(ai_win_ui PRIVATE
-                "$<$<CONFIG:Debug>:${_ai_win_ui_skia_debug_libs_genex}>"
-                "$<$<NOT:$<CONFIG:Debug>>:${_ai_win_ui_skia_release_libs_genex}>"
+            string(REPLACE ";" "$<SEMICOLON>" _dbg_genex "${_dbg_names}")
+            string(REPLACE ";" "$<SEMICOLON>" _rel_genex "${_rel_names}")
+            target_link_libraries(ai_win_ui_lib PUBLIC
+                "$<$<CONFIG:Debug>:${_dbg_genex}>"
+                "$<$<NOT:$<CONFIG:Debug>>:${_rel_genex}>"
             )
-        elseif(EXISTS "${_ai_win_ui_skia_library_dir}/skia.lib")
-            target_link_libraries(ai_win_ui PRIVATE
-                "${_ai_win_ui_skia_library_dir}/skia.lib"
-            )
+        elseif(EXISTS "${_skia_libdir}/skia.lib")
+            target_link_libraries(ai_win_ui_lib PUBLIC "${_skia_libdir}/skia.lib")
         else()
-            message(FATAL_ERROR
-                "Could not find skia.lib for AI_WIN_UI_SKIA_PROVIDER=local-sdk. "
-                "Checked '${_ai_win_ui_skia_library_dir}/Debug-x64/skia.lib', "
-                "'${_ai_win_ui_skia_library_dir}/Release-x64/skia.lib', and "
-                "'${_ai_win_ui_skia_library_dir}/skia.lib'.")
+            message(FATAL_ERROR "Could not find skia.lib under ${_skia_libdir}")
         endif()
-
-        target_compile_definitions(ai_win_ui PRIVATE AI_WIN_UI_HAS_LOCAL_SKIA=1)
-        message(STATUS "AI_WIN_UI_ENABLE_SKIA is ON and Skia will be resolved from a local SDK rooted at ${AI_WIN_UI_SKIA_DIR}.")
-    elseif(AI_WIN_UI_SKIA_PROVIDER STREQUAL "none")
-        message(STATUS "AI_WIN_UI_ENABLE_SKIA is ON. Runtime backend selection is ready, but no Skia package provider is configured yet.")
+        target_compile_definitions(ai_win_ui_lib PUBLIC AI_WIN_UI_HAS_LOCAL_SKIA=1)
+        message(STATUS "Skia: local-sdk at ${AI_WIN_UI_SKIA_DIR}")
     else()
-        message(FATAL_ERROR "Unsupported AI_WIN_UI_SKIA_PROVIDER='${AI_WIN_UI_SKIA_PROVIDER}'. Expected one of: none, vcpkg, local-sdk.")
+        message(STATUS "Skia enabled, provider=${AI_WIN_UI_SKIA_PROVIDER}")
     endif()
+else()
+    message(STATUS "AI_WIN_UI_ENABLE_SKIA=OFF (Direct2D only — CI path)")
 endif()
 
-set(_ai_win_ui_yoga_build_dir "${AI_WIN_UI_YOGA_BUILD_DIR}")
-if(AI_WIN_UI_ENABLE_SKIA AND AI_WIN_UI_SKIA_PROVIDER STREQUAL "local-sdk")
-    set(_ai_win_ui_yoga_build_dir "${AI_WIN_UI_YOGA_STATICCRT_BUILD_DIR}")
-endif()
-
-target_compile_definitions(ai_win_ui PRIVATE UNICODE _UNICODE NOMINMAX WIN32_LEAN_AND_MEAN)
-
-target_link_libraries(ai_win_ui PRIVATE
+target_link_libraries(ai_win_ui_lib PUBLIC
     "$<$<CONFIG:Debug>:${_ai_win_ui_yoga_build_dir}/yoga/Debug/yogacore.lib>"
     "$<$<NOT:$<CONFIG:Debug>>:${_ai_win_ui_yoga_build_dir}/yoga/Release/yogacore.lib>"
     d2d1
@@ -176,13 +162,34 @@ target_link_libraries(ai_win_ui PRIVATE
     windowscodecs
 )
 
-set_target_properties(ai_win_ui PROPERTIES
-    VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:ai_win_ui>"
-)
+function(ai_win_ui_add_app target_name source_file)
+    add_executable(${target_name} WIN32 ${source_file})
+    target_link_libraries(${target_name} PRIVATE ai_win_ui_lib)
+    target_include_directories(${target_name} PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    if(MSVC)
+        target_compile_options(${target_name} PRIVATE /utf-8 /wd4819)
+    endif()
+    # Match static CRT when Skia local-sdk forces /MT on the library.
+    if(AI_WIN_UI_ENABLE_SKIA AND AI_WIN_UI_SKIA_PROVIDER STREQUAL "local-sdk")
+        set_property(TARGET ${target_name} PROPERTY
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif()
+    set_target_properties(${target_name} PROPERTIES
+        VS_DEBUGGER_WORKING_DIRECTORY "$<TARGET_FILE_DIR:${target_name}>"
+    )
+    add_custom_command(TARGET ${target_name} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${AI_WIN_UI_RESOURCE_DIR}"
+            "$<TARGET_FILE_DIR:${target_name}>/resource"
+        COMMENT "Copying runtime resources next to ${target_name}"
+    )
+endfunction()
 
-add_custom_command(TARGET ai_win_ui POST_BUILD
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "${AI_WIN_UI_RESOURCE_DIR}"
-        "$<TARGET_FILE_DIR:ai_win_ui>/resource"
-    COMMENT "Copying runtime resources next to ai_win_ui.exe"
-)
+ai_win_ui_add_app(ai_win_ui src/main.cpp)
+
+if(AI_WIN_UI_BUILD_SAMPLES)
+    ai_win_ui_add_app(embed_host samples/embed_host/main.cpp)
+endif()

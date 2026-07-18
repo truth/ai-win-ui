@@ -35,6 +35,15 @@ std::optional<Color> TryResolveColorToken(const std::string& s) {
     return ColorFromHex(0xFF00FF);  // magenta sentinel
 }
 
+// S4: extract "$color.key" → "key" for runtime rebind.
+bool TryColorTokenKey(const std::string& s, std::string& outKey) {
+    if (!StartsWith(s, "$color.")) {
+        return false;
+    }
+    outKey = s.substr(7);
+    return !outKey.empty();
+}
+
 std::optional<float> TryResolveNumberToken(const std::string& s, Theme::NumberCategory expected) {
     auto matchPrefix = [&](const char* prefix, Theme::NumberCategory cat) -> std::optional<float> {
         if (!StartsWith(s, prefix)) return std::nullopt;
@@ -568,8 +577,8 @@ BorderSpec ParseBorderSpec(const JsonValue& value) {
     return border;
 }
 
-// Parses a partial BoxDecoration object: background / border / cornerRadius / opacity.
-// Used for StyleSpec.decoration and sub-parts (track / thumb / fill).
+// Parses a partial BoxDecoration object: background / border / cornerRadius / opacity /
+// gradient / shadow (Wave2 R7). Used for StyleSpec.decoration and sub-parts.
 bool ParseBoxDecorationObject(const JsonValue& value, BoxDecoration& out) {
     if (!value.IsObject()) {
         return false;
@@ -591,7 +600,133 @@ bool ParseBoxDecorationObject(const JsonValue& value, BoxDecoration& out) {
         out.opacity = static_cast<float>(value["opacity"].numberValue);
         touched = true;
     }
+    if (value["gradient"].IsObject()) {
+        const JsonValue& g = value["gradient"];
+        if (g["start"].IsString()) {
+            out.gradient.start = LayoutParser::ColorFromString(g["start"].stringValue);
+            out.gradient.enabled = true;
+        }
+        if (g["end"].IsString()) {
+            out.gradient.end = LayoutParser::ColorFromString(g["end"].stringValue);
+            out.gradient.enabled = true;
+        }
+        if (g["angle"].IsNumber()) {
+            out.gradient.angleDegrees = static_cast<float>(g["angle"].numberValue);
+            out.gradient.enabled = true;
+        }
+        touched = touched || out.gradient.enabled;
+    }
+    if (value["shadow"].IsObject()) {
+        const JsonValue& s = value["shadow"];
+        out.shadow.enabled = true;
+        if (s["offsetX"].IsNumber()) {
+            out.shadow.offsetX = static_cast<float>(s["offsetX"].numberValue);
+        }
+        if (s["offsetY"].IsNumber()) {
+            out.shadow.offsetY = static_cast<float>(s["offsetY"].numberValue);
+        }
+        if (s["blur"].IsNumber()) {
+            out.shadow.blur = static_cast<float>(s["blur"].numberValue);
+        }
+        if (s["color"].IsString()) {
+            out.shadow.color = LayoutParser::ColorFromString(s["color"].stringValue);
+        }
+        touched = true;
+    }
     return touched;
+}
+
+void ApplyPanelVisualEffectsFromJson(Panel& panel, const JsonValue& props) {
+    if (props["gradientStart"].IsString()) {
+        panel.gradient.start = LayoutParser::ColorFromString(props["gradientStart"].stringValue);
+        panel.gradient.enabled = true;
+    }
+    if (props["gradientEnd"].IsString()) {
+        panel.gradient.end = LayoutParser::ColorFromString(props["gradientEnd"].stringValue);
+        panel.gradient.enabled = true;
+    }
+    if (props["gradientAngle"].IsNumber()) {
+        panel.gradient.angleDegrees = static_cast<float>(props["gradientAngle"].numberValue);
+        panel.gradient.enabled = true;
+    }
+    if (props["gradient"].IsObject()) {
+        const JsonValue& g = props["gradient"];
+        if (g["start"].IsString()) {
+            panel.gradient.start = LayoutParser::ColorFromString(g["start"].stringValue);
+            panel.gradient.enabled = true;
+        }
+        if (g["end"].IsString()) {
+            panel.gradient.end = LayoutParser::ColorFromString(g["end"].stringValue);
+            panel.gradient.enabled = true;
+        }
+        if (g["angle"].IsNumber()) {
+            panel.gradient.angleDegrees = static_cast<float>(g["angle"].numberValue);
+            panel.gradient.enabled = true;
+        }
+    }
+    if (props["shadowBlur"].IsNumber()) {
+        panel.shadow.blur = static_cast<float>(props["shadowBlur"].numberValue);
+        panel.shadow.enabled = true;
+    }
+    if (props["shadowOffsetY"].IsNumber()) {
+        panel.shadow.offsetY = static_cast<float>(props["shadowOffsetY"].numberValue);
+        panel.shadow.enabled = true;
+    }
+    if (props["shadowOffsetX"].IsNumber()) {
+        panel.shadow.offsetX = static_cast<float>(props["shadowOffsetX"].numberValue);
+        panel.shadow.enabled = true;
+    }
+    if (props["shadowColor"].IsString()) {
+        panel.shadow.color = LayoutParser::ColorFromString(props["shadowColor"].stringValue);
+        panel.shadow.enabled = true;
+    }
+    if (props["shadow"].IsObject()) {
+        const JsonValue& s = props["shadow"];
+        panel.shadow.enabled = true;
+        if (s["blur"].IsNumber()) {
+            panel.shadow.blur = static_cast<float>(s["blur"].numberValue);
+        }
+        if (s["offsetX"].IsNumber()) {
+            panel.shadow.offsetX = static_cast<float>(s["offsetX"].numberValue);
+        }
+        if (s["offsetY"].IsNumber()) {
+            panel.shadow.offsetY = static_cast<float>(s["offsetY"].numberValue);
+        }
+        if (s["color"].IsString()) {
+            panel.shadow.color = LayoutParser::ColorFromString(s["color"].stringValue);
+        }
+    }
+}
+
+void ApplyPanelVisualEffectsFromXml(Panel& panel, const XmlNode& node) {
+    if (auto it = node.attributes.find("gradientStart"); it != node.attributes.end()) {
+        panel.gradient.start = LayoutParser::ColorFromString(it->second);
+        panel.gradient.enabled = true;
+    }
+    if (auto it = node.attributes.find("gradientEnd"); it != node.attributes.end()) {
+        panel.gradient.end = LayoutParser::ColorFromString(it->second);
+        panel.gradient.enabled = true;
+    }
+    if (auto it = node.attributes.find("gradientAngle"); it != node.attributes.end()) {
+        panel.gradient.angleDegrees = std::stof(it->second);
+        panel.gradient.enabled = true;
+    }
+    if (auto it = node.attributes.find("shadowBlur"); it != node.attributes.end()) {
+        panel.shadow.blur = std::stof(it->second);
+        panel.shadow.enabled = true;
+    }
+    if (auto it = node.attributes.find("shadowOffsetY"); it != node.attributes.end()) {
+        panel.shadow.offsetY = std::stof(it->second);
+        panel.shadow.enabled = true;
+    }
+    if (auto it = node.attributes.find("shadowOffsetX"); it != node.attributes.end()) {
+        panel.shadow.offsetX = std::stof(it->second);
+        panel.shadow.enabled = true;
+    }
+    if (auto it = node.attributes.find("shadowColor"); it != node.attributes.end()) {
+        panel.shadow.color = LayoutParser::ColorFromString(it->second);
+        panel.shadow.enabled = true;
+    }
 }
 
 StyleSpec ParseStyleSpec(const JsonValue& value) {
@@ -995,7 +1130,7 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
         }
         if (g_activeStyleCatalog) {
             if (auto s = g_activeStyleCatalog->Resolve(name)) {
-                element.SetStyle(*s);
+                element.SetStyleFromCatalog(name, *s);
             } else {
                 OutputDebugStringA(("[Style] Unknown $style." + name + "\n").c_str());
             }
@@ -1004,7 +1139,7 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
         const std::string name = props["styleRef"].stringValue;
         if (g_activeStyleCatalog) {
             if (auto s = g_activeStyleCatalog->Resolve(name)) {
-                element.SetStyle(*s);
+                element.SetStyleFromCatalog(name, *s);
             }
         }
     }
@@ -1071,13 +1206,13 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
         }
         if (g_activeStyleCatalog) {
             if (auto s = g_activeStyleCatalog->Resolve(name)) {
-                element.SetStyle(*s);
+                element.SetStyleFromCatalog(name, *s);
             }
         }
     } else if (auto itRef = node.attributes.find("styleRef"); itRef != node.attributes.end()) {
         if (g_activeStyleCatalog) {
             if (auto s = g_activeStyleCatalog->Resolve(itRef->second)) {
-                element.SetStyle(*s);
+                element.SetStyleFromCatalog(itRef->second, *s);
             }
         }
     }
@@ -1252,6 +1387,12 @@ const StyleCatalog* LayoutParser::SetActiveStyleCatalog(const StyleCatalog* cata
     return previous;
 }
 
+const Theme* LayoutParser::SetActiveTheme(const Theme* theme) {
+    const Theme* previous = g_activeTheme;
+    g_activeTheme = theme;
+    return previous;
+}
+
 float LayoutParser::ParseNumberValue(const JsonValue& value,
                                      Theme::NumberCategory category,
                                      float fallback) {
@@ -1351,7 +1492,12 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
         if (node["props"].IsObject()) {
             const JsonValue& props = node["props"];
             if (props["background"].IsString()) {
-                panel->background = LayoutParser::ColorFromString(props["background"].stringValue);
+                const std::string& bg = props["background"].stringValue;
+                std::string tokenKey;
+                if (TryColorTokenKey(bg, tokenKey)) {
+                    panel->SetBackgroundToken(tokenKey);
+                }
+                panel->background = LayoutParser::ColorFromString(bg);
             }
             TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, panel->cornerRadius);
             TryAssignNumber(props["spacing"], Theme::NumberCategory::Spacing, panel->spacing);
@@ -1374,6 +1520,7 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             } else if (props["justify-content"].IsString()) {
                 panel->justifyContent = ParseJustifyContent(props["justify-content"].stringValue);
             }
+            ApplyPanelVisualEffectsFromJson(*panel, props);
             ApplyCommonJsonProps(*panel, props);
         }
         element = std::move(panel);
@@ -1413,7 +1560,18 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
             TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, label->m_fontSize);
             if (props["color"].IsString()) {
-                label->m_color = LayoutParser::ColorFromString(props["color"].stringValue);
+                const std::string& c = props["color"].stringValue;
+                std::string tokenKey;
+                if (TryColorTokenKey(c, tokenKey)) {
+                    label->SetColorToken(tokenKey);
+                }
+                label->m_color = LayoutParser::ColorFromString(c);
+            }
+            if (props["ellipsis"].IsBool()) {
+                label->SetEllipsis(props["ellipsis"].boolValue);
+            } else if (props["ellipsis"].IsString()) {
+                const std::string v = ToLowerAscii(TrimString(props["ellipsis"].stringValue));
+                label->SetEllipsis(v == "true" || v == "1" || v == "yes");
             }
             ApplyCommonJsonProps(*label, props);
         }
@@ -1842,6 +2000,30 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*listBox, props);
         }
         element = std::move(listBox);
+    } else if (type == "VirtualListBox" || type == "VirtualList") {
+        auto list = std::make_unique<VirtualListBox>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["itemCount"].IsNumber()) {
+                list->SetItemCount(static_cast<int>(props["itemCount"].numberValue));
+            } else if (props["count"].IsNumber()) {
+                list->SetItemCount(static_cast<int>(props["count"].numberValue));
+            }
+            if (props["itemPrefix"].IsString()) {
+                list->SetItemPrefix(LayoutParser::Utf8ToUtf16(props["itemPrefix"].stringValue));
+            } else if (props["prefix"].IsString()) {
+                list->SetItemPrefix(LayoutParser::Utf8ToUtf16(props["prefix"].stringValue));
+            }
+            if (props["selectedIndex"].IsNumber()) {
+                list->SetSelectedIndex(static_cast<int>(props["selectedIndex"].numberValue));
+            }
+            if (props["itemHeight"].IsNumber()) {
+                list->itemHeight = static_cast<float>(props["itemHeight"].numberValue);
+            }
+            TryAssignNumber(props["fontSize"], Theme::NumberCategory::FontSize, list->fontSize);
+            ApplyCommonJsonProps(*list, props);
+        }
+        element = std::move(list);
     } else if (type == "ComboBox") {
         auto comboBox = std::make_unique<ComboBox>();
         if (node["props"].IsObject()) {
@@ -2489,9 +2671,16 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
             if (node["props"]["source"].IsString()) {
                 const std::string sourcePath = node["props"]["source"].stringValue;
+                icon->SetSourcePath(sourcePath);
                 if (provider.Exists(sourcePath)) {
                     icon->SetSvgData(provider.LoadBytes(sourcePath));
                 }
+            }
+            if (node["props"]["tint"].IsString()) {
+                icon->SetTint(LayoutParser::ColorFromString(node["props"]["tint"].stringValue));
+            } else if (node["props"]["color"].IsString()) {
+                // Alias: color on SvgIcon means tint (R8).
+                icon->SetTint(LayoutParser::ColorFromString(node["props"]["color"].stringValue));
             }
             ApplyCommonJsonProps(*icon, node["props"]);
         }
@@ -2563,6 +2752,10 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
     if (node.name == "Panel") {
         auto panel = std::make_unique<Panel>();
         if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            std::string tokenKey;
+            if (TryColorTokenKey(it->second, tokenKey)) {
+                panel->SetBackgroundToken(tokenKey);
+            }
             panel->background = LayoutParser::ColorFromString(it->second);
         }
         if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
@@ -2593,6 +2786,7 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         } else if (auto it2 = node.attributes.find("justify-content"); it2 != node.attributes.end()) {
             panel->justifyContent = ParseJustifyContent(it2->second);
         }
+        ApplyPanelVisualEffectsFromXml(*panel, node);
         ApplyCommonXmlAttributes(*panel, node);
         element = std::move(panel);
     } else if (node.name == "ScrollViewer") {
@@ -2633,7 +2827,15 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             label->m_fontSize = std::stof(it->second);
         }
         if (auto it = node.attributes.find("color"); it != node.attributes.end()) {
+            std::string tokenKey;
+            if (TryColorTokenKey(it->second, tokenKey)) {
+                label->SetColorToken(tokenKey);
+            }
             label->m_color = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("ellipsis"); it != node.attributes.end()) {
+            const std::string v = ToLowerAscii(TrimString(it->second));
+            label->SetEllipsis(v == "true" || v == "1" || v == "yes");
         }
         ApplyCommonXmlAttributes(*label, node);
         element = std::move(label);
@@ -3016,6 +3218,29 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*listBox, node);
         element = std::move(listBox);
+    } else if (node.name == "VirtualListBox" || node.name == "VirtualList") {
+        auto list = std::make_unique<VirtualListBox>();
+        if (auto it = node.attributes.find("itemCount"); it != node.attributes.end()) {
+            list->SetItemCount(std::stoi(it->second));
+        } else if (auto it = node.attributes.find("count"); it != node.attributes.end()) {
+            list->SetItemCount(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("itemPrefix"); it != node.attributes.end()) {
+            list->SetItemPrefix(LayoutParser::Utf8ToUtf16(it->second));
+        } else if (auto it = node.attributes.find("prefix"); it != node.attributes.end()) {
+            list->SetItemPrefix(LayoutParser::Utf8ToUtf16(it->second));
+        }
+        if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
+            list->SetSelectedIndex(std::stoi(it->second));
+        }
+        if (auto it = node.attributes.find("itemHeight"); it != node.attributes.end()) {
+            list->itemHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            list->fontSize = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*list, node);
+        element = std::move(list);
     } else if (node.name == "ComboBox") {
         auto comboBox = std::make_unique<ComboBox>();
         if (auto it = node.attributes.find("items"); it != node.attributes.end()) {
@@ -3577,6 +3802,35 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*image, node);
         element = std::move(image);
+    } else if (node.name == "SvgIcon") {
+        std::wstring source = L"";
+        if (auto it = node.attributes.find("source"); it != node.attributes.end()) {
+            source = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        auto icon = std::make_unique<SvgIcon>(std::move(source));
+        if (auto it = node.attributes.find("stretch"); it != node.attributes.end()) {
+            const std::string stretchMode = it->second;
+            if (stretchMode == "fill") {
+                icon->stretch = SvgIcon::StretchMode::Fill;
+            } else if (stretchMode == "uniformToFill") {
+                icon->stretch = SvgIcon::StretchMode::UniformToFill;
+            } else {
+                icon->stretch = SvgIcon::StretchMode::Uniform;
+            }
+        }
+        if (auto it = node.attributes.find("source"); it != node.attributes.end()) {
+            icon->SetSourcePath(it->second);
+            if (provider.Exists(it->second)) {
+                icon->SetSvgData(provider.LoadBytes(it->second));
+            }
+        }
+        if (auto it = node.attributes.find("tint"); it != node.attributes.end()) {
+            icon->SetTint(LayoutParser::ColorFromString(it->second));
+        } else if (auto it = node.attributes.find("color"); it != node.attributes.end()) {
+            icon->SetTint(LayoutParser::ColorFromString(it->second));
+        }
+        ApplyCommonXmlAttributes(*icon, node);
+        element = std::move(icon);
     } else if (node.name == "Spacer") {
         auto spacer = std::make_unique<Spacer>();
         ApplyCommonXmlAttributes(*spacer, node);

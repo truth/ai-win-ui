@@ -5,6 +5,8 @@
 #include "layout_engine.h"
 #include "renderer.h"
 #include "style.h"
+#include "style_catalog.h"
+#include "theme.h"
 #include "ui_context.h"
 #include "ui_text_metrics.h"
 
@@ -118,6 +120,23 @@ public:
     void SetStyle(ComponentStyle style) {
         m_style = std::move(style);
         m_styleFromLayout = true;
+        m_styleCatalogName.clear();
+    }
+    // Catalog-named style so S4 can re-resolve after theme reload.
+    void SetStyleFromCatalog(std::string catalogName, ComponentStyle style) {
+        m_styleCatalogName = std::move(catalogName);
+        m_style = std::move(style);
+        m_styleFromLayout = true;
+    }
+    const std::string& StyleCatalogName() const { return m_styleCatalogName; }
+    void RebindCatalogStyle() {
+        if (m_styleCatalogName.empty() || !m_context || !m_context->styleCatalog) {
+            return;
+        }
+        if (auto s = m_context->styleCatalog->Resolve(m_styleCatalogName)) {
+            m_style = *s;
+            m_styleFromLayout = true;
+        }
     }
     const ComponentStyle& Style() const { return m_style; }
     ComponentStyle& MutableStyle() { return m_style; }
@@ -446,6 +465,7 @@ protected:
     WindowChromeRequest m_windowChromeRequest = WindowChromeRequest::Unspecified;
     ComponentStyle m_style{};
     bool m_styleFromLayout = false;
+    std::string m_styleCatalogName;
     UIContext* m_context = nullptr;
 };
 
@@ -480,10 +500,24 @@ public:
     float cornerRadius = 0.0f;
     Color background = ColorFromHex(0x000000, 0.0f);
     Color borderColor = ColorFromHex(0x6A6A6A, 0.0f);
+    // Wave2 R7: optional panel-level gradient / soft shadow (also via style.decoration).
+    LinearGradientSpec gradient{};
+    SoftShadowSpec shadow{};
     Direction direction = Direction::Column;
     Wrap wrap = Wrap::NoWrap;
     AlignItems alignItems = AlignItems::Stretch;
     JustifyContent justifyContent = JustifyContent::Start;
+
+    // S4: when background came from $color.key, rebind on theme switch.
+    void SetBackgroundToken(std::string key) { m_backgroundToken = std::move(key); }
+    void ApplyThemeDefaults() override {
+        if (m_backgroundToken.empty() || !m_context || !m_context->theme) {
+            return;
+        }
+        if (auto c = m_context->theme->ResolveColor(m_backgroundToken)) {
+            background = *c;
+        }
+    }
 
     void Arrange(const Rect& finalRect) override {
         UIElement::Arrange(finalRect);
@@ -716,6 +750,8 @@ public:
         Color drawBorderColor = borderColor;
         float drawCornerRadius = cornerRadius;
         Thickness drawBorder = Border();
+        LinearGradientSpec drawGradient = gradient;
+        SoftShadowSpec drawShadow = shadow;
 
         // Catalog / layout styles: style="$style.surfaceCard" stores decoration in
         // m_style; fold it into paint when the panel was given a layout style.
@@ -735,6 +771,12 @@ public:
                 if (!shell.decoration->radius.IsZero()) {
                     drawCornerRadius = shell.decoration->radius.MaxRadius();
                 }
+                if (shell.decoration->gradient.enabled) {
+                    drawGradient = shell.decoration->gradient;
+                }
+                if (shell.decoration->shadow.enabled) {
+                    drawShadow = shell.decoration->shadow;
+                }
             }
         }
 
@@ -743,12 +785,23 @@ public:
             scaledBorder.left > 0.0f || scaledBorder.top > 0.0f ||
             scaledBorder.right > 0.0f || scaledBorder.bottom > 0.0f;
         const float scaledRadius = ScaleValue(drawCornerRadius);
-        if (drawBackground.a > 0.0f || hasBorder) {
+        const bool hasFill = drawBackground.a > 0.0f || drawGradient.enabled || drawShadow.enabled;
+        if (hasFill || hasBorder) {
             BoxDecoration deco;
             deco.background = drawBackground;
             deco.border.width = scaledBorder;
             deco.border.color = drawBorderColor;
             deco.radius = CornerRadius::Uniform(scaledRadius);
+            deco.gradient = drawGradient;
+            if (drawGradient.enabled) {
+                // Scale does not apply to colors; angle is unitless.
+            }
+            deco.shadow = drawShadow;
+            if (deco.shadow.enabled) {
+                deco.shadow.offsetX = ScaleValue(deco.shadow.offsetX);
+                deco.shadow.offsetY = ScaleValue(deco.shadow.offsetY);
+                deco.shadow.blur = ScaleValue(deco.shadow.blur);
+            }
             DrawBoxDecoration(renderer, m_bounds, deco);
         }
         // Do not clip children to the panel radius. Overlay controls (e.g. ComboBox
@@ -758,6 +811,8 @@ public:
             child->Render(renderer);
         }
     }
+
+    std::string m_backgroundToken;
 
 private:
     void MeasureRowFallback(float availableWidth, float availableHeight) {
@@ -1028,25 +1083,41 @@ public:
     void SetText(std::wstring text) { m_text = std::move(text); }
     const std::wstring& Text() const { return m_text; }
     float FontSize() const { return m_fontSize; }
+    void SetColorToken(std::string key) { m_colorToken = std::move(key); }
+    void SetEllipsis(bool enabled) { m_ellipsis = enabled; }
+    bool Ellipsis() const { return m_ellipsis; }
+
+    void ApplyThemeDefaults() override {
+        if (m_colorToken.empty() || !m_context || !m_context->theme) {
+            return;
+        }
+        if (auto c = m_context->theme->ResolveColor(m_colorToken)) {
+            m_color = *c;
+        }
+    }
 
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
-        const Size measured = MeasureTextValue(m_text, m_fontSize, availableWidth > 0.0f ? availableWidth : 4096.0f);
+        const TextWrapMode wrap = m_ellipsis ? TextWrapMode::NoWrap : TextWrapMode::Wrap;
+        const Size measured = MeasureTextValue(
+            m_text, m_fontSize, availableWidth > 0.0f ? availableWidth : 4096.0f, wrap);
         return std::min(availableWidth, measured.width + 4.0f);
     }
 
     float MeasurePreferredHeight(float width) const override {
-        const Size measured = MeasureTextValue(m_text, m_fontSize, width > 0.0f ? width : 4096.0f);
+        const TextWrapMode wrap = m_ellipsis ? TextWrapMode::NoWrap : TextWrapMode::Wrap;
+        const Size measured = MeasureTextValue(
+            m_text, m_fontSize, width > 0.0f ? width : 4096.0f, wrap);
         return measured.height + 8.0f;
     }
 
 public:
     void Render(IRenderer& renderer) override {
-        const TextRenderOptions textOptions{
-            TextWrapMode::Wrap,
-            TextHorizontalAlign::Start,
-            TextVerticalAlign::Start
-        };
+        TextRenderOptions textOptions{};
+        textOptions.wrap = m_ellipsis ? TextWrapMode::NoWrap : TextWrapMode::Wrap;
+        textOptions.horizontalAlign = TextHorizontalAlign::Start;
+        textOptions.verticalAlign = TextVerticalAlign::Start;
+        textOptions.ellipsis = m_ellipsis;
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
@@ -1062,6 +1133,8 @@ public:
 
 private:
     std::wstring m_text;
+    std::string m_colorToken;
+    bool m_ellipsis = false;
 };
 
 class StatCard : public UIElement {
@@ -1994,6 +2067,23 @@ public:
             }
         }
         return true;
+    }
+
+    // Nested-scroll: vertical when rows overflow; Shift+wheel pans columns (same as ListView).
+    bool OnMouseWheel(float delta, float x, float y, bool shiftHeld) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+        if (shiftHeld) {
+            return ScrollHorizontal(-delta * ScaleValue(48.0f));
+        }
+        if (m_viewOrder.empty()) {
+            return false;
+        }
+        const int before = m_scrollRow;
+        m_scrollRow -= static_cast<int>(std::lround(delta * 3.0f));
+        ClampScroll();
+        return m_scrollRow != before;
     }
 
     bool OnMouseUp(float x, float y) override {
@@ -2986,11 +3076,16 @@ public:
     explicit SvgIcon(std::wstring source) : m_source(std::move(source)) {}
 
     StretchMode stretch = StretchMode::Uniform;
+    // Wave2 R8: alpha > 0 enables SrcIn recolor (typical monochrome icon tint).
+    Color tint = Color{0.0f, 0.0f, 0.0f, 0.0f};
 
+    void SetSourcePath(std::string path) { m_sourcePath = std::move(path); }
     void SetSvgData(std::vector<uint8_t> svgData) {
         m_svgData = std::move(svgData);
         m_svg.reset();
     }
+    void SetTint(Color color) { tint = color; }
+    bool HasTint() const { return tint.a > 0.001f; }
 
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
@@ -3005,7 +3100,8 @@ protected:
 public:
     void Render(IRenderer& renderer) override {
         if (!m_svg && !m_svgData.empty()) {
-            m_svg = renderer.CreateSvgFromBytes(m_svgData.data(), m_svgData.size());
+            const char* cacheKey = m_sourcePath.empty() ? nullptr : m_sourcePath.c_str();
+            m_svg = renderer.CreateSvgFromBytes(m_svgData.data(), m_svgData.size(), cacheKey);
             if (m_svg) {
                 m_intrinsicSize = renderer.GetSvgSize(m_svg);
             }
@@ -3037,11 +3133,16 @@ public:
                                       m_bounds.left + offsetX + scaledWidth, m_bounds.bottom);
             }
         }
-        renderer.DrawSvg(m_svg, drawRect);
+        if (HasTint()) {
+            renderer.DrawSvg(m_svg, drawRect, true, tint);
+        } else {
+            renderer.DrawSvg(m_svg, drawRect);
+        }
     }
 
 private:
     std::wstring m_source;
+    std::string m_sourcePath;
     std::vector<uint8_t> m_svgData;
     SvgHandle m_svg = nullptr;
     Size m_intrinsicSize{24.0f, 24.0f};
@@ -6913,6 +7014,23 @@ public:
         return true;
     }
 
+    // Consume wheel when rows overflow; return false at edges so outer ScrollViewer can pan.
+    bool OnMouseWheel(float delta, float x, float y, bool /*shiftHeld*/) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+        if (m_items.empty()) {
+            return false;
+        }
+        const int before = m_scrollOffset;
+        const int visibleRows = VisibleRowCount();
+        m_scrollOffset = std::clamp(
+            m_scrollOffset - static_cast<int>(std::lround(delta * 3.0f)),
+            0,
+            std::max(0, static_cast<int>(m_items.size()) - visibleRows));
+        return m_scrollOffset != before;
+    }
+
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
         float preferred = ScaleValue(240.0f);
@@ -7151,6 +7269,372 @@ private:
     int m_hoveredIndex = -1;
     int m_scrollOffset = 0;
 };
+
+// Wave2 C5: virtualized list — O(visible) paint for large itemCount (1k+).
+// Text via binder or "prefix + index"; no full string vector allocation required.
+class VirtualListBox : public UIElement {
+public:
+    using ItemTextBinder = std::function<std::wstring(int index)>;
+
+    VirtualListBox() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-2", ColorFromHex(0x14202D));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x34485C));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xE7EFFA));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) {
+            return;
+        }
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        SyncLegacyColorsFromStyle();
+    }
+
+    void SetItemCount(int count) {
+        m_itemCount = std::max(0, count);
+        m_selectedIndex = std::min(m_selectedIndex, m_itemCount - 1);
+        if (m_itemCount == 0) {
+            m_selectedIndex = -1;
+        }
+        ClampScroll();
+    }
+    int ItemCount() const { return m_itemCount; }
+
+    void SetItemPrefix(std::wstring prefix) { m_itemPrefix = std::move(prefix); }
+    void SetItemBinder(ItemTextBinder binder) { m_binder = std::move(binder); }
+
+    bool IsFocusable() const override { return true; }
+    bool IsLayoutLeaf() const override { return true; }
+
+    bool OnFocus() override {
+        if (!m_hasFocus) {
+            m_hasFocus = true;
+            return true;
+        }
+        return false;
+    }
+    bool OnBlur() override {
+        if (m_hasFocus) {
+            m_hasFocus = false;
+            m_hoveredIndex = -1;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
+        if (m_itemCount <= 0) {
+            return false;
+        }
+        switch (keyCode) {
+            case VK_UP: return MoveSelectionBy(-1);
+            case VK_DOWN: return MoveSelectionBy(1);
+            case VK_HOME: return SetSelectedIndex(0);
+            case VK_END: return SetSelectedIndex(m_itemCount - 1);
+            case VK_PRIOR: return MoveSelectionBy(-VisibleRowCount());
+            case VK_NEXT: return MoveSelectionBy(VisibleRowCount());
+            default: break;
+        }
+        return false;
+    }
+
+    bool OnMouseDown(float x, float y) override {
+        if (!HitTest(x, y)) {
+            return false;
+        }
+        const int index = IndexFromPoint(y);
+        if (index >= 0) {
+            return SetSelectedIndex(index);
+        }
+        return true;
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        if (!HitTest(x, y)) {
+            if (m_hoveredIndex == -1) {
+                return false;
+            }
+            m_hoveredIndex = -1;
+            return true;
+        }
+        const int next = IndexFromPoint(y);
+        if (next == m_hoveredIndex) {
+            return false;
+        }
+        m_hoveredIndex = next;
+        return true;
+    }
+
+    bool OnMouseLeave() override {
+        if (m_hoveredIndex == -1) {
+            return false;
+        }
+        m_hoveredIndex = -1;
+        return true;
+    }
+
+    bool OnMouseWheel(float delta, float x, float y, bool /*shiftHeld*/) override {
+        if (!HitTest(x, y) || m_itemCount <= 0) {
+            return false;
+        }
+        const int before = m_scrollOffset;
+        m_scrollOffset -= static_cast<int>(std::lround(delta * 3.0f));
+        ClampScroll();
+        return m_scrollOffset != before;
+    }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        return std::min(availableWidth, ScaleValue(320.0f));
+    }
+    float MeasurePreferredHeight(float width) const override {
+        (void)width;
+        if (HasFixedHeight()) {
+            return ScaleValue(m_fixedHeight);
+        }
+        return ScaleValue(8.0f) + ScaleValue(itemHeight) * 12.0f + ScaleValue(8.0f);
+    }
+
+public:
+    void Render(IRenderer& renderer) override {
+        const StyleSpec shell = m_style.Resolve(GetCurrentState());
+        BoxDecoration deco = shell.decoration.value_or(BoxDecoration{});
+        if (!shell.decoration.has_value()) {
+            deco.background = background;
+            deco.border.width = Thickness{1, 1, 1, 1};
+            deco.border.color = borderColor;
+            deco.radius = CornerRadius::Uniform(cornerRadius);
+        }
+        deco.radius = CornerRadius::Uniform(ScaleValue(deco.radius.IsZero() ? cornerRadius : deco.radius.MaxRadius()));
+        deco.border.width = Thickness{
+            ScaleValue(deco.border.width.left), ScaleValue(deco.border.width.top),
+            ScaleValue(deco.border.width.right), ScaleValue(deco.border.width.bottom)};
+        DrawBoxDecoration(renderer, m_bounds, deco);
+
+        const Color shellFg = shell.foreground.value_or(textColor);
+        const float shellFs = shell.fontSize.value_or(fontSize);
+        if (m_itemCount <= 0) {
+            const std::wstring message = L"(empty virtual list)";
+            const TextRenderOptions textOptions{TextWrapMode::NoWrap, TextHorizontalAlign::Center, TextVerticalAlign::Center};
+            renderer.DrawTextW(message.c_str(), static_cast<UINT32>(message.size()), m_bounds, mutedTextColor, ScaleValue(shellFs), textOptions);
+            return;
+        }
+
+        const float inset = ScaleValue(4.0f);
+        const float rowHeight = std::max(1.0f, ScaleValue(itemHeight));
+        const Rect contentRect = Rect::Make(
+            m_bounds.left + inset, m_bounds.top + inset,
+            m_bounds.right - inset, m_bounds.bottom - inset);
+        const int visibleRows = std::max(1, static_cast<int>(std::floor(contentRect.Height() / rowHeight)));
+        ClampScroll();
+        const int endIndex = std::min(m_itemCount, m_scrollOffset + visibleRows + 1);
+
+        renderer.PushRoundedClip(contentRect, 0.0f);
+        for (int i = m_scrollOffset; i < endIndex; ++i) {
+            const float rowTop = contentRect.top + static_cast<float>(i - m_scrollOffset) * rowHeight;
+            const float rowBottom = std::min(contentRect.bottom, rowTop + rowHeight);
+            const Rect rowRect = Rect::Make(contentRect.left, rowTop, contentRect.right, rowBottom);
+
+            Color rowBg = Color{0, 0, 0, 0};
+            Color rowFg = shellFg;
+            if (i == m_selectedIndex) {
+                rowBg = selectedBackground;
+                rowFg = ColorFromHex(0xFFFFFF);
+            } else if (i == m_hoveredIndex) {
+                rowBg = hoverBackground;
+            }
+            if (rowBg.a > 0.001f) {
+                renderer.FillRoundedRect(rowRect, rowBg, ScaleValue(4.0f));
+            }
+
+            const std::wstring text = ItemTextAt(i);
+            const Rect textRect = Rect::Make(
+                rowRect.left + ScaleValue(8.0f), rowRect.top,
+                rowRect.right - ScaleValue(8.0f), rowRect.bottom);
+            const TextRenderOptions textOptions{TextWrapMode::NoWrap, TextHorizontalAlign::Start, TextVerticalAlign::Center};
+            renderer.DrawTextW(text.c_str(), static_cast<UINT32>(text.size()), textRect, rowFg, ScaleValue(shellFs), textOptions);
+        }
+        renderer.PopLayer();
+
+        // Scroll thumb (approximate).
+        if (m_itemCount > visibleRows) {
+            const float barWidth = ScaleValue(4.0f);
+            const float barRight = m_bounds.right - ScaleValue(3.0f);
+            const float barLeft = barRight - barWidth;
+            const float ratio = static_cast<float>(visibleRows) / static_cast<float>(m_itemCount);
+            const float thumbHeight = std::max(ScaleValue(14.0f), contentRect.Height() * ratio);
+            const float maxOffset = static_cast<float>(std::max(1, m_itemCount - visibleRows));
+            const float offsetRatio = static_cast<float>(m_scrollOffset) / maxOffset;
+            const float thumbTop = contentRect.top + (contentRect.Height() - thumbHeight) * offsetRatio;
+            renderer.FillRoundedRect(
+                Rect::Make(barLeft, thumbTop, barRight, thumbTop + thumbHeight),
+                scrollThumbColor,
+                ScaleValue(2.0f));
+        }
+    }
+
+    bool SetSelectedIndex(int index) {
+        if (m_itemCount <= 0) {
+            if (m_selectedIndex == -1) {
+                return false;
+            }
+            m_selectedIndex = -1;
+            return true;
+        }
+        const int clamped = std::clamp(index, 0, m_itemCount - 1);
+        if (clamped == m_selectedIndex) {
+            EnsureSelectionVisible();
+            return false;
+        }
+        m_selectedIndex = clamped;
+        EnsureSelectionVisible();
+        return true;
+    }
+    int SelectedIndex() const { return m_selectedIndex; }
+
+    Color background = ColorFromHex(0x14202D);
+    Color borderColor = ColorFromHex(0x34485C);
+    Color selectedBackground = ColorFromHex(0x2F4F77);
+    Color hoverBackground = ColorFromHex(0x1F3247);
+    Color scrollThumbColor = ColorFromHex(0x536A82);
+    Color textColor = ColorFromHex(0xE7EFFA);
+    Color mutedTextColor = ColorFromHex(0x95A7BA);
+    float cornerRadius = 8.0f;
+    float fontSize = 13.0f;
+    float itemHeight = 24.0f;
+
+private:
+    void SyncLegacyColorsFromStyle() {
+        if (m_style.base.decoration.has_value()) {
+            background = m_style.base.decoration->background;
+            borderColor = m_style.base.decoration->border.color;
+            if (!m_style.base.decoration->radius.IsZero()) {
+                cornerRadius = m_style.base.decoration->radius.MaxRadius();
+            }
+        }
+        if (m_style.base.foreground.has_value()) {
+            textColor = *m_style.base.foreground;
+        }
+        if (m_style.base.fontSize.has_value()) {
+            fontSize = *m_style.base.fontSize;
+        }
+    }
+
+    std::wstring ItemTextAt(int index) const {
+        if (m_binder) {
+            return m_binder(index);
+        }
+        return m_itemPrefix + std::to_wstring(index);
+    }
+
+    int VisibleRowCount() const {
+        const float innerHeight = std::max(1.0f, m_bounds.Height() - ScaleValue(8.0f));
+        const float rowHeight = std::max(1.0f, ScaleValue(itemHeight));
+        return std::max(1, static_cast<int>(std::floor(innerHeight / rowHeight)));
+    }
+
+    void ClampScroll() {
+        const int maxStart = std::max(0, m_itemCount - VisibleRowCount());
+        m_scrollOffset = std::clamp(m_scrollOffset, 0, maxStart);
+    }
+
+    int IndexFromPoint(float y) const {
+        if (m_itemCount <= 0) {
+            return -1;
+        }
+        const float inset = ScaleValue(4.0f);
+        const float rowHeight = std::max(1.0f, ScaleValue(itemHeight));
+        const float localY = y - (m_bounds.top + inset);
+        if (localY < 0.0f) {
+            return -1;
+        }
+        const int row = static_cast<int>(std::floor(localY / rowHeight));
+        if (row < 0 || row >= VisibleRowCount()) {
+            return -1;
+        }
+        const int index = m_scrollOffset + row;
+        return index < m_itemCount ? index : -1;
+    }
+
+    bool MoveSelectionBy(int delta) {
+        if (m_itemCount <= 0) {
+            return false;
+        }
+        if (m_selectedIndex < 0) {
+            return SetSelectedIndex(0);
+        }
+        return SetSelectedIndex(m_selectedIndex + delta);
+    }
+
+    void EnsureSelectionVisible() {
+        if (m_selectedIndex < 0 || m_itemCount <= 0) {
+            m_scrollOffset = 0;
+            return;
+        }
+        const int visibleRows = VisibleRowCount();
+        if (m_selectedIndex < m_scrollOffset) {
+            m_scrollOffset = m_selectedIndex;
+        } else if (m_selectedIndex >= m_scrollOffset + visibleRows) {
+            m_scrollOffset = m_selectedIndex - visibleRows + 1;
+        }
+        ClampScroll();
+    }
+
+    int m_itemCount = 0;
+    int m_selectedIndex = -1;
+    int m_hoveredIndex = -1;
+    int m_scrollOffset = 0;
+    std::wstring m_itemPrefix = L"Item ";
+    ItemTextBinder m_binder;
+};
+
+// Shared overlay flyout geometry (Wave2 C4): ComboBox + Popup use the same placement rules.
+namespace OverlayFlyout {
+inline bool PreferOpenAbove(float headerTop, float headerBottom, float listHeight, float viewportH, float margin) {
+    if (viewportH <= 1.0f) {
+        return false;
+    }
+    const float spaceBelow = std::max(0.0f, viewportH - headerBottom - margin);
+    const float spaceAbove = std::max(0.0f, headerTop - margin);
+    if (spaceBelow >= listHeight) {
+        return false;
+    }
+    return spaceAbove > spaceBelow;
+}
+
+inline Rect PlaceVertical(
+    const Rect& header,
+    float listHeight,
+    float viewportH,
+    float margin,
+    bool forceAbove) {
+    float height = listHeight;
+    const bool openUp = forceAbove || PreferOpenAbove(header.top, header.bottom, listHeight, viewportH, margin);
+    if (viewportH > 1.0f) {
+        const float spaceBelow = std::max(0.0f, viewportH - header.bottom - margin);
+        const float spaceAbove = std::max(0.0f, header.top - margin);
+        const float available = openUp ? spaceAbove : spaceBelow;
+        if (available > 0.0f) {
+            height = std::min(height, available);
+        }
+        height = std::max(height, std::min(1.0f, available > 0.0f ? available : height));
+    }
+    if (openUp) {
+        return Rect::Make(header.left, header.top - height, header.right, header.top);
+    }
+    return Rect::Make(header.left, header.bottom, header.right, header.bottom + height);
+}
+} // namespace OverlayFlyout
 
 class ComboBox : public UIElement {
 public:
@@ -7636,49 +8120,24 @@ private:
         return ScaleValue(itemHeight) * static_cast<float>(rows);
     }
 
-    // Open upward when there is not enough room below the header inside the window.
+    // Open upward when there is not enough room below the header (shared OverlayFlyout rules).
     bool ShouldOpenDropdownUpward(float listHeight) const {
         const Rect header = HeaderRect();
         const float viewportH = (m_context && m_context->viewportHeight > 1.0f)
             ? m_context->viewportHeight
             : 0.0f;
-        if (viewportH <= 1.0f) {
-            return false;
-        }
-        const float margin = ScaleValue(4.0f);
-        const float spaceBelow = std::max(0.0f, viewportH - header.bottom - margin);
-        const float spaceAbove = std::max(0.0f, header.top - margin);
-        if (spaceBelow >= listHeight) {
-            return false;
-        }
-        // Prefer the side with more room when neither fully fits.
-        return spaceAbove > spaceBelow;
+        return OverlayFlyout::PreferOpenAbove(
+            header.top, header.bottom, listHeight, viewportH, ScaleValue(4.0f));
     }
 
     Rect DropdownRect() const {
         const Rect header = HeaderRect();
-        float listHeight = IdealDropdownHeight();
+        const float listHeight = IdealDropdownHeight();
         const float viewportH = (m_context && m_context->viewportHeight > 1.0f)
             ? m_context->viewportHeight
             : 0.0f;
-        const float margin = ScaleValue(4.0f);
-        const bool openUp = ShouldOpenDropdownUpward(listHeight);
-
-        if (viewportH > 1.0f) {
-            const float spaceBelow = std::max(0.0f, viewportH - header.bottom - margin);
-            const float spaceAbove = std::max(0.0f, header.top - margin);
-            const float available = openUp ? spaceAbove : spaceBelow;
-            if (available > 0.0f) {
-                listHeight = std::min(listHeight, available);
-            }
-            // At least one row when possible.
-            listHeight = std::max(listHeight, std::min(ScaleValue(itemHeight), available > 0.0f ? available : ScaleValue(itemHeight)));
-        }
-
-        if (openUp) {
-            return Rect::Make(header.left, header.top - listHeight, header.right, header.top);
-        }
-        return Rect::Make(header.left, header.bottom, header.right, header.bottom + listHeight);
+        return OverlayFlyout::PlaceVertical(
+            header, listHeight, viewportH, ScaleValue(4.0f), /*forceAbove=*/false);
     }
 
     int DropdownIndexFromPoint(float y) const {
@@ -8029,27 +8488,25 @@ private:
     Rect PopupRect() const {
         const float w = ScaleValue(m_popupWidth);
         const float h = ScaleValue(m_popupHeight);
-        const float gap = ScaleValue(4.0f);
-        float left = m_bounds.left;
-        float top = (m_placement == Placement::Above)
-            ? (m_bounds.top - gap - h)
-            : (m_bounds.bottom + gap);
-
-        const float viewportW = (m_context && m_context->viewportWidth > 1.0f) ? m_context->viewportWidth : left + w;
-        const float viewportH = (m_context && m_context->viewportHeight > 1.0f) ? m_context->viewportHeight : top + h;
-        if (left + w > viewportW - 4.0f) {
-            left = std::max(4.0f, viewportW - w - 4.0f);
+        const float margin = ScaleValue(4.0f);
+        const float viewportW = (m_context && m_context->viewportWidth > 1.0f)
+            ? m_context->viewportWidth
+            : m_bounds.right + w;
+        const float viewportH = (m_context && m_context->viewportHeight > 1.0f)
+            ? m_context->viewportHeight
+            : 0.0f;
+        // C4: same vertical placement helper as ComboBox dropdown.
+        Rect placed = OverlayFlyout::PlaceVertical(
+            m_bounds,
+            h,
+            viewportH,
+            margin,
+            m_placement == Placement::Above);
+        float left = placed.left;
+        if (left + w > viewportW - margin) {
+            left = std::max(margin, viewportW - w - margin);
         }
-        if (top < 4.0f) {
-            top = m_bounds.bottom + gap; // flip down if clipped above
-        }
-        if (top + h > viewportH - 4.0f && m_placement == Placement::Below) {
-            const float above = m_bounds.top - gap - h;
-            if (above >= 4.0f) {
-                top = above;
-            }
-        }
-        return Rect::Make(left, top, left + w, top + h);
+        return Rect::Make(left, placed.top, left + w, placed.top + placed.Height());
     }
 
     void LayoutPopupChildren() {

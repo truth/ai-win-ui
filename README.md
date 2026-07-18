@@ -47,13 +47,45 @@
 ## 相关文档
 
 - `doc/README.md`：文档索引与现状快照
-- `doc/plan/2026-07-15-directui-productization-personas.md`：**产品化路线 · 分人物（R/L/C/S/H/Q）**
-- `doc/layout-spec.md`：**布局 XML/JSON 规则**（含 `$style`、ShapePanel、chrome）
+- `doc/plan/2026-07-15-directui-productization-personas.md`：**产品化路线 · 分人物（R/L/C/S/H/Q）**（Wave1 已收口，Wave2 进行中）
+- `doc/plan/2026-07-16-embed-api-v1.md`：H5 嵌入 API 设计草案
+- `doc/layout-spec.md`：**布局 XML/JSON 规则**（含 `$style`、`$color`、ellipsis、VirtualListBox、Popup）
 - `doc/style-catalog.md`：样式目录 `import` / `extend` / 引用语法
 - `doc/window-chrome.md`：自定义标题栏与 layered 异形窗
 - `doc/resource-packaging.md`：资源打包与加载方案
-- `doc/skia-integration.md`：Skia 集成分析
+- `doc/skia-integration.md`：Skia 集成 + R5 已知差 + R6 ellipsis
 - `doc/mvp-roadmap.md`：MVP 与迭代规划
+- `doc/mvp-acceptance.md`：手工验收（含 Wave2 检查表）
+
+## 可嵌入库（Wave3）
+
+```cpp
+#include <ai_win_ui/host.h>
+auto host = ai_win_ui::Host::Create(hInstance, info);
+return host->Run();
+```
+
+- 静态库：`ai_win_ui_lib`（`build/Debug/ai_win_ui_lib.lib`）
+- 头文件：`include/ai_win_ui/host.h`、`version.h`（当前 **0.3.1**）
+- 示例：`samples/embed_host` — shell + **parent 子窗嵌入** + 外部消息泵  
+  → `build/Debug/embed_host.exe`
+- 说明：`doc/plan/2026-07-16-embed-api-v1.md`、`CHANGELOG.md`
+
+## 本地 CI（Q8）+ GitHub 绿勾
+
+```powershell
+# 首次 / CI 机：解压并编译 Yoga
+.\scripts\setup_ci_deps.ps1
+
+# 构建 + gallery + smoke + measure golden
+.\scripts\run_ci_local.ps1
+
+# 已编译时
+.\scripts\run_ci_local.ps1 -SkipBuild
+```
+
+- 无本地 Skia 时自动退化为 **Direct2D only**（与 GitHub 一致）。
+- GitHub Actions：`.github/workflows/ci.yml`（`windows-latest`，D2D smoke+golden）。
 
 ## 开发日志
 

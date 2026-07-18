@@ -1,0 +1,65 @@
+<!--
+  Wave2 R7: linear gradient + soft shadow on Panel (both backends).
+  .\scripts\run_layout_demo.ps1 -Layout gradient-shadow
+-->
+<Panel name="root" direction="column" padding="28,28,28,28" spacing="20" background="#0B121A" alignItems="stretch">
+  <Label name="title" text="Gradient + Soft Shadow (R7)" fontSize="22" color="#F5F8FC" />
+  <Label name="hint" text="FillLinearGradient + FillSoftShadow on IRenderer. Panel attrs or style.decoration JSON." fontSize="13" color="#8FA3B8" />
+
+  <Panel name="row" direction="row" spacing="24" alignItems="start" background="transparent">
+    <Panel
+      name="cardA"
+      width="220"
+      height="140"
+      cornerRadius="16"
+      padding="16,16,16,16"
+      spacing="8"
+      gradientStart="#3A86FF"
+      gradientEnd="#7B6CFF"
+      gradientAngle="135"
+      shadowBlur="20"
+      shadowOffsetY="10"
+      shadowColor="#00000099"
+      alignItems="stretch">
+      <Label text="Gradient card" fontSize="16" color="#FFFFFF" />
+      <Label text="135° · soft drop shadow" fontSize="12" color="#E8EEF6" />
+    </Panel>
+
+    <Panel
+      name="cardB"
+      width="220"
+      height="140"
+      cornerRadius="16"
+      padding="16,16,16,16"
+      spacing="8"
+      gradientStart="#2A8C57"
+      gradientEnd="#E0B341"
+      gradientAngle="90"
+      shadowBlur="14"
+      shadowOffsetY="6"
+      shadowOffsetX="2"
+      shadowColor="#00000080"
+      alignItems="stretch">
+      <Label text="Vertical gradient" fontSize="16" color="#0B121A" />
+      <Label text="90° T→B + offset shadow" fontSize="12" color="#1A2430" />
+    </Panel>
+
+    <Panel
+      name="cardC"
+      width="220"
+      height="140"
+      cornerRadius="12"
+      padding="16,16,16,16"
+      spacing="8"
+      background="#1A2433"
+      shadowBlur="24"
+      shadowOffsetY="12"
+      shadowColor="#000000AA"
+      alignItems="stretch">
+      <Label text="Solid + deep shadow" fontSize="16" color="#F5F8FC" />
+      <Label text="No gradient; shadow only" fontSize="12" color="#A0B0C0" />
+    </Panel>
+  </Panel>
+
+  <Label name="footer" text="Alias: gradient-shadow · R7 · dual backend" fontSize="12" color="#5C7085" />
+</Panel>

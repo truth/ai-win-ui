@@ -262,6 +262,48 @@ FontBundle CreateFontBundle(float fontSize, bool bold, bool italic) {
 
 } // namespace
 
+void ApplyEllipsisToFirstLine(
+    SkiaTextLayoutLine& line,
+    SkFontMgr* fontMgr,
+    SkTypeface* typeface,
+    float fontSize,
+    float maxWidth) {
+    if (line.width <= maxWidth + 0.5f || maxWidth <= 1.0f) {
+        return;
+    }
+    const std::wstring ellipsis = L"\u2026";
+    const float ellipsisW = MeasureWideTextWidth(fontMgr, typeface, fontSize, ellipsis);
+    if (ellipsisW >= maxWidth) {
+        // Degenerate: only show ellipsis (or empty if even that does not fit).
+        line.text = ellipsisW <= maxWidth + 0.5f ? ellipsis : std::wstring{};
+        line.width = MeasureWideTextWidth(fontMgr, typeface, fontSize, line.text);
+        return;
+    }
+    const float budget = maxWidth - ellipsisW;
+    size_t lo = 0;
+    size_t hi = line.text.size();
+    size_t best = 0;
+    while (lo <= hi && hi <= line.text.size()) {
+        const size_t mid = lo + (hi - lo) / 2;
+        const std::wstring prefix = line.text.substr(0, mid);
+        const float w = MeasureWideTextWidth(fontMgr, typeface, fontSize, prefix);
+        if (w <= budget + 0.5f) {
+            best = mid;
+            if (mid == line.text.size()) {
+                break;
+            }
+            lo = mid + 1;
+        } else {
+            if (mid == 0) {
+                break;
+            }
+            hi = mid - 1;
+        }
+    }
+    line.text = line.text.substr(0, best) + ellipsis;
+    line.width = MeasureWideTextWidth(fontMgr, typeface, fontSize, line.text);
+}
+
 bool CreateSkiaTextLayout(const wchar_t* text,
                           uint32_t len,
                           float fontSize,
@@ -269,7 +311,8 @@ bool CreateSkiaTextLayout(const wchar_t* text,
                           TextWrapMode wrapMode,
                           SkiaTextLayout* layout,
                           bool bold,
-                          bool italic) {
+                          bool italic,
+                          bool ellipsis) {
     if (!layout) {
         return false;
     }
@@ -284,14 +327,25 @@ bool CreateSkiaTextLayout(const wchar_t* text,
         return false;
     }
 
+    const float widthBudget = std::max(1.0f, maxWidth);
     layout->lines = LayoutTextLines(
         text,
         len,
         fonts.fontMgr.get(),
         fonts.typeface.get(),
         fontSize,
-        std::max(1.0f, maxWidth),
+        widthBudget,
         wrapMode);
+
+    // R6: single-line ellipsis only (NoWrap).
+    if (ellipsis && wrapMode == TextWrapMode::NoWrap && !layout->lines.empty()) {
+        ApplyEllipsisToFirstLine(
+            layout->lines.front(),
+            fonts.fontMgr.get(),
+            fonts.typeface.get(),
+            fontSize,
+            widthBudget);
+    }
 
     SkFontMetrics metrics{};
     fonts.font.getMetrics(&metrics);
@@ -325,9 +379,10 @@ Size MeasureSkiaTextLayout(const wchar_t* text,
                            float maxWidth,
                            TextWrapMode wrapMode,
                            bool bold,
-                           bool italic) {
+                           bool italic,
+                           bool ellipsis) {
     SkiaTextLayout layout;
-    if (!CreateSkiaTextLayout(text, len, fontSize, maxWidth, wrapMode, &layout, bold, italic)) {
+    if (!CreateSkiaTextLayout(text, len, fontSize, maxWidth, wrapMode, &layout, bold, italic, ellipsis)) {
         return {};
     }
     return Size{layout.maxLineWidth, layout.blockHeight};
@@ -342,6 +397,7 @@ bool CreateSkiaTextLayout(const wchar_t*,
                           TextWrapMode,
                           SkiaTextLayout* layout,
                           bool,
+                          bool,
                           bool) {
     if (layout) {
         *layout = SkiaTextLayout{};
@@ -354,6 +410,7 @@ Size MeasureSkiaTextLayout(const wchar_t*,
                            float,
                            float,
                            TextWrapMode,
+                           bool,
                            bool,
                            bool) {
     return {};

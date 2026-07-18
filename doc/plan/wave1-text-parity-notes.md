@@ -75,3 +75,4 @@ $env:AI_WIN_UI_SIZE = "1000x700"
 | R2 多行 wrapH | **PASS** `text-wrap -HeightsOnly`（CJK soft-break + 脚本 -gt 修复） | 2026-07-15 |
 | R3 caret | **done**（最近边界 snap） | 2026-07-15 |
 | A6 TEXT_DUMP | **已实现** `AI_WIN_UI_TEXT_DUMP` | 2026-07-15 |
+| R5 已知差表 | **done** → `doc/skia-integration.md`「Known Skia ↔ Direct2D differences」 | 2026-07-16 |

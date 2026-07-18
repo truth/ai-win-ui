@@ -2,6 +2,38 @@
 
 ## 2026-07-16
 
+- **Wave3：可嵌入 + GitHub 绿勾**
+  - H5b：`UiHost` → `src/ui_host.cpp`；`main.cpp` 薄入口
+  - H6：`ai_win_ui_lib` 静态库 + `samples/embed_host`；公开 `include/ai_win_ui/host.h`
+  - H7：`version.h` + `CHANGELOG.md`（**0.3.1** child embed）
+  - **parent HWND**：`HostCreateInfo::parent` → `WS_CHILD`；`FitToParent` / `ResizeClient`；embed_host shell 示例
+  - CI：`setup_ci_deps.ps1`（Yoga）；GHA **D2D-only**（Skia 不在 git）；`run_ci_local` 无 Skia 时自动 d2d
+- **Wave2 续：Q8 本地 CI**
+  - `scripts/run_ci_local.ps1`：build + gallery coverage + headless smoke + measure golden
+  - `.github/workflows/ci.yml`：Windows Actions 调用同一脚本
+  - 文档：README / mvp-acceptance / doc/README
+- **Wave2 续：R8 Svg tint + cache**
+  - `CreateSvgFromBytes(..., cacheKey)` path/hash 缓存；`DrawSvg` 可选 tint（Skia SrcIn）
+  - `SvgIcon tint=` / `color=`；XML 解析补齐；demo `svg_tint_demo.xml`（alias `svg-tint`）
+- **Wave2 续：R7 渐变/阴影**
+  - `IRenderer::FillLinearGradient` / `FillSoftShadow`（D2D 真渐变 + 双后端 multi-pass 软阴影）
+  - `BoxDecoration.gradient` / `.shadow`；`DrawBoxDecoration` 先阴影后填充
+  - Panel 属性：`gradientStart/End/Angle`、`shadowBlur/OffsetX/OffsetY/Color`；style JSON 同字段
+  - Demo：`gradient_shadow_demo.xml`（alias `gradient-shadow`）+ gallery 卡
+- **Wave2 续：文档同步 + R6**
+  - **R6** `TextRenderOptions.ellipsis`；Skia 前缀+U+2026；D2D `SetTrimming`；`Label ellipsis="true"`；demo `text_ellipsis_cases.xml`
+  - 文档：`mvp-roadmap` / `mvp-execution-plan` / `doc/README` / 根 README / `layout-spec` / `skia-integration` / `mvp-acceptance` / `keyboard-matrix` / personas Wave2 进度
+- **Wave2 开跑（产品能力）**
+  - **C5** `VirtualListBox`：`itemCount` / `itemPrefix` / binder；demo `virtual_list_demo.xml`（1000 行）；gallery 卡 + alias `virtual-list`
+  - **C4** `OverlayFlyout` 共用几何；Combo + Popup 同路径；popup-theme 加 Combo 对照
+  - **S4** `$color.*` 运行时 rebind（Panel/Label token）；catalog 名 `SetStyleFromCatalog`；`applyTheme` 重载 StyleCatalog + `SetActiveTheme`；`buttons.json` 改 token
+  - **H5** 嵌入 API 设计草案：`doc/plan/2026-07-16-embed-api-v1.md`
+- **Wave1 收口（L1 Exit 勾选）**
+  - L2：`scroll_viewer_cases` A/B/C（嵌套 ListView/ListBox + 双轴）；`ListBox`/`DataTable` `OnMouseWheel`；layout-spec 滚轮消费矩阵
+  - L4：scroll-viewer / core-validation / yoga-measure 双后端 golden 对齐
+  - C3：IME composition font 跟 caret 高度；`mvp-acceptance` IME 表
+  - H4 / R5：退出稳定性步骤 + `skia-integration` 已知差表
+  - C4/S4 标为 Wave2 续（Popup 共用基类 / 硬编码色换肤）
 - Wave1 续 8：C4 `Popup` 控件 + demo；S4 `applyTheme:` + `themes/light.json`；gallery 卡 Popup+Theme
 - Wave1 续 7：H1 `App`→`UiHost` + `ui_host.h`/`OpenSecondaryUiHost`；C2 `DismissAllOverlays` + Esc；overlay 契约文档；Q4 gallery 验收表
 

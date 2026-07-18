@@ -29,6 +29,8 @@ and **JSON** describe the same tree; property names are largely shared.
 |------|------|
 | `Panel` | Main row/column composition, cards, shells |
 | `ScrollViewer` | Clipped viewport + scroll offset (prefer over window scroll for nested regions) |
+| `VirtualListBox` / `VirtualList` | Virtualized list (`itemCount` + prefix/binder); paints only visible rows (Wave2 C5) |
+| `Popup` | Trigger chip + overlay body (`popupWidth`/`popupHeight`, light-dismiss) |
 | `Grid` / `GridPanel` | Uniform multi-column grid via **Yoga flex-wrap** (`ILayoutEngine::MeasureGrid` / `ArrangeGrid`); equal column widths, fixed `rowHeight`, `cellSpacing` as row+column gap |
 | `ShapePanel` / `Shape` | Parametric filled polygon (heart / petal / oval / star) |
 
@@ -36,7 +38,7 @@ and **JSON** describe the same tree; property names are largely shared.
 
 | Type | Role |
 |------|------|
-| `Label` | Short text / headings |
+| `Label` | Short text / headings; `ellipsis="true"` → single-line + U+2026 (Wave2 R6) |
 | `Button` | Actions; caption variants for custom chrome |
 | `TextInput` | Single-line edit |
 | `Spacer` | Elastic gap |
@@ -46,7 +48,7 @@ and **JSON** describe the same tree; property names are largely shared.
 | Type | Role |
 |------|------|
 | `Image` | Raster via WIC / Skia |
-| `SvgIcon` | Vector via Skia `SkSVGDOM` (D2D shows placeholder) |
+| `SvgIcon` | Vector via Skia `SkSVGDOM` (D2D placeholder); `tint` + path cache (Wave2 R8) |
 
 ### Core / nav / advanced (layout-parse supported)
 
@@ -149,7 +151,7 @@ Layout properties:
 
 ### `ScrollViewer`
 
-Nested scroll region (P0). Children are measured with unbounded height when
+Nested scroll region (P0 / Wave1 L2). Children are measured with unbounded height when
 `scrollY` is true, then clipped to the viewer bounds.
 
 | Prop | Default | Notes |
@@ -162,6 +164,20 @@ Nested scroll region (P0). Children are measured with unbounded height when
 | `height` / `flexGrow` | — | Give the viewport a finite size |
 
 Demo: `resource/layouts/scroll_viewer_cases.xml` (alias `scroll-viewer`).
+
+#### Nested wheel consumption matrix (L2)
+
+Dispatch order: hit-test deepest control first; return `true` stops the chain
+(outer `ScrollViewer` / legacy host scroll does not move).
+
+| Pointer over | Wheel | Shift+wheel | When at scroll edge |
+|--------------|-------|-------------|---------------------|
+| `ScrollViewer` content (no nested scroller) | scroll Y if `scrollY` | scroll X if `scrollX` (or if only X) | return false → parent may scroll |
+| Nested `ScrollViewer` | inner first | inner first | bubbles to outer |
+| `ListView` / `ListBox` / `TreeView` / `DataTable` | list rows | ListView/DataTable: horizontal pan | bubbles when offset unchanged |
+| Host client outside any scroller | legacy window `m_scrollOffset` (unless `AI_WIN_UI_DISABLE_WINDOW_SCROLL=1`) | — | clamp |
+
+Prefer `ScrollViewer` in new layouts; mark host scroll as legacy (L1).
 
 Measure dump after layout:
 
@@ -197,8 +213,39 @@ Uses `IRenderer::FillPolygon` (Direct2D + Skia).
 | `strokeWidth` | Outline width (0 = none) |
 | `segments` | Tessellation 12–256 (default ~96) |
 | `text` | Optional centered label |
-| `textColor` / `color` | Label color |
+| `textColor` / `color` | Label color (`$color.*` rebinds on applyTheme) |
 | `fontSize` | Label size |
+| `ellipsis` | `true`/`1`/`yes` → `NoWrap` + trailing ellipsis when width overflows (R6) |
+
+### Panel visual effects (Wave2 · R7)
+
+| Attribute | Notes |
+|-----------|--------|
+| `gradientStart` / `gradientEnd` | Enables linear gradient fill (two stops) |
+| `gradientAngle` | Degrees; `0` = L→R, `90` = T→B (CSS-like) |
+| `shadowBlur` | Soft multi-pass shadow blur radius (DIP) |
+| `shadowOffsetX` / `shadowOffsetY` | Shadow offset (DIP) |
+| `shadowColor` | Shadow color (`#RRGGBB` or `#RRGGBBAA`) |
+
+JSON style `decoration` may also include:
+
+```json
+"gradient": { "start": "#3A86FF", "end": "#7B6CFF", "angle": 135 },
+"shadow": { "blur": 16, "offsetY": 8, "color": "#00000080" }
+```
+
+Demo: `layouts/gradient_shadow_demo.xml` (alias `gradient-shadow`).
+
+### SvgIcon (Wave2 · R8)
+
+| Attribute | Notes |
+|-----------|--------|
+| `source` | Resource path; also used as SvgHandle cache key |
+| `tint` / `color` | Recolor (Skia `SrcIn`); alpha 0 / omit = original paint |
+| `stretch` | `uniform` (default) / `fill` / `uniformToFill` |
+| `width` / `height` | Fixed box |
+
+Demo: `layouts/svg_tint_demo.xml` (alias `svg-tint`).
 | common | `width` / `height` / flex / `hitTest` / `style` |
 
 XML:
@@ -458,7 +505,7 @@ The current DSL does not yet offer:
 - token-in-token inside theme files
 - XML inline nested style objects (use catalog instead)
 - JSON `props.onClick` (use `events.onClick`)
-- SVG tint / SMIL / external `xlink:href`
+- SVG SMIL / external `xlink:href` (tint + path cache: Wave2 R8 done)
 - mesh geometry hit-testing (layered hits use **alpha** sampling)
 
 ---

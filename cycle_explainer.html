@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>周期计算三合一对比图示</title>
+    <!-- 引入高质感现代字体 -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            /* 亮色美学配色系统 */
+            --bg-base: #f8fafc;
+            --bg-glass: rgba(255, 255, 255, 0.75);
+            --bg-card: #ffffff;
+            --border-color: rgba(15, 23, 42, 0.08);
+            --border-light: rgba(15, 23, 42, 0.04);
+            
+            --text-primary: #0f172a;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            
+            /* 三种周期的明亮主题色 */
+            --color-month: hsl(150, 80%, 38%);
+            --color-month-light: hsl(150, 80%, 94%);
+            --color-bucket: hsl(28, 95%, 48%);
+            --color-bucket-light: hsl(28, 95%, 94%);
+            --color-rolling: hsl(205, 90%, 45%);
+            --color-rolling-light: hsl(205, 90%, 94%);
+
+            --now-line-color: #ef4444;
+
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-title: 'Outfit', var(--font-sans);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--bg-base);
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.04) 0px, transparent 40%),
+                radial-gradient(at 100% 0%, rgba(14, 165, 233, 0.04) 0px, transparent 40%),
+                radial-gradient(at 50% 100%, rgba(249, 115, 22, 0.03) 0px, transparent 40%);
+            background-attachment: fixed;
+            color: var(--text-primary);
+            min-height: 100vh;
+            padding: 2rem 1.5rem;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1000px;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+
+        /* Header 极简 */
+        header {
+            text-align: center;
+            margin-bottom: 0.5rem;
+        }
+
+        header h1 {
+            font-family: var(--font-title);
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+            margin-bottom: 0.25rem;
+        }
+
+        header p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* 交互仿真器 */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            box-shadow: 0 4px 20px rgba(15, 23, 42, 0.03);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            position: relative;
+        }
+
+        .simulator-inputs {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1rem;
+        }
+
+        .input-group {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .input-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            white-space: nowrap;
+        }
+
+        .input-control {
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-base);
+            border-radius: 8px;
+            padding: 0.5rem 0.75rem;
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            outline: none;
+            transition: all 0.2s ease;
+        }
+
+        .input-control:focus {
+            border-color: var(--color-rolling);
+            background-color: #ffffff;
+            box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15);
+        }
+
+        .presets {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            justify-content: center;
+            margin-top: 0.75rem;
+            padding-top: 0.75rem;
+            border-top: 1px solid var(--border-light);
+        }
+
+        .btn-preset {
+            background: rgba(15, 23, 42, 0.03);
+            border: 1px solid var(--border-light);
+            color: var(--text-secondary);
+            padding: 0.35rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+
+        .btn-preset:hover {
+            background: rgba(15, 23, 42, 0.06);
+            color: var(--text-primary);
+        }
+
+        .btn-preset.active {
+            background: rgba(14, 165, 233, 0.08);
+            border-color: rgba(14, 165, 233, 0.2);
+            color: var(--color-rolling);
+        }
+
+        /* 泳道时间轴图示 */
+        .diagram-container {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            margin: 1.5rem 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem 1.5rem 1.5rem 1.5rem;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.04);
+            overflow: hidden;
+        }
+
+        /* 全局时间轴刻度 */
+        .time-scale {
+            display: flex;
+            justify-content: space-between;
+            position: relative;
+            height: 20px;
+            margin-left: 120px; /* 留出左侧泳道名称宽度 */
+            border-bottom: 1px solid var(--border-light);
+            margin-bottom: 1rem;
+            color: var(--text-muted);
+            font-size: 0.75rem;
+        }
+
+        .scale-tick {
+            position: absolute;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .scale-tick::before {
+            content: '';
+            width: 1px;
+            height: 4px;
+            background-color: var(--text-muted);
+        }
+
+        /* 泳道 */
+        .swimlane {
+            display: flex;
+            align-items: center;
+            height: 60px;
+            position: relative;
+            border-bottom: 1px dashed var(--border-light);
+        }
+
+        .swimlane:last-child {
+            border-bottom: none;
+        }
+
+        .swimlane-label {
+            width: 120px;
+            font-family: var(--font-title);
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .swimlane-label span {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 400;
+            margin-top: 1px;
+        }
+
+        /* 泳道内容区 */
+        .swimlane-track {
+            flex: 1;
+            height: 100%;
+            position: relative;
+        }
+
+        /* 周期方块 */
+        .period-block {
+            position: absolute;
+            height: 34px;
+            top: 13px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 600;
+            transition: all 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            padding: 0 8px;
+            border: 1px solid transparent;
+        }
+
+        /* 非当前周期（灰色虚线或淡色） */
+        .period-block.inactive {
+            background-color: #f1f5f9;
+            border: 1px dashed var(--border-color);
+            color: var(--text-secondary);
+            font-weight: 400;
+            opacity: 0.5;
+        }
+
+        /* 三种周期的专属方块样式 */
+        .swimlane-month .period-block.active {
+            background-color: var(--color-month-light);
+            border-color: rgba(16, 185, 129, 0.25);
+            color: var(--color-month);
+            box-shadow: 0 2px 8px rgba(16, 185, 129, 0.08);
+        }
+
+        .swimlane-bucket .period-block.active {
+            background-color: var(--color-bucket-light);
+            border-color: rgba(249, 115, 22, 0.25);
+            color: var(--color-bucket);
+            box-shadow: 0 2px 8px rgba(249, 115, 22, 0.08);
+        }
+
+        .swimlane-rolling .period-block.active {
+            background-color: var(--color-rolling-light);
+            border-color: rgba(14, 165, 233, 0.25);
+            color: var(--color-rolling);
+            box-shadow: 0 2px 8px rgba(14, 165, 233, 0.08);
+        }
+
+        /* 当前时间指示虚线 (贯穿红线) */
+        .now-indicator-line {
+            position: absolute;
+            top: 20px; /* 从刻度栏下方开始 */
+            bottom: 15px;
+            width: 2px;
+            background-color: var(--now-line-color);
+            z-index: 10;
+            pointer-events: none;
+            transition: left 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+
+        .now-indicator-line::after {
+            content: '当前模拟时间 (Now)';
+            position: absolute;
+            top: -22px;
+            transform: translateX(-50%);
+            background: var(--now-line-color);
+            color: #ffffff;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            white-space: nowrap;
+            box-shadow: 0 2px 6px rgba(239, 68, 68, 0.2);
+        }
+
+        /* 底部场景与一句话解释 */
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1rem;
+            margin-top: 0.5rem;
+        }
+
+        .legend-item {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+        }
+
+        .legend-badge {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+            margin-top: 4px;
+            flex-shrink: 0;
+        }
+
+        .legend-month { background-color: var(--color-month); }
+        .legend-bucket { background-color: var(--color-bucket); }
+        .legend-rolling { background-color: var(--color-rolling); }
+
+        .legend-text h3 {
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+            color: var(--text-primary);
+        }
+
+        .legend-text p {
+            font-size: 0.8rem;
+            color: var(--text-secondary);
+            line-height: 1.4;
+        }
+
+        /* 服务未激活警告 */
+        .swimlane-overlay {
+            position: absolute;
+            left: 120px;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(2px);
+            z-index: 12;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ef4444;
+            font-size: 0.85rem;
+            font-weight: 600;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .swimlane-overlay.show {
+            opacity: 1;
+            pointer-events: auto;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>周期计算图示对比</h1>
+        <p>动态模拟三种周期规则在选定时间点下的区间划分差异</p>
+    </header>
+
+    <!-- 沙盒调节面板 -->
+    <section class="card">
+        <div class="simulator-inputs">
+            <div class="input-group">
+                <label for="signup-date">开通时间:</label>
+                <input type="date" id="signup-date" class="input-control" value="2026-05-15">
+            </div>
+            
+            <div class="input-group">
+                <label for="current-date">模拟当前时间:</label>
+                <input type="date" id="current-date" class="input-control" value="2026-07-04">
+            </div>
+        </div>
+
+        <div class="presets">
+            <button class="btn-preset active" data-signup="2026-05-15" data-current="2026-07-04">常规账期对比</button>
+            <button class="btn-preset" data-signup="2026-05-15" data-current="2026-05-20">首月未满整月</button>
+            <button class="btn-preset" data-signup="2026-01-31" data-current="2026-02-28">31号开通至2月(月末对齐)</button>
+            <button class="btn-preset" data-signup="2026-08-31" data-current="2026-09-30">大月开通至小月(月末对齐)</button>
+            <button class="btn-preset" data-signup="2026-07-10" data-current="2026-07-01">未开通状态</button>
+        </div>
+    </section>
+
+    <!-- 泳道时间轴 -->
+    <section class="diagram-container">
+        <!-- 全局时间轴刻度，动态生成 -->
+        <div class="time-scale" id="time-scale"></div>
+
+        <!-- 贯穿红线 (Now 指示) -->
+        <div class="now-indicator-line" id="now-line"></div>
+
+        <!-- 自然月泳道 -->
+        <div class="swimlane swimlane-month">
+            <div class="swimlane-overlay" id="overlay-month">服务尚未开通</div>
+            <div class="swimlane-label">
+                自然月
+                <span>以日历月为界</span>
+            </div>
+            <div class="swimlane-track" id="track-month"></div>
+        </div>
+
+        <!-- 开通日分桶泳道 -->
+        <div class="swimlane swimlane-bucket">
+            <div class="swimlane-overlay" id="overlay-bucket">服务尚未开通</div>
+            <div class="swimlane-label">
+                开通日分桶
+                <span>以开通日为锚点循环</span>
+            </div>
+            <div class="swimlane-track" id="track-bucket"></div>
+        </div>
+
+        <!-- 滚动窗口泳道 -->
+        <div class="swimlane swimlane-rolling">
+            <div class="swimlane-label">
+                滚动窗口
+                <span>固定往前推 30 天</span>
+            </div>
+            <div class="swimlane-track" id="track-rolling"></div>
+        </div>
+    </section>
+
+    <!-- 一句话解释和场景 -->
+    <section class="legend-grid">
+        <div class="legend-item">
+            <div class="legend-badge legend-month"></div>
+            <div class="legend-text">
+                <h3>自然月 (以日历月重置)</h3>
+                <p><strong>规则：</strong>首月为 [开通日 ~ 月末]，之后每月 [1号 ~ 月末]。<br><strong>场景：</strong>财务记账、固定每月1号重置额度。</p>
+            </div>
+        </div>
+        
+        <div class="legend-item">
+            <div class="legend-badge legend-bucket"></div>
+            <div class="legend-text">
+                <h3>开通日分桶 (按开通日循环)</h3>
+                <p><strong>规则：</strong>每次循环完整的一个月（如 15号 到 下月14号）。遇到小月无此日时自动前移到月末。<br><strong>场景：</strong>SaaS 订阅计费、会员按月扣费。</p>
+            </div>
+        </div>
+        
+        <div class="legend-item">
+            <div class="legend-badge legend-rolling"></div>
+            <div class="legend-text">
+                <h3>滚动窗口 (Now - 30D)</h3>
+                <p><strong>规则：</strong>区间大小永远固定为 30 天，随当前时间实时向右滑动。<br><strong>场景：</strong>API 调用频率控制（如近30天限额）、风控提现额度累计。</p>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    const signupInput = document.getElementById('signup-date');
+    const currentInput = document.getElementById('current-date');
+    const presetButtons = document.querySelectorAll('.btn-preset');
+    
+    const timeScale = document.getElementById('time-scale');
+    const nowLine = document.getElementById('now-line');
+    
+    const trackMonth = document.getElementById('track-month');
+    const trackBucket = document.getElementById('track-bucket');
+    const trackRolling = document.getElementById('track-rolling');
+    
+    const overlayMonth = document.getElementById('overlay-month');
+    const overlayBucket = document.getElementById('overlay-bucket');
+
+    // 日期处理助手
+    function parseLocalDate(str) {
+        const p = str.split('-');
+        return new Date(p[0], p[1] - 1, p[2]);
+    }
+
+    function formatDate(d) {
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const r = String(d.getDate()).padStart(2, '0');
+        return `${m}-${r}`;
+    }
+
+    function addDays(d, days) {
+        const res = new Date(d);
+        res.setDate(res.getDate() + days);
+        return res;
+    }
+
+    // 账期加月份对齐
+    function addMonthsAnniversary(baseDate, months) {
+        const d = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate());
+        let targetMonth = d.getMonth() + months;
+        d.setMonth(targetMonth);
+        
+        let expectedMonth = (baseDate.getMonth() + months) % 12;
+        if (expectedMonth < 0) expectedMonth += 12;
+        
+        if (d.getMonth() !== expectedMonth) {
+            d.setDate(0);
+        }
+        return d;
+    }
+
+    // 主渲染函数
+    function render() {
+        const signupStr = signupInput.value;
+        const currentStr = currentInput.value;
+        if (!signupStr || !currentStr) return;
+
+        const signup = parseLocalDate(signupStr);
+        const current = parseLocalDate(currentStr);
+
+        const isBeforeSignup = current < signup;
+
+        // 1. 确定全局可视时间轴边界 (以当前时间为中心，前后各展示 30 天，共 60 天跨度)
+        const totalSpanDays = 60;
+        const halfSpan = totalSpanDays / 2;
+        const timelineStart = addDays(current, -halfSpan);
+        const timelineEnd = addDays(current, halfSpan);
+        const msPerDay = 24 * 60 * 60 * 1000;
+
+        // 计算某个日期在时间轴中的百分比位置
+        function getPercent(date) {
+            const diffMs = date.getTime() - timelineStart.getTime();
+            return (diffMs / (totalSpanDays * msPerDay)) * 100;
+        }
+
+        // 2. 绘制时间轴刻度 (每 10 天绘制一个刻度)
+        timeScale.innerHTML = '';
+        for (let i = 0; i <= totalSpanDays; i += 10) {
+            const tickDate = addDays(timelineStart, i);
+            const pct = (i / totalSpanDays) * 100;
+            
+            const tick = document.createElement('div');
+            tick.className = 'scale-tick';
+            tick.style.left = `${pct}%`;
+            tick.innerHTML = `<span>${formatDate(tickDate)}</span>`;
+            timeScale.appendChild(tick);
+        }
+
+        // 3. 定位红线 (Current Date) - 永远在 50% 处
+        nowLine.style.left = `calc(120px + ${getPercent(current)}%)`;
+
+        // 清空通道
+        trackMonth.innerHTML = '';
+        trackBucket.innerHTML = '';
+        trackRolling.innerHTML = '';
+
+        // 处理未激活的遮罩
+        if (isBeforeSignup) {
+            overlayMonth.classList.add('show');
+            overlayBucket.classList.add('show');
+        } else {
+            overlayMonth.classList.remove('show');
+            overlayBucket.classList.remove('show');
+
+            // --- 渲染自然月 ---
+            // 找出全局时间轴范围内重叠的自然月
+            let tempMonth = new Date(timelineStart.getFullYear(), timelineStart.getMonth(), 1);
+            while (tempMonth <= timelineEnd) {
+                let mStart = new Date(tempMonth);
+                
+                // 如果是开通月，首个账期从开通日开始
+                if (mStart.getFullYear() === signup.getFullYear() && mStart.getMonth() === signup.getMonth()) {
+                    mStart = new Date(signup);
+                }
+                
+                let mEnd = new Date(tempMonth.getFullYear(), tempMonth.getMonth() + 1, 0); // 月末
+                
+                // 如果整个自然月早于开通月，则不渲染（未开通）
+                if (mEnd >= signup) {
+                    const left = Math.max(0, getPercent(mStart));
+                    const right = Math.min(100, getPercent(mEnd));
+                    
+                    if (right > left) {
+                        const block = document.createElement('div');
+                        const isCurrentPeriod = (current >= mStart && current <= mEnd);
+                        block.className = `period-block ${isCurrentPeriod ? 'active' : 'inactive'}`;
+                        block.style.left = `${left}%`;
+                        block.style.width = `${right - left}%`;
+                        block.innerHTML = isCurrentPeriod ? `本期: ${formatDate(mStart)} ~ ${formatDate(mEnd)}` : `${formatDate(mStart)}`;
+                        trackMonth.appendChild(block);
+                    }
+                }
+
+                tempMonth.setMonth(tempMonth.getMonth() + 1);
+            }
+
+            // --- 渲染开通日分桶 ---
+            // 确定起止账期范围：从开通日算起
+            let diffMonths = (timelineStart.getFullYear() - signup.getFullYear()) * 12 + (timelineStart.getMonth() - signup.getMonth());
+            if (diffMonths < 0) diffMonths = 0;
+
+            let bStart = addMonthsAnniversary(signup, diffMonths);
+            // 确保找到第一个与时间轴相交的账期
+            while (bStart <= timelineEnd) {
+                const bNextStart = addMonthsAnniversary(signup, diffMonths + 1);
+                const bEnd = new Date(bNextStart);
+                bEnd.setDate(bEnd.getDate() - 1);
+
+                if (bEnd >= signup) {
+                    const left = Math.max(0, getPercent(bStart));
+                    const right = Math.min(100, getPercent(bEnd));
+
+                    if (right > left) {
+                        const block = document.createElement('div');
+                        const isCurrentPeriod = (current >= bStart && current <= bEnd);
+                        block.className = `period-block ${isCurrentPeriod ? 'active' : 'inactive'}`;
+                        block.style.left = `${left}%`;
+                        block.style.width = `${right - left}%`;
+                        block.innerHTML = isCurrentPeriod ? `本期: ${formatDate(bStart)} ~ ${formatDate(bEnd)}` : `${formatDate(bStart)}`;
+                        trackBucket.appendChild(block);
+                    }
+                }
+
+                diffMonths++;
+                bStart = addMonthsAnniversary(signup, diffMonths);
+            }
+        }
+
+        // --- 渲染滚动窗口 (无论是否开通均渲染，反映物理时间) ---
+        const rStart = addDays(current, -30);
+        const rEnd = current;
+        const left = Math.max(0, getPercent(rStart));
+        const right = Math.min(100, getPercent(rEnd));
+        if (right > left) {
+            const block = document.createElement('div');
+            block.className = 'period-block active';
+            block.style.left = `${left}%`;
+            block.style.width = `${right - left}%`;
+            block.innerHTML = `滑动窗口 (近30天): ${formatDate(rStart)} ~ ${formatDate(rEnd)}`;
+            trackRolling.appendChild(block);
+        }
+    }
+
+    // 监听输入
+    signupInput.addEventListener('change', render);
+    currentInput.addEventListener('change', render);
+
+    // 预设按钮
+    presetButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            presetButtons.forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            signupInput.value = btn.dataset.signup;
+            currentInput.value = btn.dataset.current;
+            render();
+        });
+    });
+
+    // 初始化渲染
+    render();
+</script>
+
+</body>
+</html>

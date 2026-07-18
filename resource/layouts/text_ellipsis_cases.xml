@@ -1,0 +1,41 @@
+<!--
+  Wave2 R6: single-line Label ellipsis (NoWrap + …).
+  .\scripts\run_layout_demo.ps1 -Layout text-ellipsis
+-->
+<Panel name="root" direction="column" padding="20,20,20,20" spacing="14" background="$color.surface-0" alignItems="stretch">
+  <Label name="title" text="Text Ellipsis (R6)" fontSize="22" color="$color.fg-strong" />
+  <Label name="hint" text="ellipsis=true forces NoWrap and trims overflow with U+2026 on both Skia and Direct2D." fontSize="13" color="$color.fg-muted" />
+
+  <Panel name="card" direction="column" padding="14,14,14,14" spacing="10" background="$color.surface-1" cornerRadius="10" alignItems="stretch">
+    <Label text="Narrow 180px · ellipsis" fontSize="12" color="$color.fg-muted" />
+    <Panel width="180" height="28" background="$color.surface-2" cornerRadius="6" padding="8,4,8,4">
+      <Label
+        name="ellip1"
+        text="This is a long English sentence that should end with an ellipsis"
+        fontSize="14"
+        color="$color.fg"
+        ellipsis="true" />
+    </Panel>
+
+    <Label text="Narrow 180px · wrap (no ellipsis)" fontSize="12" color="$color.fg-muted" />
+    <Panel width="180" height="72" background="$color.surface-2" cornerRadius="6" padding="8,4,8,4">
+      <Label
+        name="wrap1"
+        text="This is a long English sentence that wraps instead of ellipsis"
+        fontSize="14"
+        color="$color.fg" />
+    </Panel>
+
+    <Label text="CJK · ellipsis" fontSize="12" color="$color.fg-muted" />
+    <Panel width="160" height="28" background="$color.surface-2" cornerRadius="6" padding="8,4,8,4">
+      <Label
+        name="ellipCjk"
+        text="这是一段很长的中文标题应该被截断并显示省略号"
+        fontSize="14"
+        color="$color.fg"
+        ellipsis="true" />
+    </Panel>
+  </Panel>
+
+  <Label name="footer" text="Alias: text-ellipsis · TextRenderOptions.ellipsis" fontSize="12" color="$color.fg-dim" />
+</Panel>

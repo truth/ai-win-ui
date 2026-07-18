@@ -13,27 +13,26 @@ It answers three practical questions:
 
 ## Current Priority
 
-The current MVP is not blocked by missing controls or missing architecture.
+**Wave 1 (L1 engine trust) closed 2026-07-16.**
 
-It is blocked by three closing tasks:
+Historical MVP blockers (Skia text, Yoga calibration, acceptance flow) are
+addressed for L1: dual-backend measure goldens, text dump ≤2px, nested
+`ScrollViewer` matrix, IME/H4 acceptance steps, and documented R5 deltas.
 
-1. Skia text parity and stability
-2. Yoga behavior calibration
-3. MVP acceptance and validation flow
+**Wave 2 in progress** (persona board is authoritative):
 
-**DirectUI P0 hardening** (engine trust) expands these into four tracks —
-text parity, `ScrollViewer`, in-process multi-root hosts, and measure goldens.
-File-level checklist: `doc/plan/2026-07-15-directui-p0-hardening.md`.
+| Done | Next |
+|------|------|
+| C4 OverlayFlyout shared | C6/C7 drag / modal (optional) |
+| C5 VirtualListBox 1k | Q6/Q7 optional |
+| S4 `$color` + catalog rebind | H5b/H6 lib extract (Wave3) |
+| R6–R8 text/visual polish | |
+| **Q8** local CI smoke+golden | |
+| H5 embed API **draft** | |
 
-**Productization (post-P0)** is planned by **persona/role** (parallel tracks),
-not a single linear queue. See:
-
-- `doc/plan/2026-07-15-directui-productization-personas.md`
-
-Wave 1 still prioritizes text parity (role **R**) and measure goldens (role **Q**).
-
-Work outside Wave 1 L1 exit criteria is useful, but should not block the
-persona roadmap exits above.
+Authoritative board: `doc/plan/2026-07-15-directui-productization-personas.md`.  
+Embed draft: `doc/plan/2026-07-16-embed-api-v1.md`.  
+P0 detail (historical): `doc/plan/2026-07-15-directui-p0-hardening.md`.
 
 ## Execution Order
 

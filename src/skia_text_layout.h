@@ -18,6 +18,8 @@
 //    blockHeight = (lineCount-1)*lineHeight + (ascent+descent)  // matches single-line DWrite height style
 // 6. bold/italic select the same default family chain as drawing (Segoe UI → Arial → …).
 // 7. Empty / null text → empty layout, zero size (not a failure).
+// 8. ellipsis=true + NoWrap: if first line width > maxWidth, binary-search prefix + U+2026
+//    so measured width fits maxWidth (Wave2 R6).
 
 struct SkiaTextLayoutLine {
     std::wstring text;
@@ -41,7 +43,8 @@ bool CreateSkiaTextLayout(const wchar_t* text,
                           TextWrapMode wrapMode,
                           SkiaTextLayout* layout,
                           bool bold = false,
-                          bool italic = false);
+                          bool italic = false,
+                          bool ellipsis = false);
 
 Size MeasureSkiaTextLayout(const wchar_t* text,
                            uint32_t len,
@@ -49,4 +52,5 @@ Size MeasureSkiaTextLayout(const wchar_t* text,
                            float maxWidth,
                            TextWrapMode wrapMode,
                            bool bold = false,
-                           bool italic = false);
+                           bool italic = false,
+                           bool ellipsis = false);

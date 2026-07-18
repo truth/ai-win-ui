@@ -1,0 +1,23 @@
+<!--
+  Wave2 C5: VirtualListBox with 1000 items (only visible rows painted).
+  .\scripts\run_layout_demo.ps1 -Layout virtual-list
+-->
+<Panel name="root" direction="column" padding="20,20,20,20" spacing="12" background="$color.surface-0" alignItems="stretch">
+  <Label name="title" text="Virtual List (C5) — 1000 items" fontSize="22" color="$color.fg-strong" />
+  <Label
+    name="hint"
+    text="SetItemCount + itemPrefix binder. Wheel / keys scroll; only visible rows are measured and painted."
+    fontSize="13"
+    color="$color.fg-muted" />
+
+  <VirtualListBox
+    name="vlist"
+    itemCount="1000"
+    itemPrefix="Row #"
+    selectedIndex="0"
+    itemHeight="26"
+    height="420"
+    fontSize="13" />
+
+  <Label name="footer" text="Alias: virtual-list · measure dump supported via name=vlist" fontSize="12" color="$color.fg-dim" />
+</Panel>

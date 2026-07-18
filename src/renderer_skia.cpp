@@ -3,14 +3,17 @@
 #include "skia_font_shared.h"
 
 #if defined(AI_WIN_UI_HAS_VCPKG_SKIA) || defined(AI_WIN_UI_HAS_LOCAL_SKIA)
+#include "include/core/SkBlendMode.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkColor.h"
+#include "include/core/SkColorFilter.h"
 #include "include/core/SkData.h"
 #include "include/core/SkFontMetrics.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkPath.h"
+#include "include/core/SkPoint.h"
 #include "include/core/SkRRect.h"
 #include "include/core/SkSamplingOptions.h"
 #include "include/core/SkStream.h"
@@ -18,7 +21,9 @@
 #include "include/core/SkSurface.h"
 #include "include/core/SkSurfaceProps.h"
 #include "include/core/SkTextBlob.h"
+#include "include/core/SkTileMode.h"
 #include "include/core/SkTypes.h"
+#include "include/effects/SkGradientShader.h"
 
 #include "modules/svg/include/SkSVGDOM.h"
 
@@ -27,6 +32,7 @@
 #include <cstring>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 namespace {
 
@@ -247,6 +253,71 @@ public:
         }
     }
 
+    void FillLinearGradient(const Rect& rect,
+                            float cornerRadius,
+                            const Color& start,
+                            const Color& end,
+                            float angleDegrees) override {
+        if (SkCanvas* canvas = Canvas()) {
+            const float cx = (rect.left + rect.right) * 0.5f;
+            const float cy = (rect.top + rect.bottom) * 0.5f;
+            const float halfDiag = 0.5f * std::sqrt(
+                rect.Width() * rect.Width() + rect.Height() * rect.Height());
+            const float rad = angleDegrees * 3.14159265f / 180.0f;
+            const SkPoint pts[2] = {
+                SkPoint::Make(cx - std::cos(rad) * halfDiag, cy - std::sin(rad) * halfDiag),
+                SkPoint::Make(cx + std::cos(rad) * halfDiag, cy + std::sin(rad) * halfDiag),
+            };
+            const SkColor colors[2] = {ToSkColor(start), ToSkColor(end)};
+            SkPaint paint;
+            paint.setAntiAlias(true);
+            paint.setStyle(SkPaint::kFill_Style);
+            paint.setShader(SkGradientShader::MakeLinear(
+                pts, colors, nullptr, 2, SkTileMode::kClamp));
+            if (cornerRadius > 0.5f) {
+                canvas->drawRoundRect(ToSkRect(rect), cornerRadius, cornerRadius, paint);
+            } else {
+                canvas->drawRect(ToSkRect(rect), paint);
+            }
+        }
+    }
+
+    void FillSoftShadow(const Rect& rect,
+                        float cornerRadius,
+                        float offsetX,
+                        float offsetY,
+                        float blur,
+                        const Color& color) override {
+        if (SkCanvas* canvas = Canvas()) {
+            if (color.a <= 0.001f) {
+                return;
+            }
+            const float blurPx = std::max(0.0f, blur);
+            const int passes = std::clamp(static_cast<int>(std::lround(blurPx / 3.0f)) + 2, 3, 8);
+            for (int i = passes; i >= 1; --i) {
+                const float t = static_cast<float>(i) / static_cast<float>(passes);
+                const float expand = blurPx * t * 0.55f;
+                const float alpha = color.a * (0.08f + 0.22f * (1.0f - t)) / static_cast<float>(passes) * 2.5f;
+                const Color layer{color.r, color.g, color.b, std::clamp(alpha, 0.0f, 1.0f)};
+                SkPaint paint;
+                paint.setColor(ToSkColor(layer));
+                paint.setStyle(SkPaint::kFill_Style);
+                paint.setAntiAlias(true);
+                const SkRect shadow = SkRect::MakeLTRB(
+                    rect.left - expand + offsetX,
+                    rect.top - expand + offsetY,
+                    rect.right + expand + offsetX,
+                    rect.bottom + expand + offsetY);
+                const float r = cornerRadius + expand * 0.35f;
+                if (r > 0.5f) {
+                    canvas->drawRoundRect(shadow, r, r, paint);
+                } else {
+                    canvas->drawRect(shadow, paint);
+                }
+            }
+        }
+    }
+
     void DrawRect(const Rect& rect, const Color& color, float strokeWidth) override {
         if (SkCanvas* canvas = Canvas()) {
             SkPaint paint;
@@ -367,7 +438,8 @@ public:
                 options.wrap,
                 &layout,
                 options.bold,
-                options.italic)) {
+                options.italic,
+                options.ellipsis)) {
                 return;
             }
             if (layout.lines.empty()) {
@@ -456,10 +528,27 @@ public:
             nullptr);
     }
 
-    SvgHandle CreateSvgFromBytes(const uint8_t* data, size_t size) override {
+    SvgHandle CreateSvgFromBytes(const uint8_t* data, size_t size, const char* cacheKey) override {
         if (!data || size == 0) {
             return nullptr;
         }
+        std::string key;
+        if (cacheKey && cacheKey[0]) {
+            key = cacheKey;
+        } else {
+            // Content hash so identical bytes share one DOM without a path.
+            uint64_t h = 14695981039346656037ull;
+            for (size_t i = 0; i < size; ++i) {
+                h ^= static_cast<uint64_t>(data[i]);
+                h *= 1099511628211ull;
+            }
+            key = "bytes:" + std::to_string(h) + ":" + std::to_string(size);
+        }
+        auto it = m_svgCache.find(key);
+        if (it != m_svgCache.end()) {
+            return it->second;
+        }
+
         EnsureFontManager();
         auto stream = SkMemoryStream::MakeCopy(data, size);
         if (!stream) {
@@ -471,14 +560,16 @@ public:
         if (!dom) {
             return nullptr;
         }
-        return std::make_shared<SkiaSvgResource>(std::move(dom));
+        auto handle = std::make_shared<SkiaSvgResource>(std::move(dom));
+        m_svgCache.emplace(std::move(key), handle);
+        return handle;
     }
 
     Size GetSvgSize(SvgHandle svg) override {
         return svg ? svg->GetIntrinsicSize() : Size{};
     }
 
-    void DrawSvg(SvgHandle svg, const Rect& rect) override {
+    void DrawSvg(SvgHandle svg, const Rect& rect, bool hasTint, const Color& tint) override {
         SkCanvas* canvas = Canvas();
         if (!canvas || !svg) {
             return;
@@ -488,9 +579,19 @@ public:
             return;
         }
         SkAutoCanvasRestore restore(canvas, /*doSave=*/true);
+        if (hasTint && tint.a > 0.001f) {
+            // SrcIn: keep SVG alpha, replace RGB with tint (monochrome recolor).
+            SkPaint layerPaint;
+            layerPaint.setColorFilter(SkColorFilters::Blend(ToSkColor(tint), SkBlendMode::kSrcIn));
+            const SkRect layerBounds = ToSkRect(rect);
+            canvas->saveLayer(&layerBounds, &layerPaint);
+        }
         canvas->translate(rect.left, rect.top);
         skiaSvg->Dom()->setContainerSize(SkSize::Make(rect.Width(), rect.Height()));
         skiaSvg->Dom()->render(canvas);
+        if (hasTint && tint.a > 0.001f) {
+            canvas->restore();
+        }
     }
 
 private:
@@ -652,6 +753,7 @@ private:
     sk_sp<SkFontMgr> m_fontMgr;
     sk_sp<SkTypeface> m_defaultTypeface;
     SkSamplingOptions m_bitmapSampling{SkFilterMode::kLinear, SkMipmapMode::kLinear};
+    std::unordered_map<std::string, SvgHandle> m_svgCache;
 };
 
 } // namespace

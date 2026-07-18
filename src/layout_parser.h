@@ -55,6 +55,9 @@ public:
     // Returns the previous catalog pointer.
     static const StyleCatalog* SetActiveStyleCatalog(const StyleCatalog* catalog);
 
+    // Active Theme for $color / $spacing token resolution during catalog reload (S4).
+    static const Theme* SetActiveTheme(const Theme* theme);
+
     // Resolve a single number JSON value, accepting either a literal number
     // (e.g. 12) or a "$category.key" string token (e.g. "$spacing.lg").
     // Pass the natural category of the field; unknown tokens return fallback + warning.

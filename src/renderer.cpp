@@ -6,8 +6,11 @@
 #include <wrl/client.h>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -286,6 +289,85 @@ public:
         m_renderTarget->FillRoundedRectangle(&roundedRect, m_solidBrush.Get());
     }
 
+    void FillLinearGradient(const Rect& rect,
+                            float cornerRadius,
+                            const Color& start,
+                            const Color& end,
+                            float angleDegrees) override {
+        if (!m_renderTarget || !m_d2dFactory) {
+            return;
+        }
+        const float cx = (rect.left + rect.right) * 0.5f;
+        const float cy = (rect.top + rect.bottom) * 0.5f;
+        const float halfDiag = 0.5f * std::sqrt(
+            rect.Width() * rect.Width() + rect.Height() * rect.Height());
+        // CSS-like: 0deg = left→right, 90deg = top→bottom.
+        const float rad = angleDegrees * 3.14159265f / 180.0f;
+        const float dx = std::cos(rad) * halfDiag;
+        const float dy = std::sin(rad) * halfDiag;
+
+        D2D1_GRADIENT_STOP stops[2]{};
+        stops[0].position = 0.0f;
+        stops[0].color = ToD2DColor(start);
+        stops[1].position = 1.0f;
+        stops[1].color = ToD2DColor(end);
+
+        ComPtr<ID2D1GradientStopCollection> collection;
+        if (FAILED(m_renderTarget->CreateGradientStopCollection(
+                stops, 2, D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_CLAMP, collection.ReleaseAndGetAddressOf()))) {
+            return;
+        }
+
+        ComPtr<ID2D1LinearGradientBrush> brush;
+        if (FAILED(m_renderTarget->CreateLinearGradientBrush(
+                D2D1::LinearGradientBrushProperties(
+                    D2D1::Point2F(cx - dx, cy - dy),
+                    D2D1::Point2F(cx + dx, cy + dy)),
+                collection.Get(),
+                brush.ReleaseAndGetAddressOf()))) {
+            return;
+        }
+
+        if (cornerRadius > 0.5f) {
+            D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(ToD2DRect(rect), cornerRadius, cornerRadius);
+            m_renderTarget->FillRoundedRectangle(&rr, brush.Get());
+        } else {
+            m_renderTarget->FillRectangle(ToD2DRect(rect), brush.Get());
+        }
+    }
+
+    void FillSoftShadow(const Rect& rect,
+                        float cornerRadius,
+                        float offsetX,
+                        float offsetY,
+                        float blur,
+                        const Color& color) override {
+        if (!m_renderTarget || !m_solidBrush || color.a <= 0.001f) {
+            return;
+        }
+        const float blurPx = std::max(0.0f, blur);
+        const int passes = std::clamp(static_cast<int>(std::lround(blurPx / 3.0f)) + 2, 3, 8);
+        for (int i = passes; i >= 1; --i) {
+            const float t = static_cast<float>(i) / static_cast<float>(passes);
+            const float expand = blurPx * t * 0.55f;
+            const float alpha = color.a * (0.08f + 0.22f * (1.0f - t)) / static_cast<float>(passes) * 2.5f;
+            const Color layer{color.r, color.g, color.b, std::clamp(alpha, 0.0f, 1.0f)};
+            const Rect shadow = Rect::Make(
+                rect.left - expand + offsetX,
+                rect.top - expand + offsetY,
+                rect.right + expand + offsetX,
+                rect.bottom + expand + offsetY);
+            const float r = cornerRadius + expand * 0.35f;
+            m_solidBrush->SetColor(ToD2DColor(layer));
+            if (r > 0.5f) {
+                D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(ToD2DRect(shadow), r, r);
+                m_renderTarget->FillRoundedRectangle(&rr, m_solidBrush.Get());
+            } else {
+                m_renderTarget->FillRectangle(ToD2DRect(shadow), m_solidBrush.Get());
+            }
+        }
+    }
+
     void DrawRect(const Rect& rect, const Color& color, float strokeWidth) override {
         if (!m_renderTarget || !m_solidBrush) {
             return;
@@ -454,6 +536,16 @@ public:
                 ? DWRITE_WORD_WRAPPING_WRAP
                 : DWRITE_WORD_WRAPPING_NO_WRAP);
 
+        // Wave2 R6: character-level ellipsis on NoWrap (single-line overflow).
+        if (options.ellipsis && options.wrap == TextWrapMode::NoWrap) {
+            ComPtr<IDWriteInlineObject> trimmingSign;
+            if (SUCCEEDED(m_dwriteFactory->CreateEllipsisTrimmingSign(format.Get(), trimmingSign.GetAddressOf()))) {
+                DWRITE_TRIMMING trimming{};
+                trimming.granularity = DWRITE_TRIMMING_GRANULARITY_CHARACTER;
+                format->SetTrimming(&trimming, trimmingSign.Get());
+            }
+        }
+
         m_solidBrush->SetColor(ToD2DColor(color));
         m_renderTarget->DrawTextW(text, len, format.Get(), ToD2DRect(rect), m_solidBrush.Get());
     }
@@ -546,19 +638,29 @@ public:
         m_renderTarget->DrawBitmap(d2dBitmap, ToD2DRect(rect));
     }
 
-    SvgHandle CreateSvgFromBytes(const uint8_t* /*data*/, size_t /*size*/) override {
-        return std::make_shared<PlaceholderSvgResource>();
+    SvgHandle CreateSvgFromBytes(const uint8_t* /*data*/, size_t /*size*/, const char* cacheKey) override {
+        // D2D has no real SVG parse; still cache placeholders by key so handles are stable.
+        const std::string key = cacheKey && cacheKey[0]
+            ? std::string(cacheKey)
+            : std::string("d2d-placeholder");
+        auto it = m_svgCache.find(key);
+        if (it != m_svgCache.end()) {
+            return it->second;
+        }
+        auto handle = std::make_shared<PlaceholderSvgResource>();
+        m_svgCache[key] = handle;
+        return handle;
     }
 
     Size GetSvgSize(SvgHandle /*svg*/) override {
         return Size{16.0f, 16.0f};
     }
 
-    void DrawSvg(SvgHandle svg, const Rect& rect) override {
+    void DrawSvg(SvgHandle svg, const Rect& rect, bool hasTint, const Color& tint) override {
         if (!m_renderTarget) return;
-        const Color bg     = ColorFromHex(0x2A2A2A);
-        const Color border = ColorFromHex(0x6A6A6A);
-        const Color fg     = ColorFromHex(0xB7B7B7);
+        const Color bg     = hasTint ? Color{tint.r, tint.g, tint.b, 0.25f} : ColorFromHex(0x2A2A2A);
+        const Color border = hasTint ? Color{tint.r, tint.g, tint.b, std::min(1.0f, tint.a)} : ColorFromHex(0x6A6A6A);
+        const Color fg     = hasTint ? tint : ColorFromHex(0xB7B7B7);
         FillRect(rect, bg);
         DrawRect(rect, border, 1.0f);
         if (!svg) return;
@@ -754,6 +856,7 @@ private:
     HBITMAP m_dib = nullptr;
     HBITMAP m_oldBitmap = nullptr;
     void* m_dibBits = nullptr;
+    std::unordered_map<std::string, SvgHandle> m_svgCache;
 };
 
 } // namespace

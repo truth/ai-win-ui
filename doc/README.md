@@ -39,6 +39,7 @@ older design snapshot.
   - dated implementation plans (shipped and active)
   - **active productization:** `2026-07-15-directui-productization-personas.md`
     （按 6 个人物/角色分工：R 文本 · L 布局 · C 控件 · S 样式 · H 宿主 · Q 质量）
+  - Wave2 embed API draft: `2026-07-16-embed-api-v1.md`
   - P0 hardening: `2026-07-15-directui-p0-hardening.md`
   - archived examples: declarative style v1, theme tokens, layered window v2
 
@@ -110,6 +111,11 @@ Full detail: `doc/layout-spec.md` + `doc/style-catalog.md`.
 - **`resource/layouts/style_catalog_demo.xml`** — `$style` + ShapePanel
 - **`resource/layouts/shaped_windows_hub.xml`** — open layered shape children
 - `resource/layouts/layered_chrome_demo.xml` — rounded layered card
+- **`resource/layouts/virtual_list_demo.xml`** — C5 VirtualListBox 1k
+- **`resource/layouts/popup_theme_demo.xml`** — C4/S4 Popup + theme switch
+- **`resource/layouts/text_ellipsis_cases.xml`** — R6 Label ellipsis
+- **`resource/layouts/gradient_shadow_demo.xml`** — R7 gradient + soft shadow
+- **`resource/layouts/svg_tint_demo.xml`** — R8 SvgIcon tint + cache
 
 ## Launcher Scripts
 
@@ -122,6 +128,7 @@ Full detail: `doc/layout-spec.md` + `doc/style-catalog.md`.
 - `scripts/run_dashboard_reference.ps1` — dashboard sample
 - `scripts/run_headless_smoke.ps1` — quit-after-ms smoke suite
 - `scripts/run_validation_suite.ps1` — smoke/full multi-layout suite
+- **`scripts/run_ci_local.ps1`** — Wave2 **Q8** local CI: gallery + smoke + measure golden
 
 Example:
 
@@ -133,12 +140,20 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
 powershell -ExecutionPolicy Bypass -File .\scripts\run_shaped_windows_demo.ps1
 ```
 
-## MVP Focus
+## Productization focus (Wave2)
 
-Main remaining MVP gaps:
+Wave1 (engine trust) is closed. Wave2 product capability — current:
 
-- Skia text parity and stability
-- a more complete flex behavior surface
-- formalized acceptance criteria for interaction and layout validation
+| Area | Status | Demo / doc |
+|------|--------|------------|
+| Virtual list 1k (C5) | done | `virtual-list` |
+| Popup + Combo overlay (C4) | done | `popup-theme`, `overlay-popup-contract.md` |
+| Runtime theme (S4) | done | `applyTheme:` + `$color` / catalog rebind |
+| Label ellipsis (R6) | done | `text-ellipsis` |
+| Gradient + shadow (R7) | done | `gradient-shadow` |
+| SVG tint + cache (R8) | done | `svg-tint` |
+| Local CI smoke+golden (Q8) | done | `run_ci_local.ps1` + GHA D2D |
+| Embed lib (H5b/H6/H7) | **done 0.3.1** | `ai_win_ui_lib` + parent child embed + `samples/embed_host` |
 
-See `doc/mvp-roadmap.md`, `doc/mvp-execution-plan.md`, `doc/mvp-acceptance.md`.
+Board: `doc/plan/2026-07-15-directui-productization-personas.md`.  
+Acceptance: `doc/mvp-acceptance.md`.

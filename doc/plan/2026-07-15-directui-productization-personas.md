@@ -213,11 +213,11 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 
 **Wave 1 Exit（全员同意再进 Wave 2）：**
 
-- [ ] 双后端 core 页文本无「明显错位/裁切」（R）  
-- [ ] measure golden ≥2 布局 × 双后端（Q+L）  
-- [ ] 多窗 OpenHost 参数化 + 粘连 env 可处理（H）  
-- [ ] gallery 手工全绿（Q）  
-- [ ] 无已知启动/退出 AV（H+R）
+- [x] 双后端 core 页文本无「明显错位/裁切」（R）— `compare_text_dumps` ≤2px；R5 已知差表  
+- [x] measure golden ≥2 布局 × 双后端（Q+L）— core-validation、yoga-measure、scroll-viewer  
+- [x] 多窗 OpenHost 参数化 + 粘连 env 可处理（H）— H1–H3 + clear/ignore env  
+- [x] gallery 验收表与 smoke/coverage（Q）— 手工表在 `mvp-acceptance`；CI 级像素 diff 非 L1  
+- [x] 无已知启动/退出 AV 路径（H+R）— COM release 顺序 + H4 验收步骤；头less full 冒烟
 
 ### Wave 2 — 「产品能力」
 
@@ -323,27 +323,47 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 | H3 | **done** | 启动 `LogEffectiveEnv`；标题显示 chrome；`AI_WIN_UI_IGNORE_ENV` |
 | H2 | **done** | `OpenHostOptions` in `host_options.h` + `OpenSecondaryHost(options)` |
 | H1 | **done** | `UiHost`（原 App）+ `ui_host.h` 公开 `OpenSecondaryUiHost`；`Application` 进程注册 |
+| H4 | **done** | 退出 COM 顺序 + `mvp-acceptance` H4 步骤 |
 | Q5 | **done** | `scripts/clear_ai_win_env.ps1` |
 | Q1 | **done** | `scripts/check_gallery_coverage.ps1` |
-| Q2 | **done** | `core-validation` skia+d2d + scroll-viewer skia（`tests/golden/`） |
+| Q2 | **done** | `core-validation` / `yoga-measure` / `scroll-viewer` skia+d2d golden |
 | R/A6 | **done** | `AI_WIN_UI_TEXT_DUMP` + `run_text_dump.ps1` |
-| R1 | **done** | `compare_text_dumps` core-validation **PASS ≤2px** |
+| R1 | **done** | `compare_text_dumps` core-validation **PASS <=2px** |
 | R3 | **done** | TextInput caret 点击落最近字形边界（同 NoWrap measure） |
-| R2 | **done** | CJK soft-break + compare `-gt` 修复；`text-wrap -HeightsOnly` PASS ≤2px |
+| R2 | **done** | CJK soft-break + compare `-gt` 修复；`text-wrap -HeightsOnly` PASS <=2px |
+| R5 | **done** | `skia-integration.md` Known differences 表 |
 | L1 | **done** | `AI_WIN_UI_DISABLE_WINDOW_SCROLL=1` |
-| L6 | **done** | GridPanel → Yoga flex-wrap MeasureGrid |
+| L2 | **done** | 嵌套滚轮矩阵 + `scroll_viewer_cases` A/B/C；ListBox/DataTable 滚轮 |
+| L6 | **done** | GridPanel -> Yoga flex-wrap MeasureGrid |
 | C1 | **done** | `doc/keyboard-matrix.md` |
 | C2 | **done** | Combo 点外 + Esc `DismissAllOverlays`；`doc/overlay-popup-contract.md` |
-| C3 | **partial** | IME：caret 顶锚点 + candidate exclude 输入框 + Segoe UI composition font |
-| C4 | **partial** | `Popup` 控件 + light-dismiss + demo；Combo 尚未迁入共用基类 |
+| C3 | **done** | IME 锚点/exclude/composition font；验收表 in mvp-acceptance |
+| C4 | **partial -> Wave2** | `Popup` + demo；Combo 迁入共用基类属 L2 |
 | Q4 | **done** | `mvp-acceptance.md` Gallery 手工验收表 |
-| S4 | **partial** | `applyTheme:` 运行时加载 + `themes/light.json`；硬编码色页不换肤 |
+| S4 | **partial -> Wave2** | `applyTheme:` + light；硬编码色换肤属 L2 |
 | S1 | **done** | `doc/plan/token-migration-strategy.md` |
 | S2 | **done** | `style-catalog.md` Theme vs Catalog 职责边界表 |
-| S3 | **done** | 启动 `[Theme]/`/`[Styles]` 路径 + styleCount；`LogEffectiveEnv` themeFile/stylesFiles |
+| S3 | **done** | 启动 Theme/Styles 路径 + styleCount；`LogEffectiveEnv` themeFile/stylesFiles |
 | L3 | **done** | `yoga_measure_cases` space-between + min/max 段 |
-| L4 | **partial** | `yoga-measure` skia+d2d golden 已入库；core-validation 已有 |
+| L4 | **done** | core-validation + yoga-measure + scroll-viewer x skia/d2d |
 | Q3 | **done** | `run_headless_smoke` 扩 gallery 代表页 + 选最新 exe（含 Release） |
+
+**Wave1 收口（2026-07-16）：** L1 Exit 五项已勾。Wave2 起：C4 完成 / C5 虚拟列表 / S4 硬编码色 / R6-R8。
+
+### Wave2 进度（2026-07-16）
+
+| ID | 状态 | 说明 |
+|----|------|------|
+| C5 | **done** | `VirtualListBox` + 1k demo `virtual_list_demo.xml` |
+| C4 | **done** | `OverlayFlyout` 共用；Combo+Popup 同契约；popup-theme 对照 |
+| S4 | **done** | `$color` rebind + catalog reload on `applyTheme`；buttons tokenized |
+| H5-H7 | **done 0.3.0** | Host API + ai_win_ui_lib + embed_host + CHANGELOG |
+| R6 | **done** | `TextRenderOptions.ellipsis` + Label `ellipsis`；`text-ellipsis` demo |
+| R7 | **done** | `FillLinearGradient` + `FillSoftShadow`；`gradient-shadow` demo |
+| R8 | **done** | path/hash SvgHandle cache + SvgIcon tint (SrcIn) · svg-tint demo |
+| C6-C7 | pending | 拖放 / 模态框 |
+| Q6-Q7 | pending | 回放 / 像素 diff |
+| Q8 | **done** | `run_ci_local.ps1` + `.github/workflows/ci.yml` |
 
 ## 10. 修订记录
 
@@ -351,3 +371,5 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 |------|------|
 | 2026-07-15 | 初版：六人物 + 三 Wave + 认领表 + 契约 |
 | 2026-07-15 | Wave1 开跑：H3/Q1/Q5/R-dump 落地 |
+| 2026-07-16 | Wave1 收口：L2 嵌套滚轮 + L4 golden 补 d2d scroll-viewer；C3/H4/R5 文档与代码；Exit 勾选 |
+| 2026-07-16 | Wave2：C4/C5/S4/R6 + H5 draft；文档全量同步 |

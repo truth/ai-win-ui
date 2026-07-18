@@ -35,10 +35,29 @@ void DrawBoxDecoration(IRenderer& renderer, const Rect& bounds, const BoxDecorat
 
     const float radius = d.radius.MaxRadius();
     const bool hasRadius = radius > 0.0f;
-    const bool hasBackground = d.background.a > 0.0f;
+    const bool hasGradient = d.gradient.enabled;
+    const bool hasBackground = d.background.a > 0.0f || hasGradient;
     const bool hasBorder = !d.border.IsZero() && d.border.color.a > 0.0f;
 
-    if (hasBackground) {
+    // Shadow first (behind fill).
+    if (d.shadow.enabled && d.shadow.color.a > 0.001f) {
+        renderer.FillSoftShadow(
+            bounds,
+            radius,
+            d.shadow.offsetX,
+            d.shadow.offsetY,
+            d.shadow.blur,
+            WithOpacity(d.shadow.color, d.opacity));
+    }
+
+    if (hasGradient) {
+        renderer.FillLinearGradient(
+            bounds,
+            radius,
+            WithOpacity(d.gradient.start, d.opacity),
+            WithOpacity(d.gradient.end, d.opacity),
+            d.gradient.angleDegrees);
+    } else if (hasBackground && d.background.a > 0.0f) {
         const Color bg = WithOpacity(d.background, d.opacity);
         if (hasRadius) {
             renderer.FillRoundedRect(bounds, bg, radius);

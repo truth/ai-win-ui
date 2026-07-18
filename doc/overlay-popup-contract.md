@@ -31,6 +31,11 @@
 | ContextMenu | 否（常驻面板） | — | — | — |
 | MenuStrip | 否（无 flyout） | — | — | — |
 
+## Wave2 C4：共用几何
+
+`OverlayFlyout::PreferOpenAbove` / `PlaceVertical`（`src/ui.h`）供 **ComboBox 下拉** 与 **Popup 浮层** 共用垂直放置与视口夹紧。  
+验收：popup-theme 页同时开 Combo + Popup，点外 / Esc 各自 light-dismiss 且不漏点。
+
 ## Popup（C4）
 
 ```xml

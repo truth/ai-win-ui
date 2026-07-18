@@ -1,0 +1,56 @@
+# Wave3 — GitHub green check (Direct2D path; Skia prebuilts are not in git).
+name: ci
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+  workflow_dispatch:
+
+jobs:
+  windows-d2d-smoke-golden:
+    name: windows / d2d smoke+golden
+    runs-on: windows-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSVC
+        uses: ilammy/msvc-dev-cmd@v1
+        with:
+          arch: x64
+
+      - name: CMake
+        run: cmake --version
+
+      - name: Setup Yoga (unpack + build)
+        shell: pwsh
+        run: ./scripts/setup_ci_deps.ps1 -Configuration Debug
+
+      - name: Configure (Direct2D only)
+        shell: pwsh
+        run: |
+          cmake -S . -B build `
+            -DAI_WIN_UI_ENABLE_SKIA=OFF `
+            -DAI_WIN_UI_BUILD_SAMPLES=ON
+
+      - name: Build
+        shell: pwsh
+        run: |
+          cmake --build build --config Debug --target ai_win_ui
+          cmake --build build --config Debug --target embed_host
+
+      - name: CI gate (gallery + smoke + golden, Direct2D)
+        shell: pwsh
+        run: |
+          $env:AI_WIN_UI_SIZE = "1000x700"
+          # SkipBuild: already built above; D2D-only (no Skia on runner).
+          ./scripts/run_ci_local.ps1 `
+            -SkipBuild `
+            -Configuration Debug `
+            -Renderer direct2d `
+            -SmokeProfile smoke `
+            -GoldenTolerance 1.5

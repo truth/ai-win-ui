@@ -200,8 +200,8 @@ render SVG, instead of getting a silent blank slot.
 `<SvgIcon>` is the layout-side consumer; see
 [layout-spec.md](layout-spec.md) for the DSL surface.
 
-v1 limits: no tint / colour override, no cross-instance `SvgHandle`
-caching, no SMIL animation, no external `xlink:href`.
+Wave2 **R8**: path-keyed `SvgHandle` cache + optional `tint` (Skia `SrcIn`
+recolor). Still no SMIL animation or external `xlink:href`.
 
 ### DPI Coordinate Space
 
@@ -215,21 +215,66 @@ unaffected.
 
 ## Current Limits
 
-- text draw is improved, but it still does not yet match DirectWrite behavior closely enough
-- presentation is CPU/raster only
-- bitmap scaling and text fidelity still need deeper side-by-side comparison
-  against the Direct2D backend
-- Skia text measurement is not yet the same engine as the current layout
-  measurement path
+- presentation is CPU/raster only (no GPU present path yet)
+- bitmap scaling quality can differ slightly from Direct2D (linear sampling policy)
 - the `vcpkg` Skia path still is not the preferred delivery route in this repo
+- SVG v1: no tint, no handle cache, no SMIL (Direct2D shows placeholder)
 
-## Recommended Next Tasks
+## Known Skia ↔ Direct2D differences (Wave1 · R5)
 
-1. Continue improving Skia text so it is closer to the existing text measurement path.
-2. Compare image presentation, clipping, DPI behavior, and text layout against Direct2D.
-3. Use `resource/layouts/core_validation.xml` as the shared manual acceptance page while growing parity.
-4. Continue tuning image scaling quality and compare the current explicit linear sampling policy against Direct2D.
-5. Only after raster parity is acceptable, revisit either `vcpkg` or a self-build workflow.
-6. SVG follow-ups: tint via `SkColorFilter`, cross-icon `SvgHandle`
-   caching keyed by source path, run-time backend switching that
-   re-resolves cached handles.
+Wave1 text parity accepts **metrics** within **≤2px** at 96 DPI on
+`core_validation` / `text_wrap` (`HeightsOnly`) via
+`scripts/compare_text_dumps.ps1`. Raster-only deltas below are **non-blocking**.
+
+| Area | Skia | Direct2D / DirectWrite | MVP / L1 impact |
+|------|------|------------------------|-----------------|
+| Text AA | LCD / subpixel SkFont settings | ClearType | Visual grain differs; metrics primary |
+| Font fallback | Skia font manager + shared face helpers | DWrite font collection | CJK missing-glyph systems may exceed 2px width — pin YaHei UI when comparing |
+| Mid-word emergency break | May break ultra-long no-space tokens earlier | Different | wrapH can differ ~1 line on pathological tokens only |
+| wrapW (line fill) | Manual wrap fills | DWrite line metrics | Prefer height parity (`HeightsOnly`) for R2 |
+| DPI space | Client-pixel / DIP 1:1 | `SetDpi(96,96)` on HWND RT | Aligned for hover / layout |
+| Rounded clip | save/clip/restore | geometry layers | Should match; report leaks as bugs |
+| Image scale | Explicit linear sampling | D2D default | Minor softness differences OK |
+| SVG | `SkSVGDOM` full paint | Placeholder box + "SVG" label | Backend feature gap, not a parity bug |
+| Layered present | DIB + `UpdateLayeredWindow` | DC RT + same | Both supported |
+
+Authoritative short notes also live in
+`doc/plan/wave1-text-parity-notes.md`.
+
+## Single-line ellipsis (Wave2 · R6)
+
+`TextRenderOptions.ellipsis` (with `wrap == NoWrap`):
+
+| Backend | Mechanism |
+|---------|-----------|
+| Skia | `CreateSkiaTextLayout` binary-searches prefix + U+2026 to fit `maxWidth` |
+| Direct2D | `IDWriteTextFormat::SetTrimming` + `CreateEllipsisTrimmingSign` |
+
+DSL: `Label` attribute `ellipsis="true"`. Demo: `layouts/text_ellipsis_cases.xml`
+(alias `text-ellipsis`). Multi-line ellipsis is **out of scope** for v1.
+
+## Gradient + soft shadow (Wave2 · R7)
+
+| API | Skia | Direct2D |
+|-----|------|----------|
+| `FillLinearGradient` | `SkGradientShader::MakeLinear` | `ID2D1LinearGradientBrush` |
+| `FillSoftShadow` | multi-pass rounded fills | same multi-pass approx |
+
+Consumed by `DrawBoxDecoration` via `BoxDecoration.gradient` / `.shadow`, and by
+`Panel` attributes (`gradientStart` / `shadowBlur` / …). Demo:
+`layouts/gradient_shadow_demo.xml`.
+
+## SVG tint + cache (Wave2 · R8)
+
+| Feature | Behavior |
+|---------|----------|
+| Cache key | Prefer resource path (`icons/check.svg`); else FNV-1a of bytes |
+| `CreateSvgFromBytes(data, size, cacheKey)` | Returns shared `SvgHandle` for same key |
+| `DrawSvg(..., hasTint, tint)` | Skia: `saveLayer` + `SkColorFilters::Blend(SrcIn)`; D2D: tinted placeholder |
+| DSL | `SvgIcon tint="#3A86FF"` (or `color=`); demo `svg_tint_demo.xml` |
+
+## Recommended Next Tasks (Wave2 remainder)
+
+1. Optional pixel / screenshot diff tooling (Q7) / CI (Q8).
+2. Optional C6/C7 drag / modal.
+3. Wave3: embed lib (H5b/H6).

@@ -1,25 +1,29 @@
 <!--
-  ScrollViewer cases (P0): nested vertical scroll inside a fixed viewport.
-  Wheel over the scroller moves content; window-level scroll still works outside.
+  ScrollViewer cases (Wave1 L2):
+  - basic vertical scroller (wheel / drag content / thumb)
+  - nested ListView / ListBox consume wheel first; outer only when inner at edge
+  - dual-axis scroller (scrollX+scrollY; Shift+wheel → X when Y also enabled)
 -->
 <Panel
   name="root"
   direction="column"
   background="#0B121A"
-  padding="20,20,20,20"
-  spacing="12"
+  padding="16,16,16,16"
+  spacing="10"
   alignItems="stretch">
 
-  <Label name="title" text="ScrollViewer cases" fontSize="20" color="#F5F8FC" />
+  <Label name="title" text="ScrollViewer cases (L2 nested wheel)" fontSize="20" color="#F5F8FC" />
   <Label
     name="hint"
-    text="Wheel, drag the content, or drag the scrollbar thumb. Content is taller than the viewport."
-    fontSize="13"
+    text="Outer page may use host scroll. Nested: wheel over List / ListBox / inner scroller must not move outer until edge."
+    fontSize="12"
     color="#8FA3B8" />
 
+  <!-- A: tall content vertical scroller -->
+  <Label name="secA" text="A · Vertical ScrollViewer" fontSize="14" color="#C5D4E6" />
   <ScrollViewer
     name="scroller"
-    height="280"
+    height="200"
     scrollY="true"
     scrollX="false"
     showScrollbars="true"
@@ -29,7 +33,7 @@
       name="scrollContent"
       direction="column"
       padding="12,12,12,12"
-      spacing="8"
+      spacing="6"
       background="#152033"
       alignItems="stretch">
       <Label name="line0" text="Line 0 — top of scroll content" fontSize="14" color="#E8EEF6" />
@@ -52,5 +56,76 @@
     </Panel>
   </ScrollViewer>
 
-  <Label name="footer" text="Alias: scroll-viewer  ·  measure: AI_WIN_UI_MEASURE_DUMP=1" fontSize="12" color="#5C7085" />
+  <!-- B: outer ScrollViewer + inner list controls (nested wheel matrix) -->
+  <Label name="secB" text="B · Nested ListView / ListBox (inner wheel first)" fontSize="14" color="#C5D4E6" />
+  <ScrollViewer
+    name="outerNest"
+    height="220"
+    scrollY="true"
+    scrollX="false"
+    showScrollbars="true"
+    background="#121B25"
+    barThickness="10">
+    <Panel
+      name="outerNestContent"
+      direction="column"
+      padding="10,10,10,10"
+      spacing="8"
+      background="#152033"
+      alignItems="stretch">
+      <Label name="nestIntro" text="Scroll outside the lists moves this outer panel. Wheel over lists should scroll the list only." fontSize="12" color="#9BB0C4" />
+      <ListView
+        name="nestedListView"
+        height="140"
+        columns="Name|Role|Status"
+        columnWidths="120|140|100"
+        rows="Ava Carter|Designer|Online;Noah Kim|Engineer|Review;Mia Chen|Analyst|Online;Liam Patel|QA|Blocked;Emma Garcia|PM|Online;Ethan Rossi|Backend|Offline;Sophia Diaz|UX|Online;Lucas Brown|DevOps|Online;Olivia Park|Writer|Draft;Mason Hill|Support|Escalated;Amelia Ng|Mobile|Online;Henry Cho|Platform|Online"
+        selectedIndex="1"
+        headerHeight="26"
+        rowHeight="24" />
+      <ListBox
+        name="nestedListBox"
+        height="120"
+        itemHeight="22"
+        items="Alpha|Bravo|Charlie|Delta|Echo|Foxtrot|Golf|Hotel|India|Juliet|Kilo|Lima|Mike|November|Oscar"
+        selectedIndex="0" />
+      <Label name="nestFooter" text="Below lists — outer content continues so outer can still scroll." fontSize="12" color="#7B6CFF" />
+      <Label name="pad0" text="pad 0" fontSize="13" color="#E8EEF6" />
+      <Label name="pad1" text="pad 1" fontSize="13" color="#E8EEF6" />
+      <Label name="pad2" text="pad 2" fontSize="13" color="#E8EEF6" />
+      <Label name="pad3" text="pad 3" fontSize="13" color="#E8EEF6" />
+      <Label name="pad4" text="pad 4" fontSize="13" color="#E8EEF6" />
+      <Label name="pad5" text="pad 5 — outer bottom" fontSize="13" color="#7B6CFF" />
+    </Panel>
+  </ScrollViewer>
+
+  <!-- C: dual-axis -->
+  <Label name="secC" text="C · Dual-axis ScrollViewer (Shift+wheel → X)" fontSize="14" color="#C5D4E6" />
+  <ScrollViewer
+    name="dualAxis"
+    height="140"
+    scrollY="true"
+    scrollX="true"
+    showScrollbars="true"
+    background="#121B25"
+    barThickness="10">
+    <Panel
+      name="dualContent"
+      direction="column"
+      width="1400"
+      padding="12,12,12,12"
+      spacing="6"
+      background="#1A2838"
+      alignItems="start">
+      <Label name="wide0" text="WIDE ROW 0 — horizontal overflow intentionally long so you can Shift+wheel or drag H thumb · · · · · · · · end" fontSize="13" color="#E8EEF6" />
+      <Label name="wide1" text="WIDE ROW 1 — more vertical lines for Y scroll" fontSize="13" color="#E8EEF6" />
+      <Label name="wide2" text="WIDE ROW 2" fontSize="13" color="#E8EEF6" />
+      <Label name="wide3" text="WIDE ROW 3" fontSize="13" color="#E8EEF6" />
+      <Label name="wide4" text="WIDE ROW 4" fontSize="13" color="#E8EEF6" />
+      <Label name="wide5" text="WIDE ROW 5" fontSize="13" color="#E8EEF6" />
+      <Label name="wide6" text="WIDE ROW 6 — dual-axis end" fontSize="13" color="#7B6CFF" />
+    </Panel>
+  </ScrollViewer>
+
+  <Label name="footer" text="Alias: scroll-viewer · L2 matrix in mvp-acceptance.md · measure: AI_WIN_UI_MEASURE_DUMP=1" fontSize="11" color="#5C7085" />
 </Panel>
