@@ -8602,6 +8602,14 @@ public:
             return UIElement::FindOverlayHitAt(x, y);
         }
         if (ModalRect().Contains(x, y)) {
+            // If the pointer is on a caption area, return 'this' so the host
+            // sets m_mouseCaptureTarget = Modal, and drag events flow here.
+            for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+                if (*it && (*it)->HasCaptionHitAt(x, y)) {
+                    return this;
+                }
+            }
+            // Otherwise return the deepest interactive child.
             for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
                 if (*it && (*it)->HitTest(x, y)) {
                     if (UIElement* hit = (*it)->FindOverlayHitAt(x, y)) {
