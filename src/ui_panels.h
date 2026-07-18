@@ -1,5 +1,5 @@
 #pragma once
-// Component module - part of the ai-win-ui library.
+// Panel, GridPanel, Label, StatCard, SparklineChart, ShapePanel, DataTable, SeagullAnimation
 // See ui.h for the full umbrella include.
 #include "ui_element.h"
 

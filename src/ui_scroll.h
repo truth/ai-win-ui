@@ -1,5 +1,5 @@
 #pragma once
-// Component module - part of the ai-win-ui library.
+// ScrollViewer
 // See ui.h for the full umbrella include.
 #include "ui_nav.h"
 

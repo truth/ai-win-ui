@@ -1,5 +1,5 @@
 #pragma once
-// Component module - part of the ai-win-ui library.
+// RichTextBox
 // See ui.h for the full umbrella include.
 #include "ui_pickers.h"
 

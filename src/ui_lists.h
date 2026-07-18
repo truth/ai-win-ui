@@ -1,5 +1,5 @@
 #pragma once
-// Component module - part of the ai-win-ui library.
+// ListBox, VirtualListBox, ComboBox
 // See ui.h for the full umbrella include.
 #include "ui_text.h"
 
