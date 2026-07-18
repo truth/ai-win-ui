@@ -1,4 +1,4 @@
-﻿#include "layout_parser.h"
+#include "layout_parser.h"
 #include "resource_provider.h"
 #include "style_catalog.h"
 #include "theme.h"
@@ -2099,6 +2099,22 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*popup, props);
         }
         element = std::move(popup);
+    } else if (type == "Modal") {
+        auto modal = std::make_unique<Modal>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["width"].IsNumber()) {
+                modal->SetModalWidth(static_cast<float>(props["width"].numberValue));
+            }
+            if (props["height"].IsNumber()) {
+                modal->SetModalHeight(static_cast<float>(props["height"].numberValue));
+            }
+            if (props["open"].IsBool()) {
+                modal->SetOpen(props["open"].boolValue);
+            }
+            ApplyCommonJsonProps(*modal, props);
+        }
+        element = std::move(modal);
     } else if (type == "TabControl") {
         auto tabControl = std::make_unique<TabControl>();
         if (node["props"].IsObject()) {
@@ -3312,6 +3328,19 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*popup, node);
         element = std::move(popup);
+    } else if (node.name == "Modal") {
+        auto modal = std::make_unique<Modal>();
+        if (auto it = node.attributes.find("width"); it != node.attributes.end()) {
+            modal->SetModalWidth(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("height"); it != node.attributes.end()) {
+            modal->SetModalHeight(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("open"); it != node.attributes.end()) {
+            modal->SetOpen(ToLowerAscii(it->second) == "true");
+        }
+        ApplyCommonXmlAttributes(*modal, node);
+        element = std::move(modal);
     } else if (node.name == "TabControl") {
         auto tabControl = std::make_unique<TabControl>();
         if (auto it = node.attributes.find("tabs"); it != node.attributes.end()) {

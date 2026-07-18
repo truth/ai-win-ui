@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "box_decoration.h"
 #include "graphics_types.h"
@@ -275,6 +275,9 @@ public:
     }
 
     virtual UIElement* FindHitElementAt(float x, float y) {
+        if (!HitTest(x, y)) {
+            return nullptr;
+        }
         for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
             if ((*it)->HitTest(x, y)) {
                 if (auto* hitChild = (*it)->FindHitElementAt(x, y)) {
@@ -284,6 +287,17 @@ public:
             }
         }
         return HitTest(x, y) ? const_cast<UIElement*>(this) : nullptr;
+    }
+
+    virtual bool HasCaptionHitAt(float x, float y) {
+        if (!HitTest(x, y)) return false;
+        if (m_hitTestRole == HitTestRole::Caption) return true;
+        for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+            if (*it && (*it)->HasCaptionHitAt(x, y)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     virtual void CollectFocusable(std::vector<UIElement*>& out) {
@@ -8536,6 +8550,243 @@ private:
     bool m_open = false;
 };
 
+// Modal Dialog (Wave2 C7): Blocks input to underlying tree, dim overlay.
+class Modal : public UIElement {
+public:
+    Modal() { m_style = DefaultStyle(nullptr); }
+
+    static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
+        ComponentStyle s;
+        BoxDecoration shell;
+        shell.background = ComponentStyle::ThemeColor(theme, "surface-1", ColorFromHex(0x1B2C3D));
+        shell.border.width = Thickness{1, 1, 1, 1};
+        shell.border.color = ComponentStyle::ThemeColor(theme, "border-subtle", ColorFromHex(0x36506A));
+        shell.radius = CornerRadius::Uniform(ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::Radius, "md", 8.0f));
+        s.base.decoration = shell;
+        s.base.foreground = ComponentStyle::ThemeColor(theme, "fg", ColorFromHex(0xE9F2FD));
+        s.base.fontSize = ComponentStyle::ThemeNumber(theme, Theme::NumberCategory::FontSize, "sm", 13.0f);
+        return s;
+    }
+
+    void ApplyThemeDefaults() override {
+        if (m_styleFromLayout) return;
+        const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
+        m_style = DefaultStyle(theme);
+        for (auto& child : m_children) {
+            if (child) child->ApplyThemeDefaults();
+        }
+    }
+
+    void SetModalWidth(float w) { m_modalWidth = std::max(100.0f, w); }
+    void SetModalHeight(float h) { m_modalHeight = std::max(40.0f, h); }
+    
+    void SetOpen(bool open) {
+        m_open = open;
+        if (!m_open) {
+            m_dragging = false;
+            m_offsetX = 0.0f;
+            m_offsetY = 0.0f;
+        }
+        if (m_open) {
+            LayoutModalChildren();
+        }
+    }
+    bool IsOpen() const { return m_open; }
+    void Open() { SetOpen(true); }
+    void Close() { SetOpen(false); }
+
+    bool IsFocusable() const override { return true; }
+
+    UIElement* FindOverlayHitAt(float x, float y) override {
+        if (!m_open) {
+            return UIElement::FindOverlayHitAt(x, y);
+        }
+        if (ModalRect().Contains(x, y)) {
+            for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+                if (*it && (*it)->HitTest(x, y)) {
+                    if (UIElement* hit = (*it)->FindOverlayHitAt(x, y)) {
+                        return hit;
+                    }
+                    if (UIElement* hit = (*it)->FindHitElementAt(x, y)) {
+                        return hit;
+                    }
+                }
+            }
+            // Background of modal itself
+            return this;
+        }
+        // Block hits to anything else by returning this modal for the dim region
+        return this;
+    }
+
+    bool DismissAllOverlays() override {
+        bool changed = UIElement::DismissAllOverlays();
+        if (m_open) {
+            m_open = false;
+            changed = true;
+        }
+        return changed;
+    }
+
+    bool OnMouseDown(float x, float y) override {
+        if (ModalRect().Contains(x, y)) {
+            bool handled = false;
+            for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+                if (*it && (*it)->HitTest(x, y)) {
+                    if ((*it)->OnMouseDown(x, y)) {
+                        handled = true;
+                        break;
+                    }
+                }
+            }
+            if (handled) return true;
+
+            // Check if we hit a caption area
+            for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+                if (*it && (*it)->HasCaptionHitAt(x, y)) {
+                    m_dragging = true;
+                    m_dragStartX = x;
+                    m_dragStartY = y;
+                    m_dragStartOffsetX = m_offsetX;
+                    m_dragStartOffsetY = m_offsetY;
+                    return true;
+                }
+            }
+            return true;
+        }
+        // Outside the modal. Block input.
+        return true; 
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        if (m_dragging) {
+            m_offsetX = m_dragStartOffsetX + (x - m_dragStartX);
+            m_offsetY = m_dragStartOffsetY + (y - m_dragStartY);
+            LayoutModalChildren();
+            return true;
+        }
+        bool changed = false;
+        if (m_open && ModalRect().Contains(x, y)) {
+            for (auto& child : m_children) {
+                if (child && child->OnMouseMove(x, y)) {
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    bool OnMouseUp(float x, float y) override {
+        if (m_dragging) {
+            m_dragging = false;
+            return true;
+        }
+        bool changed = false;
+        if (m_open && ModalRect().Contains(x, y)) {
+            for (auto& child : m_children) {
+                if (child && child->OnMouseUp(x, y)) {
+                    changed = true;
+                }
+            }
+        }
+        return changed;
+    }
+
+    void Measure(float /*availableWidth*/, float /*availableHeight*/) override {
+        // Modal is an overlay placeholder. It doesn't take space in flow.
+        m_desiredSize = Size{0.0f, 0.0f};
+    }
+
+    void Arrange(const Rect& finalRect) override {
+        m_bounds = finalRect;
+        if (m_open) {
+            LayoutModalChildren();
+        }
+    }
+
+    void Render(IRenderer& /*renderer*/) override {
+        // Normal render pass does nothing. Modal draws in RenderOverlay.
+    }
+
+    void RenderOverlay(IRenderer& renderer) override {
+        if (!m_open || !m_context) {
+            return;
+        }
+
+        // Draw dim layer covering the entire viewport
+        Rect dimRect = Rect::Make(0.0f, 0.0f, m_context->viewportWidth, m_context->viewportHeight);
+        renderer.FillRect(dimRect, Color{0.0f, 0.0f, 0.0f, 0.5f});
+
+        const Rect modal = ModalRect();
+        Color bg = ColorFromHex(0x1B2C3D);
+        Color border = ColorFromHex(0x36506A);
+        if (m_style.base.decoration.has_value()) {
+            bg = m_style.base.decoration->background;
+            border = m_style.base.decoration->border.color;
+        }
+        float radius = 8.0f;
+        if (m_style.base.decoration && m_style.base.decoration->radius.topLeft > 0) {
+            radius = m_style.base.decoration->radius.topLeft;
+        }
+
+        // Drop shadow for modal
+        renderer.FillSoftShadow(modal, radius, 0.0f, 6.0f, 12.0f, Color{0.0f, 0.0f, 0.0f, 0.3f});
+
+        renderer.FillRoundedRect(modal, bg, ScaleValue(radius));
+        renderer.DrawRoundedRect(modal, border, 1.0f, ScaleValue(radius));
+
+        renderer.PushRoundedClip(modal, ScaleValue(radius));
+        // Draw children
+        for (auto& child : m_children) {
+            if (child) {
+                child->Render(renderer);
+            }
+        }
+        renderer.PopLayer();
+
+        UIElement::RenderOverlay(renderer);
+    }
+
+private:
+    Rect ModalRect() const {
+        if (!m_context) return Rect::Make(0,0,0,0);
+        float vw = m_context->viewportWidth;
+        float vh = m_context->viewportHeight;
+        float w = ScaleValue(m_modalWidth);
+        float h = ScaleValue(m_modalHeight);
+        float left = (vw - w) * 0.5f + m_offsetX;
+        float top = (vh - h) * 0.5f + m_offsetY;
+        return Rect::Make(left, top, left + w, top + h);
+    }
+
+    void LayoutModalChildren() {
+        if (!m_context) return;
+        const Rect modal = ModalRect();
+        const float w = std::max(1.0f, modal.right - modal.left);
+        const float h = std::max(1.0f, modal.bottom - modal.top);
+
+        for (auto& child : m_children) {
+            if (!child) continue;
+            child->SetContext(m_context);
+            child->Measure(w, h);
+            child->Arrange(modal);
+        }
+    }
+
+    float m_modalWidth = 320.0f;
+    float m_modalHeight = 200.0f;
+    bool m_open = false;
+
+    float m_offsetX = 0.0f;
+    float m_offsetY = 0.0f;
+    bool m_dragging = false;
+    float m_dragStartX = 0.0f;
+    float m_dragStartY = 0.0f;
+    float m_dragStartOffsetX = 0.0f;
+    float m_dragStartOffsetY = 0.0f;
+};
+
+
 class TabControl : public UIElement {
 public:
     TabControl() { m_style = DefaultStyle(nullptr); }
@@ -9371,6 +9622,13 @@ public:
     }
 
 protected:
+    bool HitTest(float x, float y) const override {
+        if (m_drag != DragMode::None) {
+            return true; // Implicit capture while dragging
+        }
+        return UIElement::HitTest(x, y);
+    }
+
     float MeasurePreferredWidth(float availableWidth) const override {
         return availableWidth;
     }

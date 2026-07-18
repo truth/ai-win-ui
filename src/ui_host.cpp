@@ -1049,6 +1049,31 @@ private:
                     }
                 };
             }
+            // C7: openModal:elementName
+            if (eventId.rfind("openModal:", 0) == 0) {
+                const std::string name = eventId.substr(10);
+                return [this, name]() {
+                    if (!m_root) return;
+                    if (UIElement* el = m_root->FindElementByName(name)) {
+                        if (auto* modal = dynamic_cast<Modal*>(el)) {
+                            modal->Open();
+                            InvalidateRect(m_hwnd, nullptr, FALSE);
+                        }
+                    }
+                };
+            }
+            if (eventId.rfind("closeModal:", 0) == 0) {
+                const std::string name = eventId.substr(11);
+                return [this, name]() {
+                    if (!m_root) return;
+                    if (UIElement* el = m_root->FindElementByName(name)) {
+                        if (auto* modal = dynamic_cast<Modal*>(el)) {
+                            modal->Close();
+                            InvalidateRect(m_hwnd, nullptr, FALSE);
+                        }
+                    }
+                };
+            }
             if (eventId == "windowMinimize") {
                 return [this]() { ShowWindow(m_hwnd, SW_MINIMIZE); };
             }

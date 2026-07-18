@@ -109,6 +109,11 @@
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/navigation_components.xml||1200x750" height="32" />
         </Panel>
         <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Modal Dialog (C7)" fontSize="14" color="#F2F6FB" />
+          <Label text="Message style · block input" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/modal_demo.xml||1000x700" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
           <Label text="Advanced Inputs" fontSize="14" color="#F2F6FB" />
           <Label text="Numeric · DateTime · RichText" fontSize="11" color="#8FA3B8" />
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/advanced_inputs.xml||1100x720" height="32" />

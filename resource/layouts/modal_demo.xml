@@ -1,0 +1,50 @@
+<Panel layout="flex" direction="column" padding="24" spacing="16" background="$color.surface-0">
+    <Label text="Modal Dialog Demo" fontSize="24" foreground="$color.fg-strong"/>
+    <Label text="This demonstrates the Message-style Modal Dialog. It blocks input and supports custom title bars." foreground="$color.fg-muted" wrap="wrap"/>
+    
+    <Panel layout="flex" direction="row" spacing="12">
+        <Button text="Delete Document" onClick="openModal:deleteConfirmModal"/>
+        <Button text="Show Info" onClick="openModal:infoModal"/>
+    </Panel>
+
+    <Panel layout="flex" direction="row" spacing="12" marginTop="24">
+        <TextInput text="Try typing here while modal is open" width="250"/>
+        <Button text="I should be blocked" onClick="systemBeep"/>
+    </Panel>
+
+    <Modal id="deleteConfirmModal" width="360" height="200">
+        <Panel layout="flex" direction="column" flexGrow="1" alignItems="stretch">
+            <!-- Custom Title Bar -->
+            <Panel layout="flex" direction="row" height="44" background="#0E1622" alignItems="center" justifyContent="spaceBetween" padding="16,0,16,0" hitTest="caption">
+                <Label text="Confirm Deletion" fontSize="13" color="#F2F6FB"/>
+                <!-- We use a standard button here styled as a close button -->
+                <Button variant="caption-close" text="✕" width="32" height="32" padding="0" onClick="closeModal:deleteConfirmModal"/>
+            </Panel>
+            <!-- Content Body -->
+            <Panel layout="flex" direction="column" padding="16" flexGrow="1" justifyContent="spaceBetween" background="#152033">
+                <Label text="Are you sure you want to delete this document? This action cannot be undone." wrap="wrap" foreground="$color.fg"/>
+                <Panel layout="flex" direction="row" justifyContent="flexEnd" spacing="8">
+                    <Button text="Cancel" onClick="closeModal:deleteConfirmModal"/>
+                    <Button text="Delete" onClick="closeModal:deleteConfirmModal" textColor="#FF4444"/>
+                </Panel>
+            </Panel>
+        </Panel>
+    </Modal>
+
+    <Modal id="infoModal" width="300" height="150">
+        <Panel layout="flex" direction="column" flexGrow="1" alignItems="stretch">
+            <!-- Custom Title Bar -->
+            <Panel layout="flex" direction="row" height="44" background="#0E1622" alignItems="center" justifyContent="spaceBetween" padding="16,0,16,0" hitTest="caption">
+                <Label text="Information" fontSize="13" color="#F2F6FB"/>
+                <Button variant="caption-close" text="✕" width="32" height="32" padding="0" onClick="closeModal:infoModal"/>
+            </Panel>
+            <!-- Content Body -->
+            <Panel layout="flex" direction="column" padding="16" flexGrow="1" justifyContent="spaceBetween" background="#152033">
+                <Label text="Input is blocked. Press Escape to close." wrap="wrap" foreground="$color.fg"/>
+                <Panel layout="flex" direction="row" justifyContent="flexEnd">
+                    <Button text="Got it" onClick="closeModal:infoModal"/>
+                </Panel>
+            </Panel>
+        </Panel>
+    </Modal>
+</Panel>
