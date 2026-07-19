@@ -261,12 +261,17 @@ public:
         if (SkCanvas* canvas = Canvas()) {
             const float cx = (rect.left + rect.right) * 0.5f;
             const float cy = (rect.top + rect.bottom) * 0.5f;
-            const float halfDiag = 0.5f * std::sqrt(
-                rect.Width() * rect.Width() + rect.Height() * rect.Height());
+            // To ensure the gradient covers the entire rect without stopping early and causing a "clamping border" effect:
+            // Calculate distance to the furthest corner in the direction of the gradient.
             const float rad = angleDegrees * 3.14159265f / 180.0f;
+            const float c = std::cos(rad);
+            const float s = std::sin(rad);
+            // Distance from center to the bounding box edge along the gradient vector
+            const float maxDist = (rect.Width() * 0.5f * std::abs(c)) + (rect.Height() * 0.5f * std::abs(s));
+            
             const SkPoint pts[2] = {
-                SkPoint::Make(cx - std::cos(rad) * halfDiag, cy - std::sin(rad) * halfDiag),
-                SkPoint::Make(cx + std::cos(rad) * halfDiag, cy + std::sin(rad) * halfDiag),
+                SkPoint::Make(cx - c * maxDist, cy - s * maxDist),
+                SkPoint::Make(cx + c * maxDist, cy + s * maxDist),
             };
             const SkColor colors[2] = {ToSkColor(start), ToSkColor(end)};
             SkPaint paint;

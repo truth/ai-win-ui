@@ -299,12 +299,14 @@ public:
         }
         const float cx = (rect.left + rect.right) * 0.5f;
         const float cy = (rect.top + rect.bottom) * 0.5f;
-        const float halfDiag = 0.5f * std::sqrt(
-            rect.Width() * rect.Width() + rect.Height() * rect.Height());
         // CSS-like: 0deg = left→right, 90deg = top→bottom.
         const float rad = angleDegrees * 3.14159265f / 180.0f;
-        const float dx = std::cos(rad) * halfDiag;
-        const float dy = std::sin(rad) * halfDiag;
+        const float c = std::cos(rad);
+        const float s = std::sin(rad);
+        const float maxDist = (rect.Width() * 0.5f * std::abs(c)) + (rect.Height() * 0.5f * std::abs(s));
+        
+        const float dx = c * maxDist;
+        const float dy = s * maxDist;
 
         D2D1_GRADIENT_STOP stops[2]{};
         stops[0].position = 0.0f;
