@@ -2,13 +2,13 @@
   RolanCpp Launcher Demo Layout
   Demonstrates custom chrome, tabs, wrapping grid with shadows, and gradients.
 -->
-<Panel chrome="custom" direction="column" alignItems="stretch" spacing="0" background="#DBCAB2">
+<Panel chrome="custom" direction="column" alignItems="stretch" spacing="0" background="#DBCAB2" width="100%" height="100%">
   
   <!-- Title bar area -->
-  <Panel role="titleBar" hitTest="caption" direction="column" background="#456FE6" padding="0,0,0,0" spacing="0" alignItems="stretch">
+  <Panel role="titleBar" hitTest="caption" direction="column" background="#456FE6" padding="0,0,0,0" spacing="0" alignItems="stretch" width="100%">
     
     <!-- Top row: Title, Search, Actions -->
-    <Panel direction="row" height="48" padding="16,0,16,0" spacing="0" alignItems="center" justifyContent="spaceBetween">
+    <Panel direction="row" height="48" padding="16,0,16,0" spacing="0" alignItems="center" justifyContent="spaceBetween" width="100%">
       
       <!-- Left: Logo + Title -->
       <Panel direction="row" alignItems="center" spacing="8" hitTest="caption" flexGrow="1" flexBasis="0">
@@ -54,6 +54,7 @@
   <!-- Main Content area (Grid of App Icons) -->
   <Panel 
     flexGrow="1" 
+    width="100%"
     direction="row" 
     wrap="wrap" 
     padding="32,32,32,32" 
