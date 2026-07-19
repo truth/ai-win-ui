@@ -361,8 +361,11 @@ Start ──┼── L1,L2,L3 ──► L4 ◄── Q2
 | R6 | **done** | `TextRenderOptions.ellipsis` + Label `ellipsis`；`text-ellipsis` demo |
 | R7 | **done** | `FillLinearGradient` + `FillSoftShadow`；`gradient-shadow` demo |
 | R8 | **done** | path/hash SvgHandle cache + SvgIcon tint (SrcIn) · svg-tint demo |
-| C6-C7 | pending | 拖放 / 模态框 |
-| Q6-Q7 | pending | 回放 / 像素 diff |
+| C6-C7 | **done** | 拖放 (`FindDropTargetAt`) / 模态框 (`Modal` overlay) 已完成 |
+| S5-S6 | **done** | 主题安全回退与 Token 审计完成，保障缺色不崩 |
+| H8 | **done** | 多监视器与跨屏 DPI 变更手工测试流程已补充至验收文档 |
+| Q6 | **done** | 交互录制与回放 (`AI_WIN_UI_RECORD` / `REPLAY`) 系统完成 |
+| Q7 | pending | 像素/截图 diff (可选) |
 | Q8 | **done** | `run_ci_local.ps1` + `.github/workflows/ci.yml` |
 
 ## 10. 修订记录
