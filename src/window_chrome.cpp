@@ -14,6 +14,12 @@
 #ifndef DWMWCP_ROUND
 #define DWMWCP_ROUND 2
 #endif
+#ifndef DWMWA_BORDER_COLOR
+#define DWMWA_BORDER_COLOR 34
+#endif
+#ifndef DWMWA_COLOR_NONE
+#define DWMWA_COLOR_NONE 0xFFFFFFFEu
+#endif
 
 namespace {
 
@@ -109,6 +115,12 @@ bool WindowChrome::InitializeDwm(HWND hwnd) {
     // Win11 rounded corners when the attribute is available.
     const int preference = DWMWCP_ROUND;
     DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, &preference, sizeof(preference));
+
+    // Remove the 1px DWM border line that Windows 11 draws around all windows.
+    // DWMWA_COLOR_NONE (0xFFFFFFFE) suppresses the border entirely.
+    const COLORREF noBorder = static_cast<COLORREF>(DWMWA_COLOR_NONE);
+    DwmSetWindowAttribute(hwnd, DWMWA_BORDER_COLOR, &noBorder, sizeof(noBorder));
+
     return true;
 }
 
@@ -190,20 +202,9 @@ LRESULT WindowChrome::HandleNcCalcSize(HWND hwnd, WPARAM wParam, LPARAM lParam, 
                 if (GetMonitorInfoW(monitor, &info)) {
                     params->rgrc[0] = info.rcWork;
                 }
-            } else {
-                // Shrink the proposed client rect inward by the resize border thickness on
-                // left, right, and bottom. This pushes the system-drawn WS_THICKFRAME border
-                // lines outside the visible client area so they are clipped and invisible,
-                // while still allowing the resize hit-testing to function correctly.
-                // Top is left at 0 shrink so we keep a clean flush top edge.
-                const int framePx = GetSystemMetricsForDpi(SM_CXFRAME, m_dpi);
-                const int paddedPx = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, m_dpi);
-                const int border = framePx + paddedPx;
-                params->rgrc[0].left   += border;
-                params->rgrc[0].right  -= border;
-                params->rgrc[0].bottom -= border;
-                // Keep top flush (no shrink) so the top edge has no gap.
             }
+            // Non-maximized: leave rgrc[0] as the proposed window rect so the
+            // entire window becomes client area (no system caption/border strip).
         }
         handled = true;
         return 0;
