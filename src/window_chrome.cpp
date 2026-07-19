@@ -99,8 +99,8 @@ bool WindowChrome::InitializeDwm(HWND hwnd) {
         return false;
     }
 
-    // Keep a 1px top margin so DWM can still provide a subtle frame/shadow.
-    MARGINS margins{0, 0, 1, 0};
+    // Extend frame into the entire client area to remove all non-client borders while keeping the drop shadow.
+    MARGINS margins{-1, -1, -1, -1};
     const HRESULT hrExtend = DwmExtendFrameIntoClientArea(hwnd, &margins);
     if (FAILED(hrExtend)) {
         return false;
