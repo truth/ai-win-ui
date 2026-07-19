@@ -1,0 +1,177 @@
+<!--
+  RolanCpp Launcher Demo Layout
+  Demonstrates custom chrome, tabs, wrapping grid with shadows, and gradients.
+-->
+<Panel chrome="custom" direction="column" alignItems="stretch" spacing="0">
+  
+  <!-- Title bar area -->
+  <Panel role="titleBar" hitTest="caption" direction="column" background="#456FE6" padding="0,0,0,0" spacing="0" alignItems="stretch">
+    
+    <!-- Top row: Title, Search, Actions -->
+    <Panel direction="row" height="48" padding="16,0,16,0" spacing="0" alignItems="center" justifyContent="spaceBetween">
+      
+      <!-- Left: Logo + Title -->
+      <Panel direction="row" alignItems="center" spacing="8" hitTest="caption" flexGrow="1" flexBasis="0">
+        <Panel width="16" height="16" background="#FFFFFF" cornerRadius="4" />
+        <Label text="RolanCpp 快捷启动" fontSize="15" color="#FFFFFF" />
+      </Panel>
+      
+      <!-- Center: Search bar -->
+      <Panel direction="row" alignItems="center" background="#2F58C7" cornerRadius="16" padding="16,6,16,6" width="300" hitTest="client">
+        <Label text="搜索 Ctrl+F" fontSize="13" color="#9AB6F4" />
+      </Panel>
+      
+      <!-- Right: Actions & Window Controls -->
+      <Panel direction="row" alignItems="center" spacing="16" flexGrow="1" flexBasis="0" justifyContent="flexEnd">
+        <Panel direction="row" alignItems="center" background="#5C82EB" cornerRadius="14" padding="12,4,12,4">
+          <Label text="Ctrl+Alt+R 显示 / 隐藏" fontSize="12" color="#D8E3FA" />
+        </Panel>
+        <SvgIcon source="icons/star.svg" width="18" height="18" tint="#FFFFFF" />
+        <Panel direction="row" alignItems="center" spacing="4">
+          <Button variant="caption-minimize" width="36" height="36" hitTest="client" onClick="windowMinimize" />
+          <Button variant="caption-maximize" width="36" height="36" hitTest="client" onClick="windowMaximize" />
+          <Button variant="caption-close" width="36" height="36" hitTest="client" onClick="windowClose" />
+        </Panel>
+      </Panel>
+    </Panel>
+    
+    <!-- Bottom row: Tabs -->
+    <Panel direction="row" padding="16,0,16,12" spacing="24" alignItems="center" hitTest="caption">
+      <Label text="常用" fontSize="14" color="#FFFFFF" opacity="0.8" />
+      <Label text="IDE" fontSize="14" color="#FFFFFF" opacity="0.8" />
+      <Label text="软件开发" fontSize="14" color="#FFFFFF" opacity="0.8" />
+      
+      <!-- Selected Tab -->
+      <Panel background="#FFFFFF" cornerRadius="16" padding="16,8,16,8" shadowBlur="8" shadowOffsetY="2" shadowColor="#00000033">
+        <Label text="工具软件" fontSize="14" color="#456FE6" />
+      </Panel>
+      
+      <Label text="AI软件" fontSize="14" color="#FFFFFF" opacity="0.8" />
+      <Label text="+" fontSize="18" color="#FFFFFF" margin="8,0,0,0" />
+    </Panel>
+  </Panel>
+
+  <!-- Main Content area (Grid of App Icons) -->
+  <Panel 
+    flexGrow="1" 
+    direction="row" 
+    wrap="wrap" 
+    padding="32,32,32,32" 
+    spacing="24" 
+    alignItems="start" 
+    alignContent="start" 
+    gradientStart="#F3EDE3" 
+    gradientEnd="#DBCAB2" 
+    gradientAngle="135">
+    
+    <!-- App 1: Clash Verge -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#B478EA" cornerRadius="24" justifyContent="center" alignItems="center">
+            <SvgIcon source="icons/star.svg" width="24" height="24" tint="#FFFFFF" />
+         </Panel>
+      </Panel>
+      <Label text="Clash Verge" fontSize="13" color="#555555" />
+    </Panel>
+
+    <!-- App 2: app-manager -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#8564F4" cornerRadius="14" justifyContent="center" alignItems="center">
+            <SvgIcon source="icons/star.svg" width="24" height="24" tint="#FFFFFF" />
+         </Panel>
+      </Panel>
+      <Label text="app-manager" fontSize="13" color="#555555" />
+    </Panel>
+
+    <!-- App 3: frpc Desktop -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#174391" cornerRadius="14" justifyContent="center" alignItems="center">
+            <SvgIcon source="icons/star.svg" width="24" height="24" tint="#FFFFFF" />
+         </Panel>
+      </Panel>
+      <Label text="frpc Desktop..." fontSize="13" color="#555555" />
+    </Panel>
+
+    <!-- App 4: finger-gui -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#2464D9" cornerRadius="14" justifyContent="center" alignItems="center">
+            <SvgIcon source="icons/star.svg" width="24" height="24" tint="#FFFFFF" />
+         </Panel>
+      </Panel>
+      <Label text="finger-gui" fontSize="13" color="#555555" />
+    </Panel>
+
+    <!-- App 5: Cloudflare Tu... -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#4F92FA" cornerRadius="24" justifyContent="center" alignItems="center">
+            <SvgIcon source="icons/star.svg" width="24" height="24" tint="#FFFFFF" />
+         </Panel>
+      </Panel>
+      <Label text="Cloudflare Tu..." fontSize="13" color="#555555" />
+    </Panel>
+
+    <!-- App 6: WinSCP -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#FFFFFF" cornerRadius="14" justifyContent="center" alignItems="center">
+            <SvgIcon source="icons/arrow-right.svg" width="32" height="32" tint="#0BA745" />
+         </Panel>
+      </Panel>
+      <Label text="WinSCP" fontSize="13" color="#555555" />
+    </Panel>
+
+    <!-- App 7: Wireshark -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#FFFFFF" cornerRadius="14" justifyContent="center" alignItems="center">
+            <SvgIcon source="icons/check.svg" width="36" height="36" tint="#1E75C4" />
+         </Panel>
+      </Panel>
+      <Label text="Wireshark" fontSize="13" color="#555555" />
+    </Panel>
+
+    <!-- App 8: XMind ZEN -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#F95431" cornerRadius="14" justifyContent="center" alignItems="center">
+            <SvgIcon source="icons/check.svg" width="24" height="24" tint="#FFFFFF" />
+         </Panel>
+      </Panel>
+      <Label text="XMind ZEN" fontSize="13" color="#555555" />
+    </Panel>
+    
+    <!-- App 9: Cherry Studio -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#F74457" cornerRadius="14" justifyContent="center" alignItems="center">
+            <SvgIcon source="icons/star.svg" width="24" height="24" tint="#FFFFFF" />
+         </Panel>
+      </Panel>
+      <Label text="Cherry Studio" fontSize="13" color="#555555" />
+    </Panel>
+
+    <!-- App 10: High-Logic F... -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#1C5FB1" cornerRadius="14" justifyContent="center" alignItems="center">
+            <Label text="F" fontSize="24" color="#FFFFFF" />
+         </Panel>
+      </Panel>
+      <Label text="High-Logic F..." fontSize="13" color="#555555" />
+    </Panel>
+
+    <!-- App 11: Redis Insight -->
+    <Panel direction="column" alignItems="center" spacing="12" width="104">
+      <Panel width="88" height="88" background="#FFFFFF" cornerRadius="18" justifyContent="center" alignItems="center" shadowBlur="20" shadowOffsetY="8" shadowColor="#0000001A">
+         <Panel width="48" height="48" background="#111111" cornerRadius="14" justifyContent="center" alignItems="center">
+            <Label text="R" fontSize="24" color="#D82C20" />
+         </Panel>
+      </Panel>
+      <Label text="Redis Insight" fontSize="13" color="#555555" />
+    </Panel>
+  </Panel>
+</Panel>

@@ -189,6 +189,11 @@
           <Button text="Open" style="$style.secondaryButton" onClick="openDemo:layouts/custom_chrome_demo.xml|custom|1000x700" height="32" />
         </Panel>
         <Panel direction="column" background="#1A2438" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="RolanCpp Launcher" fontSize="14" color="#F2F6FB" />
+          <Label text="Custom chrome · wrap grid · shadows" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.secondaryButton" onClick="openDemo:layouts/rolancpp_launcher.xml|custom|1024x720" height="32" />
+        </Panel>
+        <Panel direction="column" background="#1A2438" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
           <Label text="Layered Rounded Card" fontSize="14" color="#F2F6FB" />
           <Label text="Per-pixel alpha · HTTRANSPARENT" fontSize="11" color="#8FA3B8" />
           <Button text="Open" style="$style.secondaryButton" onClick="openDemo:layouts/layered_chrome_demo.xml|layered|1000x700" height="32" />
