@@ -107,8 +107,12 @@ bool WindowChrome::InitializeDwm(HWND hwnd) {
         return false;
     }
 
-    // Extend frame into the entire client area to remove all non-client borders while keeping the drop shadow.
-    MARGINS margins{-1, -1, -1, -1};
+    // Extend DWM frame 1px at the top only. This activates the DWM compositing pipeline
+    // (enabling the window drop shadow) without extending glass to left/right/bottom.
+    // Glass on all sides (MARGINS{-1,-1,-1,-1}) causes DWM to render a glass outline border
+    // on every edge, which is visible as a thin system border on Windows 10.
+    // The 1px top glass is hidden beneath our custom title bar content.
+    MARGINS margins{0, 0, 1, 0};
     const HRESULT hrExtend = DwmExtendFrameIntoClientArea(hwnd, &margins);
     if (FAILED(hrExtend)) {
         return false;
