@@ -2,7 +2,7 @@
   RolanCpp Launcher Demo Layout
   Demonstrates custom chrome, tabs, wrapping grid with shadows, and gradients.
 -->
-<Panel chrome="custom" direction="column" alignItems="stretch" spacing="0">
+<Panel chrome="custom" direction="column" alignItems="stretch" spacing="0" background="#DBCAB2">
   
   <!-- Title bar area -->
   <Panel role="titleBar" hitTest="caption" direction="column" background="#456FE6" padding="0,0,0,0" spacing="0" alignItems="stretch">
