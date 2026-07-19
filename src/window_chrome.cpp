@@ -190,9 +190,20 @@ LRESULT WindowChrome::HandleNcCalcSize(HWND hwnd, WPARAM wParam, LPARAM lParam, 
                 if (GetMonitorInfoW(monitor, &info)) {
                     params->rgrc[0] = info.rcWork;
                 }
+            } else {
+                // Shrink the proposed client rect inward by the resize border thickness on
+                // left, right, and bottom. This pushes the system-drawn WS_THICKFRAME border
+                // lines outside the visible client area so they are clipped and invisible,
+                // while still allowing the resize hit-testing to function correctly.
+                // Top is left at 0 shrink so we keep a clean flush top edge.
+                const int framePx = GetSystemMetricsForDpi(SM_CXFRAME, m_dpi);
+                const int paddedPx = GetSystemMetricsForDpi(SM_CXPADDEDBORDER, m_dpi);
+                const int border = framePx + paddedPx;
+                params->rgrc[0].left   += border;
+                params->rgrc[0].right  -= border;
+                params->rgrc[0].bottom -= border;
+                // Keep top flush (no shrink) so the top edge has no gap.
             }
-            // Non-maximized: leave rgrc[0] as the proposed window rect so the
-            // entire window is client area (no system caption strip).
         }
         handled = true;
         return 0;
