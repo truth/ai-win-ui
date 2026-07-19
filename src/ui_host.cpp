@@ -2135,6 +2135,18 @@ private:
                 }
                 break;
             }
+            case WM_NCPAINT: {
+                // Suppress non-client area painting when using custom chrome.
+                // WM_NCCALCSIZE already absorbs the entire window rect into the client area,
+                // so there is no NC area to paint. Returning 0 here prevents Windows from
+                // drawing the WS_THICKFRAME visual border lines (left/right/bottom) that are
+                // otherwise rendered by the system on top of our content. DWM shadow is
+                // unaffected because it is managed independently by DwmExtendFrameIntoClientArea.
+                if (m_windowChrome.IsCustom()) {
+                    return 0;
+                }
+                break;
+            }
             case WM_NCHITTEST: {
                 bool handled = false;
                 const LRESULT result = m_windowChrome.HandleNcHitTest(hwnd, lParam, handled);

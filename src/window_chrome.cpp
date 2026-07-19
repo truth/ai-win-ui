@@ -71,12 +71,9 @@ bool WindowChrome::IsChromeInteractiveHit(POINT clientPt) const {
 DWORD WindowChrome::WindowStyle() const {
     if (IsCustom()) {
         // Layered and custom share borderless popup chrome; layered adds WS_EX_LAYERED.
-        // WS_THICKFRAME is intentionally OMITTED: it causes Windows to draw a visible 1-4px
-        // resize frame border around the window even when WM_NCCALCSIZE returns 0.
-        // Since we implement resize hit-testing ourselves via WM_NCHITTEST (returning HTLEFT,
-        // HTRIGHT, etc.), DefWindowProc still handles the resize drag without WS_THICKFRAME.
-        // DWM drop shadow is preserved via DwmExtendFrameIntoClientArea with MARGINS{-1,-1,-1,-1}.
-        return WS_POPUP | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN;
+        // WS_THICKFRAME is required for resize dragging via DefWindowProc on Windows 10.
+        // The visible border it causes is suppressed via WM_NCPAINT interception (see ui_host.cpp).
+        return WS_POPUP | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX | WS_SYSMENU | WS_CLIPCHILDREN;
     }
     return WS_OVERLAPPEDWINDOW | WS_VSCROLL | WS_CLIPCHILDREN;
 }
