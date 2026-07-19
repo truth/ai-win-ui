@@ -1,4 +1,4 @@
-﻿#include "layout_engine.h"
+#include "layout_engine.h"
 
 #include "ui.h"
 
@@ -316,6 +316,11 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
         }
         if (flexShrink > 0.0f) {
             YGNodeStyleSetFlexShrink(childNode, flexShrink);
+        } else if (flexGrow > 0.0f && !hasFlexBasis) {
+            // CSS `flex: N` implicitly sets flex-shrink:1 so the item can shrink
+            // when the container is smaller than the sum of flex-basis values.
+            // Without this, a flex-grow item with a large measured size overflows.
+            YGNodeStyleSetFlexShrink(childNode, 1.0f);
         } else if (style.direction == StackDirection::Row && !hasFlex) {
             // Row children with no explicit flex attrs default to shrink=1
             // so total width fits the container. Aligns with CSS flexbox.
@@ -324,8 +329,13 @@ BuiltYogaLayout BuildStackLayout(const StackLayoutStyle& style,
         if (hasFlex) {
             const float intrinsicMainAxis = style.direction == StackDirection::Column
                 ? measuredHeight : measuredWidth;
+            // When flex-grow is set without explicit flex-basis, use 0 as the
+            // basis (CSS `flex: N 1 0` behavior) — the item grows from zero to
+            // fill available space, rather than starting from its measured size
+            // (which can exceed the container and cause overflow).
             const float flexBasisVal = hasFlexBasis
-                ? child.element->FlexBasis() : intrinsicMainAxis;
+                ? child.element->FlexBasis()
+                : (flexGrow > 0.0f ? 0.0f : intrinsicMainAxis);
             YGNodeStyleSetFlexBasis(childNode, std::max(0.0f, flexBasisVal));
         }
 

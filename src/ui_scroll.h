@@ -23,6 +23,18 @@ public:
     float ContentWidth() const { return m_contentSize.width; }
     float ContentHeight() const { return m_contentSize.height; }
 
+    UIElement* FindDropTargetAt(float x, float y) override {
+        if (!UIElement::HitTest(x, y)) return nullptr;
+        // Children are arranged at (bounds - scrollOffset), so their own HitTest
+        // already accounts for the offset. We just recurse with the same x,y.
+        for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+            if (auto* target = (*it)->FindDropTargetAt(x, y)) {
+                return target;
+            }
+        }
+        return m_allowDrop ? this : nullptr;
+    }
+
     // Prefer this for capture when panning / scrollbar (not focusable children).
     UIElement* FindHitElementAt(float x, float y) override {
         if (!HitTest(x, y)) {

@@ -17,7 +17,9 @@
     
     <Label text="Drag files here (Note: UI logic needed to show dropped files)" fontSize="16" color="#FFFFFF" margin="0,0,0,20" />
     
-    <Panel flex-grow="1" allowDrop="true" background="#2A3B4D" cornerRadius="8" cursor="auto" direction="row" wrap="wrap" alignItems="flex-start" alignContent="flex-start" padding="15,15,15,15" spacing="10">
-        <Label text="Drop files here..." fontSize="20" color="#AAAAAA" />
-    </Panel>
+    <ScrollViewer flex-grow="1" background="#2A3B4D" cornerRadius="8" scrollY="true">
+        <Panel allowDrop="true" background="#00000000" cursor="auto" direction="row" wrap="wrap" alignItems="flex-start" alignContent="flex-start" padding="15,15,15,30" spacing="10">
+            <Label text="Drop files here..." fontSize="20" color="#AAAAAA" />
+        </Panel>
+    </ScrollViewer>
 </Panel>
