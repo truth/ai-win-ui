@@ -2,6 +2,7 @@
 // Panel, GridPanel, Label, StatCard, SparklineChart, ShapePanel, DataTable, SeagullAnimation
 // See ui.h for the full umbrella include.
 #include "ui_element.h"
+#include "ui_text.h"
 
 class Panel : public UIElement {
 public:
@@ -41,7 +42,8 @@ public:
     Wrap wrap = Wrap::NoWrap;
     AlignItems alignItems = AlignItems::Stretch;
     JustifyContent justifyContent = JustifyContent::Start;
-
+    bool m_placeholderCleared = false;
+    
     // S4: when background came from $color.key, rebind on theme switch.
     void SetBackgroundToken(std::string key) { m_backgroundToken = std::move(key); }
     void ApplyThemeDefaults() override {
@@ -52,6 +54,8 @@ public:
             background = *c;
         }
     }
+
+    bool OnDrop(const std::vector<std::wstring>& files, float x, float y) override;
 
     void Arrange(const Rect& finalRect) override {
         UIElement::Arrange(finalRect);
@@ -1345,6 +1349,13 @@ public:
 
     bool IsFocusable() const override { return m_selectable || m_sortable || m_editable || m_resizableColumns; }
 
+    CursorType GetCursor() const override {
+        if (m_resizingColumn >= 0 || m_hoveredResizeEdge >= 0) {
+            return CursorType::SizeWE;
+        }
+        return m_cursor;
+    }
+
     bool OnFocus() override {
         if (!m_hasFocus) {
             m_hasFocus = true;
@@ -2505,3 +2516,40 @@ private:
     float m_elapsed = 0.0f;
 };
 
+
+inline bool Panel::OnDrop(const std::vector<std::wstring>& files, float x, float y) {
+    if (!m_allowDrop) return false;
+    
+    if (!m_placeholderCleared) {
+        m_children.clear();
+        m_placeholderCleared = true;
+    }
+    
+    for (const auto& file : files) {
+        std::wstring filename = file;
+        auto pos = filename.find_last_of(L"\\/");
+        if (pos != std::wstring::npos) {
+            filename = filename.substr(pos + 1);
+        }
+        
+        auto chip = std::make_unique<Panel>();
+        chip->direction = Direction::Row;
+        chip->alignItems = AlignItems::Center;
+        chip->background = ColorFromHex(0x3A4B5D, 1.0f);
+        chip->cornerRadius = 6.0f;
+        chip->padding = Thickness{12, 8, 12, 8};
+        chip->SetMargin(Thickness{0, 0, 10, 10});
+        
+        auto label = std::make_unique<Label>(filename);
+        label->m_fontSize = 14.0f;
+        label->m_color = ColorFromHex(0xFFFFFF, 1.0f);
+        
+        chip->AddChild(std::move(label));
+        AddChild(std::move(chip));
+    }
+
+    if (m_context && m_context->requestLayout) {
+        m_context->requestLayout();
+    }
+    return true;
+}

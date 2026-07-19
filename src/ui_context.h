@@ -22,6 +22,8 @@ struct UIContext {
     Theme* theme = nullptr;
     StyleCatalog* styleCatalog = nullptr;
     UIEventResolver eventResolver;
+    std::function<void()> requestLayout;
+    std::function<void()> invalidate;
     UINT dpi = 96;
     float dpiScale = 1.0f;
     // Client-area size of the host window (DIP-free pixels). Used by overlay popups.

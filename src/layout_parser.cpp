@@ -1205,6 +1205,22 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
     }
 }
 
+static CursorType ParseCursorType(const std::string& val) {
+    const std::string value = ToLowerAscii(TrimString(val));
+    if (value == "arrow") return CursorType::Arrow;
+    if (value == "hand" || value == "pointer") return CursorType::Hand;
+    if (value == "ibeam" || value == "text") return CursorType::IBeam;
+    if (value == "cross" || value == "crosshair") return CursorType::Cross;
+    if (value == "wait") return CursorType::Wait;
+    if (value == "sizewe" || value == "ew-resize") return CursorType::SizeWE;
+    if (value == "sizens" || value == "ns-resize") return CursorType::SizeNS;
+    if (value == "sizenwse" || value == "nwse-resize") return CursorType::SizeNWSE;
+    if (value == "sizenesw" || value == "nesw-resize") return CursorType::SizeNESW;
+    if (value == "sizeall" || value == "move") return CursorType::SizeAll;
+    if (value == "forbidden" || value == "not-allowed") return CursorType::Forbidden;
+    return CursorType::Auto;
+}
+
 void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
     if (auto it = node.attributes.find("name"); it != node.attributes.end()) {
         element.SetName(it->second);
@@ -1309,6 +1325,13 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
         } else if (value == "system") {
             element.SetWindowChromeRequest(UIElement::WindowChromeRequest::System);
         }
+    }
+    if (auto it = node.attributes.find("cursor"); it != node.attributes.end()) {
+        element.SetCursor(ParseCursorType(it->second));
+    }
+    if (auto it = node.attributes.find("allowDrop"); it != node.attributes.end()) {
+        const std::string value = ToLowerAscii(TrimString(it->second));
+        element.SetAllowDrop(value == "true" || value == "1" || value == "yes");
     }
 }
 

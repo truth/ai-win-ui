@@ -23,6 +23,22 @@
 #include <utility>
 #include <vector>
 
+enum class CursorType : uint8_t {
+    Auto = 0,
+    Arrow,
+    Hand,
+    IBeam,
+    Cross,
+    Wait,
+    SizeWE,
+    SizeNS,
+    SizeNWSE,
+    SizeNESW,
+    SizeAll,
+    Forbidden
+};
+
+
 class UIElement {
 public:
     enum class SelfAlign {
@@ -114,6 +130,13 @@ public:
         }
     }
     UIContext* Context() const { return m_context; }
+
+    void SetCursor(CursorType cursor) { m_cursor = cursor; }
+    virtual CursorType GetCursor() const { return m_cursor; }
+
+    void SetAllowDrop(bool allow) { m_allowDrop = allow; }
+    bool AllowDrop() const { return m_allowDrop; }
+
 
     // Lazy theme: refresh DefaultStyle() from theme when style was not set from layout.
     virtual void ApplyThemeDefaults() {}
@@ -289,6 +312,16 @@ public:
         return HitTest(x, y) ? const_cast<UIElement*>(this) : nullptr;
     }
 
+    virtual UIElement* FindDropTargetAt(float x, float y) {
+        if (!HitTest(x, y)) return nullptr;
+        for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
+            if (auto* target = (*it)->FindDropTargetAt(x, y)) {
+                return target;
+            }
+        }
+        return m_allowDrop ? const_cast<UIElement*>(this) : nullptr;
+    }
+
     virtual bool HasCaptionHitAt(float x, float y) {
         if (!HitTest(x, y)) return false;
         if (m_hitTestRole == HitTestRole::Caption) return true;
@@ -374,6 +407,12 @@ public:
         }
         return false;
     }
+
+    // Drag & Drop
+    virtual bool OnDragEnter(const std::vector<std::wstring>& /*files*/) { return m_allowDrop; }
+    virtual bool OnDragOver(float /*x*/, float /*y*/) { return m_allowDrop; }
+    virtual void OnDragLeave() {}
+    virtual bool OnDrop(const std::vector<std::wstring>& /*files*/, float /*x*/, float /*y*/) { return false; }
 
 protected:
     virtual float MeasurePreferredWidth(float availableWidth) const {
@@ -482,9 +521,12 @@ protected:
 
     // State & Interaction
     bool                                    m_hasFocus = false;
-    bool                                    m_hovered  = false;
-    bool                                    m_pressed  = false;
+    bool                                    m_hovered = false;
+    bool                                    m_pressed = false;
     bool                                    m_disabled = false;
+    bool                                    m_allowDrop = false;
+    CursorType                              m_cursor   = CursorType::Auto;
+
 
     // Window & Chrome Integration
     HitTestRole                             m_hitTestRole = HitTestRole::Default;

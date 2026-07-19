@@ -385,6 +385,7 @@ class TextInput : public UIElement {
 public:
     explicit TextInput(std::wstring text = L"") : m_text(std::move(text)), m_caretPosition(m_text.size()) {
         m_style = DefaultStyle(nullptr);
+        m_cursor = CursorType::IBeam;
     }
 
     static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {

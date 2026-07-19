@@ -1,5 +1,6 @@
 # Visual Studio / CMake build artifacts
 build/
+build_test/
 .tmp-build/
 dist/
 *.vcxproj.user

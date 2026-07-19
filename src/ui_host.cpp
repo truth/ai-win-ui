@@ -18,6 +18,9 @@
 #include <imm.h>
 #include <shellscalingapi.h>
 #include <Windowsx.h>
+#include <oleidl.h>
+#include <shellapi.h>
+
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
@@ -96,12 +99,37 @@ UINT GetWindowDpiWithFallback(HWND hwnd) {
 // Process-wide multi-host lives in ai_win_ui::Application (src/application.*).
 class UiHost;
 void PurgeClosedSecondaryHosts();
+void RegisterHostDropTarget(UiHost* host);
+void RevokeHostDropTarget(HWND hwnd);
+
 
 class UiHost {
+    friend class HostDropTarget;
 public:
+    UiHost() {
+        m_uiContext.requestLayout = [this]() {
+            if (m_hwnd) {
+                UpdateLayout();
+                InvalidateRect(m_hwnd, nullptr, FALSE);
+            }
+        };
+        m_uiContext.invalidate = [this]() {
+            if (m_hwnd) {
+                InvalidateRect(m_hwnd, nullptr, FALSE);
+            }
+        };
+    }
+
     ~UiHost() {
+        RevokeHostDropTarget(m_hwnd);
         // Never leave a live HWND with USERDATA pointing at a destroyed UiHost.
         TeardownWindow();
+        // Balance the OleInitialize() from Initialize(). Must run after the
+        // renderer (WIC/COM) is released in TeardownWindow().
+        if (m_oleInitialized) {
+            OleUninitialize();
+            m_oleInitialized = false;
+        }
     }
 
     void SetParentHwnd(HWND parent) {
@@ -292,6 +320,13 @@ public:
             m_windowChrome.InitializeDwm(m_hwnd);
         }
 
+        // OLE drag & drop requires the UI thread to be a Single-Threaded
+        // Apartment. Establish STA here, BEFORE the renderer initializes COM
+        // as MTA (CoInitializeEx(COINIT_MULTITHREADED)) — otherwise OleInitialize
+        // fails with RPC_E_CHANGED_MODE and RegisterDragDrop never runs. The
+        // renderer already tolerates RPC_E_CHANGED_MODE, so it keeps the STA.
+        m_oleInitialized = SUCCEEDED(OleInitialize(nullptr));
+
         m_requestedRendererBackend = ParseRendererBackend(GetEnvironmentValue(L"AI_WIN_UI_RENDERER"));
         if (!InitializeRenderer()) {
             return fail();
@@ -359,6 +394,7 @@ public:
                 }
             }
         }
+        RegisterHostDropTarget(this);
         return true;
     }
 
@@ -2140,6 +2176,45 @@ private:
                 OnResize();
                 SyncCaptionMaximizeGlyphs();
                 return 0;
+            case WM_SETCURSOR: {
+                if (LOWORD(lParam) == HTCLIENT) {
+                    POINT pt;
+                    GetCursorPos(&pt);
+                    ScreenToClient(hwnd, &pt);
+                    // Handle scrolling offset if needed
+                    float x = static_cast<float>(pt.x) / m_uiContext.dpiScale;
+                    float y = static_cast<float>(pt.y) / m_uiContext.dpiScale;
+                    if (m_windowScrollEnabled) {
+                        y += m_scrollOffset;
+                    }
+                    UIElement* hit = m_root ? m_root->FindOverlayHitAt(x, y) : nullptr;
+                    if (!hit && m_root) {
+                        hit = m_root->FindHitElementAt(x, y);
+                    }
+                    if (hit) {
+                        CursorType cursor = hit->GetCursor();
+                        if (cursor != CursorType::Auto) {
+                            LPCWSTR sysCursor = IDC_ARROW;
+                            switch (cursor) {
+                                case CursorType::Hand: sysCursor = IDC_HAND; break;
+                                case CursorType::IBeam: sysCursor = IDC_IBEAM; break;
+                                case CursorType::Cross: sysCursor = IDC_CROSS; break;
+                                case CursorType::Wait: sysCursor = IDC_WAIT; break;
+                                case CursorType::SizeWE: sysCursor = IDC_SIZEWE; break;
+                                case CursorType::SizeNS: sysCursor = IDC_SIZENS; break;
+                                case CursorType::SizeNWSE: sysCursor = IDC_SIZENWSE; break;
+                                case CursorType::SizeNESW: sysCursor = IDC_SIZENESW; break;
+                                case CursorType::SizeAll: sysCursor = IDC_SIZEALL; break;
+                                case CursorType::Forbidden: sysCursor = IDC_NO; break;
+                                default: break;
+                            }
+                            SetCursor(LoadCursorW(nullptr, sysCursor));
+                            return TRUE;
+                        }
+                    }
+                }
+                break; // Fallback to DefWindowProc
+            }
             case WM_MOUSEMOVE:
                 OnMouseMove(lParam);
                 return 0;
@@ -2288,7 +2363,144 @@ private:
     bool m_windowScrollEnabled = true;
     bool m_isInitialized = false;
     bool m_isTrackingMouseLeave = false;
+    bool m_oleInitialized = false;
 };
+
+class HostDropTarget : public IDropTarget {
+public:
+    HostDropTarget(UiHost* host) : m_host(host) {}
+    
+    virtual ~HostDropTarget() = default;
+
+    HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) override {
+        if (riid == IID_IUnknown || riid == IID_IDropTarget) {
+            *ppvObject = static_cast<IDropTarget*>(this);
+            AddRef();
+            return S_OK;
+        }
+        *ppvObject = nullptr;
+        return E_NOINTERFACE;
+    }
+    
+    ULONG STDMETHODCALLTYPE AddRef() override { return ++m_refCount; }
+    
+    ULONG STDMETHODCALLTYPE Release() override {
+        ULONG count = --m_refCount;
+        if (count == 0) delete this;
+        return count;
+    }
+    
+    HRESULT STDMETHODCALLTYPE DragEnter(IDataObject* pDataObj, DWORD grfKeyState, POINTL pt, DWORD* pdwEffect) override {
+        m_files = ExtractFiles(pDataObj);
+        return DragOver(grfKeyState, pt, pdwEffect);
+    }
+    
+    HRESULT STDMETHODCALLTYPE DragOver(DWORD /*grfKeyState*/, POINTL pt, DWORD* pdwEffect) override {
+        if (m_files.empty()) {
+            *pdwEffect = DROPEFFECT_NONE;
+            return S_OK;
+        }
+        
+        POINT p{pt.x, pt.y};
+        ScreenToClient(m_host->m_hwnd, &p);
+        float x = static_cast<float>(p.x) / m_host->m_uiContext.dpiScale;
+        float y = static_cast<float>(p.y) / m_host->m_uiContext.dpiScale;
+        if (m_host->m_windowScrollEnabled) y += m_host->m_scrollOffset;
+        
+        UIElement* hit = m_host->m_root ? m_host->m_root->FindDropTargetAt(x, y) : nullptr;
+
+        if (hit != m_currentDragElement) {
+            if (m_currentDragElement) m_currentDragElement->OnDragLeave();
+            m_currentDragElement = hit;
+            if (m_currentDragElement) m_currentDragElement->OnDragEnter(m_files);
+        }
+
+        if (m_currentDragElement && m_currentDragElement->OnDragOver(x, y)) {
+            *pdwEffect = DROPEFFECT_COPY;
+        } else {
+            *pdwEffect = DROPEFFECT_NONE;
+        }
+        return S_OK;
+    }
+    
+    HRESULT STDMETHODCALLTYPE DragLeave() override {
+        if (m_currentDragElement) {
+            m_currentDragElement->OnDragLeave();
+            m_currentDragElement = nullptr;
+        }
+        m_files.clear();
+        return S_OK;
+    }
+    
+    HRESULT STDMETHODCALLTYPE Drop(IDataObject* pDataObj, DWORD /*grfKeyState*/, POINTL pt, DWORD* pdwEffect) override {
+        if (m_files.empty()) {
+            *pdwEffect = DROPEFFECT_NONE;
+            return S_OK;
+        }
+        POINT p{pt.x, pt.y};
+        ScreenToClient(m_host->m_hwnd, &p);
+        float x = static_cast<float>(p.x) / m_host->m_uiContext.dpiScale;
+        float y = static_cast<float>(p.y) / m_host->m_uiContext.dpiScale;
+        if (m_host->m_windowScrollEnabled) y += m_host->m_scrollOffset;
+        
+        if (m_currentDragElement) {
+            if (m_currentDragElement->OnDrop(m_files, x, y)) {
+                *pdwEffect = DROPEFFECT_COPY;
+            } else {
+                *pdwEffect = DROPEFFECT_NONE;
+            }
+            m_currentDragElement->OnDragLeave();
+            m_currentDragElement = nullptr;
+        } else {
+            *pdwEffect = DROPEFFECT_NONE;
+        }
+        m_files.clear();
+        return S_OK;
+    }
+
+private:
+    std::vector<std::wstring> ExtractFiles(IDataObject* pDataObj) {
+        std::vector<std::wstring> files;
+        FORMATETC fmt = { CF_HDROP, nullptr, DVASPECT_CONTENT, -1, TYMED_HGLOBAL };
+        STGMEDIUM stg = { 0 };
+        if (SUCCEEDED(pDataObj->GetData(&fmt, &stg))) {
+            HDROP hDrop = static_cast<HDROP>(stg.hGlobal);
+            UINT count = DragQueryFileW(hDrop, 0xFFFFFFFF, nullptr, 0);
+            for (UINT i = 0; i < count; ++i) {
+                UINT length = DragQueryFileW(hDrop, i, nullptr, 0);
+                if (length > 0) {
+                    std::wstring path(length, L'\0');
+                    DragQueryFileW(hDrop, i, &path[0], length + 1);
+                    files.push_back(path);
+                }
+            }
+            ReleaseStgMedium(&stg);
+        }
+        return files;
+    }
+
+    UiHost* m_host;
+    ULONG m_refCount = 1;
+    UIElement* m_currentDragElement = nullptr;
+    std::vector<std::wstring> m_files;
+};
+
+void RegisterHostDropTarget(UiHost* host) {
+    // OLE STA is established in UiHost::Initialize(); here we only register the
+    // target. RegisterDragDrop takes its own reference, so we release ours.
+    if (!host || !host->GetHwnd()) {
+        return;
+    }
+    IDropTarget* target = new HostDropTarget(host);
+    RegisterDragDrop(host->GetHwnd(), target);
+    target->Release();
+}
+
+void RevokeHostDropTarget(HWND hwnd) {
+    if (hwnd) {
+        RevokeDragDrop(hwnd);
+    }
+}
 
 void PurgeClosedSecondaryHosts() {
     ai_win_ui::Application::PurgeClosedSecondaries(&UiHost::HostIsClosed, &UiHost::HostDestroy);
@@ -2431,3 +2643,4 @@ bool Host::FitToParent() {
 }
 
 } // namespace ai_win_ui
+ 

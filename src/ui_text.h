@@ -7,6 +7,7 @@ class RichTextBox : public UIElement {
 public:
     explicit RichTextBox(std::wstring text = L"") {
         m_style = DefaultStyle(nullptr);
+        m_cursor = CursorType::IBeam;
         SetText(std::move(text));
     }
 

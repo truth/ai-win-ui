@@ -160,6 +160,8 @@ target_link_libraries(ai_win_ui_lib PUBLIC
     dwmapi
     imm32
     windowscodecs
+    ole32
+    shell32
 )
 
 function(ai_win_ui_add_app target_name source_file)

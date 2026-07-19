@@ -5,6 +5,29 @@ All notable changes to **ai-win-ui** are documented in this file.
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [SemVer](https://semver.org/) (`AI_WIN_UI_VERSION_*` in `include/ai_win_ui/version.h`).
 
+## [Unreleased]
+
+### Added
+
+- **File drag & drop**
+  - OLE `IDropTarget` on the host window (`DragEnter`/`DragOver`/`DragLeave`/`Drop`)
+  - `UIElement` hooks `OnDragEnter/OnDragOver/OnDragLeave/OnDrop` + `FindDropTargetAt`
+  - `allowDrop="true"` XML attribute; `Panel` default drop appends dropped file names
+  - `resource/layouts/drag_drop_cases.xml` demo
+- **Cursor control**
+  - `CursorType` enum + `UIElement::SetCursor/GetCursor`, `cursor="..."` XML attribute
+  - `WM_SETCURSOR` maps element cursor to system cursors (hand/wait/ibeam/resize/…)
+  - `TextInput`/`RichTextBox` default to I-beam; `DataTable` shows resize cursor on column edges
+- `UIContext::requestLayout` / `invalidate` callbacks so elements can request relayout/repaint
+
+### Fixed
+
+- Drag & drop never registered: the UI thread was initialized as MTA by the renderer,
+  so `OleInitialize` failed with `RPC_E_CHANGED_MODE` and `RegisterDragDrop` was skipped.
+  The host now establishes an STA **before** renderer COM init.
+- `Panel::OnDrop` filename parsing used an invalid `L"\/"` escape (matched `/` only),
+  breaking basename extraction for Windows backslash paths.
+
 ## [0.3.1] — 2026-07-16
 
 ### Added

@@ -57,6 +57,19 @@ function Resolve-LayoutEnvPath([string]$layoutArg) {
     if ($aliases.ContainsKey($key)) {
         return $aliases[$key]
     }
+    
+    $candidates = @(
+        $layoutArg,
+        "layouts/$layoutArg",
+        "layouts/$layoutArg.xml",
+        "layouts/$layoutArg.json"
+    )
+    foreach ($cand in $candidates) {
+        if (Test-Path "resource/$cand") {
+            return $cand
+        }
+    }
+    
     if ($layoutArg -match '^(layouts/|\w)') {
         return $layoutArg
     }
