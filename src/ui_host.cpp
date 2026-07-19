@@ -22,11 +22,13 @@
 #include <shellapi.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <fstream>
 #include <functional>
 #include <memory>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -97,6 +99,13 @@ UINT GetWindowDpiWithFallback(HWND hwnd) {
 } // namespace
 
 // Process-wide multi-host lives in ai_win_ui::Application (src/application.*).
+struct ReplayEvent {
+    uint32_t timeOffsetMs;
+    UINT msg;
+    WPARAM wParam;
+    LPARAM lParam;
+};
+
 class UiHost;
 void PurgeClosedSecondaryHosts();
 void RegisterHostDropTarget(UiHost* host);
@@ -121,6 +130,7 @@ public:
     }
 
     ~UiHost() {
+        SaveRecordedEvents();
         RevokeHostDropTarget(m_hwnd);
         // Never leave a live HWND with USERDATA pointing at a destroyed UiHost.
         TeardownWindow();
@@ -382,6 +392,20 @@ public:
         }
 
         SetTimer(m_hwnd, kUiTimerId, kUiTimerIntervalMs, nullptr);
+
+        m_recordPath = GetEnvironmentValue(L"AI_WIN_UI_RECORD");
+        if (!m_recordPath.empty()) {
+            m_startTime = std::chrono::steady_clock::now();
+        }
+
+        m_replayPath = GetEnvironmentValue(L"AI_WIN_UI_REPLAY");
+        if (!m_replayPath.empty()) {
+            m_isReplaying = LoadReplayEvents(m_replayPath);
+            if (m_isReplaying) {
+                m_replayStartTime = std::chrono::steady_clock::now();
+                m_replayIndex = 0;
+            }
+        }
 
         // Headless/smoke: AI_WIN_UI_QUIT_AFTER_MS=1500 exits after layout paints.
         // Do not apply quit timer to secondary/embedded hosts.
@@ -2093,6 +2117,15 @@ private:
     }
 
     LRESULT HandleMessage(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+        if (!m_recordPath.empty() && !m_isReplaying) {
+            if (msg == WM_LBUTTONDOWN || msg == WM_LBUTTONUP || msg == WM_MOUSEMOVE || msg == WM_MOUSEWHEEL ||
+                msg == WM_KEYDOWN || msg == WM_KEYUP || msg == WM_CHAR) {
+                auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - m_startTime).count();
+                m_recordedEvents.push_back({ static_cast<uint32_t>(elapsed), msg, wParam, lParam });
+            }
+        }
+
         switch (msg) {
             case WM_NCCALCSIZE: {
                 bool handled = false;
@@ -2277,6 +2310,23 @@ private:
                 break;
             case WM_TIMER:
                 if (wParam == kUiTimerId) {
+                    if (m_isReplaying && m_replayIndex < m_replayEvents.size()) {
+                        auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            std::chrono::steady_clock::now() - m_replayStartTime).count();
+                        bool processed = false;
+                        while (m_replayIndex < m_replayEvents.size() && elapsed >= m_replayEvents[m_replayIndex].timeOffsetMs) {
+                            const auto& ev = m_replayEvents[m_replayIndex++];
+                            HandleMessage(hwnd, ev.msg, ev.wParam, ev.lParam);
+                            processed = true;
+                        }
+                        if (processed) {
+                            InvalidateRect(m_hwnd, nullptr, FALSE);
+                        }
+                        if (m_replayIndex >= m_replayEvents.size()) {
+                            SetTimer(m_hwnd, kQuitTimerId, 500, nullptr);
+                        }
+                    }
+
                     if (m_root && m_root->OnTimer(wParam)) {
                         InvalidateRect(m_hwnd, nullptr, FALSE);
                     }
@@ -2364,6 +2414,50 @@ private:
     bool m_isInitialized = false;
     bool m_isTrackingMouseLeave = false;
     bool m_oleInitialized = false;
+
+    bool LoadReplayEvents(const std::wstring& path) {
+        std::ifstream file(path);
+        if (!file.is_open()) {
+            return false;
+        }
+        std::string line;
+        while (std::getline(file, line)) {
+            if (line.empty() || line[0] == '#') continue;
+            std::stringstream ss(line);
+            uint32_t timeOffsetMs = 0;
+            UINT msg = 0;
+            WPARAM wParam = 0;
+            LPARAM lParam = 0;
+            if (ss >> timeOffsetMs >> msg >> wParam >> lParam) {
+                m_replayEvents.push_back({ timeOffsetMs, msg, wParam, lParam });
+            }
+        }
+        return !m_replayEvents.empty();
+    }
+
+    void SaveRecordedEvents() {
+        if (m_recordPath.empty() || m_recordedEvents.empty()) {
+            return;
+        }
+        std::ofstream file(m_recordPath);
+        if (!file.is_open()) {
+            return;
+        }
+        file << "# AI WinUI Event Recording\n";
+        file << "# format: time_offset_ms msg wParam lParam\n";
+        for (const auto& ev : m_recordedEvents) {
+            file << ev.timeOffsetMs << " " << ev.msg << " " << ev.wParam << " " << ev.lParam << "\n";
+        }
+    }
+
+    std::wstring m_recordPath;
+    std::wstring m_replayPath;
+    std::vector<ReplayEvent> m_recordedEvents;
+    std::vector<ReplayEvent> m_replayEvents;
+    size_t m_replayIndex = 0;
+    std::chrono::steady_clock::time_point m_startTime;
+    std::chrono::steady_clock::time_point m_replayStartTime;
+    bool m_isReplaying = false;
 };
 
 class HostDropTarget : public IDropTarget {
