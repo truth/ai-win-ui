@@ -30,18 +30,16 @@ function Resolve-LauncherConfig {
     $configurePreset = if ($Backend -eq "skia") { "dev-debug-skia-local-sdk" } else { "dev-debug" }
     $buildPreset = if ($Backend -eq "skia") { "build-dev-debug-skia-local-sdk" } else { "build-dev-debug" }
 
-    # Prefer the newest existing binary so Release (cmake --build build) is not ignored
-    # when preset Debug trees are stale. Runtime backend still comes from AI_WIN_UI_RENDERER.
-    $candidates = @(
-        $presetExe,
-        (Join-Path $RepoRoot "build\Release\ai_win_ui.exe"),
-        (Join-Path $RepoRoot "build\Debug\ai_win_ui.exe")
-    )
-    $existing = @($candidates | Where-Object { Test-Path -LiteralPath $_ })
-    $exePath = if ($existing.Count -gt 0) {
-        ($existing | Sort-Object { (Get-Item -LiteralPath $_).LastWriteTime } -Descending | Select-Object -First 1)
-    } else {
-        $presetExe
+    $exePath = $presetExe
+    if (-not (Test-Path $exePath)) {
+        $candidates = @(
+            (Join-Path $RepoRoot "build\Release\ai_win_ui.exe"),
+            (Join-Path $RepoRoot "build\Debug\ai_win_ui.exe")
+        )
+        $existing = @($candidates | Where-Object { Test-Path -LiteralPath $_ })
+        if ($existing.Count -gt 0) {
+            $exePath = ($existing | Sort-Object { (Get-Item -LiteralPath $_).LastWriteTime } -Descending | Select-Object -First 1)
+        }
     }
 
     return @{
