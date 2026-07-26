@@ -54,6 +54,14 @@ RendererBackend ParseRendererBackend(const std::wstring& value) {
     if (normalized == L"skia") {
         return RendererBackend::Skia;
     }
+    if (normalized == L"d2d" || normalized == L"direct2d") {
+        return RendererBackend::Direct2D;
+    }
+#if defined(AI_WIN_UI_ENABLE_SKIA)
+    if (normalized.empty()) {
+        return RendererBackend::Skia;
+    }
+#endif
     return RendererBackend::Direct2D;
 }
 
