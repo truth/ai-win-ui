@@ -183,7 +183,8 @@ public:
     bool Initialize(HWND hwnd) override {
         m_hwnd = hwnd;
         EnsureFontManager();
-        return RecreateSurface();
+        RecreateSurface();
+        return true;
     }
 
     void Resize(UINT width, UINT height) override {
