@@ -31,4 +31,8 @@ struct UIContext {
     float viewportHeight = 0.0f;
     // False while the top-level window is inactive (custom chrome dims caption).
     bool windowActive = true;
+    // Phase 7: DevTools & Performance Overlay (F12)
+    bool showDevTools = false;
+    float currentFps = 60.0f;
+    float frameTimeMs = 16.6f;
 };

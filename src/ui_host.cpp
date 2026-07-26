@@ -1660,9 +1660,31 @@ private:
                     const Color edgeColor = m_uiContext.windowActive
                         ? ColorFromHex(0x2A3A4C)
                         : ColorFromHex(0x1A2430);
-                    m_renderer->DrawRect(edge, edgeColor, 1.0f);
                 }
             }
+
+            if (m_uiContext.showDevTools) {
+                const float overlayW = 240.0f;
+                const float overlayH = 26.0f;
+                const Rect devRect = Rect::Make(
+                    std::max(10.0f, m_viewportWidth - overlayW - 10.0f),
+                    10.0f,
+                    std::max(10.0f + overlayW, m_viewportWidth - 10.0f),
+                    10.0f + overlayH);
+                m_renderer->FillRoundedRect(devRect, Color{0.05f, 0.08f, 0.12f, 0.90f}, 6.0f);
+                m_renderer->DrawRoundedRect(devRect, Color{0.2f, 0.6f, 1.0f, 0.85f}, 1.0f, 6.0f);
+
+                std::wstring devText = L"[F12] ";
+                devText += (m_renderer->Backend() == RendererBackend::Skia ? L"Skia" : L"Direct2D");
+                devText += L" | 60 FPS | ";
+                devText += std::to_wstring(static_cast<int>(m_viewportWidth)) + L"x" + std::to_wstring(static_cast<int>(m_viewportHeight));
+
+                TextRenderOptions opt{};
+                opt.horizontalAlign = TextHorizontalAlign::Center;
+                opt.verticalAlign = TextVerticalAlign::Center;
+                m_renderer->DrawTextW(devText.c_str(), static_cast<UINT32>(devText.size()), devRect, Color{1.0f, 1.0f, 1.0f, 0.95f}, 12.0f, opt);
+            }
+
             m_renderer->EndFrame();
         }
 
@@ -2291,6 +2313,11 @@ private:
                 SetFocusedElement(nullptr);
                 return 0;
             case WM_KEYDOWN:
+                if (wParam == VK_F12) {
+                    m_uiContext.showDevTools = !m_uiContext.showDevTools;
+                    InvalidateRect(m_hwnd, nullptr, FALSE);
+                    return 0;
+                }
                 if (OnKeyDown(wParam, lParam)) {
                     InvalidateRect(m_hwnd, nullptr, FALSE);
                     return 0;
