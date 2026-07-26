@@ -64,6 +64,7 @@ abstractions:
 | Layout parse | `src/layout_parser.*`, `src/layout_parser_panels.*`, `src/layout_parser_controls.*` |
 | **UiHost / multi-host** | **`src/ui_host.h`**, `src/ui_host_input.cpp`, `src/ui_host_overlay.cpp`, `src/application.*` |
 | Animation & Reactive | `src/animation_controller.*`, `<ai_win_ui/observable.h>` |
+| **C-API Interop** | **`<ai_win_ui/c_api.h>`**, `src/c_api.cpp` |
 | Host impl (TU) | `src/main.cpp` (`class UiHost`) |
 
 The app currently supports:

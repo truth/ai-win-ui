@@ -14,6 +14,9 @@
   - **响应式绑定与动效 Transition 引擎 (Phase 3/4)**
     - **`Observable<T>` 响应式属性**：导出公开头文件 [include/ai_win_ui/observable.h](file:///f:/AI-Projects/ai-win-ui/include/ai_win_ui/observable.h)，实现变量改变自动更新 UI；
     - **Animation Controller**：新增 [src/animation_controller.h](file:///f:/AI-Projects/ai-win-ui/src/animation_controller.h)，支持 Linear, EaseIn, EaseOut, CubicBezier, Spring 缓动插值算法与 ColorLerp / FloatLerp 计算。
+  - **平铺纯 C-API 导出 (Phase 5/6)**
+    - 导出公开头文件 [include/ai_win_ui/c_api.h](file:///f:/AI-Projects/ai-win-ui/include/ai_win_ui/c_api.h) 与 [src/c_api.cpp](file:///f:/AI-Projects/ai-win-ui/src/c_api.cpp)；
+    - 导出 C 句柄 `AiHostHandle` 与 `AIWinUI_CreateHost`、`AIWinUI_DestroyHost`、`AIWinUI_Run`、`AIWinUI_ProcessMessage` 平铺 API，为 C# / Rust / Python 绑定提供支持。
   - **自动化 CI 全过 (Q8)**
     - `scripts/run_ci_local.ps1` 跑通全套 7 项自动化测试（Skia/D2D Smoke、Core/Yoga/ScrollViewer Golden），回归通过。
 
