@@ -9,8 +9,9 @@
 #include <vector>
 
 enum class RendererBackend {
-    Direct2D,
-    Skia,
+    Default = -1, // Not explicitly set; honour the inherited AI_WIN_UI_RENDERER env.
+    Direct2D = 0,
+    Skia = 1,
 };
 
 // How the backend presents pixels to the OS window.

@@ -607,7 +607,6 @@ public:
     bool IsSecondary() const { return m_isSecondary; }
     HWND GetHwnd() const { return m_hwnd; }
 
-    // Apply structured options as process env for the next Initialize (embed/API).
     static void ApplyOptionsToEnvironment(const OpenHostOptions& options) {
         if (!options.layout.empty()) {
             SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", options.layout.c_str());
@@ -620,9 +619,14 @@ public:
         if (!options.size.empty()) {
             SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", options.size.c_str());
         }
-        SetEnvironmentVariableW(
-            L"AI_WIN_UI_RENDERER",
-            options.renderer == RendererBackend::Skia ? L"skia" : L"direct2d");
+        // Only overwrite AI_WIN_UI_RENDERER when an explicit backend is requested.
+        // Leave the inherited env intact when options.renderer is the default Direct2D
+        // and no explicit override was issued by the caller.
+        if (options.renderer == RendererBackend::Skia) {
+            SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", L"skia");
+        } else if (options.renderer == RendererBackend::Direct2D) {
+            SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", L"direct2d");
+        }
     }
 
 private:
@@ -1029,9 +1033,11 @@ private:
         } else {
             SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", nullptr);
         }
-        SetEnvironmentVariableW(
-            L"AI_WIN_UI_RENDERER",
-            options.renderer == RendererBackend::Skia ? L"skia" : L"direct2d");
+        if (options.renderer == RendererBackend::Skia) {
+            SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", L"skia");
+        } else if (options.renderer == RendererBackend::Direct2D) {
+            SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", L"direct2d");
+        }
 
         std::wstring cmdLine = L"\"";
         cmdLine += exePath;

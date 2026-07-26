@@ -10,7 +10,8 @@ struct OpenHostOptions {
     std::wstring layout;     // resource path e.g. layouts/ui.xml
     std::wstring chrome;     // empty/system => system frame; custom; layered
     std::wstring size;       // empty => default; e.g. 1100x750
-    RendererBackend renderer = RendererBackend::Direct2D;
+    RendererBackend renderer = RendererBackend::Default;
+    // Default means "honour AI_WIN_UI_RENDERER env"; Direct2D/Skia force a specific backend.
     bool childProcess = false; // true => CreateProcess instead of in-process
     HWND parent = nullptr;   // Wave3: WS_CHILD host when non-null
 };
