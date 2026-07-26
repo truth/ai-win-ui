@@ -74,4 +74,10 @@ private:
                                                    UIEventResolver eventResolver);
 
     static XmlNode ParseXml(const std::string& text);
+
+    // Sub-parser module helpers (layout_parser_panels.cpp & layout_parser_controls.cpp)
+    static std::unique_ptr<UIElement> CreatePanelElementFromXml(const XmlNode& node, IResourceProvider& provider, UIEventResolver eventResolver);
+    static std::unique_ptr<UIElement> CreateControlElementFromXml(const XmlNode& node, IResourceProvider& provider, UIEventResolver eventResolver);
+    static std::unique_ptr<UIElement> CreatePanelElementFromJson(const JsonValue& node, IResourceProvider& provider, UIEventResolver eventResolver);
+    static std::unique_ptr<UIElement> CreateControlElementFromJson(const JsonValue& node, IResourceProvider& provider, UIEventResolver eventResolver);
 };

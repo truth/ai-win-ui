@@ -59,6 +59,11 @@ set(AI_WIN_UI_LIB_SOURCES
     src/resource_provider.cpp
     src/zip_resource_provider.cpp
     src/layout_parser.cpp
+    src/layout_parser_panels.cpp
+    src/layout_parser_controls.cpp
+    src/ui_panels.cpp
+    src/ui_host_input.cpp
+    src/ui_host_overlay.cpp
     src/window_chrome.cpp
 )
 
