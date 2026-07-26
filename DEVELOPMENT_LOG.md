@@ -17,6 +17,9 @@
   - **平铺纯 C-API 导出 (Phase 5/6)**
     - 导出公开头文件 [include/ai_win_ui/c_api.h](file:///f:/AI-Projects/ai-win-ui/include/ai_win_ui/c_api.h) 与 [src/c_api.cpp](file:///f:/AI-Projects/ai-win-ui/src/c_api.cpp)；
     - 导出 C 句柄 `AiHostHandle` 与 `AIWinUI_CreateHost`、`AIWinUI_DestroyHost`、`AIWinUI_Run`、`AIWinUI_ProcessMessage` 平铺 API，为 C# / Rust / Python 绑定提供支持。
+  - **DevTools & 性能监控浮层 (Phase 7)**
+    - 支持按键 `F12` 唤起/隐藏 DevTools 调试条；
+    - 在右上角实时展示渲染 Backend (Direct2D / Skia)、FPS 帧率与视口 Resolution 尺寸。
   - **自动化 CI 全过 (Q8)**
     - `scripts/run_ci_local.ps1` 跑通全套 7 项自动化测试（Skia/D2D Smoke、Core/Yoga/ScrollViewer Golden），回归通过。
 
