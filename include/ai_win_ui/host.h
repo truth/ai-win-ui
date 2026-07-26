@@ -19,8 +19,9 @@
 namespace ai_win_ui {
 
 enum class Backend {
-    Direct2D = 0,
-    Skia = 1,
+    Default = 0,
+    Direct2D = 1,
+    Skia = 2,
 };
 
 struct HostCreateInfo {
@@ -39,7 +40,7 @@ struct HostCreateInfo {
     // When parent is set and size is empty, host fills the parent client rect.
     const wchar_t* size = nullptr;
 
-    Backend renderer = Backend::Direct2D;
+    Backend renderer = Backend::Default;
 
     // When true, Host::Run() pumps GetMessage until quit.
     // When false, the embedder owns the message loop (use ProcessMessage or DispatchMessage).

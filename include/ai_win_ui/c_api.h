@@ -24,8 +24,9 @@ extern "C" {
 typedef void* AiHostHandle;
 
 typedef enum AiBackend {
-    AI_BACKEND_DIRECT2D = 0,
-    AI_BACKEND_SKIA = 1
+    AI_BACKEND_DEFAULT = 0,
+    AI_BACKEND_DIRECT2D = 1,
+    AI_BACKEND_SKIA = 2
 } AiBackend;
 
 typedef struct AiHostCreateInfo {

@@ -555,9 +555,11 @@ public:
         } else {
             SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", nullptr);
         }
-        SetEnvironmentVariableW(
-            L"AI_WIN_UI_RENDERER",
-            options.renderer == RendererBackend::Skia ? L"skia" : L"direct2d");
+        if (options.renderer == RendererBackend::Skia) {
+            SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", L"skia");
+        } else if (options.renderer == RendererBackend::Direct2D) {
+            SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", L"direct2d");
+        }
         // Never auto-quit secondary hosts.
         SetEnvironmentVariableW(L"AI_WIN_UI_QUIT_AFTER_MS", nullptr);
 
@@ -2706,8 +2708,13 @@ std::unique_ptr<Host> Host::Create(HINSTANCE instance, const HostCreateInfo& inf
     if (info.size && info.size[0]) {
         options.size = info.size;
     }
-    options.renderer =
-        info.renderer == Backend::Skia ? RendererBackend::Skia : RendererBackend::Direct2D;
+    if (info.renderer == Backend::Skia) {
+        SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", L"skia");
+        options.renderer = RendererBackend::Skia;
+    } else if (info.renderer == Backend::Direct2D) {
+        SetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", L"direct2d");
+        options.renderer = RendererBackend::Direct2D;
+    }
     options.parent = info.parent;
 
     // Map structured options onto env consumed by UiHost::Initialize / BuildUI.
