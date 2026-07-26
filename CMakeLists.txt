@@ -64,6 +64,7 @@ set(AI_WIN_UI_LIB_SOURCES
     src/ui_panels.cpp
     src/ui_host_input.cpp
     src/ui_host_overlay.cpp
+    src/animation_controller.cpp
     src/window_chrome.cpp
 )
 

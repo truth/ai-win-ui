@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ai_win_ui/observable.h"
+#include "animation_controller.h"
 #include "box_decoration.h"
 #include "graphics_types.h"
 #include "layout_engine.h"
