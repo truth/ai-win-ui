@@ -1,6 +1,22 @@
 # 开发日志
 
-## 2026-07-16
+## 2026-07-26
+
+- **Wave4：架构模块化重构、渲染性能优化与响应式动效系统**
+  - **代码模块解耦 (Phase 1)**
+    - 将 191KB 巨型 [layout_parser.cpp](file:///f:/AI-Projects/ai-win-ui/src/layout_parser.cpp) 解耦为 `layout_parser_panels.cpp` 与 `layout_parser_controls.cpp`；
+    - 将 [ui_panels.h](file:///f:/AI-Projects/ai-win-ui/src/ui_panels.h) 复杂的容器方法剥离至 [ui_panels.cpp](file:///f:/AI-Projects/ai-win-ui/src/ui_panels.cpp)；
+    - 将 `ui_host.cpp` 拆解输入路由 [ui_host_input.cpp](file:///f:/AI-Projects/ai-win-ui/src/ui_host_input.cpp) 与浮层管理 [ui_host_overlay.cpp](file:///f:/AI-Projects/ai-win-ui/src/ui_host_overlay.cpp)。
+  - **渲染性能与显存/内存优化 (Phase 2)**
+    - **TextLayout 测量缓存**：在 [text_measurer.cpp](file:///f:/AI-Projects/ai-win-ui/src/text_measurer.cpp) 中新增 LRU 文本测量缓存（默认 1024 项），避免滚动与重复测量时的 DWrite/Skia 布局重建开销；
+    - **脏区包围盒剔除 (Dirty Rect BBox Culling)**：在 [renderer.h](file:///f:/AI-Projects/ai-win-ui/src/renderer.h) 与 [ui_element.h](file:///f:/AI-Projects/ai-win-ui/src/ui_element.h) 中增加脏区检测相交剪枝，直接剔除非视区的 UI 节点 Render；
+    - **SVG DOM 显存 LRU 淘汰**：在 [renderer_skia.cpp](file:///f:/AI-Projects/ai-win-ui/src/renderer_skia.cpp) 中限制 256 项 SVG DOM 的显存淘汰。
+  - **响应式绑定与动效 Transition 引擎 (Phase 3/4)**
+    - **`Observable<T>` 响应式属性**：导出公开头文件 [include/ai_win_ui/observable.h](file:///f:/AI-Projects/ai-win-ui/include/ai_win_ui/observable.h)，实现变量改变自动更新 UI；
+    - **Animation Controller**：新增 [src/animation_controller.h](file:///f:/AI-Projects/ai-win-ui/src/animation_controller.h)，支持 Linear, EaseIn, EaseOut, CubicBezier, Spring 缓动插值算法与 ColorLerp / FloatLerp 计算。
+  - **自动化 CI 全过 (Q8)**
+    - `scripts/run_ci_local.ps1` 跑通全套 7 项自动化测试（Skia/D2D Smoke、Core/Yoga/ScrollViewer Golden），回归通过。
+
 
 - **Wave3：可嵌入 + GitHub 绿勾**
   - H5b：`UiHost` → `src/ui_host.cpp`；`main.cpp` 薄入口

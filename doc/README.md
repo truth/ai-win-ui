@@ -37,6 +37,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **Wave4 architecture & performance:** `2026-07-26-architecture-refactoring-and-optimization-v1.md`
   - **active productization:** `2026-07-15-directui-productization-personas.md`
     （按 6 个人物/角色分工：R 文本 · L 布局 · C 控件 · S 样式 · H 宿主 · Q 质量）
   - Wave2 embed API draft: `2026-07-16-embed-api-v1.md`
@@ -50,9 +51,9 @@ abstractions:
 
 | Area | Files |
 |------|--------|
-| Controls | `src/ui.h` |
+| Controls | `src/ui.h`, `src/ui_panels.*` |
 | Renderer | `src/renderer.h` (+ D2D / Skia) |
-| Text measure | `src/text_measurer.h` |
+| Text measure | `src/text_measurer.h` (with `CachingTextMeasurer`) |
 | Layout engine | `src/layout_engine.h` (Yoga) |
 | Context | `src/ui_context.h` (includes `StyleCatalog*`) |
 | Box decoration | `src/box_decoration.*` |
@@ -60,8 +61,9 @@ abstractions:
 | **Style catalog** | **`src/style_catalog.*`** |
 | Theme tokens | `src/theme.*` |
 | Window chrome | `src/window_chrome.*` |
-| Layout parse | `src/layout_parser.*` |
-| **UiHost / multi-host** | **`src/ui_host.h`**, `src/application.*`, `src/host_options.h` |
+| Layout parse | `src/layout_parser.*`, `src/layout_parser_panels.*`, `src/layout_parser_controls.*` |
+| **UiHost / multi-host** | **`src/ui_host.h`**, `src/ui_host_input.cpp`, `src/ui_host_overlay.cpp`, `src/application.*` |
+| Animation & Reactive | `src/animation_controller.*`, `<ai_win_ui/observable.h>` |
 | Host impl (TU) | `src/main.cpp` (`class UiHost`) |
 
 The app currently supports:
