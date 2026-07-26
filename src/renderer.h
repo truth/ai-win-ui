@@ -111,6 +111,23 @@ public:
         DrawSvg(svg, rect, false, Color{});
     }
     virtual void DrawSvg(SvgHandle svg, const Rect& rect, bool hasTint, const Color& tint) = 0;
+
+    // Phase 2: Dirty Rect BBox Culling
+    virtual void SetDirtyRect(const Rect& rect) { m_dirtyRect = rect; m_hasDirtyRect = true; }
+    virtual void ClearDirtyRect() { m_hasDirtyRect = false; }
+    virtual bool HasDirtyRect() const { return m_hasDirtyRect; }
+    virtual Rect GetDirtyRect() const { return m_dirtyRect; }
+    virtual bool IntersectsDirtyRect(const Rect& rect) const {
+        if (!m_hasDirtyRect) return true;
+        return !(rect.right < m_dirtyRect.left ||
+                 rect.left > m_dirtyRect.right ||
+                 rect.bottom < m_dirtyRect.top ||
+                 rect.top > m_dirtyRect.bottom);
+    }
+
+protected:
+    Rect m_dirtyRect{};
+    bool m_hasDirtyRect = false;
 };
 
 std::unique_ptr<IRenderer> CreateDirect2DRenderer();

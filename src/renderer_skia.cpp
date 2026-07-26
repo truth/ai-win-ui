@@ -549,9 +549,10 @@ public:
             }
             key = "bytes:" + std::to_string(h) + ":" + std::to_string(size);
         }
-        auto it = m_svgCache.find(key);
-        if (it != m_svgCache.end()) {
-            return it->second;
+        auto it = m_svgCacheMap.find(key);
+        if (it != m_svgCacheMap.end()) {
+            m_svgCacheList.splice(m_svgCacheList.begin(), m_svgCacheList, it->second);
+            return it->second->handle;
         }
 
         EnsureFontManager();
@@ -566,7 +567,14 @@ public:
             return nullptr;
         }
         auto handle = std::make_shared<SkiaSvgResource>(std::move(dom));
-        m_svgCache.emplace(std::move(key), handle);
+        if (m_svgCacheList.size() >= kMaxSvgCacheSize) {
+            auto last = m_svgCacheList.end();
+            --last;
+            m_svgCacheMap.erase(last->key);
+            m_svgCacheList.pop_back();
+        }
+        m_svgCacheList.push_front(SvgCacheEntry{key, handle});
+        m_svgCacheMap[key] = m_svgCacheList.begin();
         return handle;
     }
 
@@ -758,7 +766,13 @@ private:
     sk_sp<SkFontMgr> m_fontMgr;
     sk_sp<SkTypeface> m_defaultTypeface;
     SkSamplingOptions m_bitmapSampling{SkFilterMode::kLinear, SkMipmapMode::kLinear};
-    std::unordered_map<std::string, SvgHandle> m_svgCache;
+    struct SvgCacheEntry {
+        std::string key;
+        SvgHandle handle;
+    };
+    static constexpr size_t kMaxSvgCacheSize = 256;
+    std::list<SvgCacheEntry> m_svgCacheList;
+    std::unordered_map<std::string, std::list<SvgCacheEntry>::iterator> m_svgCacheMap;
 };
 
 } // namespace

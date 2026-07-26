@@ -17,3 +17,5 @@ public:
 };
 
 std::unique_ptr<ITextMeasurer> CreateTextMeasurer(RendererBackend backend = RendererBackend::Direct2D);
+std::unique_ptr<ITextMeasurer> CreateCachedTextMeasurer(std::unique_ptr<ITextMeasurer> inner, size_t maxCapacity = 1024);
+

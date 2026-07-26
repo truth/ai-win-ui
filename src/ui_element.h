@@ -190,6 +190,7 @@ public:
     }
     virtual void Arrange(const Rect& finalRect) { m_bounds = finalRect; }
     virtual void Render(IRenderer& renderer) {
+        if (!renderer.IntersectsDirtyRect(m_bounds)) return;
         for (auto& child : m_children) {
             child->Render(renderer);
         }
