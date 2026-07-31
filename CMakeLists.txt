@@ -201,4 +201,12 @@ ai_win_ui_add_app(ai_win_ui src/main.cpp)
 
 if(AI_WIN_UI_BUILD_SAMPLES)
     ai_win_ui_add_app(embed_host samples/embed_host/main.cpp)
+
+    # 便签 — sticky-notes desktop app (multi-file).
+    ai_win_ui_add_app(sticky_notes samples/sticky_notes/main.cpp)
+    target_sources(sticky_notes PRIVATE
+        samples/sticky_notes/note_store.cpp
+        samples/sticky_notes/layout_gen.cpp
+        samples/sticky_notes/app.rc
+    )
 endif()
