@@ -69,6 +69,8 @@ return host->Run();
 - 头文件：`include/ai_win_ui/host.h`、`version.h`（当前 **0.3.1**）
 - 示例：`samples/embed_host` — shell + **parent 子窗嵌入** + 外部消息泵  
   → `build/Debug/embed_host.exe`
+- 示例：`samples/sticky_notes`（便签）— 内联布局 XML + 托盘 + 多个浮动 layered 窗口 + 管理器  
+  → `build/Debug/sticky_notes.exe`，说明见 `samples/sticky_notes/README.md`
 - 说明：`doc/plan/2026-07-16-embed-api-v1.md`、`CHANGELOG.md`
 
 ## 本地 CI（Q8）+ GitHub 绿勾
