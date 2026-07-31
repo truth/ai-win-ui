@@ -11,6 +11,13 @@ public:
         SetText(std::move(text));
     }
 
+    // Layouts that set background/textColor/borderColor explicitly must call
+    // this so ApplyThemeDefaults() doesn't overwrite them with the theme's
+    // defaults (see ApplyThemeDefaults below) — otherwise Render() resolves
+    // colors from m_style, which SyncLegacyColorsFromStyle just reset from the
+    // theme, silently discarding the per-instance colors set from layout.
+    void LockColors() { m_styleFromLayout = true; }
+
     static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
         ComponentStyle s;
         BoxDecoration shell;
@@ -269,6 +276,28 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        if (m_styleFromLayout) {
+            // Layout set background/textColor/borderColor explicitly (see LockColors);
+            // push them into m_style so they win over whatever ApplyThemeDefaults
+            // last resolved, instead of being silently shadowed by shell.decoration
+            // / shell.foreground below.
+            if (!m_style.base.decoration.has_value()) {
+                m_style.base.decoration = BoxDecoration{};
+            }
+            m_style.base.decoration->background = background;
+            m_style.base.decoration->border.color = borderColor;
+            m_style.base.foreground = textColor;
+            // The Focused override replaces decoration wholesale (see
+            // ComponentStyle::Resolve / MergeOptional), so it must carry the
+            // locked-in background too, not just its own border-ring tweak —
+            // otherwise focusing the box (i.e. clicking in to type) would flip
+            // the background back to DefaultStyle's stale snapshot while text
+            // stays the locked (often dark) color, i.e. dark-on-dark.
+            auto& focusedDecoration = m_style.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration;
+            if (focusedDecoration.has_value()) {
+                focusedDecoration->background = background;
+            }
+        }
         const float scaledCorner = ScaleValue(cornerRadius);
         const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
         Color shellBg = background;

@@ -302,6 +302,12 @@ public:
                 windowX = work.left + std::max(0L, (work.right - work.left - windowWidth) / 2);
                 windowY = work.top + std::max(0L, (work.bottom - work.top - windowHeight) / 2);
             }
+            // Explicit embedder-requested placement overrides centering (e.g.
+            // restoring a saved sticky-note position).
+            if (m_hasInitialPos) {
+                windowX = m_initialX;
+                windowY = m_initialY;
+            }
         }
 
         m_hwnd = CreateWindowExW(
@@ -607,6 +613,51 @@ public:
     bool IsSecondary() const { return m_isSecondary; }
     HWND GetHwnd() const { return m_hwnd; }
 
+    // ---- Embedder hooks (set before Initialize) ---------------------------
+    void SetInlineLayout(std::string utf8, bool isJson) {
+        m_inlineLayoutXml = std::move(utf8);
+        m_inlineLayoutIsJson = isJson;
+    }
+    void SetActionCallback(ai_win_ui::HostActionCallback cb, void* user) {
+        m_actionCallback = cb;
+        m_actionUser = user;
+    }
+    void SetInitialPosition(int x, int y) {
+        m_hasInitialPos = true;
+        m_initialX = x;
+        m_initialY = y;
+    }
+
+    // ---- Runtime element access (used by embedders) -----------------------
+    std::wstring GetElementText(const std::string& name) const {
+        if (!m_root) {
+            return std::wstring();
+        }
+        UIElement* el = m_root->FindElementByName(name);
+        return el ? ReadElementText(el) : std::wstring();
+    }
+
+    bool SetElementText(const std::string& name, const std::wstring& text) {
+        if (!m_root) {
+            return false;
+        }
+        UIElement* el = m_root->FindElementByName(name);
+        if (!el || !WriteElementText(el, text)) {
+            return false;
+        }
+        if (m_hwnd) {
+            UpdateLayout();
+            InvalidateRect(m_hwnd, nullptr, FALSE);
+        }
+        return true;
+    }
+
+    void Invalidate() {
+        if (m_hwnd) {
+            InvalidateRect(m_hwnd, nullptr, FALSE);
+        }
+    }
+
     static void ApplyOptionsToEnvironment(const OpenHostOptions& options) {
         if (!options.layout.empty()) {
             SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", options.layout.c_str());
@@ -630,6 +681,39 @@ public:
     }
 
 private:
+    static std::wstring ReadElementText(UIElement* el) {
+        if (auto* ti = dynamic_cast<TextInput*>(el)) {
+            return ti->Text();
+        }
+        if (auto* rtb = dynamic_cast<RichTextBox*>(el)) {
+            return rtb->Text();
+        }
+        if (auto* lbl = dynamic_cast<Label*>(el)) {
+            return lbl->Text();
+        }
+        return std::wstring();
+    }
+
+    static bool WriteElementText(UIElement* el, const std::wstring& text) {
+        if (auto* ti = dynamic_cast<TextInput*>(el)) {
+            ti->SetText(text);
+            return true;
+        }
+        if (auto* rtb = dynamic_cast<RichTextBox*>(el)) {
+            rtb->SetPlainText(text);
+            return true;
+        }
+        if (auto* lbl = dynamic_cast<Label*>(el)) {
+            lbl->SetText(text);
+            return true;
+        }
+        if (auto* btn = dynamic_cast<Button*>(el)) {
+            btn->SetText(text);
+            return true;
+        }
+        return false;
+    }
+
     bool InitializeRenderer() {
         // Layered present is supported on both Direct2D and Skia. Prefer the
         // requested backend; fall back to Direct2D if Skia init fails.
@@ -1229,11 +1313,28 @@ private:
                         wSize.empty() ? nullptr : wSize.c_str());
                 };
             }
+            // Fall back to the embedder's action sink for any unrecognised id.
+            if (m_actionCallback) {
+                ai_win_ui::HostActionCallback cb = m_actionCallback;
+                void* user = m_actionUser;
+                return [cb, user, eventId]() { cb(eventId.c_str(), user); };
+            }
             return UIEventHandler();
         };
 
         LoadTheme();
         LoadStyleCatalog();
+
+        // Embedder-supplied in-memory layout wins over env / file candidates.
+        if (!m_inlineLayoutXml.empty()) {
+            m_root = LayoutParser::BuildFromXmlText(m_uiContext, m_inlineLayoutXml, m_inlineLayoutIsJson);
+            if (m_root) {
+                m_activeLayoutPath = "inline";
+                UpdateWindowTitle();
+                SetFocusedElement(GetFirstFocusable());
+                return;
+            }
+        }
 
         std::vector<std::string> layoutCandidates;
         const std::wstring requestedLayout = GetEnvironmentValue(L"AI_WIN_UI_LAYOUT");
@@ -1735,6 +1836,52 @@ private:
         if (handled) {
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
+        DispatchHoverChange(x, y);
+    }
+
+    // Report hover enter/leave for elements named "hoverpreview_*" to the
+    // embedder action sink as "hover:<name>" / "hover:" (leave). Used to drive
+    // hover-preview popups from generated layouts.
+    std::string FindHoverNameAt(float x, float y) const {
+        std::string found;
+        std::function<void(const UIElement*)> walk = [&](const UIElement* el) {
+            if (!el) {
+                return;
+            }
+            const Rect b = el->Bounds();
+            if (x < b.left || x > b.right || y < b.top || y > b.bottom) {
+                return;
+            }
+            const std::string& n = el->Name();
+            if (n.rfind("hoverpreview_", 0) == 0) {
+                found = n; // deeper matches overwrite as recursion descends
+            }
+            for (const auto& child : el->Children()) {
+                walk(child.get());
+            }
+        };
+        walk(m_root.get());
+        return found;
+    }
+
+    void DispatchHoverChange(float x, float y) {
+        if (!m_actionCallback) {
+            return;
+        }
+        std::string hoverName = FindHoverNameAt(x, y);
+        if (hoverName == m_lastHoverName) {
+            return;
+        }
+        m_lastHoverName = hoverName;
+        const std::string id = "hover:" + hoverName;
+        m_actionCallback(id.c_str(), m_actionUser);
+    }
+
+    void ClearHover() {
+        if (m_actionCallback && !m_lastHoverName.empty()) {
+            m_lastHoverName.clear();
+            m_actionCallback("hover:", m_actionUser);
+        }
     }
 
     void OnMouseDown(LPARAM lParam) {
@@ -1804,6 +1951,7 @@ private:
 
     void OnMouseLeave() {
         m_isTrackingMouseLeave = false;
+        ClearHover();
         if (m_root && m_root->OnMouseLeave()) {
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
@@ -2431,6 +2579,16 @@ private:
         return DefWindowProcW(hwnd, msg, wParam, lParam);
     }
 
+    // Embedder hooks (set via Set* before Initialize).
+    std::string m_inlineLayoutXml;
+    bool m_inlineLayoutIsJson = false;
+    ai_win_ui::HostActionCallback m_actionCallback = nullptr;
+    void* m_actionUser = nullptr;
+    bool m_hasInitialPos = false;
+    int m_initialX = 0;
+    int m_initialY = 0;
+    std::string m_lastHoverName;
+
     HINSTANCE m_instance = nullptr;
     int m_cmdShow = SW_SHOWNORMAL;
     bool m_isSecondary = false;
@@ -2738,6 +2896,15 @@ std::unique_ptr<Host> Host::Create(HINSTANCE instance, const HostCreateInfo& inf
     impl->host = std::make_unique<UiHost>();
     impl->ownPump = info.ownMessagePump;
     impl->host->SetParentHwnd(info.parent);
+    if (info.inlineLayoutXml && info.inlineLayoutXml[0]) {
+        impl->host->SetInlineLayout(info.inlineLayoutXml, info.inlineLayoutIsJson);
+    }
+    if (info.onAction) {
+        impl->host->SetActionCallback(info.onAction, info.actionUser);
+    }
+    if (info.hasPosition && !info.parent) {
+        impl->host->SetInitialPosition(info.posX, info.posY);
+    }
     const int showCmd = info.showCommand != 0 ? info.showCommand : SW_SHOWNORMAL;
     if (!impl->host->Initialize(instance, showCmd)) {
         return nullptr;
@@ -2794,6 +2961,26 @@ bool Host::ResizeClient(int width, int height) {
 
 bool Host::FitToParent() {
     return m_impl && m_impl->host && m_impl->host->FitToParent();
+}
+
+std::wstring Host::GetElementText(const char* name) const {
+    if (!m_impl || !m_impl->host || !name) {
+        return std::wstring();
+    }
+    return m_impl->host->GetElementText(name);
+}
+
+bool Host::SetElementText(const char* name, const wchar_t* text) {
+    if (!m_impl || !m_impl->host || !name) {
+        return false;
+    }
+    return m_impl->host->SetElementText(name, text ? std::wstring(text) : std::wstring());
+}
+
+void Host::Invalidate() {
+    if (m_impl && m_impl->host) {
+        m_impl->host->Invalidate();
+    }
 }
 
 } // namespace ai_win_ui

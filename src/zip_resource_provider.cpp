@@ -158,6 +158,10 @@ static bool ParseCentralDirectory(ZipState& state) {
             return false;
         }
         std::string filename(reinterpret_cast<const char*>(header + 46), fileNameLen);
+        // Some Windows zip writers (e.g. PowerShell's Compress-Archive) store
+        // entry names with '\' separators instead of the ZIP-spec '/'; normalize
+        // so lookups by a forward-slash resource path always match.
+        std::replace(filename.begin(), filename.end(), '\\', '/');
         ZipFileEntry entry;
         entry.filename = std::move(filename);
         entry.crc32 = crc32;

@@ -43,6 +43,13 @@ public:
     static std::unique_ptr<UIElement> BuildFromFile(UIContext& context,
                                                     const std::string& resourcePath);
 
+    // Build a UI tree from an in-memory layout string (no file IO). Used by
+    // embedders that generate layouts at runtime. Pass the raw XML (or JSON when
+    // isJson=true). Requires context.resourceProvider to be set.
+    static std::unique_ptr<UIElement> BuildFromXmlText(UIContext& context,
+                                                       const std::string& xmlText,
+                                                       bool isJson = false);
+
     static Color ColorFromString(const std::string& value);
     static std::wstring Utf8ToUtf16(const std::string& utf8);
 

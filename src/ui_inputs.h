@@ -20,6 +20,22 @@ public:
 
     void SetOnClick(std::function<void()> onClick) { m_onClick = std::move(onClick); }
     void SetText(std::wstring text) { m_text = std::move(text); }
+
+    // Optional SVG icon drawn (tinted with the button foreground) instead of text.
+    void SetIconSvg(std::vector<uint8_t> data, std::string cacheKey) {
+        m_iconSvg = std::move(data);
+        m_iconKey = std::move(cacheKey);
+        m_svg = nullptr;
+    }
+    bool HasIcon() const { return !m_iconSvg.empty(); }
+
+    // Locks the quick-set background/foreground against ApplyThemeDefaults(),
+    // which SetContext() runs unconditionally on every element (not just on
+    // theme switches) and otherwise resets a plain layout `background=`/
+    // `foreground=` attribute back to the theme's generic button color. Use
+    // this for buttons whose color is semantically meaningful per-instance
+    // (e.g. a color-picker swatch) rather than themed chrome.
+    void LockColors() { m_styleFromLayout = true; }
     void SetVariant(Variant variant) {
         m_variant = variant;
         const Theme* theme = (m_context && m_context->theme) ? m_context->theme : nullptr;
@@ -242,6 +258,26 @@ public:
             return;
         }
 
+        // SVG icon (tinted with the resolved foreground) takes priority over text.
+        if (!m_iconSvg.empty()) {
+            if (!m_svg) {
+                m_svg = renderer.CreateSvgFromBytes(
+                    m_iconSvg.data(), m_iconSvg.size(),
+                    m_iconKey.empty() ? nullptr : m_iconKey.c_str());
+            }
+            if (m_svg) {
+                const float pad = ScaleValue(6.0f);
+                float side = std::min(m_bounds.Width(), m_bounds.Height());
+                side = std::max(1.0f, side - pad * 2.0f);
+                const float cx = (m_bounds.left + m_bounds.right) * 0.5f;
+                const float cy = (m_bounds.top + m_bounds.bottom) * 0.5f;
+                const Rect iconRect = Rect::Make(cx - side * 0.5f, cy - side * 0.5f,
+                                                 cx + side * 0.5f, cy + side * 0.5f);
+                renderer.DrawSvg(m_svg, iconRect, true, fg);
+                return;
+            }
+        }
+
         // Center label properly (no left padding bias).
         const TextRenderOptions textOptions{
             TextWrapMode::NoWrap,
@@ -377,6 +413,9 @@ public:
 private:
     std::wstring m_text;
     std::function<void()> m_onClick;
+    std::vector<uint8_t> m_iconSvg;
+    std::string m_iconKey;
+    SvgHandle m_svg = nullptr;
     Variant m_variant = Variant::Default;
     bool m_showRestoreGlyph = false;
 };
@@ -386,6 +425,14 @@ public:
     explicit TextInput(std::wstring text = L"") : m_text(std::move(text)), m_caretPosition(m_text.size()) {
         m_style = DefaultStyle(nullptr);
         m_cursor = CursorType::IBeam;
+    }
+
+    // Programmatic access to the edited value (used by embedders reading form state).
+    const std::wstring& Text() const { return m_text; }
+    void SetText(std::wstring text) {
+        m_text = std::move(text);
+        m_caretPosition = m_text.size();
+        ClearSelection();
     }
 
     static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
@@ -819,6 +866,18 @@ private:
         m_style.base.decoration->background = background;
         m_style.base.foreground = textColor;
         m_style.base.fontSize  = fontSize;
+        // The Focused override in DefaultStyle() snapshots a whole BoxDecoration
+        // (border-ring tweak + a copy of the background at that time).
+        // ComponentStyle::Resolve replaces decoration wholesale when a state
+        // override is present, so without this, focusing the field (i.e.
+        // clicking in to type) would flip its background back to that stale
+        // snapshot while the text/caret stay this instance's (possibly dark)
+        // textColor — a dark-on-dark collision. (Disabled's background is
+        // intentionally different — a muted surface color — so it's left alone.)
+        auto& focusedDecoration = m_style.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration;
+        if (focusedDecoration.has_value()) {
+            focusedDecoration->background = background;
+        }
     }
 
 public:

@@ -1511,6 +1511,37 @@ std::unique_ptr<UIElement> LayoutParser::BuildFromFile(UIContext& context,
     return nullptr;
 }
 
+std::unique_ptr<UIElement> LayoutParser::BuildFromXmlText(UIContext& context,
+                                                          const std::string& xmlText,
+                                                          bool isJson) {
+    if (!context.resourceProvider || xmlText.empty()) {
+        return nullptr;
+    }
+
+    g_activeTheme = context.theme;
+    g_activeStyleCatalog = context.styleCatalog;
+
+    IResourceProvider& provider = *context.resourceProvider;
+    try {
+        if (isJson) {
+            JsonValue root = ParseJson(xmlText);
+            auto element = CreateElementFromJson(root, provider, context.eventResolver);
+            if (element) {
+                element->SetContext(&context);
+            }
+            return element;
+        }
+        XmlNode root = ParseXml(xmlText);
+        auto element = CreateElementFromXml(root, provider, context.eventResolver);
+        if (element) {
+            element->SetContext(&context);
+        }
+        return element;
+    } catch (const std::exception&) {
+        return nullptr;
+    }
+}
+
 std::wstring MakeUtf16(const std::string& text) {
     const int size = MultiByteToWideChar(CP_UTF8, 0, text.c_str(), -1, nullptr, 0);
     std::wstring result(size > 0 ? size - 1 : 0, L'\0');
@@ -1997,12 +2028,15 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
             if (props["background"].IsString()) {
                 rich->background = LayoutParser::ColorFromString(props["background"].stringValue);
+                rich->LockColors();
             }
             if (props["borderColor"].IsString()) {
                 rich->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+                rich->LockColors();
             }
             if (props["textColor"].IsString()) {
                 rich->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+                rich->LockColors();
             }
             if (props["height"].IsNumber()) {
                 rich->preferredHeight = static_cast<float>(props["height"].numberValue);
@@ -3235,12 +3269,15 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
             rich->background = LayoutParser::ColorFromString(it->second);
+            rich->LockColors();
         }
         if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
             rich->borderColor = LayoutParser::ColorFromString(it->second);
+            rich->LockColors();
         }
         if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
             rich->textColor = LayoutParser::ColorFromString(it->second);
+            rich->LockColors();
         }
         if (auto it = node.attributes.find("height"); it != node.attributes.end()) {
             rich->preferredHeight = std::stof(it->second);
@@ -3743,6 +3780,20 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
                 button->SetVariant(Button::Variant::CaptionMaximize);
             } else if (value == "captionclose" || value == "caption-close" || value == "close") {
                 button->SetVariant(Button::Variant::CaptionClose);
+            }
+        }
+        if (auto it = node.attributes.find("icon"); it != node.attributes.end()) {
+            if (provider.Exists(it->second)) {
+                button->SetIconSvg(provider.LoadBytes(it->second), it->second);
+            }
+        }
+        // Prevents SetContext()'s unconditional ApplyThemeDefaults() call from
+        // resetting a plain background=/foreground= to the theme's generic
+        // button color (see Button::LockColors doc comment).
+        if (auto it = node.attributes.find("lockColors"); it != node.attributes.end()) {
+            const std::string value = ToLowerAscii(TrimString(it->second));
+            if (value == "true" || value == "1" || value == "yes") {
+                button->LockColors();
             }
         }
         ApplyCommonXmlAttributes(*button, node);
