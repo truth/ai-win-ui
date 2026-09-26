@@ -15,7 +15,11 @@
   - **Observable 生命周期强化**：修改 `observable.h` 支持 `Subscribe` 返回 ID 及 `Unsubscribe` 注销。
   - **Host::BindText API**：扩展 C++ 宿主接口，允许将 `Observable<std::wstring>` 绑定至指定名称的 `Label`/`Button` 控件，且宿主析构时安全解绑。
   - **Embedder Action 拦截**：完善 `main.cpp` 示例，支持从 Gallery 接收自定义 Action (`openBindingDemo`)，展示如何动态创建 Secondary Host 并与全局/静态状态绑定。
-
+- **Wave5：声明式过渡动画 DSL (Q8)**
+  - **CSS 风格过渡**：实现 `<Panel transition="background 500ms ease-in, border 300ms linear">` 属性解析，支持指定属性的动画插值。
+  - **独立计时与刷新**：将 `OnTimer` 修改为以 `dtMs` (Delta ms) 为参数并沿组件树广播，实现基于实际流逝时间的帧无关（Frame-independent）色彩插值。
+  - **动画装饰解析**：在 `ui_element.h` 中新增 `ResolveAnimatedDecoration`，拦截静态渲染过程并注入当前计算的色彩中间态，支持对 `Panel`, `Button`, `TextBox` 等基础控件的热插拔生效。
+  - **集成画廊 Demo**：新增 `transition_demo.xml` 展示鼠标悬浮触发的色彩渐变，已集成入主页面 Gallery 测试。
 ## 2026-07-26
 
 - **Wave4：架构模块化重构、渲染性能优化与响应式动效系统**
