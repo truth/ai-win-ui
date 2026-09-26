@@ -37,6 +37,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **Wave5 keyboard matrix:** `2026-09-26-keyboard-matrix-v1.md`
   - **Wave5 transition DSL (Q8):** `2026-09-26-declarative-transition-dsl-v1.md`
   - **Wave5 observable binding:** `2026-09-26-observable-binding-v1.md`
   - **Wave5 flex & chrome specs:** `2026-09-26-flex-chrome-spec-v1.md`

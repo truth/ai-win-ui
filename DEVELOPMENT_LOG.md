@@ -20,6 +20,10 @@
   - **独立计时与刷新**：将 `OnTimer` 修改为以 `dtMs` (Delta ms) 为参数并沿组件树广播，实现基于实际流逝时间的帧无关（Frame-independent）色彩插值。
   - **动画装饰解析**：在 `ui_element.h` 中新增 `ResolveAnimatedDecoration`，拦截静态渲染过程并注入当前计算的色彩中间态，支持对 `Panel`, `Button`, `TextBox` 等基础控件的热插拔生效。
   - **集成画廊 Demo**：新增 `transition_demo.xml` 展示鼠标悬浮触发的色彩渐变，已集成入主页面 Gallery 测试。
+- **Wave5：键盘控制与交互增强 (Keyboard-matrix)**
+  - **焦点请求接口**：在 `UIContext` 新增 `requestFocus` 允许 `UIElement` 主动申请获得焦点。
+  - **RadioGroup 方向键导航**：在单选框分组内支持使用方向键自动切换并移交焦点，具备首尾循环能力。
+  - **DataTable 状态控制**：实现在非编辑模式下按下 `Esc` 键清除所有选中行，进一步完善无障碍键盘操作。
 ## 2026-07-26
 
 - **Wave4：架构模块化重构、渲染性能优化与响应式动效系统**
