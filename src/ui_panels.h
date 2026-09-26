@@ -1448,6 +1448,14 @@ public:
         }
 
         switch (keyCode) {
+            case VK_ESCAPE:
+                if (m_selectedIndex >= 0 || !m_selectedSet.empty()) {
+                    m_selectedIndex = -1;
+                    m_selectedSet.clear();
+                    NotifySelectionChanged();
+                    return true;
+                }
+                return false;
             case VK_UP:
                 return MoveSelection(-1, shift, ctrl);
             case VK_DOWN:

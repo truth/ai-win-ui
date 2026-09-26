@@ -136,6 +136,9 @@ public:
                 InvalidateRect(m_hwnd, nullptr, FALSE);
             }
         };
+        m_uiContext.requestFocus = [this](UIElement* element) {
+            SetFocusedElement(element);
+        };
     }
 
     ~UiHost() {

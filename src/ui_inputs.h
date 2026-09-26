@@ -1212,6 +1212,27 @@ public:
             SetChecked(true);
             return true;
         }
+        if (keyCode == VK_UP || keyCode == VK_LEFT || keyCode == VK_DOWN || keyCode == VK_RIGHT) {
+            auto& group = s_groups[m_group];
+            if (group.size() <= 1) return false;
+
+            auto it = std::find(group.begin(), group.end(), this);
+            if (it != group.end()) {
+                size_t index = std::distance(group.begin(), it);
+                if (keyCode == VK_UP || keyCode == VK_LEFT) {
+                    index = (index == 0) ? group.size() - 1 : index - 1;
+                } else {
+                    index = (index + 1) % group.size();
+                }
+
+                RadioButton* nextBtn = group[index];
+                nextBtn->SetChecked(true);
+                if (m_context && m_context->requestFocus) {
+                    m_context->requestFocus(nextBtn);
+                }
+                return true;
+            }
+        }
         return false;
     }
 

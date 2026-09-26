@@ -10,6 +10,7 @@ class IResourceProvider;
 class ILayoutEngine;
 class Theme;
 class StyleCatalog;
+class UIElement;
 
 using UIEventHandler = std::function<void()>;
 using UIEventResolver = std::function<UIEventHandler(const std::string&)>;
@@ -24,6 +25,7 @@ struct UIContext {
     UIEventResolver eventResolver;
     std::function<void()> requestLayout;
     std::function<void()> invalidate;
+    std::function<void(UIElement*)> requestFocus;
     UINT dpi = 96;
     float dpiScale = 1.0f;
     // Client-area size of the host window (DIP-free pixels). Used by overlay popups.
