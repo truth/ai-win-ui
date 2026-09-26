@@ -19,16 +19,15 @@ Historical MVP blockers (Skia text, Yoga calibration, acceptance flow) are
 addressed for L1: dual-backend measure goldens, text dump ≤2px, nested
 `ScrollViewer` matrix, IME/H4 acceptance steps, and documented R5 deltas.
 
-**Wave 2 in progress** (persona board is authoritative):
+**Waves 1–4 closed.** **Wave5 engine line** (persona board + feature branch):
 
-| Done | Next |
+| Track | Next |
 |------|------|
-| C4 OverlayFlyout shared | C6/C7 drag / modal (optional) |
-| C5 VirtualListBox 1k | Q6/Q7 optional |
-| S4 `$color` + catalog rebind | H5b/H6 lib extract (Wave3) |
-| R6–R8 text/visual polish | |
-| **Q8** local CI smoke+golden | |
-| H5 embed API **draft** | |
+| Flex + chrome | layout-spec, window-chrome, gallery `flex-chrome` |
+| Binding | Host `BindText` / Observable → Label, Button |
+| Animation | Host tick + `transition` on Panel/Button decoration |
+| Controls | Radio group arrows, DataTable Esc |
+| Quality | Q7 screenshot diff (backlog), keep Q8 CI green |
 
 Authoritative board: `doc/plan/2026-07-15-directui-productization-personas.md`.  
 Embed draft: `doc/plan/2026-07-16-embed-api-v1.md`.  

@@ -1,0 +1,41 @@
+---
+description: Rules for authoring XML/JSON layouts in ai-win-ui, including Flexbox properties and custom window chrome.
+globs: *.xml, *.json
+---
+
+# AI WinUI Layout Authoring Rules
+
+When modifying or creating `.xml` or `.json` layout files for `ai-win-ui`, follow these critical rules:
+
+## 1. Flexbox & Composition
+- Use `Panel` as the main composition primitive (rows/columns/cards).
+- Supported Flex properties:
+  - `direction="row|column"`
+  - `wrap="nowrap|wrap"`
+  - `alignItems="stretch|start|center|end"`
+  - `justifyContent="start|center|end|space-between"`
+  - `flexGrow="1"`, `flexBasis="0"`, `alignSelf="auto|stretch|start|center|end"`
+- There is NO absolute positioning. Build screens with nested `Panel`, `Spacer`, and flex properties.
+
+## 2. Window Chrome & Layered Windows
+If a layout represents a custom or layered window:
+- **Layered Chrome (`chrome="layered"`)**:
+  - The root element MUST have `background="transparent"`.
+  - Provide an opaque body (e.g. `ShapePanel` or rounded `Panel`) to define the hit-testable area.
+- **Hit Testing**:
+  - `hitTest="caption"`: Makes the area draggable (acts as the window title bar).
+  - `hitTest="client"`: Normal interactive area.
+  - `role="titleBar"`: Alias for caption region.
+- **Window Events**: Use predefined IDs for window controls: `onClick="windowClose"`, `windowMinimize`, `windowMaximize`.
+
+## 3. Style System & Theme Tokens
+- **Theme Tokens**: Use `$color.xxx` or `$spacing.xxx` for dynamic theme values (e.g., `background="$color.surface"`).
+- **Style Catalog (`$style.xxx`)**:
+  - Use catalog styles for shared components: `style="$style.primaryButton"`.
+  - XML cannot embed nested objects in attributes. Use `$style.xxx` referencing `resource/styles/*.json`.
+  - Do not mix `$style.xxx` and inline `style` objects on the same node.
+
+## 4. Components
+- `ScrollViewer`: Use for nested scroll regions (prefer over window scroll). Set `scrollY="true"`.
+- `ShapePanel`: Parametric polygon (`kind="heart|petal|oval|star"`). Use for layered window bodies.
+- `Label`: For text. Use `ellipsis="true"` for single-line truncation.

@@ -7,7 +7,7 @@ set(AI_WIN_UI_RESOURCE_DIR "${CMAKE_SOURCE_DIR}/resource")
 
 set(AI_WIN_UI_VERSION_MAJOR 0)
 set(AI_WIN_UI_VERSION_MINOR 3)
-set(AI_WIN_UI_VERSION_PATCH 1)
+set(AI_WIN_UI_VERSION_PATCH 2)
 
 # Auto-detect bundled Skia SDK (gitignored; present on local dev machines).
 set(_ai_win_ui_default_skia_dir "${CMAKE_SOURCE_DIR}/third_party/skia-m124")

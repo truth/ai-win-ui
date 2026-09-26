@@ -1,5 +1,15 @@
 # 开发日志
 
+## 2026-09-26
+
+- **Wave5：Flex + Chrome 规范、画廊与 CI 验证**
+  - **规范化 (Cursor AI Rules)**
+    - 新增 `.cursor/rules/ai_win_ui_layout.mdc` 规则，指导 Cursor AI 生成标准的 XML/JSON 布局，强制规范 Flex 属性、Window Chrome 设定及 `hitTest` 控制。
+  - **画廊验证 (Validation Gallery)**
+    - 新增 `resource/layouts/flex_chrome_validation.xml`，综合测试 Layered Chrome (透明层叠窗口)、标题栏拖拽以及复杂的 Flex 多行包裹。
+    - 修改 `resource/layouts/demo_gallery.xml`，添加 `Flex Chrome Validation` 入口卡片。
+  - **CI (Q8)**
+    - `scripts/run_ci_local.ps1` 跑通全套 7 项自动化回归测试。
 ## 2026-07-26
 
 - **Wave4：架构模块化重构、渲染性能优化与响应式动效系统**

@@ -66,7 +66,7 @@ return host->Run();
 ```
 
 - 静态库：`ai_win_ui_lib`（`build/Debug/ai_win_ui_lib.lib`）
-- 头文件：`include/ai_win_ui/host.h`、`version.h`（当前 **0.3.1**）
+- 头文件：`include/ai_win_ui/host.h`、`version.h`（当前 **0.3.2**，引擎线目标 **0.4.0**）
 - 示例：`samples/embed_host` — shell + **parent 子窗嵌入** + 外部消息泵  
   → `build/Debug/embed_host.exe`
 - 示例：`samples/sticky_notes`（便签）— 内联布局 XML + 托盘 + 多个浮动 layered 窗口 + 管理器  

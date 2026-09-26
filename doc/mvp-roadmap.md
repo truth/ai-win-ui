@@ -72,22 +72,26 @@ The current MVP is a retained-mode Win32 UI demo that can:
 - Single-line controls now measure against `NoWrap` expectations so layout and
   rendering are more closely aligned.
 
-### In Progress
+### Waves closed (2026-07-16 – 2026-07-26)
 
-- Wave 1 (L1 engine trust) **closed** 2026-07-16.
-- Wave 2 (L2 product capability) **in progress** — C4/C5/S4/R6/H5-draft done;
-  see `doc/plan/2026-07-15-directui-productization-personas.md` § Wave2 进度.
+- Wave 1 (L1 engine trust) **closed**.
+- Wave 2 (L2 product capability) **closed** — C4/C5/S4/R6–R8, C6/C7, Q6/Q8.
+- Wave 3 (L3 embed) **closed** — `ai_win_ui_lib`, Host API, `embed_host`, v0.3.1 parent embed.
+- Wave 4 **closed** — parser/host split, text LRU, dirty rect culling, SVG LRU, C API, DevTools.
 
-### Not Yet Complete (Wave2 remainder / Wave3)
+### Current focus — Engine line (Wave5)
 
-- Pixel-perfect Skia↔D2D raster match is **not** required; known differences
-  are documented in `doc/skia-integration.md` (R5). Metrics ≤2px @96DPI is the
-  L1 bar and is met for core/text-wrap dumps.
-- Interaction automation beyond headless smoke + measure golden is still light
-  (Q6/Q7 optional).
-- DSL visual polish **R6–R8 done** (ellipsis, gradient/shadow, Svg tint/cache).
-  Optional further: multi-stop gradients, true Gaussian blur shadows.
-- Embed library target + sample (H5b/H6) is Wave3.
+See branch `feature/engine-flex-binding-v0.4` and personas board updates:
+
+1. Flex + layered/custom chrome spec + gallery validation.
+2. Observable Host binding + AnimationController tick.
+3. Keyboard-matrix partials (Radio group arrows, DataTable Esc).
+4. Optional backlog: Q7 screenshot diff, Zip Deflate, Skia GHA, basic UIA names.
+
+### Not required for MVP
+
+- Pixel-perfect Skia↔D2D raster match (R5 known differences in `doc/skia-integration.md`).
+- Optional R7 polish: multi-stop gradients, true Gaussian blur shadows.
 
 ## MVP Completion Checklist
 
@@ -142,8 +146,7 @@ L1 / Wave1 exit criteria are met (text metrics ≤2px, dual-backend measure
 goldens, ScrollViewer matrix, acceptance docs). Use `doc/mvp-acceptance.md`
 for a repeatable manual pass when declaring a given build “MVP verified.”
 
-Product work continues under **Wave 2** (not MVP-blocking): R7/R8 visuals,
-optional C6/C7, Q tooling, then Wave3 embed packaging.
+MVP L1 sign-off stands. Product/engine work continues under **Wave5** (see above).
 
 Recent validation improvements that help close those gaps:
 
@@ -201,11 +204,12 @@ Exit criteria:
 
 ## Immediate Execution Plan
 
-Follow the persona Wave board:
+Engine line (Wave5):
 
-1. Finish Wave2 remaining: **R7** gradients/shadow, **R8** Svg tint (optional polish).
-2. Keep C4/C5/S4 demos green: `popup-theme`, `virtual-list`, `text-ellipsis`.
-3. Wave3 when packaging matters: H5b `ui_host.cpp` + H6 `ai_win_ui_lib`.
+1. **0.3.2** — drag/drop, cursor, STA fix (released).
+2. Flex + chrome spec, `.cursor/rules`, `flex_chrome_validation` gallery.
+3. Host `BindText` + `binding_demo`; animation tick + transition DSL MVP.
+4. Keyboard-matrix + yoga measure extensions; CI green each milestone.
 
 Detailed lists:
 

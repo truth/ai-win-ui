@@ -7,6 +7,8 @@ Versioning follows [SemVer](https://semver.org/) (`AI_WIN_UI_VERSION_*` in `incl
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-09-26
+
 ### Added
 
 - **File drag & drop**

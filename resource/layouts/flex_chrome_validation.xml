@@ -1,0 +1,53 @@
+<Panel
+  chrome="layered"
+  direction="column"
+  background="transparent"
+  padding="32,32,32,32"
+  alignItems="stretch"
+  justifyContent="center">
+
+  <Panel
+    direction="column"
+    background="#152033"
+    cornerRadius="16"
+    padding="24,24,24,24"
+    spacing="20"
+    shadowBlur="32"
+    shadowOffsetY="16"
+    shadowColor="#00000080"
+    hitTest="caption"
+    flexGrow="1">
+    
+    <!-- Title bar area -->
+    <Panel direction="row" justifyContent="space-between" alignItems="center">
+      <Label text="Flex &amp; Layered Chrome Validation" fontSize="20" color="#FFFFFF" />
+      <!-- hitTest="client" allows button clicks inside the draggable caption area -->
+      <Button text="Close" style="$style.dangerButton" onClick="windowClose" hitTest="client" width="90" />
+    </Panel>
+
+    <Label text="This card acts as the custom chrome caption and is draggable." fontSize="14" color="#A0B3C6" />
+    <Label text="The layout tests wrap behavior inside a transparent layered window." fontSize="14" color="#A0B3C6" />
+    
+    <!-- Flex wrap content area -->
+    <Panel 
+      direction="row" 
+      wrap="wrap" 
+      spacing="16" 
+      hitTest="client" 
+      padding="16,16,16,16" 
+      background="#0B121A" 
+      cornerRadius="8"
+      flexGrow="1"
+      alignItems="start">
+      
+      <Button text="Wrap Item 1" style="$style.primaryButton" width="140" />
+      <Button text="Wrap Item 2" style="$style.secondaryButton" width="140" />
+      <Button text="Wrap Item 3" style="$style.primaryButton" width="140" />
+      <Button text="Wrap Item 4" style="$style.secondaryButton" width="140" />
+      <Button text="Wrap Item 5" style="$style.primaryButton" width="140" />
+      <Button text="Wrap Item 6" style="$style.secondaryButton" width="140" />
+      <Button text="Wrap Item 7" style="$style.primaryButton" width="140" />
+      <Button text="Wrap Item 8" style="$style.secondaryButton" width="140" />
+    </Panel>
+  </Panel>
+</Panel>

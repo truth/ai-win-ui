@@ -273,8 +273,8 @@ Consumed by `DrawBoxDecoration` via `BoxDecoration.gradient` / `.shadow`, and by
 | `DrawSvg(..., hasTint, tint)` | Skia: `saveLayer` + `SkColorFilters::Blend(SrcIn)`; D2D: tinted placeholder |
 | DSL | `SvgIcon tint="#3A86FF"` (or `color=`); demo `svg_tint_demo.xml` |
 
-## Recommended Next Tasks (Wave2 remainder)
+## Recommended Next Tasks (engine / Wave5)
 
-1. Optional pixel / screenshot diff tooling (Q7) / CI (Q8).
-2. Optional C6/C7 drag / modal.
-3. Wave3: embed lib (H5b/H6).
+1. Optional pixel / screenshot diff tooling (Q7); local CI smoke+golden (Q8) is done.
+2. Engine line: Flex + chrome spec, Observable binding, AnimationController tick — see `doc/plan/` Wave5 notes and `doc/mvp-roadmap.md`.
+3. Optional R7 polish: multi-stop gradients, true Gaussian blur shadows.
