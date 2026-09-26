@@ -10,6 +10,12 @@
     - 修改 `resource/layouts/demo_gallery.xml`，添加 `Flex Chrome Validation` 入口卡片。
   - **CI (Q8)**
     - `scripts/run_ci_local.ps1` 跑通全套 7 项自动化回归测试。
+
+- **Wave5：响应式数据绑定 (Phase 3)**
+  - **Observable 生命周期强化**：修改 `observable.h` 支持 `Subscribe` 返回 ID 及 `Unsubscribe` 注销。
+  - **Host::BindText API**：扩展 C++ 宿主接口，允许将 `Observable<std::wstring>` 绑定至指定名称的 `Label`/`Button` 控件，且宿主析构时安全解绑。
+  - **Embedder Action 拦截**：完善 `main.cpp` 示例，支持从 Gallery 接收自定义 Action (`openBindingDemo`)，展示如何动态创建 Secondary Host 并与全局/静态状态绑定。
+
 ## 2026-07-26
 
 - **Wave4：架构模块化重构、渲染性能优化与响应式动效系统**

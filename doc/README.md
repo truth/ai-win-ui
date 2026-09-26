@@ -37,6 +37,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **Wave5 observable binding:** `2026-09-26-observable-binding-v1.md`
   - **Wave5 flex & chrome specs:** `2026-09-26-flex-chrome-spec-v1.md`
   - **Wave4 architecture & performance:** `2026-07-26-architecture-refactoring-and-optimization-v1.md`
   - **active productization:** `2026-07-15-directui-productization-personas.md`

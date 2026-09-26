@@ -28,16 +28,33 @@ public:
         return *nothrow_this();
     }
 
-    void Subscribe(Listener listener) {
+    size_t Subscribe(Listener listener) {
         if (listener) {
-            m_listeners.push_back(std::move(listener));
+            size_t id = ++m_nextId;
+            m_listeners.push_back({id, std::move(listener)});
+            return id;
+        }
+        return 0;
+    }
+
+    void Unsubscribe(size_t id) {
+        if (id == 0) return;
+        for (auto it = m_listeners.begin(); it != m_listeners.end(); ++it) {
+            if (it->first == id) {
+                m_listeners.erase(it);
+                return;
+            }
         }
     }
 
     void Notify() const {
-        for (const auto& listener : m_listeners) {
-            if (listener) {
-                listener(m_value);
+        // Iterate by index or copy vector to allow Unsubscribe during Notify?
+        // Simple case: just iterate. If they unsubscribe during Notify it might break the iterator.
+        // Copying is safer.
+        auto copy = m_listeners;
+        for (const auto& pair : copy) {
+            if (pair.second) {
+                pair.second(m_value);
             }
         }
     }
@@ -47,7 +64,8 @@ public:
 private:
     Observable* nothrow_this() { return this; }
     T m_value{};
-    std::vector<Listener> m_listeners;
+    size_t m_nextId = 0;
+    std::vector<std::pair<size_t, Listener>> m_listeners;
 };
 
 } // namespace ai_win_ui

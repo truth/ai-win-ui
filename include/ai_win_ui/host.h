@@ -19,6 +19,9 @@
 
 namespace ai_win_ui {
 
+template <typename T>
+class Observable;
+
 enum class Backend {
     Default = 0,
     Direct2D = 1,
@@ -106,6 +109,11 @@ public:
 
     // Set the text of a named element and re-layout. Returns false if not found.
     bool SetElementText(const char* name, const wchar_t* text);
+
+    // Bind a string observable to a named element. The element's text will update
+    // automatically when the observable's value changes. The observable must outlive
+    // this Host. Returns false if the element is not found.
+    bool BindText(const char* name, Observable<std::wstring>* observable);
 
     // Request a repaint of the host window.
     void Invalidate();

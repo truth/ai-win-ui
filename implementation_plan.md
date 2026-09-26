@@ -1,37 +1,34 @@
-# 实施计划 (Implementation Plan)
+# Implementation Plan: 数据绑定 (Host `BindText` & Observable)
 
-## 目标 (Objective)
-执行 Wave5 执行计划中的步骤 2：
-- 编写 `.cursor/rules`，指导 AI 生成正确的 Flex 属性和 Chrome 自定义层叠布局。
-- 增加 `flex_chrome_validation` 画廊页面，用于综合测试 Flex 对齐/包裹以及 Layered Chrome 拖拽交互。
-- 确保所有的修改对齐并满足最新的布局规范，并保持 CI 回归测试通过。
+## 1. 目标 (Goals)
+实现响应式数据绑定机制，使得 C++ 宿主 (Embedder) 能够将 `Observable<std::wstring>` 绑定到布局文件中的指定元素（如 Label、Button）上。当数据变化时，UI 会自动更新。
 
-## 修改内容与技术方案 (Changes & Technical Solutions)
+## 2. 架构设计与详细步骤
 
-1. **建立 Cursor AI 规则文件**
-   - **文件路径**: `.cursor/rules/ai_win_ui_layout.mdc`
-   - **内容要点**:
-     - 强制采用 `Panel` 的 `direction`、`wrap`、`alignItems` 和 `justifyContent` 等 Flexbox 语法。
-     - 指定 `chrome="layered"` 时，必须使用 `background="transparent"` 以及提供一个带 `hitTest="caption"` 的 `ShapePanel` 或 `Panel` 以支持拖拽。
-     - 规范 `$style.xxx` 与 `theme` 令牌的引用，并指明 XML 与 JSON 在样式嵌套上的区别。
+### Step 1: 完善 Observable 生命周期管理
+- 修改 `include/ai_win_ui/observable.h`：
+  - 将 `Subscribe` 修改为返回一个 `size_t` (subscription ID)。
+  - 新增 `void Unsubscribe(size_t id)`，允许按 ID 移除回调。
+  - 这确保了当绑定宿主 (UiHost) 销毁时，可以安全地注销订阅，防止 Observable 触发指向已销毁宿主的悬空闭包（Dangling Callback）。
 
-2. **新增综合测试布局画廊**
-   - **文件路径**: `resource/layouts/flex_chrome_validation.xml`
-   - **内容要点**:
-     - 根节点使用 `chrome="layered"` 和透明背景。
-     - 内部使用圆角 `Panel` 或者 `ShapePanel` 作为主体。
-     - 测试 Flex 的 `wrap="wrap"` 多行包裹，以及 `justifyContent`（如 `space-between`）和 `alignItems`。
-     - 增加关闭按钮（`onClick="windowClose"`）和自定义标题拖拽区域（`hitTest="caption"`）。
+### Step 2: 扩展 Host API 以支持 BindText
+- 修改 `include/ai_win_ui/host.h`，在 `Host` 类中新增：
+  - `bool BindText(const char* name, Observable<std::wstring>* observable);`
+- 修改内部实现 `src/ui_host.cpp` 中的 `UiHost` 类：
+  - 新增 `std::vector<std::pair<Observable<std::wstring>*, size_t>> m_bindings;`。
+  - 在 `BindText` 方法中，调用 `observable->Subscribe(...)`，回调内调用 `SetElementText(name, value)`。
+  - 在 `~UiHost()` 析构函数中遍历 `m_bindings` 并调用 `Unsubscribe`，安全清理绑定。
+  - 将 `Host::BindText` 路由到内部 `UiHost::BindText`。
 
-3. **集成至主画廊**
-   - **文件路径**: `resource/layouts/demo_gallery.xml`
-   - **修改内容**:
-     - 在 "Window Chrome" 网格区域，新增一个 `flex_chrome_validation` 的入口。
-     - 配置 `onClick="openDemo:layouts/flex_chrome_validation.xml|layered|1000x700"`。
+### Step 3: 创建 binding_demo 测试用例
+- **资源文件**：
+  - 新增 `resource/layouts/binding_demo.xml`，其中包含 `<Label name="lblStatus" />` 和 `<Button name="btnCount" />`。
+  - 在 `resource/layouts/demo_gallery.xml` 增加入口，配置 `onClick="action:openBindingDemo"`。
+- **宿主逻辑 (main.cpp)**：
+  - 在 `wWinMain` 初始化时，配置 `info.onAction` 拦截 `openBindingDemo`。
+  - 拦截到动作后，使用 `Host::Create` 创建二级窗口，并将全局/静态的 `Observable<std::wstring>` 绑定到它的子节点上。
+  - 启动一个系统 Timer（`SetTimer`），每秒或每点击一次就自增计数器更新 Observable，以此验证 UI 自动渲染机制。
 
-## 验证指标 (Verification Metrics)
-- `flex_chrome_validation.xml` 在加载时展现正确的层叠不规则窗口（Layered Chrome）。
-- 在标题栏区域可以正常拖拽窗口。
-- 窗口内多行 Flex 元素正确包裹与对齐。
-- `.\scripts\run_ci_local.ps1 -SkipBuild` 的 7 项 CI 回归测试 **100% PASS**。
-
+### Step 4: 编译与自动化测试
+- 使用 `scripts/run_ci_local.ps1 -SkipBuild` 进行完整的自动化测试。
+- 确保新增 API 不影响现有的 7 项 CI 测试，并且新的 `binding_demo` 能正常编译和加载。

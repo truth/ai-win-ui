@@ -2,6 +2,7 @@
 #include "host_options.h"
 #include "ui_host.h"
 #include "ai_win_ui/host.h"
+#include "ai_win_ui/observable.h"
 #include "ai_win_ui/version.h"
 #include "layout_parser.h"
 #include "layout_engine.h"
@@ -138,6 +139,13 @@ public:
     }
 
     ~UiHost() {
+        for (const auto& binding : m_bindings) {
+            if (binding.first) {
+                binding.first->Unsubscribe(binding.second);
+            }
+        }
+        m_bindings.clear();
+
         SaveRecordedEvents();
         RevokeHostDropTarget(m_hwnd);
         // Never leave a live HWND with USERDATA pointing at a destroyed UiHost.
@@ -650,6 +658,21 @@ public:
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
         return true;
+    }
+
+    bool BindText(const char* name, ai_win_ui::Observable<std::wstring>* observable) {
+        if (!observable || !name) {
+            return false;
+        }
+        size_t id = observable->Subscribe([this, name(std::string(name))](const std::wstring& value) {
+            SetElementText(name, value);
+        });
+        if (id != 0) {
+            m_bindings.push_back({ observable, id });
+            SetElementText(name, observable->Get());
+            return true;
+        }
+        return false;
     }
 
     void Invalidate() {
@@ -2671,6 +2694,8 @@ private:
     std::chrono::steady_clock::time_point m_startTime;
     std::chrono::steady_clock::time_point m_replayStartTime;
     bool m_isReplaying = false;
+
+    std::vector<std::pair<ai_win_ui::Observable<std::wstring>*, size_t>> m_bindings;
 };
 
 class HostDropTarget : public IDropTarget {
@@ -2975,6 +3000,13 @@ bool Host::SetElementText(const char* name, const wchar_t* text) {
         return false;
     }
     return m_impl->host->SetElementText(name, text ? std::wstring(text) : std::wstring());
+}
+
+bool Host::BindText(const char* name, Observable<std::wstring>* observable) {
+    if (!m_impl || !m_impl->host || !name) {
+        return false;
+    }
+    return m_impl->host->BindText(name, observable);
 }
 
 void Host::Invalidate() {

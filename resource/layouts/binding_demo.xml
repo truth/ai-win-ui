@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+  Binding Demo
+  Demonstrates C++ backend binding using ai_win_ui::Observable<std::wstring>.
+-->
+<Panel direction="column" background="#1E1E24" padding="40" spacing="20">
+  <Label text="Observable Binding Demo" fontSize="24" color="#FFFFFF" fontWeight="600" />
+  
+  <Panel direction="column" cornerRadius="8" background="#2D2D35" padding="24" spacing="16">
+    <Label text="The text below is bound to an Observable in C++ (main.cpp). It will update automatically." 
+           fontSize="13" color="#A0A0A0" wrap="wrap" />
+           
+    <Label name="lblStatus" text="Waiting for binding..." fontSize="16" color="#4CAF50" fontWeight="500" />
+    
+    <Panel direction="row" spacing="12" alignItems="center">
+      <Button name="btnCount" text="Clicks: 0" style="$style.primaryButton" onClick="action:incrementCount" />
+      <Label text="<-- This button's text is also bound. Click it to mutate state." fontSize="13" color="#A0A0A0" />
+    </Panel>
+  </Panel>
+  
+  <Button text="Close Demo" style="$style.defaultButton" alignSelf="flex-start" onClick="action:closeWindow" />
+</Panel>
