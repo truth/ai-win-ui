@@ -1,6 +1,9 @@
 #pragma once
 
 #include "graphics_types.h"
+#include "animation_controller.h"
+#include <vector>
+#include <string>
 
 class IRenderer;
 
@@ -64,6 +67,7 @@ struct BoxDecoration {
     float opacity = 1.0f;
     LinearGradientSpec gradient{};
     SoftShadowSpec shadow{};
+    std::vector<ai_win_ui::TransitionDef> transitions;
 };
 
 void DrawBoxDecoration(IRenderer& renderer, const Rect& bounds, const BoxDecoration& decoration);

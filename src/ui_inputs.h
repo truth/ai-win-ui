@@ -229,7 +229,7 @@ public:
     void Render(IRenderer& renderer) override {
         SyncQuickSetToStyle();
         const StyleSpec resolved = m_style.Resolve(GetCurrentState());
-        BoxDecoration deco = resolved.decoration.value_or(BoxDecoration{});
+        BoxDecoration deco = ResolveAnimatedDecoration(resolved);
         if (IsCaptionVariant()) {
             // Caption controls stay sharp-edged and borderless.
             deco.radius = CornerRadius::Uniform(0.0f);
@@ -750,7 +750,7 @@ public:
         return best;
     }
 
-    bool OnTimer(UINT_PTR /*timerId*/) override {
+    bool OnTimer(UINT_PTR /*timerId*/, uint32_t /*dtMs*/) override {
         if (!m_hasFocus) {
             return false;
         }

@@ -294,13 +294,15 @@ public:
         // Catalog / layout styles: style="$style.surfaceCard" stores decoration in
         // m_style; fold it into paint when the panel was given a layout style.
         if (m_styleFromLayout) {
-            const StyleSpec shell = m_style.Resolve(StyleState::Normal);
+            const StyleSpec shell = m_style.Resolve(GetCurrentState());
+            BoxDecoration animDeco = ResolveAnimatedDecoration(shell);
+            
             if (shell.decoration.has_value()) {
-                if (shell.decoration->background.a > 0.0f || drawBackground.a <= 0.0f) {
-                    drawBackground = shell.decoration->background;
+                if (animDeco.background.a > 0.0f || drawBackground.a <= 0.0f) {
+                    drawBackground = animDeco.background;
                 }
-                if (shell.decoration->border.color.a > 0.0f) {
-                    drawBorderColor = shell.decoration->border.color;
+                if (animDeco.border.color.a > 0.0f) {
+                    drawBorderColor = animDeco.border.color;
                 }
                 const Thickness bw = shell.decoration->border.width;
                 if (bw.left > 0.0f || bw.top > 0.0f || bw.right > 0.0f || bw.bottom > 0.0f) {
@@ -2457,9 +2459,9 @@ protected:
     }
 
 public:
-    bool OnTimer(UINT_PTR timerId) override {
-        const bool childChanged = UIElement::OnTimer(timerId);
-        m_elapsed += 0.016f;
+    bool OnTimer(UINT_PTR timerId, uint32_t dtMs) override {
+        const bool childChanged = UIElement::OnTimer(timerId, dtMs);
+        m_elapsed += (dtMs / 1000.0f);
         return childChanged || true;
     }
 

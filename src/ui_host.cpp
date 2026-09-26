@@ -2553,8 +2553,17 @@ private:
                         }
                     }
 
-                    if (m_root && m_root->OnTimer(wParam)) {
-                        InvalidateRect(m_hwnd, nullptr, FALSE);
+                    if (m_root) {
+                        uint32_t now = GetTickCount();
+                        if (m_lastTickMs == 0) m_lastTickMs = now;
+                        uint32_t dtMs = now - m_lastTickMs;
+                        // Clamp dtMs to prevent huge jumps (e.g. from suspending process)
+                        if (dtMs > 100) dtMs = 100;
+                        m_lastTickMs = now;
+                        
+                        if (m_root->OnTimer(wParam, dtMs)) {
+                            InvalidateRect(m_hwnd, nullptr, FALSE);
+                        }
                     }
                     return 0;
                 }
@@ -2696,6 +2705,7 @@ private:
     bool m_isReplaying = false;
 
     std::vector<std::pair<ai_win_ui::Observable<std::wstring>*, size_t>> m_bindings;
+    uint32_t m_lastTickMs = 0;
 };
 
 class HostDropTarget : public IDropTarget {

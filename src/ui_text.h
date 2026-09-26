@@ -243,7 +243,7 @@ public:
         return true;
     }
 
-    bool OnTimer(UINT_PTR /*timerId*/) override {
+    bool OnTimer(UINT_PTR /*timerId*/, uint32_t /*dtMs*/) override {
         if (!m_hasFocus) {
             return false;
         }

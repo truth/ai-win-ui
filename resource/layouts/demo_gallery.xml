@@ -138,6 +138,11 @@
           <Label text="Timer-driven animation" fontSize="11" color="#8FA3B8" />
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/seagull_animation.xml||1000x700" height="32" />
         </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Transition DSL (Q8)" fontSize="14" color="#F2F6FB" />
+          <Label text="Declarative animation DSL" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/transition_demo.xml||1000x700" height="32" />
+        </Panel>
       </Grid>
 
       <!-- ========== Style / Theme ========== -->

@@ -3,6 +3,8 @@
 #include "graphics_types.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
+#include <string>
 
 namespace ai_win_ui {
 
@@ -53,6 +55,61 @@ public:
 
     static float LerpFloat(float start, float end, float progress) {
         return start + (end - start) * std::clamp(progress, 0.0f, 1.0f);
+    }
+};
+
+struct TransitionDef {
+    std::string propertyName; // e.g. "background", "border", "opacity"
+    uint32_t durationMs = 0;
+    EasingType easing = EasingType::Linear;
+};
+
+// Manages the state of an animatable color
+struct AnimatableColor {
+    Color current{0,0,0,0};
+    Color start{0,0,0,0};
+    Color target{0,0,0,0};
+    uint32_t elapsedMs = 0;
+    uint32_t durationMs = 0;
+    EasingType easing = EasingType::Linear;
+    bool active = false;
+
+    AnimatableColor() = default;
+    AnimatableColor(const Color& initial) : current(initial), start(initial), target(initial) {}
+
+    void SetTarget(const Color& newTarget, uint32_t transitionDuration, EasingType transitionEasing) {
+        if (target.r == newTarget.r && target.g == newTarget.g && target.b == newTarget.b && target.a == newTarget.a) {
+            return;
+        }
+        start = current;
+        target = newTarget;
+        durationMs = transitionDuration;
+        easing = transitionEasing;
+        elapsedMs = 0;
+        
+        if (durationMs > 0) {
+            active = true;
+        } else {
+            current = target;
+            active = false;
+        }
+    }
+
+    // Returns true if animation changed state and requires a repaint
+    bool Tick(uint32_t dt) {
+        if (!active) return false;
+        
+        elapsedMs += dt;
+        if (elapsedMs >= durationMs) {
+            current = target;
+            active = false;
+            return true; // We just finished this frame, need one last repaint
+        }
+        
+        float progress = static_cast<float>(elapsedMs) / static_cast<float>(durationMs);
+        float t = Easing::Evaluate(progress, easing);
+        current = AnimationController::LerpColor(start, target, t);
+        return true;
     }
 };
 

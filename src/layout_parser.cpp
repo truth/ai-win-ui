@@ -639,6 +639,59 @@ bool ParseBoxDecorationObject(const JsonValue& value, BoxDecoration& out) {
         }
         touched = true;
     }
+    if (value["transition"].IsString()) {
+        std::string tstr = value["transition"].stringValue;
+        size_t start = 0;
+        while (start < tstr.length()) {
+            size_t end = tstr.find(',', start);
+            if (end == std::string::npos) end = tstr.length();
+            std::string part = tstr.substr(start, end - start);
+            start = end + 1;
+            
+            // Trim
+            part.erase(0, part.find_first_not_of(" \t\r\n"));
+            part.erase(part.find_last_not_of(" \t\r\n") + 1);
+            if (part.empty()) continue;
+
+            // Split by space
+            std::vector<std::string> tokens;
+            size_t ts = 0;
+            while (ts < part.length()) {
+                ts = part.find_first_not_of(" \t", ts);
+                if (ts == std::string::npos) break;
+                size_t te = part.find_first_of(" \t", ts);
+                if (te == std::string::npos) te = part.length();
+                tokens.push_back(part.substr(ts, te - ts));
+                ts = te;
+            }
+
+            if (tokens.size() >= 2) {
+                ai_win_ui::TransitionDef def;
+                def.propertyName = tokens[0];
+                
+                std::string durationStr = tokens[1];
+                if (durationStr.length() > 2 && durationStr.substr(durationStr.length() - 2) == "ms") {
+                    def.durationMs = std::stoul(durationStr.substr(0, durationStr.length() - 2));
+                } else if (durationStr.length() > 1 && durationStr.back() == 's') {
+                    def.durationMs = static_cast<uint32_t>(std::stof(durationStr.substr(0, durationStr.length() - 1)) * 1000.0f);
+                } else {
+                    def.durationMs = std::stoul(durationStr);
+                }
+
+                if (tokens.size() >= 3) {
+                    std::string ease = tokens[2];
+                    if (ease == "ease-in") def.easing = ai_win_ui::EasingType::EaseIn;
+                    else if (ease == "ease-out") def.easing = ai_win_ui::EasingType::EaseOut;
+                    else if (ease == "ease-in-out") def.easing = ai_win_ui::EasingType::EaseInOut;
+                    else if (ease == "cubic-bezier") def.easing = ai_win_ui::EasingType::CubicBezier;
+                    else if (ease == "spring") def.easing = ai_win_ui::EasingType::Spring;
+                    else def.easing = ai_win_ui::EasingType::Linear;
+                }
+                out.transitions.push_back(def);
+                touched = true;
+            }
+        }
+    }
     return touched;
 }
 

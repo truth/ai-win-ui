@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Panel direction="column" background="#152033" padding="40" spacing="20">
+  <Label text="Transition Animation Demo" fontSize="24" color="#FFFFFF" fontWeight="600" />
+  
+  <Panel direction="column" padding="20" spacing="16" cornerRadius="8" 
+         background="#203040" transition="background 500ms ease-in-out, border 500ms cubic-bezier">
+    
+    <Label text="Hover over the panel above and the button below to see the color transitions." color="#A0B0C0" />
+    
+    <Button text="Hover Me" width="120" height="40" cornerRadius="6"
+            background="#005fb8" transition="background 300ms ease-out" />
+            
+    <Button text="Fast Transition" width="120" height="40" cornerRadius="6"
+            background="#c83b3b" transition="background 100ms linear" />
+
+  </Panel>
+  
+  <Button text="Close Demo" style="$style.defaultButton" alignSelf="flex-start" onClick="action:closeWindow" />
+</Panel>

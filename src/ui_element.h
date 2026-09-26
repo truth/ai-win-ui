@@ -281,10 +281,13 @@ public:
         return false;
     }
 
-    virtual bool OnTimer(UINT_PTR timerId) {
+    virtual bool OnTimer(UINT_PTR timerId, uint32_t dtMs) {
         bool changed = false;
+        changed = m_animBackground.Tick(dtMs) || changed;
+        changed = m_animBorder.Tick(dtMs) || changed;
+        
         for (auto& child : m_children) {
-            changed = child->OnTimer(timerId) || changed;
+            changed = child->OnTimer(timerId, dtMs) || changed;
         }
         return changed;
     }
@@ -418,6 +421,56 @@ public:
     virtual bool OnDrop(const std::vector<std::wstring>& /*files*/, float /*x*/, float /*y*/) { return false; }
 
 protected:
+    StyleState m_lastStyleState = StyleState::Normal;
+    ai_win_ui::AnimatableColor m_animBackground;
+    ai_win_ui::AnimatableColor m_animBorder;
+
+    BoxDecoration ResolveAnimatedDecoration(const StyleSpec& resolved) {
+        StyleState currentState = GetCurrentState();
+        BoxDecoration deco = resolved.decoration.value_or(BoxDecoration{});
+
+        if (m_lastStyleState != currentState) {
+            StyleSpec oldSpec = m_style.Resolve(m_lastStyleState);
+            BoxDecoration oldDeco = oldSpec.decoration.value_or(BoxDecoration{});
+
+            uint32_t bgDuration = 0, borderDuration = 0;
+            ai_win_ui::EasingType bgEase = ai_win_ui::EasingType::Linear;
+            ai_win_ui::EasingType borderEase = ai_win_ui::EasingType::Linear;
+            
+            const auto& transitions = deco.transitions.empty() ? oldDeco.transitions : deco.transitions;
+            for (const auto& t : transitions) {
+                if (t.propertyName == "background" || t.propertyName == "all") {
+                    bgDuration = t.durationMs;
+                    bgEase = t.easing;
+                }
+                if (t.propertyName == "border" || t.propertyName == "all") {
+                    borderDuration = t.durationMs;
+                    borderEase = t.easing;
+                }
+            }
+
+            if (bgDuration > 0) {
+                if (!m_animBackground.active) m_animBackground.current = oldDeco.background;
+                m_animBackground.SetTarget(deco.background, bgDuration, bgEase);
+            }
+            if (borderDuration > 0) {
+                if (!m_animBorder.active) m_animBorder.current = oldDeco.border.color;
+                m_animBorder.SetTarget(deco.border.color, borderDuration, borderEase);
+            }
+
+            m_lastStyleState = currentState;
+        }
+
+        if (m_animBackground.active) {
+            deco.background = m_animBackground.current;
+        }
+        if (m_animBorder.active) {
+            deco.border.color = m_animBorder.current;
+        }
+
+        return deco;
+    }
+
     virtual float MeasurePreferredWidth(float availableWidth) const {
         return availableWidth;
     }
