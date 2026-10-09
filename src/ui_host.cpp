@@ -21,6 +21,9 @@
 #include <Windowsx.h>
 #include <oleidl.h>
 #include <shellapi.h>
+#include <uiautomation.h>
+
+#include "uia_provider.h"
 
 #include <algorithm>
 #include <chrono>
@@ -2339,6 +2342,15 @@ private:
         }
 
         switch (msg) {
+            case WM_GETOBJECT: {
+                if (static_cast<long>(lParam) == static_cast<long>(UiaRootObjectId)) {
+                    if (!m_uiaHostProvider) {
+                        m_uiaHostProvider = Microsoft::WRL::Make<UIAHostProvider>(this, hwnd);
+                    }
+                    return UiaReturnRawElementProvider(hwnd, wParam, lParam, m_uiaHostProvider.Get());
+                }
+                break;
+            }
             case WM_NCCALCSIZE: {
                 bool handled = false;
                 const LRESULT result = m_windowChrome.HandleNcCalcSize(hwnd, wParam, lParam, handled);
@@ -2662,6 +2674,7 @@ private:
     bool m_isInitialized = false;
     bool m_isTrackingMouseLeave = false;
     bool m_oleInitialized = false;
+    Microsoft::WRL::ComPtr<UIAHostProvider> m_uiaHostProvider;
 
     bool LoadReplayEvents(const std::wstring& path) {
         std::ifstream file(path);

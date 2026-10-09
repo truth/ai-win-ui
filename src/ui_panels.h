@@ -618,6 +618,7 @@ public:
 
 class Label : public UIElement {
 public:
+    long GetUiaControlType() const override { return UIA::TextControlType; }
     explicit Label(std::wstring text) : m_text(std::move(text)) {}
 
     void SetText(std::wstring text) { m_text = std::move(text); }

@@ -5,6 +5,7 @@
 
 class Button : public UIElement {
 public:
+    long GetUiaControlType() const override { return UIA::ButtonControlType; }
     // Default: filled action button. Caption*: window chrome controls with
     // geometric glyphs (min / max / close) and Fluent-like hover washes.
     enum class Variant {
@@ -422,6 +423,7 @@ private:
 
 class TextInput : public UIElement {
 public:
+    long GetUiaControlType() const override { return UIA::EditControlType; }
     explicit TextInput(std::wstring text = L"") : m_text(std::move(text)), m_caretPosition(m_text.size()) {
         m_style = DefaultStyle(nullptr);
         m_cursor = CursorType::IBeam;
@@ -971,6 +973,7 @@ private:
 
 class Checkbox : public UIElement {
 public:
+    long GetUiaControlType() const override { return UIA::CheckBoxControlType; }
     explicit Checkbox(std::wstring text = L"") : m_text(std::move(text)) {
         m_style = DefaultStyle(nullptr);
     }
@@ -1145,6 +1148,7 @@ private:
 
 class RadioButton : public UIElement {
 public:
+    long GetUiaControlType() const override { return UIA::RadioButtonControlType; }
     explicit RadioButton(std::wstring text = L"", std::wstring group = L"default")
         : m_text(std::move(text)), m_group(std::move(group)) {
         s_groups[m_group].push_back(this);
@@ -1360,6 +1364,7 @@ private:
 
 class Slider : public UIElement {
 public:
+    long GetUiaControlType() const override { return UIA::SliderControlType; }
     explicit Slider(std::wstring label = L"") : m_label(std::move(label)) {
         m_style = DefaultStyle(nullptr);
     }

@@ -67,6 +67,7 @@ set(AI_WIN_UI_LIB_SOURCES
     src/animation_controller.cpp
     src/c_api.cpp
     src/window_chrome.cpp
+    src/uia_provider.cpp
 )
 
 add_library(ai_win_ui_lib STATIC ${AI_WIN_UI_LIB_SOURCES})
@@ -169,6 +170,7 @@ target_link_libraries(ai_win_ui_lib PUBLIC
     windowscodecs
     ole32
     shell32
+    uiautomationcore
 )
 
 function(ai_win_ui_add_app target_name source_file)

@@ -1146,6 +1146,13 @@ void ApplyCommonJsonProps(UIElement& element, const JsonValue& props) {
         element.SetName(props["id"].stringValue);
     }
 
+    if (props["uiaName"].IsString()) {
+        element.SetUiaName(props["uiaName"].stringValue);
+    }
+    if (props["uiaHelpText"].IsString()) {
+        element.SetUiaHelpText(props["uiaHelpText"].stringValue);
+    }
+
     if (props["flex"].IsNumber()) {
         element.SetFlexGrow(static_cast<float>(props["flex"].numberValue));
         element.SetFlexShrink(1.0f);
@@ -1279,6 +1286,13 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
         element.SetName(it->second);
     } else if (auto itId = node.attributes.find("id"); itId != node.attributes.end()) {
         element.SetName(itId->second);
+    }
+
+    if (auto it = node.attributes.find("uiaName"); it != node.attributes.end()) {
+        element.SetUiaName(it->second);
+    }
+    if (auto it = node.attributes.find("uiaHelpText"); it != node.attributes.end()) {
+        element.SetUiaHelpText(it->second);
     }
 
     if (auto it = node.attributes.find("style"); it != node.attributes.end()) {

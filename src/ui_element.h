@@ -25,6 +25,17 @@
 #include <utility>
 #include <vector>
 
+namespace UIA {
+    constexpr long WindowControlType = 50032;
+    constexpr long ButtonControlType = 50000;
+    constexpr long CheckBoxControlType = 50002;
+    constexpr long EditControlType = 50004;
+    constexpr long RadioButtonControlType = 50013;
+    constexpr long SliderControlType = 50015;
+    constexpr long TextControlType = 50020;
+    constexpr long CustomControlType = 50025;
+}
+
 enum class CursorType : uint8_t {
     Auto = 0,
     Arrow,
@@ -138,6 +149,14 @@ public:
 
     void SetAllowDrop(bool allow) { m_allowDrop = allow; }
     bool AllowDrop() const { return m_allowDrop; }
+
+    void SetUiaName(std::string name) { m_uiaName = std::move(name); }
+    const std::string& UiaName() const { return m_uiaName; }
+
+    void SetUiaHelpText(std::string text) { m_uiaHelpText = std::move(text); }
+    const std::string& UiaHelpText() const { return m_uiaHelpText; }
+
+    virtual long GetUiaControlType() const { return UIA::CustomControlType; }
 
 
     // Lazy theme: refresh DefaultStyle() from theme when style was not set from layout.
@@ -552,6 +571,8 @@ protected:
 
     // Tree & Identity
     std::string                             m_name;
+    std::string                             m_uiaName;
+    std::string                             m_uiaHelpText;
     std::vector<std::unique_ptr<UIElement>> m_children;
     UIContext*                              m_context = nullptr;
 
