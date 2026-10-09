@@ -1,5 +1,15 @@
 # 开发日志
 
+## 2026-10-09
+
+- **Wave5：UIA 无障碍自动化 (UI Automation Basics)**
+  - 接入 `uiautomationcore` 库，为 `ai-win-ui` 提供无障碍访问支持。
+  - **COM 接口实现**：新增 `UIAElementProvider` 与 `UIAHostProvider`（基于 WRL），分别实现 `IRawElementProviderSimple`、`IRawElementProviderFragment`、`IRawElementProviderFragmentRoot`。
+  - **宿主集成**：在 `ui_host.cpp` 的 `WM_GETOBJECT` 中拦截 `UiaRootObjectId`，返回 UIA 根提供程序。
+  - **控件角色映射**：`UIElement` 及其派生类（`Button`, `Label` 等）支持重写 `GetUiaControlType` 以返回标准的 `UIA_ButtonControlTypeId` 等角色 ID。
+  - **布局解析**：XML/JSON 支持 `uiaName` 与 `uiaHelpText` 属性，供读屏软件读取。
+  - **测试与验证**：修复编译重定义错误，统一 `#include <uiautomation.h>`。本地全套 7 项 CI 回归测试（Skia/D2D Smoke、Core/Yoga/ScrollViewer Golden）均通过。
+
 ## 2026-09-26
 
 - **Wave5：Flex + Chrome 规范、画廊与 CI 验证**
