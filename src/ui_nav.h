@@ -186,7 +186,7 @@ public:
         const float width = GetPreferredWidth(availableWidth);
         m_desiredSize.width = width;
 
-        const float header = ScaleValue(std::max(1.0f, headerHeight));
+        const float header = (headerHeight <= 0.0f) ? 0.0f : ScaleValue(std::max(1.0f, headerHeight));
         const float contentWidth = std::max(1.0f, width - ScaleValue(2.0f));
         // Measure every page so height fits the tallest tab (stable when switching).
         float body = ScaleValue(80.0f);
@@ -435,7 +435,7 @@ private:
     }
 
     Rect HeaderRect() const {
-        if (m_bounds.Height() <= 0.0f || m_bounds.Width() <= 0.0f) {
+        if (m_bounds.Height() <= 0.0f || m_bounds.Width() <= 0.0f || headerHeight <= 0.0f) {
             return Rect{};
         }
         const float height = std::min(m_bounds.Height(), ScaleValue(std::max(1.0f, headerHeight)));
@@ -445,6 +445,9 @@ private:
     Rect ContentRect() const {
         if (m_bounds.Height() <= 0.0f || m_bounds.Width() <= 0.0f) {
             return Rect{};
+        }
+        if (headerHeight <= 0.0f) {
+            return m_bounds;
         }
         const Rect header = HeaderRect();
         const float inset = ScaleValue(1.0f);
@@ -485,6 +488,9 @@ private:
     }
 
     int TabIndexFromPoint(float x, float y) const {
+        if (headerHeight <= 0.0f) {
+            return -1;
+        }
         const std::vector<Rect> rects = BuildTabRects();
         for (size_t i = 0; i < rects.size(); ++i) {
             if (rects[i].Contains(x, y)) {

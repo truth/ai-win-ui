@@ -681,6 +681,52 @@ public:
         return false;
     }
 
+    bool SetElementBackground(const std::string& name, Color color) {
+        if (!m_root) return false;
+        UIElement* el = m_root->FindElementByName(name);
+        if (!el) return false;
+        if (auto* btn = dynamic_cast<Button*>(el)) {
+            btn->background = color;
+            btn->LockColors();
+        } else if (auto* pnl = dynamic_cast<Panel*>(el)) {
+            pnl->background = color;
+        } else {
+            return false;
+        }
+        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
+
+    bool SetElementForeground(const std::string& name, Color color) {
+        if (!m_root) return false;
+        UIElement* el = m_root->FindElementByName(name);
+        if (!el) return false;
+        if (auto* btn = dynamic_cast<Button*>(el)) {
+            btn->foreground = color;
+            btn->LockColors();
+        } else if (auto* lbl = dynamic_cast<Label*>(el)) {
+            lbl->m_color = color;
+        } else {
+            return false;
+        }
+        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
+
+    bool SelectTab(const std::string& name, int index) {
+        if (!m_root) return false;
+        UIElement* el = m_root->FindElementByName(name);
+        if (!el) return false;
+        auto* tabControl = dynamic_cast<TabControl*>(el);
+        if (!tabControl) return false;
+        bool changed = tabControl->SetSelectedIndex(index);
+        if (m_hwnd) {
+            UpdateLayout();
+            InvalidateRect(m_hwnd, nullptr, FALSE);
+        }
+        return changed;
+    }
+
     void Invalidate() {
         if (m_hwnd) {
             InvalidateRect(m_hwnd, nullptr, FALSE);
@@ -1222,6 +1268,18 @@ private:
             if (eventId.rfind("applyTheme:", 0) == 0) {
                 const std::string path = eventId.substr(11);
                 return [this, path]() { ApplyThemePath(path); };
+            }
+            // selectTab:elementName:index
+            if (eventId.rfind("selectTab:", 0) == 0) {
+                const std::string payload = eventId.substr(10);
+                const auto colon = payload.find(':');
+                if (colon != std::string::npos) {
+                    const std::string name = payload.substr(0, colon);
+                    const int tabIdx = std::stoi(payload.substr(colon + 1));
+                    return [this, name, tabIdx]() {
+                        SelectTab(name, tabIdx);
+                    };
+                }
             }
             // C4: togglePopup:elementName
             if (eventId.rfind("togglePopup:", 0) == 0) {
@@ -3033,6 +3091,23 @@ bool Host::BindText(const char* name, Observable<std::wstring>* observable) {
         return false;
     }
     return m_impl->host->BindText(name, observable);
+}
+
+bool Host::SelectTab(const char* name, int index) {
+    if (!m_impl || !m_impl->host || !name) {
+        return false;
+    }
+    return m_impl->host->SelectTab(name, index);
+}
+
+bool Host::SetElementBackground(const char* name, uint32_t argb) {
+    if (!m_impl || !m_impl->host || !name) return false;
+    return m_impl->host->SetElementBackground(name, ColorFromHex(argb));
+}
+
+bool Host::SetElementForeground(const char* name, uint32_t argb) {
+    if (!m_impl || !m_impl->host || !name) return false;
+    return m_impl->host->SetElementForeground(name, ColorFromHex(argb));
 }
 
 void Host::Invalidate() {

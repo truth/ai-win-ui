@@ -116,6 +116,11 @@ public:
     bool BindText(const char* name, Observable<std::wstring>* observable);
 
     // Request a repaint of the host window.
+    // Select tab by index on a named TabControl. Returns false if not found.
+    bool SelectTab(const char* name, int index);
+    bool SetElementBackground(const char* name, uint32_t argb);
+    bool SetElementForeground(const char* name, uint32_t argb);
+
     void Invalidate();
 
 private:
