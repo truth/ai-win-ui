@@ -120,6 +120,7 @@ public:
     bool SelectTab(const char* name, int index);
     bool SetElementBackground(const char* name, uint32_t argb);
     bool SetElementForeground(const char* name, uint32_t argb);
+    bool ScrollToBottom(const char* name, bool force = false);
 
     void Invalidate();
 

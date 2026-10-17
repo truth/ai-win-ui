@@ -28,6 +28,15 @@ std::unique_ptr<UIElement> LayoutParser::CreatePanelElementFromXml(const XmlNode
         if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
             scrollViewer->background = LayoutParser::ColorFromString(it->second);
         }
+        if (auto it = node.attributes.find("barThickness"); it != node.attributes.end()) {
+            scrollViewer->barThickness = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("trackColor"); it != node.attributes.end()) {
+            scrollViewer->trackColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("thumbColor"); it != node.attributes.end()) {
+            scrollViewer->thumbColor = LayoutParser::ColorFromString(it->second);
+        }
         return scrollViewer;
     }
     return nullptr;

@@ -727,6 +727,20 @@ public:
         return changed;
     }
 
+    bool ScrollToBottom(const std::string& name, bool force = false) {
+        if (!m_root) return false;
+        UIElement* el = m_root->FindElementByName(name);
+        if (!el) return false;
+        auto* sv = dynamic_cast<ScrollViewer*>(el);
+        if (!sv) return false;
+        float maxY = std::max(0.0f, sv->ContentHeight() - sv->Bounds().Height());
+        if (force || (maxY - sv->ScrollY() < 60.0f)) {
+            sv->SetScrollOffset(sv->ScrollX(), maxY);
+            if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        }
+        return true;
+    }
+
     void Invalidate() {
         if (m_hwnd) {
             InvalidateRect(m_hwnd, nullptr, FALSE);
@@ -3108,6 +3122,11 @@ bool Host::SetElementBackground(const char* name, uint32_t argb) {
 bool Host::SetElementForeground(const char* name, uint32_t argb) {
     if (!m_impl || !m_impl->host || !name) return false;
     return m_impl->host->SetElementForeground(name, ColorFromHex(argb));
+}
+
+bool Host::ScrollToBottom(const char* name, bool force) {
+    if (!m_impl || !m_impl->host || !name) return false;
+    return m_impl->host->ScrollToBottom(name, force);
 }
 
 void Host::Invalidate() {
