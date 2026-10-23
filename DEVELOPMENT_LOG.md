@@ -1,6 +1,20 @@
 # 开发日志
 
+## 2026-10-23
+
+- **Chart v2 Phase 1：通用 `<Chart>` 组件**（分支 `feature/chart-v2`）
+  - **新增 `src/ui_chart.h`**（header-only，经 `ui.h` 引入）：支持 `line` / `bar` / `area` 多系列，仅使用 `IRenderer` 现有接口（`DrawPolyline`、`FillPolygon`、`FillRect`、`DrawTextW`），Skia 与 Direct2D 共用。
+  - **坐标轴**：Y 轴自动 nice-tick（1/2/5×10ⁿ）；X 轴支持分类轴（`categories`）与数值轴（系列 `x` 属性，仅折线/面积；含柱状系列时回退分类轴）；水平网格。
+  - **交互**：悬停显示十字准线 + Tooltip（`RenderOverlay` 绘制，避免被兄弟控件遮挡）；点击图例切换系列显隐。
+  - **布局解析**：XML `<Chart>` + `<Series name type values x color visible>` 子节点；JSON `type: "Chart"` + `props.series`。分类以 `|` 分隔。支持 `showLegend/showGrid/showTooltip/minValue/maxValue/fontSize` 等属性。
+  - **Host API**：`Host::SetChartSeriesData(name, seriesIndex, values, count)`、`Host::SetChartSeriesVisible(name, seriesIndex, visible)`。
+  - **UIA**：Chart 自动设置摘要 `uiaHelpText`（系列数/点数）；深度无障碍（逐点朗读）留待后续。
+  - **示例**：`resource/layouts/stats_components.xml` 新增折线+面积、柱状、数值 X 轴三个 Chart。
+  - **验证**：`build.ps1` 无错误；`run_ci_local.ps1 -SkipBuild` 7/7 PASS。
+  - **后续 (Phase 2)**：时间轴、双 Y 轴、对数轴、饼图/环图、`SparklineChart` 复用。
+
 ## 2026-10-09
+
 
 - **Wave5：UIA 无障碍自动化 (UI Automation Basics)**
   - 接入 `uiautomationcore` 库，为 `ai-win-ui` 提供无障碍访问支持。
