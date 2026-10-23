@@ -38,6 +38,7 @@ older design snapshot.
 - `doc/plan/`
   - dated implementation plans (shipped and active)
   - **Wave5 keyboard matrix:** `2026-09-26-keyboard-matrix-v1.md`
+  - **Wave5 Chart v2 (Phase 1):** `2026-10-23-chart-v2.md`
   - **Wave5 UI Automation:** `2026-10-09-uia-automation-basics.md`
   - **Wave5 transition DSL (Q8):** `2026-09-26-declarative-transition-dsl-v1.md`
   - **Wave5 observable binding:** `2026-09-26-observable-binding-v1.md`
@@ -57,6 +58,7 @@ abstractions:
 | Area | Files |
 |------|--------|
 | Controls | `src/ui.h`, `src/ui_panels.*` |
+| **Chart** | **`src/ui_chart.h`** (line / bar / area, axes, legend, tooltip) |
 | Renderer | `src/renderer.h` (+ D2D / Skia) |
 | Text measure | `src/text_measurer.h` (with `CachingTextMeasurer`) |
 | Layout engine | `src/layout_engine.h` (Yoga) |
