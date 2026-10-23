@@ -121,6 +121,9 @@ public:
     bool SetElementBackground(const char* name, uint32_t argb);
     bool SetElementForeground(const char* name, uint32_t argb);
     bool ScrollToBottom(const char* name, bool force = false);
+    // Replace values of series `seriesIndex` on a named Chart. Returns false if not found.
+    bool SetChartSeriesData(const char* name, int seriesIndex, const float* values, size_t count);
+    bool SetChartSeriesVisible(const char* name, int seriesIndex, bool visible);
 
     void Invalidate();
 

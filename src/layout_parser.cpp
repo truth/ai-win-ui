@@ -896,6 +896,20 @@ std::vector<float> ParseNumberList(const std::string& value, char separator = ',
     return numbers;
 }
 
+ChartSeries::Type ParseChartSeriesType(const std::string& value) {
+    const std::string v = TrimString(value);
+    if (v == "bar") return ChartSeries::Type::Bar;
+    if (v == "area") return ChartSeries::Type::Area;
+    return ChartSeries::Type::Line;
+}
+
+bool ParseBoolString(const std::string& value, bool fallback) {
+    const std::string v = TrimString(value);
+    if (v == "false" || v == "0") return false;
+    if (v == "true" || v == "1") return true;
+    return fallback;
+}
+
 std::vector<float> ParseNumberArray(const JsonValue& value) {
     std::vector<float> numbers;
     if (!value.IsArray()) {
@@ -1758,6 +1772,55 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*statCard, props);
         }
         element = std::move(statCard);
+    } else if (type == "Chart") {
+        auto chart = std::make_unique<Chart>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["categories"].IsString()) {
+                chart->SetCategories(ParseWideStringList(props["categories"].stringValue, '|'));
+            }
+            if (props["series"].IsArray()) {
+                for (const auto& item : props["series"].arrayValue) {
+                    if (!item.IsObject()) continue;
+                    ChartSeries s;
+                    if (item["name"].IsString()) s.name = LayoutParser::Utf8ToUtf16(item["name"].stringValue);
+                    if (item["type"].IsString()) s.type = ParseChartSeriesType(item["type"].stringValue);
+                    if (item["values"].IsArray()) s.values = ParseNumberArray(item["values"]);
+                    else if (item["values"].IsString()) s.values = ParseNumberList(item["values"].stringValue);
+                    if (item["x"].IsArray()) s.xs = ParseNumberArray(item["x"]);
+                    else if (item["x"].IsString()) s.xs = ParseNumberList(item["x"].stringValue);
+                    if (item["color"].IsString()) {
+                        s.color = LayoutParser::ColorFromString(item["color"].stringValue);
+                        s.hasColor = true;
+                    }
+                    if (item["visible"].IsBool()) s.visible = item["visible"].boolValue;
+                    chart->AddSeries(std::move(s));
+                }
+            }
+            if (props["showLegend"].IsBool()) chart->showLegend = props["showLegend"].boolValue;
+            if (props["showGrid"].IsBool()) chart->showGrid = props["showGrid"].boolValue;
+            if (props["showTooltip"].IsBool()) chart->showTooltip = props["showTooltip"].boolValue;
+            if (props["background"].IsString()) {
+                chart->background = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            if (props["borderColor"].IsString()) {
+                chart->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            }
+            if (props["strokeWidth"].IsNumber()) {
+                chart->strokeWidth = static_cast<float>(props["strokeWidth"].numberValue);
+            }
+            if (props["fontSize"].IsNumber()) {
+                chart->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            }
+            TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, chart->cornerRadius);
+            if (props["minValue"].IsNumber() && props["maxValue"].IsNumber()) {
+                chart->SetYRange(
+                    static_cast<float>(props["minValue"].numberValue),
+                    static_cast<float>(props["maxValue"].numberValue));
+            }
+            ApplyCommonJsonProps(*chart, props);
+        }
+        element = std::move(chart);
     } else if (type == "SparklineChart") {
         auto chart = std::make_unique<SparklineChart>();
         if (node["props"].IsObject()) {
@@ -3045,6 +3108,66 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*statCard, node);
         element = std::move(statCard);
+    } else if (node.name == "Chart") {
+        auto chart = std::make_unique<Chart>();
+        if (auto it = node.attributes.find("categories"); it != node.attributes.end()) {
+            chart->SetCategories(ParseWideStringList(it->second, '|'));
+        }
+        for (const auto& child : node.children) {
+            if (child.name != "Series") continue;
+            ChartSeries s;
+            if (auto a = child.attributes.find("name"); a != child.attributes.end()) {
+                s.name = LayoutParser::Utf8ToUtf16(a->second);
+            }
+            if (auto a = child.attributes.find("type"); a != child.attributes.end()) {
+                s.type = ParseChartSeriesType(a->second);
+            }
+            if (auto a = child.attributes.find("values"); a != child.attributes.end()) {
+                s.values = ParseNumberList(a->second);
+            }
+            if (auto a = child.attributes.find("x"); a != child.attributes.end()) {
+                s.xs = ParseNumberList(a->second);
+            }
+            if (auto a = child.attributes.find("color"); a != child.attributes.end()) {
+                s.color = LayoutParser::ColorFromString(a->second);
+                s.hasColor = true;
+            }
+            if (auto a = child.attributes.find("visible"); a != child.attributes.end()) {
+                s.visible = ParseBoolString(a->second, true);
+            }
+            chart->AddSeries(std::move(s));
+        }
+        if (auto it = node.attributes.find("showLegend"); it != node.attributes.end()) {
+            chart->showLegend = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("showGrid"); it != node.attributes.end()) {
+            chart->showGrid = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("showTooltip"); it != node.attributes.end()) {
+            chart->showTooltip = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            chart->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            chart->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("strokeWidth"); it != node.attributes.end()) {
+            chart->strokeWidth = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            chart->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            chart->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("minValue"); it != node.attributes.end()) {
+            if (auto it2 = node.attributes.find("maxValue"); it2 != node.attributes.end()) {
+                chart->SetYRange(std::stof(it->second), std::stof(it2->second));
+            }
+        }
+        ApplyCommonXmlAttributes(*chart, node);
+        element = std::move(chart);
     } else if (node.name == "SparklineChart") {
         auto chart = std::make_unique<SparklineChart>();
         if (auto it = node.attributes.find("points"); it != node.attributes.end()) {

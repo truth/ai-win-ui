@@ -15,4 +15,18 @@
       <SparklineChart points="44,42,39,38,40,36,35,34,33,31,30,28" lineColor="#F28F7B" height="130" />
     </Panel>
   </Panel>
+
+  <Panel direction="row" spacing="10" background="#0F1720" alignItems="start">
+    <Chart name="chartTrend" categories="Mon|Tue|Wed|Thu|Fri|Sat|Sun" height="220" flexGrow="1" flexShrink="1" minWidth="300">
+      <Series name="Visits" type="area" values="120,150,180,160,210,260,240" />
+      <Series name="Orders" type="line" values="40,55,70,62,88,120,110" />
+    </Chart>
+    <Chart name="chartBars" categories="Q1|Q2|Q3|Q4" height="220" flexGrow="1" flexShrink="1" minWidth="300">
+      <Series name="2025" type="bar" values="32,45,38,60" />
+      <Series name="2026" type="bar" values="41,52,49,73" />
+    </Chart>
+    <Chart name="chartNumeric" height="220" flexGrow="1" flexShrink="1" minWidth="300">
+      <Series name="Sensor A" type="line" x="0,1,2.5,4,6,8" values="0.2,0.5,0.4,0.9,0.7,1.2" />
+    </Chart>
+  </Panel>
 </Panel>

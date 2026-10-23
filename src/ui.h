@@ -6,6 +6,7 @@
 
 #include "ui_element.h"
 #include "ui_panels.h"
+#include "ui_chart.h"
 #include "ui_media.h"
 #include "ui_inputs.h"
 #include "ui_pickers.h"

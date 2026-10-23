@@ -713,6 +713,22 @@ public:
         return true;
     }
 
+    bool SetChartSeriesData(const std::string& name, int seriesIndex, std::vector<float> values) {
+        if (!m_root) return false;
+        auto* chart = dynamic_cast<Chart*>(m_root->FindElementByName(name));
+        if (!chart || !chart->SetSeriesValues(static_cast<size_t>(seriesIndex), std::move(values))) return false;
+        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
+
+    bool SetChartSeriesVisible(const std::string& name, int seriesIndex, bool visible) {
+        if (!m_root) return false;
+        auto* chart = dynamic_cast<Chart*>(m_root->FindElementByName(name));
+        if (!chart || !chart->SetSeriesVisible(static_cast<size_t>(seriesIndex), visible)) return false;
+        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
+
     bool SelectTab(const std::string& name, int index) {
         if (!m_root) return false;
         UIElement* el = m_root->FindElementByName(name);
@@ -3127,6 +3143,16 @@ bool Host::SetElementForeground(const char* name, uint32_t argb) {
 bool Host::ScrollToBottom(const char* name, bool force) {
     if (!m_impl || !m_impl->host || !name) return false;
     return m_impl->host->ScrollToBottom(name, force);
+}
+
+bool Host::SetChartSeriesData(const char* name, int seriesIndex, const float* values, size_t count) {
+    if (!m_impl || !m_impl->host || !name || seriesIndex < 0 || (!values && count > 0)) return false;
+    return m_impl->host->SetChartSeriesData(name, seriesIndex, std::vector<float>(values, values + count));
+}
+
+bool Host::SetChartSeriesVisible(const char* name, int seriesIndex, bool visible) {
+    if (!m_impl || !m_impl->host || !name || seriesIndex < 0) return false;
+    return m_impl->host->SetChartSeriesVisible(name, seriesIndex, visible);
 }
 
 void Host::Invalidate() {
