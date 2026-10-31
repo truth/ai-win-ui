@@ -1,0 +1,10 @@
+<Panel direction="column" padding="14,14,14,14" cornerRadius="14" background="#FFFFFF" border="1,#EAEFF5" height="102">
+  <Panel direction="row" alignItems="center">
+    <Label text="Referrals" fontSize="12" color="#1E293B" bold="true" flexGrow="1" />
+    <Panel width="24" height="24" cornerRadius="6" background="#EBF2FE" justifyContent="center" alignItems="center">
+      <Label text="📅" fontSize="11" color="#2764FF" />
+    </Panel>
+  </Panel>
+  <Label text="9" fontSize="28" color="#0F172A" bold="true" marginTop="2" />
+  <Label text="Active Referrals" fontSize="11" color="#94A3B8" />
+</Panel>

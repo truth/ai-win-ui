@@ -1,0 +1,28 @@
+<Panel direction="row" spacing="0" padding="0" background="#FFFFFF" alignItems="center" height="54" borderBottom="1,#F1F5F9">
+  <!-- Avatar -->
+  <Panel width="32" height="32" marginLeft="4" cornerRadius="16" background="#F1F5F9" justifyContent="center" alignItems="center">
+    <Label text="A" fontSize="12" color="#64748B" bold="true" />
+  </Panel>
+
+  <!-- Name & Contact -->
+  <Panel direction="column" marginLeft="14" width="230">
+    <Label text="Ansh Singh" fontSize="13" color="#0F172A" bold="true" />
+    <Label text="9685858585 - 6be5r@virgilian.com" fontSize="11" color="#94A3B8" />
+  </Panel>
+
+  <!-- Time -->
+  <Panel direction="row" marginLeft="12" alignItems="center" width="84">
+    <Label text="🕒" fontSize="11" color="#94A3B8" marginRight="4" />
+    <Label text="14:40" fontSize="12" color="#475569" />
+  </Panel>
+
+  <!-- Date -->
+  <Label text="16 Feb 2026" fontSize="12" color="#64748B" width="100" marginLeft="12" />
+
+  <!-- Status Badge: Scheduled -->
+  <Panel padding="12,4,12,4" cornerRadius="6" background="#E0F2FE" justifyContent="center" alignItems="center" marginLeft="10">
+    <Label text="Scheduled" fontSize="11" color="#0284C7" bold="true" />
+  </Panel>
+
+  <Spacer flexGrow="1" />
+</Panel>

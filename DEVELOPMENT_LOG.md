@@ -1,5 +1,20 @@
 # 开发日志
 
+## 2026-11-01
+
+- **Medlio 医疗看板高保真 UI 对齐测试与视觉重构**（分支 `feature/medlio-dashboard`）
+  - **架构层级颠覆与修复**：将旧方案中包裹在白底卡片内的 Sidebar 移至外部深蓝画布（`#2764FF`），确立“左深蓝侧边栏 + 右嵌入式浅灰白工作卡片（`#F6F8FB`，圆角 20px）”的经典高质感层级，解决整体对齐还原度偏低的问题。
+  - **色彩材质与状态还原**：
+    - 侧边栏：品牌 Logo 白字，激活态 Dashboard 为白底蓝字药丸胶囊，其余为浅蓝白半透明文字（`#BACFFF` / `#D8E5FF`）。
+    - 浅灰白工作区：各个功能块均采用纯白底（`#FFFFFF`）+ 极细浅灰微边框（`#EAEFF5`）+ 14-16px 圆角。
+  - **组件化全面赋能 (<Include>)**：
+    - KPI 统计卡片：抽离为 `components/kpi_stat_card.xml`、`kpi_stat_card_revenue.xml`、`kpi_stat_card_referrals.xml`，首张卡片设为皇家蓝高亮；
+    - 预约列表项：抽离为 `components/appointment_row.xml`（Checked_in 绿药丸与操作按钮）与 `components/appointment_row_scheduled.xml`（Scheduled 蓝灰药丸）。
+  - **图表与数据拟真精调**：
+    - Daily appointment count：周三（Wed）峰值药丸高亮，隐藏默认图例，定制分段器（Today | Monthly | Weekly）；
+    - Revenue：金额排版（大字 4,820 + 灰字 .89 + 绿色增长药丸 +12.8%）与面积渐变图表。
+  - **验证**：`build.ps1` 编译通过；`run_ci_local.ps1 -SkipBuild` 7 项自动化回归测试 100% PASS。
+
 ## 2026-10-31
 
 - **声明式组件嵌套复用系统 (<Include> Phase 1)**（分支 `feature/component-include`）

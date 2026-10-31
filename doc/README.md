@@ -37,6 +37,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **Medlio Dashboard UI Alignment:** `2026-11-01-medlio-dashboard-alignment.md`
   - **Component Include (Phase 1):** `2026-10-31-component-include-v1.md`
   - **Modular Parsers (pugixml & yyjson):** `2026-10-31-modular-parsers-v1.md`
   - **Wave5 keyboard matrix:** `2026-09-26-keyboard-matrix-v1.md`
