@@ -1,0 +1,252 @@
+<Panel direction="column" background="#F8FAFC" padding="16,16,16,16" alignItems="stretch">
+  <!-- Outer App Container with rounded borders and shadow -->
+  <Panel direction="row" background="#FFFFFF" cornerRadius="20" border="1,#E2E8F0" alignItems="stretch" flexGrow="1">
+
+    <!-- ==================== LEFT SIDEBAR ==================== -->
+    <Panel width="180" background="#2563EB" padding="20,16,20,16" direction="column" borderRight="1,#1D4ED8">
+      <!-- App Brand -->
+      <Label text="Medlio" fontSize="22" color="#FFFFFF" bold="true" marginBottom="24" />
+
+      <!-- Navigation Menu -->
+      <Panel direction="column" spacing="6">
+        <!-- Active Nav Item -->
+        <Panel direction="row" padding="10,8,10,8" cornerRadius="8" background="#FFFFFF" alignItems="center" height="38">
+          <Label text="📊" fontSize="13" color="#2563EB" marginRight="8" />
+          <Label text="Dashboard" fontSize="13" color="#2563EB" bold="true" />
+        </Panel>
+
+        <!-- Reusable Inactive Items -->
+        <Panel direction="row" padding="10,8,10,8" cornerRadius="8" background="transparent" alignItems="center" height="38">
+          <Label text="📅" fontSize="13" color="#93C5FD" marginRight="8" />
+          <Label text="Appointment" fontSize="13" color="#DBEAFE" />
+        </Panel>
+        <Panel direction="row" padding="10,8,10,8" cornerRadius="8" background="transparent" alignItems="center" height="38">
+          <Label text="🕒" fontSize="13" color="#93C5FD" marginRight="8" />
+          <Label text="Schedule" fontSize="13" color="#DBEAFE" />
+        </Panel>
+        <Panel direction="row" padding="10,8,10,8" cornerRadius="8" background="transparent" alignItems="center" height="38">
+          <Label text="👤" fontSize="13" color="#93C5FD" marginRight="8" />
+          <Label text="Patient" fontSize="13" color="#DBEAFE" />
+        </Panel>
+        <Panel direction="row" padding="10,8,10,8" cornerRadius="8" background="transparent" alignItems="center" height="38">
+          <Label text="💳" fontSize="13" color="#93C5FD" marginRight="8" />
+          <Label text="Billing" fontSize="13" color="#DBEAFE" />
+        </Panel>
+        <Panel direction="row" padding="10,8,10,8" cornerRadius="8" background="transparent" alignItems="center" height="38">
+          <Label text="👥" fontSize="13" color="#93C5FD" marginRight="8" />
+          <Label text="Referrals" fontSize="13" color="#DBEAFE" />
+        </Panel>
+      </Panel>
+
+      <Spacer flexGrow="1" />
+
+      <!-- Bottom Settings -->
+      <Panel direction="column" spacing="6">
+        <Panel direction="row" padding="10,8,10,8" cornerRadius="8" background="transparent" alignItems="center" height="38">
+          <Label text="⚙" fontSize="13" color="#93C5FD" marginRight="8" />
+          <Label text="Settings" fontSize="13" color="#DBEAFE" />
+        </Panel>
+        <Panel direction="row" padding="10,8,10,8" cornerRadius="8" background="transparent" alignItems="center" height="38">
+          <Label text="🎧" fontSize="13" color="#93C5FD" marginRight="8" />
+          <Label text="Support" fontSize="13" color="#DBEAFE" />
+        </Panel>
+      </Panel>
+    </Panel>
+
+    <!-- ==================== MAIN CONTENT AREA ==================== -->
+    <ScrollViewer flexGrow="1" scrollY="true" background="#F8FAFC">
+      <Panel direction="column" padding="24,20,24,20" spacing="16" alignItems="stretch">
+
+        <!-- Top Header Bar -->
+        <Panel direction="row" alignItems="center" height="42">
+          <!-- Search Bar -->
+          <Panel direction="row" background="#FFFFFF" cornerRadius="10" border="1,#E2E8F0" padding="12,6,12,6" alignItems="center" width="340">
+            <Label text="🔍" fontSize="11" color="#94A3B8" marginRight="8" />
+            <TextInput text="Search" fontSize="12" background="transparent" textColor="#64748B" width="280" />
+          </Panel>
+
+          <Spacer flexGrow="1" />
+
+          <!-- Notification & Action Icons -->
+          <Panel width="32" height="32" cornerRadius="8" background="#FFFFFF" border="1,#E2E8F0" justifyContent="center" alignItems="center" marginRight="8">
+            <Label text="🔔" fontSize="12" color="#64748B" />
+          </Panel>
+          <Panel width="32" height="32" cornerRadius="8" background="#FFFFFF" border="1,#E2E8F0" justifyContent="center" alignItems="center" marginRight="12">
+            <Label text="📤" fontSize="12" color="#64748B" />
+          </Panel>
+
+          <!-- User Profile -->
+          <Panel direction="row" alignItems="center" padding="4,4,8,4" background="#FFFFFF" cornerRadius="10" border="1,#E2E8F0">
+            <Panel width="28" height="28" cornerRadius="14" background="#DBEAFE" justifyContent="center" alignItems="center" marginRight="8">
+              <Label text="👨‍⚕️" fontSize="13" />
+            </Panel>
+            <Panel direction="column">
+              <Label text="Dr. Dsouza" fontSize="12" color="#0F172A" bold="true" />
+              <Label text="drdsouza@medlio.com" fontSize="10" color="#94A3B8" />
+            </Panel>
+          </Panel>
+        </Panel>
+
+        <!-- Page Title & CTA -->
+        <Panel direction="row" alignItems="center" marginTop="8">
+          <Label text="Dashboard" fontSize="22" color="#0F172A" bold="true" />
+          <Spacer flexGrow="1" />
+          <Button text="Now Consultation" height="34" padding="16,0,16,0" fontSize="12" background="#2563EB" color="#FFFFFF" cornerRadius="8" />
+        </Panel>
+
+        <!-- KPI Cards Row using <Include> -->
+        <Grid columns="4" spacing="12" cellSpacing="12" rowHeight="106" background="transparent">
+          <!-- Active Highlight Card -->
+          <Panel direction="column" padding="16,16,16,16" cornerRadius="12" background="#2563EB" spacing="4" height="106">
+            <Panel direction="row" alignItems="center">
+              <Label text="Upcoming Today" fontSize="12" color="#DBEAFE" bold="true" flexGrow="1" />
+              <Panel width="22" height="22" cornerRadius="6" background="#1D4ED8" justifyContent="center" alignItems="center">
+                <Label text="📅" fontSize="10" color="#FFFFFF" />
+              </Panel>
+            </Panel>
+            <Label text="5" fontSize="26" color="#FFFFFF" bold="true" marginTop="6" />
+            <Label text="Scheduled" fontSize="11" color="#BFDBFE" />
+          </Panel>
+
+          <!-- Included Reusable KPI Cards with Overrides -->
+          <Include src="components/kpi_stat_card.xml" name="kpiAppointments" />
+          <Include src="components/kpi_stat_card.xml" name="kpiRevenue" />
+          <Include src="components/kpi_stat_card.xml" name="kpiReferrals" />
+        </Grid>
+
+        <!-- Middle Charts & Activity Section -->
+        <Panel direction="row" spacing="12" alignItems="stretch">
+          <!-- Left: Daily Appointment Count Bar Chart -->
+          <Panel direction="column" padding="16,16,16,16" background="#FFFFFF" cornerRadius="12" border="1,#E2E8F0" flexGrow="3" minWidth="380">
+            <Panel direction="row" alignItems="center" marginBottom="12">
+              <Label text="📊" fontSize="13" color="#2563EB" marginRight="6" />
+              <Label text="Daily appointment count" fontSize="14" color="#0F172A" bold="true" />
+              <Spacer flexGrow="1" />
+              <!-- Time Pills -->
+              <Panel direction="row" padding="2,2,2,2" background="#F1F5F9" cornerRadius="8">
+                <Label text="Today" fontSize="11" color="#64748B" padding="8,4,8,4" />
+                <Label text="Monthly" fontSize="11" color="#64748B" padding="8,4,8,4" />
+                <Panel background="#2563EB" cornerRadius="6" padding="8,4,8,4">
+                  <Label text="Weekly" fontSize="11" color="#FFFFFF" bold="true" />
+                </Panel>
+              </Panel>
+            </Panel>
+
+            <Chart categories="Mon|Tue|Wed|Thu|Fri|Sat|Sun" height="180">
+              <Series name="Appointments" type="bar" values="180,210,380,190,170,220,185" color="#3B82F6" />
+            </Chart>
+          </Panel>
+
+          <!-- Middle: Revenue Area Chart -->
+          <Panel direction="column" padding="16,16,16,16" background="#FFFFFF" cornerRadius="12" border="1,#E2E8F0" flexGrow="2" minWidth="260">
+            <Panel direction="row" alignItems="center">
+              <Label text="📈" fontSize="13" color="#2563EB" marginRight="6" />
+              <Panel direction="column">
+                <Label text="Revenue" fontSize="13" color="#0F172A" bold="true" />
+                <Label text="Total amount for this month" fontSize="10" color="#94A3B8" />
+              </Panel>
+              <Spacer flexGrow="1" />
+              <Panel background="#EFF6FF" cornerRadius="6" padding="6,2,6,2">
+                <Label text="Weekly" fontSize="10" color="#2563EB" bold="true" />
+              </Panel>
+            </Panel>
+
+            <Panel direction="row" alignItems="center" marginTop="8">
+              <Label text="4,820" fontSize="24" color="#0F172A" bold="true" />
+              <Label text=".89" fontSize="14" color="#64748B" bold="true" />
+              <Panel background="#DBEAFE" cornerRadius="6" padding="4,2,4,2" marginLeft="8">
+                <Label text="+12.8%" fontSize="10" color="#1D4ED8" bold="true" />
+              </Panel>
+            </Panel>
+
+            <Chart categories="W1|W2|W3|W4" height="130">
+              <Series name="Revenue" type="area" values="140,220,380,410" color="#60A5FA" />
+            </Chart>
+          </Panel>
+
+          <!-- Right: Diagnostics & Lab Activity -->
+          <Panel direction="column" spacing="12" width="240">
+            <!-- Diagnostics card -->
+            <Panel direction="column" padding="12,12,12,12" background="#FFFFFF" cornerRadius="12" border="1,#E2E8F0" spacing="8">
+              <Panel direction="row" alignItems="center">
+                <Label text="Diagnostics" fontSize="13" color="#0F172A" bold="true" />
+                <Spacer flexGrow="1" />
+                <Label text="View all ↗" fontSize="11" color="#2563EB" />
+              </Panel>
+              <!-- Item 1 -->
+              <Panel direction="row" padding="8,6,8,6" background="#F8FAFC" cornerRadius="8" alignItems="center">
+                <Panel width="24" height="24" cornerRadius="12" background="#EFF6FF" justifyContent="center" alignItems="center" marginRight="8">
+                  <Label text="🧠" fontSize="11" />
+                </Panel>
+                <Panel direction="column" flexGrow="1">
+                  <Label text="MRI Brain Scan" fontSize="11" color="#0F172A" bold="true" />
+                  <Label text="Completed" fontSize="10" color="#10B981" />
+                </Panel>
+                <Label text="›" fontSize="14" color="#94A3B8" />
+              </Panel>
+              <!-- Item 2 -->
+              <Panel direction="row" padding="8,6,8,6" background="#F8FAFC" cornerRadius="8" alignItems="center">
+                <Panel width="24" height="24" cornerRadius="12" background="#EFF6FF" justifyContent="center" alignItems="center" marginRight="8">
+                  <Label text="🦴" fontSize="11" />
+                </Panel>
+                <Panel direction="column" flexGrow="1">
+                  <Label text="Chest X-Ray" fontSize="11" color="#0F172A" bold="true" />
+                  <Label text="Processing" fontSize="10" color="#F59E0B" />
+                </Panel>
+                <Label text="›" fontSize="14" color="#94A3B8" />
+              </Panel>
+            </Panel>
+
+            <!-- Lab Activity card -->
+            <Panel direction="column" padding="12,12,12,12" background="#FFFFFF" cornerRadius="12" border="1,#E2E8F0" spacing="6">
+              <Panel direction="row" alignItems="center">
+                <Label text="Lab Activity" fontSize="13" color="#0F172A" bold="true" />
+                <Spacer flexGrow="1" />
+                <Label text="View all ↗" fontSize="11" color="#2563EB" />
+              </Panel>
+              <Label text="• CBC Blood Work: Normal" fontSize="11" color="#10B981" />
+              <Label text="  11:30 AM" fontSize="10" color="#94A3B8" marginBottom="4" />
+              <Label text="• Pathology Report: Flagged" fontSize="11" color="#EF4444" />
+              <Label text="  10:15 AM" fontSize="10" color="#94A3B8" />
+            </Panel>
+          </Panel>
+        </Panel>
+
+        <!-- Bottom Appointments Section using <Include> Rows -->
+        <Panel direction="column" padding="16,16,16,16" background="#FFFFFF" cornerRadius="12" border="1,#E2E8F0" spacing="12">
+          <!-- Section Header -->
+          <Panel direction="row" alignItems="center">
+            <Panel direction="column">
+              <Panel direction="row" alignItems="center">
+                <Label text="Appointments" fontSize="15" color="#0F172A" bold="true" />
+                <Label text=" ▾" fontSize="12" color="#64748B" />
+              </Panel>
+              <Label text="View and manage your scheduled appointments" fontSize="11" color="#94A3B8" />
+            </Panel>
+
+            <Spacer flexGrow="1" />
+
+            <!-- Filters -->
+            <Panel direction="row" padding="8,6,8,6" background="#F8FAFC" cornerRadius="8" border="1,#E2E8F0" alignItems="center" marginRight="8">
+              <Label text="📅" fontSize="11" marginRight="4" />
+              <Label text="February 16th, 2026" fontSize="11" color="#475569" />
+            </Panel>
+            <Panel direction="row" padding="8,6,8,6" background="#F8FAFC" cornerRadius="8" border="1,#E2E8F0" alignItems="center" marginRight="8">
+              <Label text="All Status ▾" fontSize="11" color="#475569" />
+            </Panel>
+            <Button text="Book New" height="32" padding="14,0,14,0" fontSize="11" background="#2563EB" color="#FFFFFF" cornerRadius="8" />
+          </Panel>
+
+          <!-- Appointment List: 4 Reusable Row Components -->
+          <Panel direction="column" spacing="8">
+            <Include src="components/appointment_row.xml" name="row1" />
+            <Include src="components/appointment_row.xml" name="row2" />
+            <Include src="components/appointment_row.xml" name="row3" />
+            <Include src="components/appointment_row.xml" name="row4" />
+          </Panel>
+        </Panel>
+
+      </Panel>
+    </ScrollViewer>
+  </Panel>
+</Panel>

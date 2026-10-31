@@ -1,0 +1,6 @@
+<Panel direction="row" padding="10,8,10,8" cornerRadius="8" background="transparent" alignItems="center" height="38">
+  <Panel width="18" height="18" justifyContent="center" alignItems="center" marginRight="10">
+    <Label text="•" fontSize="14" color="#94A3B8" />
+  </Panel>
+  <Label name="navTitle" text="Dashboard" fontSize="13" color="#64748B" bold="true" flexGrow="1" />
+</Panel>

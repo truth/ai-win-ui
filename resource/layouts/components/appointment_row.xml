@@ -1,0 +1,34 @@
+<Panel direction="row" spacing="0" padding="0" background="#FFFFFF" cornerRadius="10" border="1,#E2E8F0" alignItems="center" height="52">
+  <!-- Checkbox / Avatar -->
+  <Panel width="40" height="40" marginLeft="12" cornerRadius="20" background="#F1F5F9" justifyContent="center" alignItems="center">
+    <Label text="A" fontSize="13" color="#64748B" bold="true" />
+  </Panel>
+
+  <!-- Name & Email -->
+  <Panel direction="column" marginLeft="12" width="220">
+    <Label name="patientName" text="Adesh Shetty" fontSize="13" color="#0F172A" bold="true" />
+    <Label name="patientEmail" text="9685858585 • 6be5r@virgilian.com" fontSize="11" color="#94A3B8" />
+  </Panel>
+
+  <!-- Time -->
+  <Panel direction="row" marginLeft="20" alignItems="center" width="90">
+    <Panel width="14" height="14" cornerRadius="7" background="#E0E7FF" justifyContent="center" alignItems="center" marginRight="6">
+      <Label text="•" fontSize="10" color="#4F46E5" />
+    </Panel>
+    <Label name="appointmentTime" text="13:30" fontSize="12" color="#475569" bold="true" />
+  </Panel>
+
+  <!-- Date -->
+  <Label name="appointmentDate" text="16 Feb 2026" fontSize="12" color="#64748B" width="100" marginLeft="10" />
+
+  <!-- Status Badge -->
+  <Panel name="statusBadge" padding="10,4,10,4" cornerRadius="6" background="#DCFCE7" width="90" justifyContent="center" alignItems="center" marginLeft="10">
+    <Label name="statusText" text="Checked_In" fontSize="11" color="#166534" bold="true" />
+  </Panel>
+
+  <Spacer flexGrow="1" />
+
+  <!-- Action buttons -->
+  <Button name="btnPrimaryAction" text="Start Session" height="28" padding="10,0,10,0" fontSize="11" background="#2563EB" color="#FFFFFF" cornerRadius="6" marginRight="8" />
+  <Button name="btnSecondaryAction" text="EMR" height="28" padding="10,0,10,0" fontSize="11" background="#F1F5F9" color="#475569" cornerRadius="6" marginRight="12" />
+</Panel>

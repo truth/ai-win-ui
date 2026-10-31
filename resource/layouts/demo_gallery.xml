@@ -169,6 +169,11 @@
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/include_component_cases.xml||1000x700" height="32" />
         </Panel>
         <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Medlio Medical UI" fontSize="14" color="#F2F6FB" />
+          <Label text="Full alignment demo with Include &amp; Charts" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/medlio_dashboard.xml||1200x820" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
           <Label text="Test SVG (JSON)" fontSize="14" color="#F2F6FB" />
           <Label text="SvgIcon · Skia recommended" fontSize="11" color="#8FA3B8" />
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/test_svg.json||900x700" height="32" />
