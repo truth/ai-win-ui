@@ -1,0 +1,25 @@
+<Panel direction="column" padding="20" spacing="16" background="#0F172A">
+    <!-- Header -->
+    <Panel direction="column" spacing="4">
+        <Label text="Component Include System (<Include> 嵌套引用)" fontSize="20" color="#F8FAFC" bold="true" />
+        <Label text="展示通过 <Include src='...' /> 引用外部独立组件，并支持父级覆盖属性 (Override) 与智能相对路径寻址。" fontSize="12" color="#94A3B8" />
+    </Panel>
+
+    <!-- Case 1: Standard relative path include -->
+    <Panel direction="column" spacing="8" padding="12" background="#1E293B" cornerRadius="8">
+        <Label text="用例 1: 相对路径组件引用 (layouts/components/reusable_card.xml)" fontSize="14" color="#38BDF8" bold="true" />
+        <Include src="components/reusable_card.xml" />
+    </Panel>
+
+    <!-- Case 2: Attribute overrides (width, margin, background) -->
+    <Panel direction="column" spacing="8" padding="12" background="#1E293B" cornerRadius="8">
+        <Label text="用例 2: 属性覆盖 (Override: background=#312E81, cornerRadius=14, name='customCard')" fontSize="14" color="#A78BFA" bold="true" />
+        <Include src="components/reusable_card.xml" name="customCard" background="#312E81" cornerRadius="14" />
+    </Panel>
+
+    <!-- Case 3: Error Handling & Graceful Fallback -->
+    <Panel direction="column" spacing="8" padding="12" background="#1E293B" cornerRadius="8">
+        <Label text="用例 3: 容错与优雅降级测试 (文件不存在时不崩溃，呈现占位提示)" fontSize="14" color="#F87171" bold="true" />
+        <Include src="components/non_existent_component.xml" />
+    </Panel>
+</Panel>

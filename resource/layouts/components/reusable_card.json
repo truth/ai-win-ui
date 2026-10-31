@@ -1,0 +1,70 @@
+{
+  "type": "Panel",
+  "props": {
+    "direction": "row",
+    "padding": [12, 10, 12, 10],
+    "cornerRadius": 8,
+    "background": "#1E293B",
+    "alignItems": "center"
+  },
+  "children": [
+    {
+      "type": "Panel",
+      "props": {
+        "width": 36,
+        "height": 36,
+        "cornerRadius": 18,
+        "background": "#10B981",
+        "justifyContent": "center",
+        "alignItems": "center"
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "JS",
+            "fontSize": 14,
+            "color": "#FFFFFF"
+          }
+        }
+      ]
+    },
+    {
+      "type": "Panel",
+      "props": {
+        "direction": "column",
+        "marginLeft": 10,
+        "flexGrow": 1
+      },
+      "children": [
+        {
+          "type": "Label",
+          "props": {
+            "text": "可复用功能卡片 (JSON Component)",
+            "fontSize": 14,
+            "color": "#F1F5F9"
+          }
+        },
+        {
+          "type": "Label",
+          "props": {
+            "text": "此组件定义于 layouts/components/reusable_card.json",
+            "fontSize": 11,
+            "color": "#94A3B8"
+          }
+        }
+      ]
+    },
+    {
+      "type": "Button",
+      "props": {
+        "text": "Run",
+        "width": 70,
+        "height": 28,
+        "background": "#059669",
+        "cornerRadius": 6,
+        "color": "#FFFFFF"
+      }
+    }
+  ]
+}

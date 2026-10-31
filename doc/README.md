@@ -91,6 +91,7 @@ The app currently supports:
 - **named style catalog**: `resource/styles/*.json` with `import` / `extend`;
   layouts reference via `style="$style.name"` (XML) or `"style": "$style.name"` (JSON)
 - theme tokens (`$color.x`, `$spacing.x`, …) at load time, magenta fallback for unknowns
+- **Component Include**: `<Include src="..." />` (XML) or `type: "Include"` (JSON) with relative path resolution and attribute overrides
 - **`ShapePanel`**: heart / petal / oval / star via `FillPolygon`
 - custom chrome + **layered** per-pixel alpha windows; multi-process shaped demos
 - vector icons via `SvgIcon` on Skia (`SkSVGDOM`); D2D shows a placeholder

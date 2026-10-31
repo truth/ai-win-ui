@@ -1,0 +1,15 @@
+<Panel direction="row" padding="12,10,12,10" cornerRadius="8" background="#1E293B" alignItems="center">
+    <!-- Component avatar/badge -->
+    <Panel width="36" height="36" cornerRadius="18" background="#3B82F6" justifyContent="center" alignItems="center">
+        <Label text="UI" fontSize="14" color="#FFFFFF" bold="true" />
+    </Panel>
+    
+    <!-- Component text details -->
+    <Panel direction="column" marginLeft="10" flexGrow="1">
+        <Label text="可复用功能卡片 (XML Component)" fontSize="14" color="#F1F5F9" bold="true" />
+        <Label text="此组件定义于 layouts/components/reusable_card.xml，支持跨页面嵌套与属性重写。" fontSize="11" color="#94A3B8" />
+    </Panel>
+    
+    <!-- Component action button -->
+    <Button text="Action" width="70" height="28" background="#2563EB" cornerRadius="6" color="#FFFFFF" />
+</Panel>

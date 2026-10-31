@@ -2,6 +2,16 @@
 
 ## 2026-10-31
 
+- **声明式组件嵌套复用系统 (<Include> Phase 1)**（分支 `feature/component-include`）
+  - **文件级组件嵌套**：
+    - XML 语法：`<Include src="..." [override attributes...] />`
+    - JSON 语法：`{ "type": "Include", "props": { "src": "...", ... } }`
+  - **属性覆盖机制 (Attribute Override)**：父级在 `<Include>` 节点上声明的属性（如 `background`、`name`、`cornerRadius`、`padding`、尺寸与外边距等）直接覆盖被引入组件根节点的同名属性。
+  - **相对路径寻址**：通过 `g_includeStack` 获取当前文件父目录，优先相对路径解析（如 `layouts/components/card.xml`），未命中时回退 Resource 根目录查找。
+  - **循环引用与容错机制**：基于包含栈检测循环嵌套，遇到文件缺失或循环引用时不崩溃退出，优雅降级并在界面上呈现显眼的红色错误提示 Panel。
+  - **画廊与测试覆盖**：新增 `resource/layouts/components/reusable_card.xml`、`reusable_card.json` 以及 `include_component_cases.xml` 并在主画廊中挂载卡片。
+  - **验证**：`build.ps1` 编译通过；`run_ci_local.ps1 -SkipBuild` 7/7 PASS。
+
 - **XML/JSON 解析器模块化与高性能三方库接入 (pugixml & yyjson)**（分支 `feature/modular-parsers`）
   - **解耦核心解析逻辑**：将原内联于 `layout_parser.cpp` 匿名命名空间中的 400 余行手写递归下降解析器剥离，新增独立的 `src/json_parser.h/.cpp` 与 `src/xml_parser.h/.cpp`。
   - **引入高性能轻量库**：

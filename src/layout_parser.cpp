@@ -86,7 +86,83 @@ bool TryAssignNumber(const JsonValue& value,
     return false;
 }
 
+std::vector<std::string> g_includeStack;
 
+std::string NormalizePath(const std::string& raw) {
+    std::string s;
+    s.reserve(raw.size());
+    for (char c : raw) {
+        if (c == '\\') s.push_back('/');
+        else s.push_back(c);
+    }
+    std::vector<std::string> parts;
+    size_t start = 0;
+    while (start < s.size()) {
+        size_t slash = s.find('/', start);
+        if (slash == std::string::npos) slash = s.size();
+        std::string part = s.substr(start, slash - start);
+        start = slash + 1;
+        if (part.empty() || part == ".") continue;
+        if (part == "..") {
+            if (!parts.empty()) parts.pop_back();
+        } else {
+            parts.push_back(part);
+        }
+    }
+    std::string out;
+    for (size_t i = 0; i < parts.size(); ++i) {
+        if (i > 0) out.push_back('/');
+        out.append(parts[i]);
+    }
+    return out;
+}
+
+std::string GetParentDirectory(const std::string& path) {
+    std::string norm = NormalizePath(path);
+    size_t slash = norm.find_last_of('/');
+    if (slash == std::string::npos) return "";
+    return norm.substr(0, slash);
+}
+
+std::string ResolveIncludePath(const std::string& src, IResourceProvider& provider) {
+    std::string normSrc = NormalizePath(src);
+    if (!g_includeStack.empty()) {
+        std::string parentDir = GetParentDirectory(g_includeStack.back());
+        if (!parentDir.empty()) {
+            std::string relativePath = NormalizePath(parentDir + "/" + normSrc);
+            if (provider.Exists(relativePath)) {
+                return relativePath;
+            }
+        }
+    }
+    if (provider.Exists(normSrc)) {
+        return normSrc;
+    }
+    return normSrc;
+}
+
+bool IsCircularInclude(const std::string& path) {
+    std::string norm = NormalizePath(path);
+    for (const auto& item : g_includeStack) {
+        if (NormalizePath(item) == norm) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::unique_ptr<UIElement> CreateIncludeErrorPlaceholder(const std::string& msg) {
+    auto panel = std::make_unique<Panel>();
+    panel->background = ColorFromHex(0x331111);
+    panel->borderColor = ColorFromHex(0xFF4444);
+    panel->padding = Thickness{ 8.0f, 6.0f, 8.0f, 6.0f };
+    panel->cornerRadius = 4.0f;
+    auto label = std::make_unique<Label>(LayoutParser::Utf8ToUtf16("[Include Error] " + msg));
+    label->m_color = ColorFromHex(0xFF6666);
+    label->m_fontSize = 12.0f;
+    panel->AddChild(std::move(label));
+    return panel;
+}
 
 std::vector<std::string> SplitString(const std::string& value, char separator) {
     std::vector<std::string> pieces;
@@ -1148,6 +1224,18 @@ std::unique_ptr<UIElement> LayoutParser::BuildFromFile(UIContext& context,
     const bool isJson = path.size() >= 5 && path.substr(path.size() - 5) == ".json";
     const bool isXml = path.size() >= 4 && path.substr(path.size() - 4) == ".xml";
 
+    struct ScopeIncludeGuard {
+        std::string currentPath;
+        ScopeIncludeGuard(const std::string& p) : currentPath(p) {
+            g_includeStack.push_back(p);
+        }
+        ~ScopeIncludeGuard() {
+            if (!g_includeStack.empty()) {
+                g_includeStack.pop_back();
+            }
+        }
+    } includeGuard(path);
+
     try {
         if (isJson) {
             JsonValue root = ParseJson(text);
@@ -1226,7 +1314,37 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
     const std::string type = node["type"].IsString() ? node["type"].stringValue : "";
     std::unique_ptr<UIElement> element;
 
-    if (type == "Panel") {
+    if (type == "Include") {
+        std::string src;
+        if (node["props"].IsObject() && node["props"]["src"].IsString()) {
+            src = node["props"]["src"].stringValue;
+        } else if (node["src"].IsString()) {
+            src = node["src"].stringValue;
+        }
+        if (src.empty()) {
+            return CreateIncludeErrorPlaceholder("Missing 'src' attribute");
+        }
+        if (src.size() < 5 || src.substr(src.size() - 5) != ".json") {
+            return CreateIncludeErrorPlaceholder("JSON layout can only include .json components: " + src);
+        }
+        std::string resolvedPath = ResolveIncludePath(src, provider);
+        if (!provider.Exists(resolvedPath)) {
+            return CreateIncludeErrorPlaceholder("File not found: " + src);
+        }
+        if (IsCircularInclude(resolvedPath)) {
+            return CreateIncludeErrorPlaceholder("Circular include detected: " + src);
+        }
+        g_includeStack.push_back(resolvedPath);
+        std::string content = provider.LoadText(resolvedPath);
+        JsonValue subRoot = JsonParser::Parse(content);
+        element = CreateElementFromJson(subRoot, provider, eventResolver);
+        g_includeStack.pop_back();
+
+        if (element && node["props"].IsObject()) {
+            ApplyCommonJsonProps(*element, node["props"]);
+        }
+        return element;
+    } else if (type == "Panel") {
         auto panel = std::make_unique<Panel>();
         if (node["props"].IsObject()) {
             const JsonValue& props = node["props"];
@@ -2562,7 +2680,33 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
     }
 
     std::unique_ptr<UIElement> element;
-    if (node.name == "Panel") {
+    if (node.name == "Include") {
+        auto itSrc = node.attributes.find("src");
+        if (itSrc == node.attributes.end() || itSrc->second.empty()) {
+            return CreateIncludeErrorPlaceholder("Missing 'src' attribute");
+        }
+        const std::string& src = itSrc->second;
+        if (src.size() < 4 || src.substr(src.size() - 4) != ".xml") {
+            return CreateIncludeErrorPlaceholder("XML layout can only include .xml components: " + src);
+        }
+        std::string resolvedPath = ResolveIncludePath(src, provider);
+        if (!provider.Exists(resolvedPath)) {
+            return CreateIncludeErrorPlaceholder("File not found: " + src);
+        }
+        if (IsCircularInclude(resolvedPath)) {
+            return CreateIncludeErrorPlaceholder("Circular include detected: " + src);
+        }
+        g_includeStack.push_back(resolvedPath);
+        std::string content = provider.LoadText(resolvedPath);
+        XmlNode subRoot = XmlParser::Parse(content);
+        element = CreateElementFromXml(subRoot, provider, eventResolver);
+        g_includeStack.pop_back();
+
+        if (element) {
+            ApplyCommonXmlAttributes(*element, node);
+        }
+        return element;
+    } else if (node.name == "Panel") {
         auto panel = std::make_unique<Panel>();
         if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
             std::string tokenKey;
