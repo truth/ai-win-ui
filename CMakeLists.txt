@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(AiWinUiRenderer LANGUAGES CXX)
+project(AiWinUiRenderer LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -58,6 +58,8 @@ set(AI_WIN_UI_LIB_SOURCES
     src/ui_text_metrics.cpp
     src/resource_provider.cpp
     src/zip_resource_provider.cpp
+    src/json_parser.cpp
+    src/xml_parser.cpp
     src/layout_parser.cpp
     src/layout_parser_panels.cpp
     src/layout_parser_controls.cpp
@@ -68,6 +70,8 @@ set(AI_WIN_UI_LIB_SOURCES
     src/c_api.cpp
     src/window_chrome.cpp
     src/uia_provider.cpp
+    ${CMAKE_SOURCE_DIR}/third_party/pugixml/pugixml.cpp
+    ${CMAKE_SOURCE_DIR}/third_party/yyjson/yyjson.c
 )
 
 add_library(ai_win_ui_lib STATIC ${AI_WIN_UI_LIB_SOURCES})
@@ -80,6 +84,8 @@ target_include_directories(ai_win_ui_lib
     PRIVATE
         ${CMAKE_SOURCE_DIR}/src
         ${CMAKE_SOURCE_DIR}/third_party/yoga-3.2.1
+        ${CMAKE_SOURCE_DIR}/third_party/pugixml
+        ${CMAKE_SOURCE_DIR}/third_party/yyjson
 )
 
 target_compile_definitions(ai_win_ui_lib PUBLIC

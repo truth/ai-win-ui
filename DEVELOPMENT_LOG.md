@@ -1,5 +1,17 @@
 # 开发日志
 
+## 2026-10-31
+
+- **XML/JSON 解析器模块化与高性能三方库接入 (pugixml & yyjson)**（分支 `feature/modular-parsers`）
+  - **解耦核心解析逻辑**：将原内联于 `layout_parser.cpp` 匿名命名空间中的 400 余行手写递归下降解析器剥离，新增独立的 `src/json_parser.h/.cpp` 与 `src/xml_parser.h/.cpp`。
+  - **引入高性能轻量库**：
+    - 在 `third_party/yyjson` 引入单源文件 `yyjson`，提供业界顶尖的 SIMD/现代 CPU 深度优化的 JSON 解析吞吐。
+    - 在 `third_party/pugixml` 引入单源文件 `pugixml`，提供标准完整的 XML DOM 解析（完整支持实体解码、CDATA、自闭合及多属性规范）。
+  - **工程与接口兼容**：
+    - 更新 `CMakeLists.txt` 启用 `C` 语言支持并挂载三方源码；
+    - 保留并维护原 `JsonValue` 与 `XmlNode` 稳定结构及 `operator[]` 接口，现有 `Theme`、`StyleCatalog`、UI 布局树解析实现零破坏性平滑迁移。
+  - **验证**：`build.ps1` 编译通过；`run_ci_local.ps1 -SkipBuild` 7 项自动化回归测试 100% 通过（7/7 PASS）。
+
 ## 2026-10-23
 
 - **Chart v2 Phase 1：通用 `<Chart>` 组件**（分支 `feature/chart-v2`）

@@ -37,6 +37,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **Modular Parsers (pugixml & yyjson):** `2026-10-31-modular-parsers-v1.md`
   - **Wave5 keyboard matrix:** `2026-09-26-keyboard-matrix-v1.md`
   - **Wave5 Chart v2 (Phase 1):** `2026-10-23-chart-v2.md`
   - **Wave5 UI Automation:** `2026-10-09-uia-automation-basics.md`
@@ -68,7 +69,7 @@ abstractions:
 | **Style catalog** | **`src/style_catalog.*`** |
 | Theme tokens | `src/theme.*` |
 | Window chrome | `src/window_chrome.*` |
-| Layout parse | `src/layout_parser.*`, `src/layout_parser_panels.*`, `src/layout_parser_controls.*` |
+| Layout parse | `src/json_parser.*`, `src/xml_parser.*`, `src/layout_parser.*`, `src/layout_parser_panels.*`, `src/layout_parser_controls.*` |
 | **UiHost / multi-host** | **`src/ui_host.h`**, `src/ui_host_input.cpp`, `src/ui_host_overlay.cpp`, `src/application.*` |
 | Animation & Reactive | `src/animation_controller.*`, `<ai_win_ui/observable.h>` |
 | **C-API Interop** | **`<ai_win_ui/c_api.h>`**, `src/c_api.cpp` |
