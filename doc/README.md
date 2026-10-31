@@ -37,6 +37,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **Component Include (Phase 1):** `2026-10-31-component-include-v1.md`
   - **Modular Parsers (pugixml & yyjson):** `2026-10-31-modular-parsers-v1.md`
   - **Wave5 keyboard matrix:** `2026-09-26-keyboard-matrix-v1.md`
   - **Wave5 Chart v2 (Phase 1):** `2026-10-23-chart-v2.md`
