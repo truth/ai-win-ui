@@ -50,6 +50,9 @@ older design snapshot.
   - Wave2 embed API draft: `2026-07-16-embed-api-v1.md`
   - P0 hardening: `2026-07-15-directui-p0-hardening.md`
   - archived examples: declarative style v1, theme tokens, layered window v2
+- `doc/reports/`
+  - dated test and QA regression reports
+  - **Modular Parsers Test Report:** `2026-10-31-modular-parsers-test-report.md`
 
 ## Current System Snapshot
 
