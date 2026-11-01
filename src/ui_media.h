@@ -1,7 +1,8 @@
 #pragma once
-// Spacer, Image, SvgIcon
+// Spacer, Image, SvgIcon, VectorIcon, VectorPath
 // See ui.h for the full umbrella include.
 #include "ui_panels.h"
+#include "ui_icons.h"
 
 class Spacer : public UIElement {
 protected:
@@ -179,4 +180,3 @@ private:
     SvgHandle m_svg = nullptr;
     Size m_intrinsicSize{24.0f, 24.0f};
 };
-

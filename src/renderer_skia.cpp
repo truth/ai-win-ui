@@ -4,6 +4,7 @@
 
 #if defined(AI_WIN_UI_HAS_VCPKG_SKIA) || defined(AI_WIN_UI_HAS_LOCAL_SKIA)
 #include "include/core/SkBlendMode.h"
+#include "include/core/SkBlurTypes.h"
 #include "include/core/SkCanvas.h"
 #include "include/core/SkColor.h"
 #include "include/core/SkColorFilter.h"
@@ -11,8 +12,10 @@
 #include "include/core/SkFontMetrics.h"
 #include "include/core/SkImage.h"
 #include "include/core/SkImageInfo.h"
+#include "include/core/SkMaskFilter.h"
 #include "include/core/SkPaint.h"
 #include "include/core/SkPath.h"
+#include "include/core/SkPathEffect.h"
 #include "include/core/SkPoint.h"
 #include "include/core/SkRRect.h"
 #include "include/core/SkSamplingOptions.h"
@@ -23,13 +26,16 @@
 #include "include/core/SkTextBlob.h"
 #include "include/core/SkTileMode.h"
 #include "include/core/SkTypes.h"
+#include "include/effects/SkDashPathEffect.h"
 #include "include/effects/SkGradientShader.h"
+#include "include/utils/SkParsePath.h"
 
 #include "modules/svg/include/SkSVGDOM.h"
 
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <list>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -45,6 +51,18 @@ SkColor ToSkColor(const Color& color) {
 
 SkRect ToSkRect(const Rect& rect) {
     return SkRect::MakeLTRB(rect.left, rect.top, rect.right, rect.bottom);
+}
+
+SkRRect ToSkRRect(const Rect& rect, const CornerRadius& r) {
+    SkRRect rrect;
+    const SkVector radii[4] = {
+        {r.topLeft, r.topLeft},
+        {r.topRight, r.topRight},
+        {r.bottomRight, r.bottomRight},
+        {r.bottomLeft, r.bottomLeft},
+    };
+    rrect.setRectRadii(ToSkRect(rect), radii);
+    return rrect;
 }
 
 void DrawSimpleTextWithFallback(SkCanvas* canvas,
@@ -128,7 +146,6 @@ public:
             if (sz.width() > 0.0f && sz.height() > 0.0f) {
                 m_intrinsic = Size{sz.width(), sz.height()};
             } else {
-                // SVG without explicit width/height: leave a sensible 24x24 hint.
                 m_intrinsic = Size{24.0f, 24.0f};
             }
         }
@@ -157,7 +174,6 @@ public:
             return;
         }
         m_presentMode = mode;
-        // Rebuild backing so layered/hwnd share the same DIB path.
         m_width = 0;
         m_height = 0;
         RecreateSurface();
@@ -174,7 +190,6 @@ public:
         if (x < 0 || y < 0 || x >= static_cast<int>(m_width) || y >= static_cast<int>(m_height)) {
             return false;
         }
-        // N32 premul on Windows is BGRA; alpha is byte 3.
         const size_t index = (static_cast<size_t>(y) * m_width + static_cast<size_t>(x)) * 4u;
         const auto* bytes = static_cast<const uint8_t*>(m_dibBits);
         return bytes[index + 3] >= alphaThreshold;
@@ -217,7 +232,6 @@ public:
         if (!m_surface || !m_dibBits || !m_hwnd || m_width == 0 || m_height == 0) {
             return;
         }
-        // Skip presents while minimized; surface stays warm for restore.
         if (IsIconic(m_hwnd)) {
             m_frameDirty = false;
             return;
@@ -254,6 +268,16 @@ public:
         }
     }
 
+    void FillRRect(const Rect& rect, const CornerRadius& radii, const Color& color) override {
+        if (SkCanvas* canvas = Canvas()) {
+            SkPaint paint;
+            paint.setColor(ToSkColor(color));
+            paint.setStyle(SkPaint::kFill_Style);
+            paint.setAntiAlias(true);
+            canvas->drawRRect(ToSkRRect(rect, radii), paint);
+        }
+    }
+
     void FillLinearGradient(const Rect& rect,
                             float cornerRadius,
                             const Color& start,
@@ -262,14 +286,11 @@ public:
         if (SkCanvas* canvas = Canvas()) {
             const float cx = (rect.left + rect.right) * 0.5f;
             const float cy = (rect.top + rect.bottom) * 0.5f;
-            // To ensure the gradient covers the entire rect without stopping early and causing a "clamping border" effect:
-            // Calculate distance to the furthest corner in the direction of the gradient.
             const float rad = angleDegrees * 3.14159265f / 180.0f;
             const float c = std::cos(rad);
             const float s = std::sin(rad);
-            // Distance from center to the bounding box edge along the gradient vector
             const float maxDist = (rect.Width() * 0.5f * std::abs(c)) + (rect.Height() * 0.5f * std::abs(s));
-            
+
             const SkPoint pts[2] = {
                 SkPoint::Make(cx - c * maxDist, cy - s * maxDist),
                 SkPoint::Make(cx + c * maxDist, cy + s * maxDist),
@@ -299,27 +320,39 @@ public:
                 return;
             }
             const float blurPx = std::max(0.0f, blur);
-            const int passes = std::clamp(static_cast<int>(std::lround(blurPx / 3.0f)) + 2, 3, 8);
-            for (int i = passes; i >= 1; --i) {
-                const float t = static_cast<float>(i) / static_cast<float>(passes);
-                const float expand = blurPx * t * 0.55f;
-                const float alpha = color.a * (0.08f + 0.22f * (1.0f - t)) / static_cast<float>(passes) * 2.5f;
-                const Color layer{color.r, color.g, color.b, std::clamp(alpha, 0.0f, 1.0f)};
-                SkPaint paint;
-                paint.setColor(ToSkColor(layer));
-                paint.setStyle(SkPaint::kFill_Style);
-                paint.setAntiAlias(true);
-                const SkRect shadow = SkRect::MakeLTRB(
-                    rect.left - expand + offsetX,
-                    rect.top - expand + offsetY,
-                    rect.right + expand + offsetX,
-                    rect.bottom + expand + offsetY);
-                const float r = cornerRadius + expand * 0.35f;
-                if (r > 0.5f) {
-                    canvas->drawRoundRect(shadow, r, r, paint);
-                } else {
-                    canvas->drawRect(shadow, paint);
+            const SkRect shadowRect = SkRect::MakeLTRB(
+                rect.left + offsetX,
+                rect.top + offsetY,
+                rect.right + offsetX,
+                rect.bottom + offsetY);
+
+            // Visual Rendering v2: True Gaussian blur shadow via SkMaskFilter::MakeBlur.
+            const float sigma = blurPx * 0.45f;
+            if (sigma > 0.25f) {
+                if (sk_sp<SkMaskFilter> mf = SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, sigma)) {
+                    SkPaint paint;
+                    paint.setColor(ToSkColor(color));
+                    paint.setStyle(SkPaint::kFill_Style);
+                    paint.setAntiAlias(true);
+                    paint.setMaskFilter(std::move(mf));
+                    if (cornerRadius > 0.5f) {
+                        canvas->drawRoundRect(shadowRect, cornerRadius, cornerRadius, paint);
+                    } else {
+                        canvas->drawRect(shadowRect, paint);
+                    }
+                    return;
                 }
+            }
+
+            // Fallback when blur is near zero
+            SkPaint paint;
+            paint.setColor(ToSkColor(color));
+            paint.setStyle(SkPaint::kFill_Style);
+            paint.setAntiAlias(true);
+            if (cornerRadius > 0.5f) {
+                canvas->drawRoundRect(shadowRect, cornerRadius, cornerRadius, paint);
+            } else {
+                canvas->drawRect(shadowRect, paint);
             }
         }
     }
@@ -346,6 +379,17 @@ public:
         }
     }
 
+    void DrawRRect(const Rect& rect, const CornerRadius& radii, const Color& color, float strokeWidth) override {
+        if (SkCanvas* canvas = Canvas()) {
+            SkPaint paint;
+            paint.setColor(ToSkColor(color));
+            paint.setStyle(SkPaint::kStroke_Style);
+            paint.setStrokeWidth(strokeWidth);
+            paint.setAntiAlias(true);
+            canvas->drawRRect(ToSkRRect(rect, radii), paint);
+        }
+    }
+
     void DrawLine(const PointF& start, const PointF& end, const Color& color, float strokeWidth) override {
         if (SkCanvas* canvas = Canvas()) {
             SkPaint paint;
@@ -353,6 +397,24 @@ public:
             paint.setStyle(SkPaint::kStroke_Style);
             paint.setStrokeWidth(strokeWidth);
             paint.setAntiAlias(true);
+            canvas->drawLine(start.x, start.y, end.x, end.y, paint);
+        }
+    }
+
+    void DrawDashedLine(const PointF& start,
+                        const PointF& end,
+                        const Color& color,
+                        float strokeWidth,
+                        float dashLength,
+                        float gapLength) override {
+        if (SkCanvas* canvas = Canvas()) {
+            SkPaint paint;
+            paint.setColor(ToSkColor(color));
+            paint.setStyle(SkPaint::kStroke_Style);
+            paint.setStrokeWidth(strokeWidth);
+            paint.setAntiAlias(true);
+            const SkScalar intervals[2] = {std::max(1.0f, dashLength), std::max(1.0f, gapLength)};
+            paint.setPathEffect(SkDashPathEffect::Make(intervals, 2, 0.0f));
             canvas->drawLine(start.x, start.y, end.x, end.y, paint);
         }
     }
@@ -366,6 +428,8 @@ public:
             paint.setColor(ToSkColor(color));
             paint.setStyle(SkPaint::kStroke_Style);
             paint.setStrokeWidth(strokeWidth);
+            paint.setStrokeCap(SkPaint::kRound_Cap);
+            paint.setStrokeJoin(SkPaint::kRound_Join);
             paint.setAntiAlias(true);
 
             SkPath path;
@@ -393,6 +457,79 @@ public:
             }
             path.close();
             canvas->drawPath(path, paint);
+        }
+    }
+
+    void FillPolygonLinearGradient(const std::vector<PointF>& points,
+                                   float topY,
+                                   float bottomY,
+                                   const Color& topColor,
+                                   const Color& bottomColor) override {
+        if (points.size() < 3) {
+            return;
+        }
+        if (SkCanvas* canvas = Canvas()) {
+            const SkPoint pts[2] = {
+                SkPoint::Make(0.0f, topY),
+                SkPoint::Make(0.0f, std::max(topY + 1.0f, bottomY)),
+            };
+            const SkColor colors[2] = {ToSkColor(topColor), ToSkColor(bottomColor)};
+            SkPaint paint;
+            paint.setStyle(SkPaint::kFill_Style);
+            paint.setAntiAlias(true);
+            paint.setShader(SkGradientShader::MakeLinear(pts, colors, nullptr, 2, SkTileMode::kClamp));
+            SkPath path;
+            path.moveTo(points.front().x, points.front().y);
+            for (size_t i = 1; i < points.size(); ++i) {
+                path.lineTo(points[i].x, points[i].y);
+            }
+            path.close();
+            canvas->drawPath(path, paint);
+        }
+    }
+
+    void DrawSvgPath(const std::string& svgPathData,
+                     float viewBoxWidth,
+                     float viewBoxHeight,
+                     const Rect& destRect,
+                     const Color& fill,
+                     const Color& stroke,
+                     float strokeWidth) override {
+        SkCanvas* canvas = Canvas();
+        if (!canvas || svgPathData.empty() || destRect.Width() <= 0.5f || destRect.Height() <= 0.5f) {
+            return;
+        }
+        SkPath path;
+        if (!SkParsePath::FromSVGString(svgPathData.c_str(), &path)) {
+            return;
+        }
+        const float vbW = std::max(1.0f, viewBoxWidth);
+        const float vbH = std::max(1.0f, viewBoxHeight);
+        const float scale = std::min(destRect.Width() / vbW, destRect.Height() / vbH);
+        const float offsetX = destRect.left + (destRect.Width() - vbW * scale) * 0.5f;
+        const float offsetY = destRect.top + (destRect.Height() - vbH * scale) * 0.5f;
+
+        SkAutoCanvasRestore restore(canvas, /*doSave=*/true);
+        canvas->translate(offsetX, offsetY);
+        canvas->scale(scale, scale);
+
+        if (fill.a > 0.001f) {
+            SkPaint fillPaint;
+            fillPaint.setColor(ToSkColor(fill));
+            fillPaint.setStyle(SkPaint::kFill_Style);
+            fillPaint.setAntiAlias(true);
+            canvas->drawPath(path, fillPaint);
+        }
+        if (stroke.a > 0.001f && strokeWidth > 0.0f) {
+            SkPaint strokePaint;
+            strokePaint.setColor(ToSkColor(stroke));
+            strokePaint.setStyle(SkPaint::kStroke_Style);
+            // Keep strokeWidth in destination pixel space by dividing by scale
+            strokePaint.setStrokeWidth(strokeWidth / std::max(0.01f, scale));
+            strokePaint.setStrokeCap(SkPaint::kRound_Cap);
+            strokePaint.setStrokeJoin(SkPaint::kRound_Join);
+            strokePaint.setAntiAlias(true);
+            canvas->drawPath(path, strokePaint);
         }
     }
 
@@ -424,17 +561,16 @@ public:
 
             EnsureFontManager();
 
+            const uint16_t effectiveWeight = options.EffectiveWeight();
             sk_sp<SkTypeface> styleFace = m_defaultTypeface;
-            if (options.bold || options.italic) {
-                styleFace = skia_font::CreateDefaultTypeface(m_fontMgr.get(), options.bold, options.italic);
+            if (options.bold || options.italic || effectiveWeight != 400 || !options.fontFamily.empty()) {
+                styleFace = skia_font::CreateDefaultTypeface(
+                    m_fontMgr.get(), options.bold, options.italic, effectiveWeight, options.fontFamily);
                 if (!styleFace) {
                     styleFace = m_defaultTypeface;
                 }
             }
 
-            SkFont font = skia_font::CreateSkiaFont(fontSize, styleFace.get());
-
-            // Measure and draw share CreateSkiaTextLayout (incl. bold/italic face).
             SkiaTextLayout layout;
             if (!CreateSkiaTextLayout(
                 text,
@@ -445,7 +581,10 @@ public:
                 &layout,
                 options.bold,
                 options.italic,
-                options.ellipsis)) {
+                options.ellipsis,
+                effectiveWeight,
+                options.fontFamily,
+                options.lineHeightFactor)) {
                 return;
             }
             if (layout.lines.empty()) {
@@ -542,7 +681,6 @@ public:
         if (cacheKey && cacheKey[0]) {
             key = cacheKey;
         } else {
-            // Content hash so identical bytes share one DOM without a path.
             uint64_t h = 14695981039346656037ull;
             for (size_t i = 0; i < size; ++i) {
                 h ^= static_cast<uint64_t>(data[i]);
@@ -594,7 +732,6 @@ public:
         }
         SkAutoCanvasRestore restore(canvas, /*doSave=*/true);
         if (hasTint && tint.a > 0.001f) {
-            // SrcIn: keep SVG alpha, replace RGB with tint (monochrome recolor).
             SkPaint layerPaint;
             layerPaint.setColorFilter(SkColorFilters::Blend(ToSkColor(tint), SkBlendMode::kSrcIn));
             const SkRect layerBounds = ToSkRect(rect);
@@ -703,7 +840,6 @@ private:
         if (!dc) {
             return;
         }
-        // Zero-copy present: Skia draws into the DIB, BitBlt to the window.
         BitBlt(
             dc,
             0,
@@ -739,9 +875,11 @@ private:
         }
 
         const size_t rowBytes = static_cast<size_t>(m_width) * 4;
-        // Draw directly into the DIB (shared by HWND BitBlt and layered ULW).
         const SkImageInfo info = SkImageInfo::MakeN32Premul(static_cast<int>(m_width), static_cast<int>(m_height));
-        m_surface = SkSurfaces::WrapPixels(info, m_dibBits, rowBytes, &m_surfaceProps);
+        const SkSurfaceProps surfaceProps(
+            0,
+            m_presentMode == PresentMode::Layered ? kUnknown_SkPixelGeometry : kRGB_H_SkPixelGeometry);
+        m_surface = SkSurfaces::WrapPixels(info, m_dibBits, rowBytes, &surfaceProps);
         m_frameDirty = true;
         return static_cast<bool>(m_surface);
     }
@@ -760,10 +898,6 @@ private:
     HBITMAP m_oldBitmap = nullptr;
     void* m_dibBits = nullptr;
     sk_sp<SkSurface> m_surface;
-    SkSurfaceProps m_surfaceProps{
-        SkSurfaceProps::kUseDeviceIndependentFonts_Flag,
-        kRGB_H_SkPixelGeometry
-    };
     sk_sp<SkFontMgr> m_fontMgr;
     sk_sp<SkTypeface> m_defaultTypeface;
     SkSamplingOptions m_bitmapSampling{SkFilterMode::kLinear, SkMipmapMode::kLinear};

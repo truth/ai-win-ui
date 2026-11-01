@@ -434,6 +434,51 @@ void ApplyPanelVisualEffectsFromJson(Panel& panel, const JsonValue& props) {
 }
 
 void ApplyPanelVisualEffectsFromXml(Panel& panel, const XmlNode& node) {
+    if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+        panel.borderColor = LayoutParser::ColorFromString(it->second);
+    }
+    if (auto it = node.attributes.find("border"); it != node.attributes.end()) {
+        const auto parts = SplitString(it->second, ',');
+        if (parts.size() == 4) {
+            panel.SetBorder(ParseThickness(parts));
+        } else if (parts.size() == 2) {
+            const float w = std::stof(TrimString(parts[0]));
+            panel.SetBorder(Thickness{w, w, w, w});
+            panel.borderColor = LayoutParser::ColorFromString(TrimString(parts[1]));
+        } else if (parts.size() == 1 && !TrimString(parts[0]).empty()) {
+            const float w = std::stof(TrimString(parts[0]));
+            panel.SetBorder(Thickness{w, w, w, w});
+        }
+    }
+    auto applySideBorder = [&](const char* attr, float Thickness::* side) {
+        if (auto it = node.attributes.find(attr); it != node.attributes.end()) {
+            Thickness b = panel.Border();
+            const auto parts = SplitString(it->second, ',');
+            if (!parts.empty() && !TrimString(parts[0]).empty()) {
+                b.*side = std::stof(TrimString(parts[0]));
+            }
+            if (parts.size() >= 2) {
+                panel.borderColor = LayoutParser::ColorFromString(TrimString(parts[1]));
+            }
+            panel.SetBorder(b);
+        }
+    };
+    applySideBorder("borderLeft", &Thickness::left);
+    applySideBorder("borderTop", &Thickness::top);
+    applySideBorder("borderRight", &Thickness::right);
+    applySideBorder("borderBottom", &Thickness::bottom);
+    if (auto it = node.attributes.find("paddingTop"); it != node.attributes.end()) {
+        panel.padding.top = std::stof(TrimString(it->second));
+    }
+    if (auto it = node.attributes.find("paddingBottom"); it != node.attributes.end()) {
+        panel.padding.bottom = std::stof(TrimString(it->second));
+    }
+    if (auto it = node.attributes.find("paddingLeft"); it != node.attributes.end()) {
+        panel.padding.left = std::stof(TrimString(it->second));
+    }
+    if (auto it = node.attributes.find("paddingRight"); it != node.attributes.end()) {
+        panel.padding.right = std::stof(TrimString(it->second));
+    }
     if (auto it = node.attributes.find("gradientStart"); it != node.attributes.end()) {
         panel.gradient.start = LayoutParser::ColorFromString(it->second);
         panel.gradient.enabled = true;
@@ -1037,6 +1082,32 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
         const auto values = SplitString(it->second, ',');
         if (values.size() == 4) {
             element.SetMargin(ParseThickness(values));
+        } else if (values.size() == 1 && !TrimString(values[0]).empty()) {
+            const float m = std::stof(TrimString(values[0]));
+            element.SetMargin(Thickness{m, m, m, m});
+        }
+    }
+    {
+        Thickness m = element.Margin();
+        bool changed = false;
+        if (auto it = node.attributes.find("marginLeft"); it != node.attributes.end()) {
+            m.left = std::stof(TrimString(it->second));
+            changed = true;
+        }
+        if (auto it = node.attributes.find("marginTop"); it != node.attributes.end()) {
+            m.top = std::stof(TrimString(it->second));
+            changed = true;
+        }
+        if (auto it = node.attributes.find("marginRight"); it != node.attributes.end()) {
+            m.right = std::stof(TrimString(it->second));
+            changed = true;
+        }
+        if (auto it = node.attributes.find("marginBottom"); it != node.attributes.end()) {
+            m.bottom = std::stof(TrimString(it->second));
+            changed = true;
+        }
+        if (changed) {
+            element.SetMargin(m);
         }
     }
     if (auto it = node.attributes.find("flexGrow"); it != node.attributes.end()) {
@@ -2716,7 +2787,18 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             panel->background = LayoutParser::ColorFromString(it->second);
         }
         if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
-            panel->cornerRadius = std::stof(it->second);
+            const auto radValues = SplitString(it->second, ',');
+            if (radValues.size() == 4) {
+                panel->cornerRadii = CornerRadius{
+                    std::stof(radValues[0]),
+                    std::stof(radValues[1]),
+                    std::stof(radValues[2]),
+                    std::stof(radValues[3]),
+                };
+                panel->cornerRadius = panel->cornerRadii.MaxRadius();
+            } else {
+                panel->cornerRadius = std::stof(it->second);
+            }
         }
         if (auto it = node.attributes.find("spacing"); it != node.attributes.end()) {
             panel->spacing = std::stof(it->second);
@@ -2794,6 +2876,37 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             const std::string v = ToLowerAscii(TrimString(it->second));
             label->SetEllipsis(v == "true" || v == "1" || v == "yes");
         }
+        if (auto it = node.attributes.find("bold"); it != node.attributes.end()) {
+            label->m_bold = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("italic"); it != node.attributes.end()) {
+            label->m_italic = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("fontWeight"); it != node.attributes.end()) {
+            const std::string fw = ToLowerAscii(TrimString(it->second));
+            if (fw == "bold") label->m_fontWeight = 700;
+            else if (fw == "semibold" || fw == "demibold") label->m_fontWeight = 600;
+            else if (fw == "medium") label->m_fontWeight = 500;
+            else if (fw == "normal" || fw == "regular") label->m_fontWeight = 400;
+            else if (fw == "light") label->m_fontWeight = 300;
+            else label->m_fontWeight = static_cast<uint16_t>(std::clamp(std::stoi(fw), 100, 900));
+        }
+        if (auto it = node.attributes.find("fontFamily"); it != node.attributes.end()) {
+            label->m_fontFamily = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("lineHeight"); it != node.attributes.end()) {
+            label->m_lineHeightFactor = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("align"); it != node.attributes.end()) {
+            const std::string a = ToLowerAscii(TrimString(it->second));
+            if (a == "center") label->m_horizontalAlign = TextHorizontalAlign::Center;
+            else if (a == "end" || a == "right") label->m_horizontalAlign = TextHorizontalAlign::End;
+        }
+        if (auto it = node.attributes.find("verticalAlign"); it != node.attributes.end()) {
+            const std::string va = ToLowerAscii(TrimString(it->second));
+            if (va == "center") label->m_verticalAlign = TextVerticalAlign::Center;
+            else if (va == "end" || va == "bottom") label->m_verticalAlign = TextVerticalAlign::End;
+        }
         ApplyCommonXmlAttributes(*label, node);
         element = std::move(label);
     } else if (node.name == "StatCard") {
@@ -2859,6 +2972,29 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             if (auto a = child.attributes.find("visible"); a != child.attributes.end()) {
                 s.visible = ParseBoolString(a->second, true);
             }
+            if (auto a = child.attributes.find("smooth"); a != child.attributes.end()) {
+                s.smooth = ParseBoolString(a->second, false);
+            }
+            if (auto a = child.attributes.find("areaGradient"); a != child.attributes.end()) {
+                s.areaGradient = ParseBoolString(a->second, true);
+            }
+            if (auto a = child.attributes.find("barRadius"); a != child.attributes.end()) {
+                s.barRadius = std::stof(a->second);
+            }
+            if (auto a = child.attributes.find("highlightIndex"); a != child.attributes.end()) {
+                s.highlightIndex = std::stoi(a->second);
+            }
+            if (auto a = child.attributes.find("highlightColor"); a != child.attributes.end()) {
+                s.highlightColor = LayoutParser::ColorFromString(a->second);
+                s.hasHighlightColor = true;
+            }
+            if (auto a = child.attributes.find("barTrackColor"); a != child.attributes.end()) {
+                s.barTrackColor = LayoutParser::ColorFromString(a->second);
+                s.hasBarTrack = true;
+            }
+            if (auto a = child.attributes.find("showPoints"); a != child.attributes.end()) {
+                s.showPoints = ParseBoolString(a->second, true);
+            }
             chart->AddSeries(std::move(s));
         }
         if (auto it = node.attributes.find("showLegend"); it != node.attributes.end()) {
@@ -2869,6 +3005,21 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         if (auto it = node.attributes.find("showTooltip"); it != node.attributes.end()) {
             chart->showTooltip = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("smooth"); it != node.attributes.end()) {
+            chart->smooth = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("dashedGrid"); it != node.attributes.end()) {
+            chart->dashedGrid = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("showAxes"); it != node.attributes.end()) {
+            chart->showAxes = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("gridColor"); it != node.attributes.end()) {
+            chart->gridColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            chart->textColor = LayoutParser::ColorFromString(it->second);
         }
         if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
             chart->background = LayoutParser::ColorFromString(it->second);
@@ -3878,6 +4029,61 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*icon, node);
         element = std::move(icon);
+    } else if (node.name == "Icon") {
+        auto icon = std::make_unique<VectorIcon>();
+        if (auto it = node.attributes.find("name"); it != node.attributes.end()) {
+            icon->name = TrimString(it->second);
+        } else if (auto it2 = node.attributes.find("icon"); it2 != node.attributes.end()) {
+            icon->name = TrimString(it2->second);
+        }
+        if (auto it = node.attributes.find("size"); it != node.attributes.end()) {
+            icon->size = std::stof(it->second);
+            icon->SetFixedWidth(icon->size);
+            icon->SetFixedHeight(icon->size);
+        }
+        if (auto it = node.attributes.find("color"); it != node.attributes.end()) {
+            icon->color = LayoutParser::ColorFromString(it->second);
+        } else if (auto it2 = node.attributes.find("tint"); it2 != node.attributes.end()) {
+            icon->color = LayoutParser::ColorFromString(it2->second);
+        }
+        if (auto it = node.attributes.find("fill"); it != node.attributes.end()) {
+            icon->fill = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("strokeWidth"); it != node.attributes.end()) {
+            icon->strokeWidth = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*icon, node);
+        element = std::move(icon);
+    } else if (node.name == "Path") {
+        auto vpath = std::make_unique<VectorPath>();
+        if (auto it = node.attributes.find("data"); it != node.attributes.end()) {
+            vpath->data = it->second;
+        } else if (auto it2 = node.attributes.find("d"); it2 != node.attributes.end()) {
+            vpath->data = it2->second;
+        }
+        if (auto it = node.attributes.find("viewBox"); it != node.attributes.end()) {
+            const auto vals = ParseNumberList(it->second);
+            if (vals.size() == 2) {
+                vpath->viewBoxWidth = vals[0];
+                vpath->viewBoxHeight = vals[1];
+            } else if (vals.size() == 4) {
+                vpath->viewBoxWidth = vals[2];
+                vpath->viewBoxHeight = vals[3];
+            }
+        }
+        if (auto it = node.attributes.find("fill"); it != node.attributes.end()) {
+            vpath->fill = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("stroke"); it != node.attributes.end()) {
+            vpath->stroke = LayoutParser::ColorFromString(it->second);
+        } else if (auto it2 = node.attributes.find("color"); it2 != node.attributes.end()) {
+            vpath->stroke = LayoutParser::ColorFromString(it2->second);
+        }
+        if (auto it = node.attributes.find("strokeWidth"); it != node.attributes.end()) {
+            vpath->strokeWidth = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*vpath, node);
+        element = std::move(vpath);
     } else if (node.name == "Spacer") {
         auto spacer = std::make_unique<Spacer>();
         ApplyCommonXmlAttributes(*spacer, node);

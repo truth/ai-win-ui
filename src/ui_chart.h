@@ -1,6 +1,6 @@
 #pragma once
 // Chart: multi-series line / bar / area chart with axes, grid, legend and hover tooltip.
-// See ui.h for the full umbrella include. Rendering uses IRenderer primitives only.
+// Visual Rendering v2: smooth spline curves, vertical area gradients, pill bars, highlight badges & dashed grids.
 #include "ui_element.h"
 
 #include <algorithm>
@@ -23,6 +23,17 @@ struct ChartSeries {
     Color color{};
     bool hasColor = false;
     bool visible = true;
+
+    // Visual Rendering v2 additions
+    bool smooth = false;
+    bool areaGradient = true;
+    float barRadius = 6.0f;
+    int highlightIndex = -1;
+    Color highlightColor{};
+    bool hasHighlightColor = false;
+    Color barTrackColor{};
+    bool hasBarTrack = false;
+    bool showPoints = true;
 };
 
 class Chart : public UIElement {
@@ -67,11 +78,14 @@ public:
     Color textColor = ColorFromHex(0x9FB0C0);
     Color tooltipBackground = ColorFromHex(0x1D2A38);
     float cornerRadius = 10.0f;
-    float strokeWidth = 2.0f;
+    float strokeWidth = 2.2f;
     float fontSize = 12.0f;
     bool showLegend = true;
     bool showGrid = true;
     bool showTooltip = true;
+    bool smooth = false;
+    bool dashedGrid = true;
+    bool showAxes = false;
 
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
@@ -88,8 +102,12 @@ public:
         if (!renderer.IntersectsDirtyRect(m_bounds)) return;
 
         const float radius = ScaleValue(cornerRadius);
-        renderer.FillRoundedRect(m_bounds, background, radius);
-        renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, radius);
+        if (background.a > 0.001f) {
+            renderer.FillRoundedRect(m_bounds, background, radius);
+        }
+        if (borderColor.a > 0.001f) {
+            renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, radius);
+        }
 
         BuildLayout();
         DrawLegend(renderer);
@@ -113,7 +131,7 @@ public:
 
         if (m_hoverIndex >= 0 && showTooltip) {
             const float x = PointX(m_hoverSeries, static_cast<size_t>(m_hoverIndex));
-            renderer.DrawLine(PointF{x, m_plot.top}, PointF{x, m_plot.bottom}, axisColor, 1.0f);
+            renderer.DrawDashedLine(PointF{x, m_plot.top}, PointF{x, m_plot.bottom}, axisColor, 1.0f, 3.0f, 3.0f);
         }
     }
 
@@ -155,7 +173,6 @@ public:
     }
 
     // ---- helpers exposed for tests / parser ------------------------------
-    // Nice 1/2/5 x 10^n scale covering [lo, hi]. Returns step.
     static float NiceScale(float lo, float hi, int targetTicks, float& niceLo, float& niceHi) {
         if (!(hi > lo)) {
             hi = lo + 1.0f;
@@ -232,22 +249,22 @@ private:
     }
 
     void DrawText(IRenderer& renderer, const std::wstring& text, const Rect& rect,
-                  const Color& color, TextHorizontalAlign align) const {
+                  const Color& color, TextHorizontalAlign align, uint16_t weight = 400) const {
         TextRenderOptions opts;
         opts.wrap = TextWrapMode::NoWrap;
         opts.horizontalAlign = align;
         opts.verticalAlign = TextVerticalAlign::Center;
+        opts.fontWeight = weight;
+        opts.bold = (weight >= 600);
         renderer.DrawTextW(text.c_str(), static_cast<UINT32>(text.size()), rect, color,
                            ScaleValue(fontSize), opts);
     }
 
-    // Compute Y range, ticks, plot rect and legend rects from current bounds / data.
     void BuildLayout() {
-        const float pad = ScaleValue(10.0f);
+        const float pad = ScaleValue(6.0f);
         const float th = TextH();
         const float gap = ScaleValue(6.0f);
 
-        // Legend row.
         m_legendRects.clear();
         float top = m_bounds.top + pad;
         if (showLegend && !m_series.empty()) {
@@ -261,7 +278,6 @@ private:
             top += th + gap + ScaleValue(6.0f);
         }
 
-        // Y range.
         float lo = std::numeric_limits<float>::max();
         float hi = std::numeric_limits<float>::lowest();
         bool zeroBase = false;
@@ -280,16 +296,14 @@ private:
         m_yStep = NiceScale(lo, hi, 5, m_yLo, m_yHi);
         if (m_manualRange) { m_yLo = lo; m_yHi = hi; }
 
-        // Widest Y label decides left gutter.
         float labelW = 0.0f;
         for (float v = m_yLo; v <= m_yHi + m_yStep * 0.001f; v += m_yStep) {
             labelW = std::max(labelW, TextW(FormatNumber(v, m_yStep)));
         }
         const float left = m_bounds.left + pad + labelW + gap;
         const float bottom = m_bounds.bottom - pad - th - gap;
-        m_plot = Rect::Make(left, top, m_bounds.right - pad, bottom);
+        m_plot = Rect::Make(left, top + ScaleValue(6.0f), m_bounds.right - pad, bottom);
 
-        // Numeric X scale.
         m_numericX = UseNumericX();
         if (m_numericX) {
             float xlo = std::numeric_limits<float>::max();
@@ -358,17 +372,25 @@ private:
         for (float v = m_yLo; v <= m_yHi + m_yStep * 0.001f; v += m_yStep) {
             const float y = ValueToY(v);
             if (showGrid) {
-                renderer.DrawLine(PointF{m_plot.left, y}, PointF{m_plot.right, y}, gridColor, 1.0f);
+                if (dashedGrid) {
+                    renderer.DrawDashedLine(PointF{m_plot.left, y}, PointF{m_plot.right, y}, gridColor, 1.0f, 4.0f, 4.0f);
+                } else {
+                    renderer.DrawLine(PointF{m_plot.left, y}, PointF{m_plot.right, y}, gridColor, 1.0f);
+                }
             }
             DrawText(renderer, FormatNumber(v, m_yStep),
                      Rect::Make(m_bounds.left, y - th * 0.5f, m_plot.left - gap, y + th * 0.5f),
                      textColor, TextHorizontalAlign::End);
         }
-        renderer.DrawLine(PointF{m_plot.left, m_plot.top}, PointF{m_plot.left, m_plot.bottom}, axisColor, 1.0f);
+        if (showAxes) {
+            renderer.DrawLine(PointF{m_plot.left, m_plot.top}, PointF{m_plot.left, m_plot.bottom}, axisColor, 1.0f);
+        }
     }
 
     void DrawXAxis(IRenderer& renderer) const {
-        renderer.DrawLine(PointF{m_plot.left, m_plot.bottom}, PointF{m_plot.right, m_plot.bottom}, axisColor, 1.0f);
+        if (showAxes) {
+            renderer.DrawLine(PointF{m_plot.left, m_plot.bottom}, PointF{m_plot.right, m_plot.bottom}, axisColor, 1.0f);
+        }
         const float th = TextH();
         const float top = m_plot.bottom + ScaleValue(4.0f);
 
@@ -412,29 +434,80 @@ private:
         return pts;
     }
 
+    std::vector<PointF> BuildSmoothPoints(const std::vector<PointF>& pts) const {
+        if (pts.size() < 3) {
+            return pts;
+        }
+        std::vector<PointF> result;
+        constexpr int kSteps = 12;
+        result.reserve((pts.size() - 1) * kSteps + 1);
+        for (size_t i = 0; i + 1 < pts.size(); ++i) {
+            const PointF p0 = (i == 0) ? pts[0] : pts[i - 1];
+            const PointF p1 = pts[i];
+            const PointF p2 = pts[i + 1];
+            const PointF p3 = (i + 2 < pts.size()) ? pts[i + 2] : pts[i + 1];
+            for (int step = 0; step < kSteps; ++step) {
+                const float t = static_cast<float>(step) / static_cast<float>(kSteps);
+                const float t2 = t * t;
+                const float t3 = t2 * t;
+                const float x = 0.5f * ((2.0f * p1.x) +
+                                        (-p0.x + p2.x) * t +
+                                        (2.0f * p0.x - 5.0f * p1.x + 4.0f * p2.x - p3.x) * t2 +
+                                        (-p0.x + 3.0f * p1.x - 3.0f * p2.x + p3.x) * t3);
+                float y = 0.5f * ((2.0f * p1.y) +
+                                  (-p0.y + p2.y) * t +
+                                  (2.0f * p0.y - 5.0f * p1.y + 4.0f * p2.y - p3.y) * t2 +
+                                  (-p0.y + 3.0f * p1.y - 3.0f * p2.y + p3.y) * t3);
+                y = std::clamp(y, m_plot.top, m_plot.bottom);
+                result.push_back(PointF{x, y});
+            }
+        }
+        result.push_back(pts.back());
+        return result;
+    }
+
     void DrawLine(IRenderer& renderer, size_t s) const {
-        const auto pts = BuildPoints(s);
-        if (pts.empty()) return;
+        const auto rawPts = BuildPoints(s);
+        if (rawPts.empty()) return;
+        const bool isSmooth = m_series[s].smooth || smooth;
+        const auto pts = isSmooth ? BuildSmoothPoints(rawPts) : rawPts;
         const Color c = SeriesColor(s);
         if (pts.size() >= 2) {
             renderer.DrawPolyline(pts, c, ScaleValue(strokeWidth));
         }
-        const float r = ScaleValue(3.0f);
-        for (const auto& p : pts) {
-            renderer.FillRoundedRect(Rect::Make(p.x - r, p.y - r, p.x + r, p.y + r), c, r);
+        if (m_series[s].showPoints && !isSmooth) {
+            const float r = ScaleValue(3.0f);
+            for (const auto& p : rawPts) {
+                renderer.FillRoundedRect(Rect::Make(p.x - r, p.y - r, p.x + r, p.y + r), c, r);
+            }
         }
     }
 
     void DrawArea(IRenderer& renderer, size_t s) const {
-        auto pts = BuildPoints(s);
-        if (pts.size() < 2) return;
+        const auto rawPts = BuildPoints(s);
+        if (rawPts.size() < 2) return;
+        const bool isSmooth = m_series[s].smooth || smooth;
+        auto pts = isSmooth ? BuildSmoothPoints(rawPts) : rawPts;
         const float zeroY = ValueToY(std::clamp(0.0f, m_yLo, m_yHi));
+        float minY = zeroY;
+        for (const auto& p : pts) {
+            minY = std::min(minY, p.y);
+        }
         std::vector<PointF> poly = pts;
         poly.push_back(PointF{pts.back().x, zeroY});
         poly.push_back(PointF{pts.front().x, zeroY});
-        Color fill = SeriesColor(s);
-        fill.a = 0.25f;
-        renderer.FillPolygon(poly, fill);
+        const Color baseColor = SeriesColor(s);
+        if (m_series[s].areaGradient) {
+            Color topFill = baseColor;
+            topFill.a = 0.28f;
+            Color bottomFill = baseColor;
+            bottomFill.a = 0.01f;
+            renderer.FillPolygonLinearGradient(poly, minY, zeroY, topFill, bottomFill);
+        } else {
+            Color fill = baseColor;
+            fill.a = 0.25f;
+            renderer.FillPolygon(poly, fill);
+        }
     }
 
     void DrawBars(IRenderer& renderer) const {
@@ -445,18 +518,44 @@ private:
         if (bars.empty()) return;
         const size_t n = std::max<size_t>(1, MaxPointCount());
         const float cell = m_plot.Width() / static_cast<float>(n);
-        const float group = cell * 0.7f;
+        const float group = cell * 0.56f;
         const float barW = group / static_cast<float>(bars.size());
         const float zeroY = ValueToY(std::clamp(0.0f, m_yLo, m_yHi));
         for (size_t b = 0; b < bars.size(); ++b) {
             const size_t s = bars[b];
-            const Color c = SeriesColor(s);
-            for (size_t i = 0; i < m_series[s].values.size(); ++i) {
-                const float v = m_series[s].values[i];
+            const ChartSeries& series = m_series[s];
+            const Color baseColor = SeriesColor(s);
+            const float radius = ScaleValue(series.barRadius);
+            for (size_t i = 0; i < series.values.size(); ++i) {
+                const float v = series.values[i];
                 if (!std::isfinite(v)) continue;
                 const float x0 = CategoryX(i) - group * 0.5f + static_cast<float>(b) * barW;
+                const Rect barSlot = Rect::Make(x0 + 2.0f, m_plot.top, x0 + barW - 2.0f, zeroY);
+                if (series.hasBarTrack && series.barTrackColor.a > 0.001f) {
+                    renderer.FillRoundedRect(barSlot, series.barTrackColor, radius);
+                }
                 const float y = ValueToY(v);
-                renderer.FillRect(Rect::Make(x0 + 1.0f, std::min(y, zeroY), x0 + barW - 1.0f, std::max(y, zeroY)), c);
+                const bool isHighlighted = (series.highlightIndex >= 0 && static_cast<size_t>(series.highlightIndex) == i);
+                const Color barColor = (isHighlighted && series.hasHighlightColor)
+                    ? series.highlightColor
+                    : baseColor;
+                const Rect barRect = Rect::Make(x0 + 2.0f, std::min(y, zeroY), x0 + barW - 2.0f, std::max(y, zeroY));
+                if (radius > 0.5f) {
+                    renderer.FillRoundedRect(barRect, barColor, radius);
+                } else {
+                    renderer.FillRect(barRect, barColor);
+                }
+                // Highlight badge above bar
+                if (isHighlighted) {
+                    const std::wstring badgeText = FormatNumber(v, 1.0f);
+                    const float bw = std::max(ScaleValue(34.0f), TextW(badgeText) + ScaleValue(12.0f));
+                    const float bh = ScaleValue(20.0f);
+                    const float cx = (barRect.left + barRect.right) * 0.5f;
+                    const float by = std::max(m_bounds.top + 2.0f, barRect.top - bh - ScaleValue(4.0f));
+                    const Rect badgeRect = Rect::Make(cx - bw * 0.5f, by, cx + bw * 0.5f, by + bh);
+                    renderer.FillRoundedRect(badgeRect, barColor, bh * 0.5f);
+                    DrawText(renderer, badgeText, badgeRect, ColorFromHex(0xFFFFFF), TextHorizontalAlign::Center, 600);
+                }
             }
         }
     }
@@ -512,14 +611,12 @@ private:
     float m_yMin = 0.0f;
     float m_yMax = 1.0f;
 
-    // Layout cache (rebuilt each Render; used by hit testing).
     Rect m_plot{};
     std::vector<Rect> m_legendRects;
     float m_yLo = 0.0f, m_yHi = 1.0f, m_yStep = 1.0f;
     float m_xLo = 0.0f, m_xHi = 1.0f, m_xStep = 1.0f;
     bool m_numericX = false;
 
-    // Hover state.
     int m_hoverIndex = -1;
     size_t m_hoverSeries = 0;
     float m_mouseX = 0.0f;

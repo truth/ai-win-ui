@@ -33,6 +33,7 @@ public:
     Thickness padding{8, 8, 8, 8};
     float spacing = 6.0f;
     float cornerRadius = 0.0f;
+    CornerRadius cornerRadii{};
     Color background = ColorFromHex(0x000000, 0.0f);
     Color borderColor = ColorFromHex(0x6A6A6A, 0.0f);
     // Wave2 R7: optional panel-level gradient / soft shadow (also via style.decoration).
@@ -286,7 +287,7 @@ public:
     void Render(IRenderer& renderer) override {
         Color drawBackground = background;
         Color drawBorderColor = borderColor;
-        float drawCornerRadius = cornerRadius;
+        CornerRadius drawRadii = !cornerRadii.IsZero() ? cornerRadii : CornerRadius::Uniform(cornerRadius);
         Thickness drawBorder = Border();
         LinearGradientSpec drawGradient = gradient;
         SoftShadowSpec drawShadow = shadow;
@@ -309,7 +310,7 @@ public:
                     drawBorder = bw;
                 }
                 if (!shell.decoration->radius.IsZero()) {
-                    drawCornerRadius = shell.decoration->radius.MaxRadius();
+                    drawRadii = shell.decoration->radius;
                 }
                 if (shell.decoration->gradient.enabled) {
                     drawGradient = shell.decoration->gradient;
@@ -324,14 +325,18 @@ public:
         const bool hasBorder =
             scaledBorder.left > 0.0f || scaledBorder.top > 0.0f ||
             scaledBorder.right > 0.0f || scaledBorder.bottom > 0.0f;
-        const float scaledRadius = ScaleValue(drawCornerRadius);
         const bool hasFill = drawBackground.a > 0.0f || drawGradient.enabled || drawShadow.enabled;
         if (hasFill || hasBorder) {
             BoxDecoration deco;
             deco.background = drawBackground;
             deco.border.width = scaledBorder;
             deco.border.color = drawBorderColor;
-            deco.radius = CornerRadius::Uniform(scaledRadius);
+            deco.radius = CornerRadius{
+                ScaleValue(drawRadii.topLeft),
+                ScaleValue(drawRadii.topRight),
+                ScaleValue(drawRadii.bottomRight),
+                ScaleValue(drawRadii.bottomLeft),
+            };
             deco.gradient = drawGradient;
             if (drawGradient.enabled) {
                 // Scale does not apply to colors; angle is unitless.
@@ -656,9 +661,14 @@ public:
     void Render(IRenderer& renderer) override {
         TextRenderOptions textOptions{};
         textOptions.wrap = m_ellipsis ? TextWrapMode::NoWrap : TextWrapMode::Wrap;
-        textOptions.horizontalAlign = TextHorizontalAlign::Start;
-        textOptions.verticalAlign = TextVerticalAlign::Start;
+        textOptions.horizontalAlign = m_horizontalAlign;
+        textOptions.verticalAlign = m_verticalAlign;
         textOptions.ellipsis = m_ellipsis;
+        textOptions.bold = m_bold || (m_fontWeight >= 600);
+        textOptions.italic = m_italic;
+        textOptions.fontWeight = m_fontWeight;
+        textOptions.fontFamily = m_fontFamily;
+        textOptions.lineHeightFactor = m_lineHeightFactor;
         renderer.DrawTextW(
             m_text.c_str(),
             static_cast<UINT32>(m_text.size()),
@@ -671,6 +681,13 @@ public:
 
     float m_fontSize = 15.0f;
     Color m_color = ColorFromHex(0xEDEDED);
+    bool m_bold = false;
+    bool m_italic = false;
+    uint16_t m_fontWeight = 0;
+    std::wstring m_fontFamily;
+    float m_lineHeightFactor = 0.0f;
+    TextHorizontalAlign m_horizontalAlign = TextHorizontalAlign::Start;
+    TextVerticalAlign m_verticalAlign = TextVerticalAlign::Start;
 
 private:
     std::wstring m_text;

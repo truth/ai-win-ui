@@ -6,7 +6,9 @@
 #include <wrl/client.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <memory>
 #include <string>
@@ -48,6 +50,232 @@ DWRITE_PARAGRAPH_ALIGNMENT ToDWriteParagraphAlignment(TextVerticalAlign align) {
         default:
             return DWRITE_PARAGRAPH_ALIGNMENT_NEAR;
     }
+}
+
+ComPtr<ID2D1PathGeometry> CreateD2DRRectGeometry(ID2D1Factory* factory, const Rect& rect, const CornerRadius& radii) {
+    if (!factory) {
+        return nullptr;
+    }
+    ComPtr<ID2D1PathGeometry> path;
+    if (FAILED(factory->CreatePathGeometry(path.ReleaseAndGetAddressOf()))) {
+        return nullptr;
+    }
+    ComPtr<ID2D1GeometrySink> sink;
+    if (FAILED(path->Open(sink.ReleaseAndGetAddressOf()))) {
+        return nullptr;
+    }
+
+    const float w = rect.Width();
+    const float h = rect.Height();
+    const float maxR = std::min(w, h) * 0.5f;
+    const float tl = std::clamp(radii.topLeft, 0.0f, maxR);
+    const float tr = std::clamp(radii.topRight, 0.0f, maxR);
+    const float br = std::clamp(radii.bottomRight, 0.0f, maxR);
+    const float bl = std::clamp(radii.bottomLeft, 0.0f, maxR);
+
+    sink->BeginFigure(D2D1::Point2F(rect.left + tl, rect.top), D2D1_FIGURE_BEGIN_FILLED);
+    sink->AddLine(D2D1::Point2F(rect.right - tr, rect.top));
+    if (tr > 0.0f) {
+        sink->AddArc(D2D1::ArcSegment(
+            D2D1::Point2F(rect.right, rect.top + tr),
+            D2D1::SizeF(tr, tr), 0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    }
+    sink->AddLine(D2D1::Point2F(rect.right, rect.bottom - br));
+    if (br > 0.0f) {
+        sink->AddArc(D2D1::ArcSegment(
+            D2D1::Point2F(rect.right - br, rect.bottom),
+            D2D1::SizeF(br, br), 0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    }
+    sink->AddLine(D2D1::Point2F(rect.left + bl, rect.bottom));
+    if (bl > 0.0f) {
+        sink->AddArc(D2D1::ArcSegment(
+            D2D1::Point2F(rect.left, rect.bottom - bl),
+            D2D1::SizeF(bl, bl), 0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    }
+    sink->AddLine(D2D1::Point2F(rect.left, rect.top + tl));
+    if (tl > 0.0f) {
+        sink->AddArc(D2D1::ArcSegment(
+            D2D1::Point2F(rect.left + tl, rect.top),
+            D2D1::SizeF(tl, tl), 0.0f, D2D1_SWEEP_DIRECTION_CLOCKWISE, D2D1_ARC_SIZE_SMALL));
+    }
+    sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+    sink->Close();
+    return path;
+}
+
+// Lightweight SVG Path parser for Direct2D (supports M/m, L/l, H/h, V/v, C/c, Z/z)
+ComPtr<ID2D1PathGeometry> ParseSvgPathToD2D(ID2D1Factory* factory,
+                                            const std::string& data,
+                                            float scale,
+                                            float offsetX,
+                                            float offsetY,
+                                            bool filled) {
+    if (!factory || data.empty()) {
+        return nullptr;
+    }
+    ComPtr<ID2D1PathGeometry> path;
+    if (FAILED(factory->CreatePathGeometry(path.ReleaseAndGetAddressOf()))) {
+        return nullptr;
+    }
+    ComPtr<ID2D1GeometrySink> sink;
+    if (FAILED(path->Open(sink.ReleaseAndGetAddressOf()))) {
+        return nullptr;
+    }
+
+    const char* p = data.c_str();
+    auto skipWs = [&]() {
+        while (*p && (std::isspace(static_cast<unsigned char>(*p)) || *p == ',')) {
+            ++p;
+        }
+    };
+    auto readFloat = [&](float& out) -> bool {
+        skipWs();
+        if (!*p || (*p != '-' && *p != '+' && *p != '.' && !std::isdigit(static_cast<unsigned char>(*p)))) {
+            return false;
+        }
+        char* endPtr = nullptr;
+        out = std::strtof(p, &endPtr);
+        if (endPtr == p) {
+            return false;
+        }
+        p = endPtr;
+        return true;
+    };
+    auto mapPt = [&](float x, float y) -> D2D1_POINT_2F {
+        return D2D1::Point2F(offsetX + x * scale, offsetY + y * scale);
+    };
+
+    float curX = 0.0f;
+    float curY = 0.0f;
+    float startX = 0.0f;
+    float startY = 0.0f;
+    bool inFigure = false;
+    char cmd = 0;
+
+    while (*p) {
+        skipWs();
+        if (!*p) break;
+        if (std::isalpha(static_cast<unsigned char>(*p))) {
+            cmd = *p++;
+        } else if (!cmd) {
+            break;
+        }
+
+        switch (cmd) {
+            case 'M':
+            case 'm': {
+                float x = 0.0f, y = 0.0f;
+                if (!readFloat(x) || !readFloat(y)) break;
+                if (cmd == 'm') { x += curX; y += curY; }
+                if (inFigure) {
+                    sink->EndFigure(D2D1_FIGURE_END_OPEN);
+                }
+                sink->BeginFigure(mapPt(x, y), filled ? D2D1_FIGURE_BEGIN_FILLED : D2D1_FIGURE_BEGIN_HOLLOW);
+                inFigure = true;
+                curX = startX = x;
+                curY = startY = y;
+                cmd = (cmd == 'M') ? 'L' : 'l';
+                break;
+            }
+            case 'L':
+            case 'l': {
+                float x = 0.0f, y = 0.0f;
+                if (!readFloat(x) || !readFloat(y)) { cmd = 0; break; }
+                if (cmd == 'l') { x += curX; y += curY; }
+                if (inFigure) {
+                    sink->AddLine(mapPt(x, y));
+                }
+                curX = x;
+                curY = y;
+                break;
+            }
+            case 'H':
+            case 'h': {
+                float x = 0.0f;
+                if (!readFloat(x)) { cmd = 0; break; }
+                if (cmd == 'h') x += curX;
+                if (inFigure) {
+                    sink->AddLine(mapPt(x, curY));
+                }
+                curX = x;
+                break;
+            }
+            case 'V':
+            case 'v': {
+                float y = 0.0f;
+                if (!readFloat(y)) { cmd = 0; break; }
+                if (cmd == 'v') y += curY;
+                if (inFigure) {
+                    sink->AddLine(mapPt(curX, y));
+                }
+                curY = y;
+                break;
+            }
+            case 'C':
+            case 'c': {
+                float x1 = 0, y1 = 0, x2 = 0, y2 = 0, x = 0, y = 0;
+                if (!readFloat(x1) || !readFloat(y1) || !readFloat(x2) || !readFloat(y2) || !readFloat(x) || !readFloat(y)) {
+                    cmd = 0;
+                    break;
+                }
+                if (cmd == 'c') {
+                    x1 += curX; y1 += curY;
+                    x2 += curX; y2 += curY;
+                    x += curX;  y += curY;
+                }
+                if (inFigure) {
+                    sink->AddBezier(D2D1::BezierSegment(mapPt(x1, y1), mapPt(x2, y2), mapPt(x, y)));
+                }
+                curX = x;
+                curY = y;
+                break;
+            }
+            case 'A':
+            case 'a': {
+                float rx = 0, ry = 0, rot = 0, largeArc = 0, sweep = 0, x = 0, y = 0;
+                if (!readFloat(rx) || !readFloat(ry) || !readFloat(rot) ||
+                    !readFloat(largeArc) || !readFloat(sweep) || !readFloat(x) || !readFloat(y)) {
+                    cmd = 0;
+                    break;
+                }
+                if (cmd == 'a') {
+                    x += curX;
+                    y += curY;
+                }
+                if (inFigure) {
+                    sink->AddArc(D2D1::ArcSegment(
+                        mapPt(x, y),
+                        D2D1::SizeF(std::abs(rx) * scale, std::abs(ry) * scale),
+                        rot,
+                        sweep > 0.5f ? D2D1_SWEEP_DIRECTION_CLOCKWISE : D2D1_SWEEP_DIRECTION_COUNTER_CLOCKWISE,
+                        largeArc > 0.5f ? D2D1_ARC_SIZE_LARGE : D2D1_ARC_SIZE_SMALL));
+                }
+                curX = x;
+                curY = y;
+                break;
+            }
+            case 'Z':
+            case 'z': {
+                if (inFigure) {
+                    sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+                    inFigure = false;
+                }
+                curX = startX;
+                curY = startY;
+                cmd = 0;
+                break;
+            }
+            default:
+                ++p;
+                cmd = 0;
+                break;
+        }
+    }
+    if (inFigure) {
+        sink->EndFigure(D2D1_FIGURE_END_OPEN);
+    }
+    sink->Close();
+    return path;
 }
 
 class DecodedBitmapResource final : public BitmapResource {
@@ -98,10 +326,6 @@ private:
     uint64_t m_generation = 0;
 };
 
-// SVG sentinel for the Direct2D backend: SVG is only fully drawn when the
-// active backend is Skia. Direct2D paints a placeholder (gray box + "SVG"
-// label) so the user notices the mismatch instead of getting a silent
-// blank slot.
 class PlaceholderSvgResource final : public SvgResource {
 public:
     Size GetIntrinsicSize() const override { return Size{16.0f, 16.0f}; }
@@ -110,7 +334,6 @@ public:
 class Direct2DRenderer final : public IRenderer {
 public:
     ~Direct2DRenderer() override {
-        // Release all COM objects before CoUninitialize — otherwise combase AV on exit.
         while (!m_layerStack.empty()) {
             if (m_renderTarget) {
                 m_renderTarget->PopLayer();
@@ -153,7 +376,6 @@ public:
         if (x < 0 || y < 0 || x >= static_cast<int>(m_pixelWidth) || y >= static_cast<int>(m_pixelHeight)) {
             return false;
         }
-        // Top-down BGRA DIB: alpha in byte 3.
         const size_t index = (static_cast<size_t>(y) * m_pixelWidth + static_cast<size_t>(x)) * 4u;
         const auto* bytes = static_cast<const uint8_t*>(m_dibBits);
         return bytes[index + 3] >= alphaThreshold;
@@ -207,7 +429,6 @@ public:
         m_pixelHeight = height;
 
         if (m_presentMode == PresentMode::Layered) {
-            // Layered surface size is baked into the DIB; recreate on resize.
             DestroyRenderTarget();
             EnsureRenderTarget();
             return;
@@ -289,6 +510,20 @@ public:
         m_renderTarget->FillRoundedRectangle(&roundedRect, m_solidBrush.Get());
     }
 
+    void FillRRect(const Rect& rect, const CornerRadius& radii, const Color& color) override {
+        if (!m_renderTarget || !m_solidBrush || !m_d2dFactory) {
+            return;
+        }
+        if (radii.IsUniform()) {
+            FillRoundedRect(rect, color, radii.topLeft);
+            return;
+        }
+        if (auto geom = CreateD2DRRectGeometry(m_d2dFactory.Get(), rect, radii)) {
+            m_solidBrush->SetColor(ToD2DColor(color));
+            m_renderTarget->FillGeometry(geom.Get(), m_solidBrush.Get());
+        }
+    }
+
     void FillLinearGradient(const Rect& rect,
                             float cornerRadius,
                             const Color& start,
@@ -299,12 +534,11 @@ public:
         }
         const float cx = (rect.left + rect.right) * 0.5f;
         const float cy = (rect.top + rect.bottom) * 0.5f;
-        // CSS-like: 0deg = left→right, 90deg = top→bottom.
         const float rad = angleDegrees * 3.14159265f / 180.0f;
         const float c = std::cos(rad);
         const float s = std::sin(rad);
         const float maxDist = (rect.Width() * 0.5f * std::abs(c)) + (rect.Height() * 0.5f * std::abs(s));
-        
+
         const float dx = c * maxDist;
         const float dy = s * maxDist;
 
@@ -348,18 +582,20 @@ public:
             return;
         }
         const float blurPx = std::max(0.0f, blur);
-        const int passes = std::clamp(static_cast<int>(std::lround(blurPx / 3.0f)) + 2, 3, 8);
+        const int passes = std::clamp(static_cast<int>(std::lround(blurPx / 2.0f)) + 4, 6, 14);
         for (int i = passes; i >= 1; --i) {
             const float t = static_cast<float>(i) / static_cast<float>(passes);
-            const float expand = blurPx * t * 0.55f;
-            const float alpha = color.a * (0.08f + 0.22f * (1.0f - t)) / static_cast<float>(passes) * 2.5f;
+            const float expand = blurPx * t * 0.65f;
+            // Smooth Gaussian-like falloff weight
+            const float weight = std::exp(-2.2f * t * t);
+            const float alpha = color.a * weight / static_cast<float>(passes) * 2.2f;
             const Color layer{color.r, color.g, color.b, std::clamp(alpha, 0.0f, 1.0f)};
             const Rect shadow = Rect::Make(
                 rect.left - expand + offsetX,
                 rect.top - expand + offsetY,
                 rect.right + expand + offsetX,
                 rect.bottom + expand + offsetY);
-            const float r = cornerRadius + expand * 0.35f;
+            const float r = cornerRadius + expand * 0.4f;
             m_solidBrush->SetColor(ToD2DColor(layer));
             if (r > 0.5f) {
                 D2D1_ROUNDED_RECT rr = D2D1::RoundedRect(ToD2DRect(shadow), r, r);
@@ -389,6 +625,20 @@ public:
         m_renderTarget->DrawRoundedRectangle(&roundedRect, m_solidBrush.Get(), strokeWidth);
     }
 
+    void DrawRRect(const Rect& rect, const CornerRadius& radii, const Color& color, float strokeWidth) override {
+        if (!m_renderTarget || !m_solidBrush || !m_d2dFactory) {
+            return;
+        }
+        if (radii.IsUniform()) {
+            DrawRoundedRect(rect, color, strokeWidth, radii.topLeft);
+            return;
+        }
+        if (auto geom = CreateD2DRRectGeometry(m_d2dFactory.Get(), rect, radii)) {
+            m_solidBrush->SetColor(ToD2DColor(color));
+            m_renderTarget->DrawGeometry(geom.Get(), m_solidBrush.Get(), strokeWidth);
+        }
+    }
+
     void DrawLine(const PointF& start, const PointF& end, const Color& color, float strokeWidth) override {
         if (!m_renderTarget || !m_solidBrush) {
             return;
@@ -400,6 +650,42 @@ public:
             D2D1::Point2F(end.x, end.y),
             m_solidBrush.Get(),
             strokeWidth);
+    }
+
+    void DrawDashedLine(const PointF& start,
+                        const PointF& end,
+                        const Color& color,
+                        float strokeWidth,
+                        float dashLength,
+                        float gapLength) override {
+        if (!m_renderTarget || !m_solidBrush || !m_d2dFactory) {
+            return;
+        }
+        const float sw = std::max(0.5f, strokeWidth);
+        const float dashes[2] = {std::max(1.0f, dashLength) / sw, std::max(1.0f, gapLength) / sw};
+        ComPtr<ID2D1StrokeStyle> strokeStyle;
+        if (SUCCEEDED(m_d2dFactory->CreateStrokeStyle(
+                D2D1::StrokeStyleProperties(
+                    D2D1_CAP_STYLE_FLAT,
+                    D2D1_CAP_STYLE_FLAT,
+                    D2D1_CAP_STYLE_FLAT,
+                    D2D1_LINE_JOIN_MITER,
+                    10.0f,
+                    D2D1_DASH_STYLE_CUSTOM,
+                    0.0f),
+                dashes,
+                2,
+                strokeStyle.ReleaseAndGetAddressOf()))) {
+            m_solidBrush->SetColor(ToD2DColor(color));
+            m_renderTarget->DrawLine(
+                D2D1::Point2F(start.x, start.y),
+                D2D1::Point2F(end.x, end.y),
+                m_solidBrush.Get(),
+                strokeWidth,
+                strokeStyle.Get());
+            return;
+        }
+        DrawLine(start, end, color, strokeWidth);
     }
 
     void DrawPolyline(const std::vector<PointF>& points, const Color& color, float strokeWidth) override {
@@ -470,6 +756,104 @@ public:
         m_renderTarget->FillGeometry(geometry.Get(), m_solidBrush.Get());
     }
 
+    void FillPolygonLinearGradient(const std::vector<PointF>& points,
+                                   float topY,
+                                   float bottomY,
+                                   const Color& topColor,
+                                   const Color& bottomColor) override {
+        if (!m_renderTarget || !m_d2dFactory || points.size() < 3) {
+            return;
+        }
+
+        ComPtr<ID2D1PathGeometry> geometry;
+        if (FAILED(m_d2dFactory->CreatePathGeometry(geometry.ReleaseAndGetAddressOf()))) {
+            return;
+        }
+
+        ComPtr<ID2D1GeometrySink> sink;
+        if (FAILED(geometry->Open(sink.ReleaseAndGetAddressOf()))) {
+            return;
+        }
+
+        sink->BeginFigure(D2D1::Point2F(points.front().x, points.front().y), D2D1_FIGURE_BEGIN_FILLED);
+        std::vector<D2D1_POINT_2F> segmentPoints;
+        segmentPoints.reserve(points.size() - 1);
+        for (size_t i = 1; i < points.size(); ++i) {
+            segmentPoints.push_back(D2D1::Point2F(points[i].x, points[i].y));
+        }
+        if (!segmentPoints.empty()) {
+            sink->AddLines(segmentPoints.data(), static_cast<UINT32>(segmentPoints.size()));
+        }
+        sink->EndFigure(D2D1_FIGURE_END_CLOSED);
+        if (FAILED(sink->Close())) {
+            return;
+        }
+
+        D2D1_GRADIENT_STOP stops[2]{};
+        stops[0].position = 0.0f;
+        stops[0].color = ToD2DColor(topColor);
+        stops[1].position = 1.0f;
+        stops[1].color = ToD2DColor(bottomColor);
+
+        ComPtr<ID2D1GradientStopCollection> collection;
+        if (FAILED(m_renderTarget->CreateGradientStopCollection(
+                stops, 2, D2D1_GAMMA_2_2, D2D1_EXTEND_MODE_CLAMP, collection.ReleaseAndGetAddressOf()))) {
+            return;
+        }
+
+        ComPtr<ID2D1LinearGradientBrush> brush;
+        if (FAILED(m_renderTarget->CreateLinearGradientBrush(
+                D2D1::LinearGradientBrushProperties(
+                    D2D1::Point2F(0.0f, topY),
+                    D2D1::Point2F(0.0f, std::max(topY + 1.0f, bottomY))),
+                collection.Get(),
+                brush.ReleaseAndGetAddressOf()))) {
+            return;
+        }
+
+        m_renderTarget->FillGeometry(geometry.Get(), brush.Get());
+    }
+
+    void DrawSvgPath(const std::string& svgPathData,
+                     float viewBoxWidth,
+                     float viewBoxHeight,
+                     const Rect& destRect,
+                     const Color& fill,
+                     const Color& stroke,
+                     float strokeWidth) override {
+        if (!m_renderTarget || !m_solidBrush || !m_d2dFactory || svgPathData.empty()) {
+            return;
+        }
+        const float vbW = std::max(1.0f, viewBoxWidth);
+        const float vbH = std::max(1.0f, viewBoxHeight);
+        const float scale = std::min(destRect.Width() / vbW, destRect.Height() / vbH);
+        const float offsetX = destRect.left + (destRect.Width() - vbW * scale) * 0.5f;
+        const float offsetY = destRect.top + (destRect.Height() - vbH * scale) * 0.5f;
+
+        if (fill.a > 0.001f) {
+            if (auto geom = ParseSvgPathToD2D(m_d2dFactory.Get(), svgPathData, scale, offsetX, offsetY, true)) {
+                m_solidBrush->SetColor(ToD2DColor(fill));
+                m_renderTarget->FillGeometry(geom.Get(), m_solidBrush.Get());
+            }
+        }
+        if (stroke.a > 0.001f && strokeWidth > 0.0f) {
+            if (auto geom = ParseSvgPathToD2D(m_d2dFactory.Get(), svgPathData, scale, offsetX, offsetY, false)) {
+                ComPtr<ID2D1StrokeStyle> roundStyle;
+                m_d2dFactory->CreateStrokeStyle(
+                    D2D1::StrokeStyleProperties(
+                        D2D1_CAP_STYLE_ROUND,
+                        D2D1_CAP_STYLE_ROUND,
+                        D2D1_CAP_STYLE_ROUND,
+                        D2D1_LINE_JOIN_ROUND),
+                    nullptr,
+                    0,
+                    roundStyle.ReleaseAndGetAddressOf());
+                m_solidBrush->SetColor(ToD2DColor(stroke));
+                m_renderTarget->DrawGeometry(geom.Get(), m_solidBrush.Get(), strokeWidth, roundStyle.Get());
+            }
+        }
+    }
+
     void PushRoundedClip(const Rect& rect, float radius) override {
         if (!m_renderTarget || !m_d2dFactory) {
             return;
@@ -518,11 +902,14 @@ public:
             return;
         }
 
+        const wchar_t* family = options.fontFamily.empty() ? L"Segoe UI" : options.fontFamily.c_str();
+        const DWRITE_FONT_WEIGHT weight = static_cast<DWRITE_FONT_WEIGHT>(options.EffectiveWeight());
+
         ComPtr<IDWriteTextFormat> format;
         if (FAILED(m_dwriteFactory->CreateTextFormat(
-                L"Segoe UI",
+                family,
                 nullptr,
-                options.bold ? DWRITE_FONT_WEIGHT_BOLD : DWRITE_FONT_WEIGHT_NORMAL,
+                weight,
                 options.italic ? DWRITE_FONT_STYLE_ITALIC : DWRITE_FONT_STYLE_NORMAL,
                 DWRITE_FONT_STRETCH_NORMAL,
                 fontSize,
@@ -537,8 +924,11 @@ public:
             options.wrap == TextWrapMode::Wrap
                 ? DWRITE_WORD_WRAPPING_WRAP
                 : DWRITE_WORD_WRAPPING_NO_WRAP);
+        if (options.lineHeightFactor > 0.0f) {
+            const float lh = fontSize * options.lineHeightFactor;
+            format->SetLineSpacing(DWRITE_LINE_SPACING_METHOD_UNIFORM, lh, lh * 0.8f);
+        }
 
-        // Wave2 R6: character-level ellipsis on NoWrap (single-line overflow).
         if (options.ellipsis && options.wrap == TextWrapMode::NoWrap) {
             ComPtr<IDWriteInlineObject> trimmingSign;
             if (SUCCEEDED(m_dwriteFactory->CreateEllipsisTrimmingSign(format.Get(), trimmingSign.GetAddressOf()))) {
@@ -641,7 +1031,6 @@ public:
     }
 
     SvgHandle CreateSvgFromBytes(const uint8_t* /*data*/, size_t /*size*/, const char* cacheKey) override {
-        // D2D has no real SVG parse; still cache placeholders by key so handles are stable.
         const std::string key = cacheKey && cacheKey[0]
             ? std::string(cacheKey)
             : std::string("d2d-placeholder");
@@ -734,7 +1123,6 @@ private:
             return false;
         }
         m_oldBitmap = static_cast<HBITMAP>(SelectObject(m_memDC, m_dib));
-        // Clear to transparent.
         ZeroMemory(m_dibBits, static_cast<size_t>(m_pixelWidth) * m_pixelHeight * 4u);
         return true;
     }
@@ -752,7 +1140,6 @@ private:
         blend.SourceConstantAlpha = 255;
         blend.AlphaFormat = AC_SRC_ALPHA;
 
-        // Leave position unchanged (pptDst = nullptr); only refresh pixels/size.
         UpdateLayeredWindow(
             m_hwnd,
             nullptr,
@@ -806,7 +1193,6 @@ private:
             }
 
             m_renderTarget = m_dcRenderTarget;
-            // Grayscale AA avoids ClearType fringing on transparent edges.
             m_renderTarget->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_GRAYSCALE);
         } else {
             const auto size = D2D1::SizeU(m_pixelWidth, m_pixelHeight);
@@ -817,7 +1203,6 @@ private:
                 return false;
             }
             m_renderTarget = m_hwndRenderTarget;
-            // Force 1 DIP = 1 pixel so layout / hit-test stay aligned with mouse.
             m_renderTarget->SetDpi(96.0f, 96.0f);
             m_renderTarget->SetTextAntialiasMode(D2D1_TEXT_ANTIALIAS_MODE_CLEARTYPE);
         }

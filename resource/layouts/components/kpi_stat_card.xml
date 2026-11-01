@@ -1,10 +1,10 @@
-<Panel direction="column" padding="14,14,14,14" cornerRadius="14" background="#FFFFFF" border="1,#EAEFF5" height="102">
+<Panel direction="column" padding="14,14,14,14" cornerRadius="14" background="#FFFFFF" border="1,#EAEFF5" shadowBlur="10" shadowOffsetY="3" shadowColor="#0F172A08" height="102">
   <Panel direction="row" alignItems="center">
-    <Label name="kpiTitle" text="Total Appointments" fontSize="12" color="#1E293B" bold="true" flexGrow="1" />
-    <Panel width="24" height="24" cornerRadius="6" background="#EBF2FE" justifyContent="center" alignItems="center">
-      <Label text="📅" fontSize="11" color="#2764FF" />
+    <Label name="kpiTitle" text="Total Appointments" fontSize="12" color="#1E293B" fontWeight="600" flexGrow="1" />
+    <Panel width="26" height="26" cornerRadius="7" background="#EBF2FE" justifyContent="center" alignItems="center">
+      <Icon name="calendar" size="13" color="#2764FF" strokeWidth="2.0" />
     </Panel>
   </Panel>
-  <Label name="kpiValue" text="24" fontSize="28" color="#0F172A" bold="true" marginTop="2" />
+  <Label name="kpiValue" text="24" fontSize="28" color="#0F172A" fontWeight="700" marginTop="2" />
   <Label name="kpiSubtext" text="This month" fontSize="11" color="#94A3B8" />
 </Panel>

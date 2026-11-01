@@ -37,6 +37,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **Visual Rendering v2 (Shadows, Typography, Vector Icons & Smooth Charts):** `2026-11-01-visual-rendering-v2.md`
   - **Medlio Dashboard UI Alignment:** `2026-11-01-medlio-dashboard-alignment.md`
   - **Component Include (Phase 1):** `2026-10-31-component-include-v1.md`
   - **Modular Parsers (pugixml & yyjson):** `2026-10-31-modular-parsers-v1.md`
@@ -63,13 +64,13 @@ abstractions:
 
 | Area | Files |
 |------|--------|
-| Controls | `src/ui.h`, `src/ui_panels.*` |
-| **Chart** | **`src/ui_chart.h`** (line / bar / area, axes, legend, tooltip) |
-| Renderer | `src/renderer.h` (+ D2D / Skia) |
-| Text measure | `src/text_measurer.h` (with `CachingTextMeasurer`) |
+| Controls | `src/ui.h`, `src/ui_panels.*`, `src/ui_media.h`, **`src/ui_icons.h`** (`<Icon>` / `<Path>`) |
+| **Chart** | **`src/ui_chart.h`** (smooth spline line / vertical gradient area / rounded pill bar + highlight badge, dashed grid, axes, legend, tooltip) |
+| Renderer | `src/renderer.h`, `src/renderer.cpp` (D2D), `src/renderer_skia.cpp` (Skia) |
+| Text measure & layout | `src/text_measurer.h`, `src/skia_font_shared.h`, `src/skia_text_layout.*` (100..900 fontWeight, fontFamily, lineHeight) |
 | Layout engine | `src/layout_engine.h` (Yoga) |
 | Context | `src/ui_context.h` (includes `StyleCatalog*`) |
-| Box decoration | `src/box_decoration.*` |
+| Box decoration | `src/box_decoration.*` (Gaussian soft shadow, 4-corner `CornerRadius`, 4-side independent borders) |
 | Component style | `src/style.*` |
 | **Style catalog** | **`src/style_catalog.*`** |
 | Theme tokens | `src/theme.*` |
@@ -94,8 +95,14 @@ The app currently supports:
 - theme tokens (`$color.x`, `$spacing.x`, …) at load time, magenta fallback for unknowns
 - **Component Include**: `<Include src="..." />` (XML) or `type: "Include"` (JSON) with relative path resolution and attribute overrides
 - **`ShapePanel`**: heart / petal / oval / star via `FillPolygon`
+- **Visual Rendering v2**:
+  - True Gaussian blur drop shadows (`SkMaskFilter::MakeBlur` on Skia, 12-step Gaussian falloff on Direct2D)
+  - 4-corner independent `CornerRadius` (`cornerRadius="tl,tr,br,bl"`) and 4-side independent borders (`borderBottom="1,#EEF2F7"`, etc.)
+  - Multi-weight typography (`fontWeight="100..900|medium|semibold|bold"`, `fontFamily`, `lineHeight`)
+  - Built-in Lucide-style vector icons (`<Icon name="search|bell|calendar|..." />`) and inline SVG paths (`<Path data="M..." />`) across both Skia and Direct2D
+  - Smooth Catmull-Rom spline curves (`smooth="true"`), vertical linear gradient area fills, and rounded pill bar charts with highlight badges
 - custom chrome + **layered** per-pixel alpha windows; multi-process shaped demos
-- vector icons via `SvgIcon` on Skia (`SkSVGDOM`); D2D shows a placeholder
+- external SVG files via `SvgIcon` on Skia (`SkSVGDOM`)
 
 ### Layout / style rule impact (quick reference)
 
@@ -113,6 +120,7 @@ Full detail: `doc/layout-spec.md` + `doc/style-catalog.md`.
 ## Recommended Validation Pages
 
 - `resource/layouts/ui.xml` — default mixed demo
+- `resource/layouts/medlio_dashboard.xml` — high-fidelity SaaS medical dashboard (Visual Rendering v2 showcase)
 - `resource/layouts/yoga_measure_cases.xml` — Yoga sizing
 - `resource/layouts/skia_image_cases.xml` — image / clip
 - `resource/layouts/core_validation.xml` — core MVP checks
