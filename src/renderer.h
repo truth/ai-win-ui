@@ -6,6 +6,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <string>
 #include <vector>
 
 enum class RendererBackend {
@@ -46,6 +47,18 @@ struct TextRenderOptions {
     // Wave2 R6: when wrap==NoWrap and text exceeds rect width, show "…" (draw+measure).
     // Ignored for TextWrapMode::Wrap (multi-line ellipsis not in v1).
     bool ellipsis = false;
+    // Visual Rendering v2: fine-grained typography controls.
+    uint16_t fontWeight = 0; // 0 = derive from bold (700 if bold else 400); otherwise 100..900
+    std::wstring fontFamily; // empty = default "Segoe UI"
+    float letterSpacing = 0.0f;
+    float lineHeightFactor = 0.0f; // > 0 overrides default line spacing as fontSize * lineHeightFactor
+
+    uint16_t EffectiveWeight() const {
+        if (fontWeight >= 100 && fontWeight <= 900) {
+            return fontWeight;
+        }
+        return bold ? 700 : 400;
+    }
 };
 
 const char* RendererBackendId(RendererBackend backend);
@@ -73,13 +86,20 @@ public:
 
     virtual void FillRect(const Rect& rect, const Color& color) = 0;
     virtual void FillRoundedRect(const Rect& rect, const Color& color, float radius) = 0;
-    // Wave2 R7: two-stop linear gradient fill (optional rounded). angleDegrees: 0=L→R, 90=T→B.
+    virtual void FillRRect(const Rect& rect, const CornerRadius& radii, const Color& color) {
+        if (radii.IsZero()) {
+            FillRect(rect, color);
+        } else {
+            FillRoundedRect(rect, color, radii.MaxRadius());
+        }
+    }
+    // Wave2 R7: two-stop linear gradient fill (optional rounded). angleDegrees: 0=L->R, 90=T->B.
     virtual void FillLinearGradient(const Rect& rect,
                                     float cornerRadius,
                                     const Color& start,
                                     const Color& end,
                                     float angleDegrees) = 0;
-    // Soft shadow under a rounded rect (drawn around bounds + offset; multi-pass approx).
+    // Soft shadow under a rounded rect (drawn around bounds + offset; Gaussian blur on Skia).
     virtual void FillSoftShadow(const Rect& rect,
                                 float cornerRadius,
                                 float offsetX,
@@ -88,10 +108,52 @@ public:
                                 const Color& color) = 0;
     virtual void DrawRect(const Rect& rect, const Color& color, float strokeWidth = 1.0f) = 0;
     virtual void DrawRoundedRect(const Rect& rect, const Color& color, float strokeWidth, float radius) = 0;
+    virtual void DrawRRect(const Rect& rect, const CornerRadius& radii, const Color& color, float strokeWidth = 1.0f) {
+        if (radii.IsZero()) {
+            DrawRect(rect, color, strokeWidth);
+        } else {
+            DrawRoundedRect(rect, color, strokeWidth, radii.MaxRadius());
+        }
+    }
     virtual void DrawLine(const PointF& start, const PointF& end, const Color& color, float strokeWidth = 1.0f) = 0;
+    virtual void DrawDashedLine(const PointF& start,
+                                const PointF& end,
+                                const Color& color,
+                                float strokeWidth = 1.0f,
+                                float dashLength = 4.0f,
+                                float gapLength = 4.0f) {
+        (void)dashLength;
+        (void)gapLength;
+        DrawLine(start, end, color, strokeWidth);
+    }
     virtual void DrawPolyline(const std::vector<PointF>& points, const Color& color, float strokeWidth = 1.0f) = 0;
     // Filled closed polygon (first point connected to last). Empty / single-point is a no-op.
     virtual void FillPolygon(const std::vector<PointF>& points, const Color& color) = 0;
+    virtual void FillPolygonLinearGradient(const std::vector<PointF>& points,
+                                           float topY,
+                                           float bottomY,
+                                           const Color& topColor,
+                                           const Color& bottomColor) {
+        (void)topY;
+        (void)bottomY;
+        (void)bottomColor;
+        FillPolygon(points, topColor);
+    }
+    virtual void DrawSvgPath(const std::string& svgPathData,
+                             float viewBoxWidth,
+                             float viewBoxHeight,
+                             const Rect& destRect,
+                             const Color& fill,
+                             const Color& stroke,
+                             float strokeWidth = 1.5f) {
+        (void)svgPathData;
+        (void)viewBoxWidth;
+        (void)viewBoxHeight;
+        (void)destRect;
+        (void)fill;
+        (void)stroke;
+        (void)strokeWidth;
+    }
     virtual void PushRoundedClip(const Rect& rect, float radius) = 0;
     virtual void PopLayer() = 0;
     virtual void DrawTextW(const wchar_t* text,

@@ -2,6 +2,21 @@
 
 ## 2026-11-01
 
+- **UI 视觉渲染与绘制表现力升级 (Visual Rendering v2)**（分支 eature/visual-rendering-v2）
+  - **盒模型与高斯软阴影 (ox_decoration.*, enderer_skia.cpp, enderer.cpp)**：
+    - Skia 后端 FillSoftShadow 接入 SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, sigma) 真高斯模糊阴影，Direct2D 后端升级为 12 步高斯衰减阴影，消除浅色卡片阴影阶梯感；
+    - 新增四角独立圆角 (FillRRect / DrawRRect，支持 cornerRadius="tl,tr,br,bl") 与四边独立边框绘制（支持 orderBottom="1,#EEF2F7"、order="1,#EAEFF5" 等单边分割线及微边框）；
+    - 修复 XML 解析器此前忽略 order、orderTop/Bottom/Left/Right 与 marginLeft/Top/Right/Bottom 简写属性的问题。
+  - **字体排版与字重层级 (skia_font_shared.h, skia_text_layout.*, ui_panels.h)**：
+    - 扩展 TextRenderOptions 与 <Label>，支持 ontWeight（100..900 及 medium/semibold/old）、ontFamily、lineHeight、lign/erticalAlign；
+    - 移除 Skia SkSurfaceProps 中的 kUseDeviceIndependentFonts_Flag，恢复桌面端字形 Hinting 锐度。
+  - **内置矢量图标与内联路径 (src/ui_icons.h, src/ui_media.h)**：
+    - 新增 <Icon name="search|bell|calendar|..." />（内置 24+ 现代 Lucide 风格矢量图标）与 <Path data="M..." /> 控件；
+    - Skia (SkParsePath::FromSVGString) 与 Direct2D（内置轻量 SVG Path M/L/H/V/C/A/Z 解析器）双后端原生渲染矢量图标与任意路径。
+  - **图表平滑曲线与渐变精修 (src/ui_chart.h)**：
+    - 新增 Catmull-Rom 平滑样条曲线（smooth="true"）、面积图垂直线性渐变填充（FillPolygonLinearGradient）、圆角胶囊柱（arRadius）、背景轨道槽（arTrackColor）、单柱高亮与柱顶悬浮胶囊标签（highlightIndex / highlightColor）以及柔和虚线网格（DrawDashedLine）。
+  - **Medlio 看板全面升级与验证**：应用 <Icon> 矢量图标、多级字重、单边分割线、真高斯阴影与平滑渐变图表升级 medlio_dashboard.xml 及子组件；uild.ps1 编译通过，un_ci_local.ps1 -SkipBuild 7/7 项自动化回归测试 100% PASS。
+
 - **Medlio 医疗看板高保真 UI 对齐测试与视觉重构**（分支 `feature/medlio-dashboard`）
   - **架构层级颠覆与修复**：将旧方案中包裹在白底卡片内的 Sidebar 移至外部深蓝画布（`#2764FF`），确立“左深蓝侧边栏 + 右嵌入式浅灰白工作卡片（`#F6F8FB`，圆角 20px）”的经典高质感层级，解决整体对齐还原度偏低的问题。
   - **色彩材质与状态还原**：

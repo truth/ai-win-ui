@@ -82,7 +82,6 @@ bool IsCjkOrFullwidth(wchar_t ch) {
     if (ch >= 0xFF00 && ch <= 0xFFEF) {
         return true; // Fullwidth forms
     }
-    // Common CJK punctuation outside the blocks above.
     switch (ch) {
     case L'，':
     case L'。':
@@ -135,8 +134,6 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
             line.substr(begin, end - begin));
     };
 
-    // Small slack so Skia emergency mid-word breaks match DirectWrite packing
-    // (hinting / subpixel measure can read ~0.5–1px wider per line).
     const float fitLimit = maxWidth + 1.0f;
 
     std::vector<SkiaTextLayoutLine> wrapped;
@@ -149,11 +146,8 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
             break;
         }
 
-        // lastSoftEnd: exclusive end of the latest soft-break that still fits.
-        // Soft breaks: after whitespace, hyphen, or CJK/fullwidth (DWrite-like).
-        // Only updated while the prefix still fits — never on the overflowing glyph.
         size_t lastSoftEnd = std::wstring::npos;
-        size_t lastFitEnd = lineStart; // exclusive end of longest fitting prefix
+        size_t lastFitEnd = lineStart;
         bool emitted = false;
 
         for (size_t i = lineStart; i < line.size(); ++i) {
@@ -162,7 +156,6 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
             if (width <= fitLimit) {
                 lastFitEnd = tryEnd;
                 const wchar_t ch = line[i];
-                // Soft opportunities ≈ DWrite WRAP / common Western + CJK breaks.
                 const bool soft =
                     std::iswspace(ch) != 0 ||
                     ch == L'-' || ch == L'/' ||
@@ -175,15 +168,12 @@ std::vector<SkiaTextLayoutLine> WrapWideLine(const std::wstring& line,
                 continue;
             }
 
-            // Overflow at character i.
             size_t cutEnd = lastSoftEnd;
             if (cutEnd == std::wstring::npos || cutEnd <= lineStart) {
-                // No soft break in the fitting prefix: hard-break after last fit.
                 cutEnd = (lastFitEnd > lineStart) ? lastFitEnd : tryEnd;
             }
 
             if (cutEnd <= lineStart) {
-                // Pathological: single glyph wider than maxWidth.
                 cutEnd = tryEnd;
             }
 
@@ -245,14 +235,18 @@ struct FontBundle {
     SkFont font;
 };
 
-FontBundle CreateFontBundle(float fontSize, bool bold, bool italic) {
+FontBundle CreateFontBundle(float fontSize,
+                            bool bold,
+                            bool italic,
+                            uint16_t fontWeight = 0,
+                            const std::wstring& fontFamily = {}) {
     FontBundle bundle;
     static sk_sp<SkFontMgr> s_fontMgr = skia_font::CreateDefaultFontManager();
     if (!s_fontMgr) {
         return bundle;
     }
     bundle.fontMgr = s_fontMgr;
-    bundle.typeface = skia_font::CreateDefaultTypeface(s_fontMgr.get(), bold, italic);
+    bundle.typeface = skia_font::CreateDefaultTypeface(s_fontMgr.get(), bold, italic, fontWeight, fontFamily);
     if (!bundle.typeface) {
         return bundle;
     }
@@ -274,7 +268,6 @@ void ApplyEllipsisToFirstLine(
     const std::wstring ellipsis = L"\u2026";
     const float ellipsisW = MeasureWideTextWidth(fontMgr, typeface, fontSize, ellipsis);
     if (ellipsisW >= maxWidth) {
-        // Degenerate: only show ellipsis (or empty if even that does not fit).
         line.text = ellipsisW <= maxWidth + 0.5f ? ellipsis : std::wstring{};
         line.width = MeasureWideTextWidth(fontMgr, typeface, fontSize, line.text);
         return;
@@ -312,7 +305,10 @@ bool CreateSkiaTextLayout(const wchar_t* text,
                           SkiaTextLayout* layout,
                           bool bold,
                           bool italic,
-                          bool ellipsis) {
+                          bool ellipsis,
+                          uint16_t fontWeight,
+                          const std::wstring& fontFamily,
+                          float lineHeightFactor) {
     if (!layout) {
         return false;
     }
@@ -322,7 +318,7 @@ bool CreateSkiaTextLayout(const wchar_t* text,
         return true;
     }
 
-    FontBundle fonts = CreateFontBundle(fontSize, bold, italic);
+    FontBundle fonts = CreateFontBundle(fontSize, bold, italic, fontWeight, fontFamily);
     if (!fonts.font.getTypeface()) {
         return false;
     }
@@ -337,7 +333,6 @@ bool CreateSkiaTextLayout(const wchar_t* text,
         widthBudget,
         wrapMode);
 
-    // R6: single-line ellipsis only (NoWrap).
     if (ellipsis && wrapMode == TextWrapMode::NoWrap && !layout->lines.empty()) {
         ApplyEllipsisToFirstLine(
             layout->lines.front(),
@@ -353,19 +348,15 @@ bool CreateSkiaTextLayout(const wchar_t* text,
     layout->ascent = std::isfinite(metrics.fAscent) ? -metrics.fAscent : fontSize * 0.8f;
     layout->descent = std::isfinite(metrics.fDescent) ? metrics.fDescent : fontSize * 0.25f;
     layout->lineHeight = std::max(fonts.font.getSpacing(), layout->ascent + layout->descent);
+    if (lineHeightFactor > 0.0f) {
+        layout->lineHeight = fontSize * lineHeightFactor;
+    }
     layout->textHeight = layout->ascent + layout->descent;
     layout->maxLineWidth = 0.0f;
     for (const auto& line : layout->lines) {
         layout->maxLineWidth = std::max(layout->maxLineWidth, line.width);
     }
 
-    // blockHeight uses (lines - 1) * lineHeight + textHeight so that:
-    //   - Single-line text reports textHeight (ascent + descent), matching
-    //     DirectWrite's DWRITE_TEXT_METRICS.height for one line.
-    //   - Multi-line text reserves full line spacing between baselines
-    //     (lineHeight) but only needs textHeight from the last baseline to
-    //     the bottom. This keeps vertical centering and End alignment
-    //     closer to DirectWrite's paragraph layout.
     layout->blockHeight = layout->lines.empty()
         ? 0.0f
         : static_cast<float>(layout->lines.size() - 1) * layout->lineHeight + layout->textHeight;
@@ -380,9 +371,24 @@ Size MeasureSkiaTextLayout(const wchar_t* text,
                            TextWrapMode wrapMode,
                            bool bold,
                            bool italic,
-                           bool ellipsis) {
+                           bool ellipsis,
+                           uint16_t fontWeight,
+                           const std::wstring& fontFamily,
+                           float lineHeightFactor) {
     SkiaTextLayout layout;
-    if (!CreateSkiaTextLayout(text, len, fontSize, maxWidth, wrapMode, &layout, bold, italic, ellipsis)) {
+    if (!CreateSkiaTextLayout(
+            text,
+            len,
+            fontSize,
+            maxWidth,
+            wrapMode,
+            &layout,
+            bold,
+            italic,
+            ellipsis,
+            fontWeight,
+            fontFamily,
+            lineHeightFactor)) {
         return {};
     }
     return Size{layout.maxLineWidth, layout.blockHeight};
@@ -398,7 +404,10 @@ bool CreateSkiaTextLayout(const wchar_t*,
                           SkiaTextLayout* layout,
                           bool,
                           bool,
-                          bool) {
+                          bool,
+                          uint16_t,
+                          const std::wstring&,
+                          float) {
     if (layout) {
         *layout = SkiaTextLayout{};
     }
@@ -412,7 +421,10 @@ Size MeasureSkiaTextLayout(const wchar_t*,
                            TextWrapMode,
                            bool,
                            bool,
-                           bool) {
+                           bool,
+                           uint16_t,
+                           const std::wstring&,
+                           float) {
     return {};
 }
 

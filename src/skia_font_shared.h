@@ -63,34 +63,53 @@ inline SkUnichar DecodeUtf16At(const wchar_t* text, uint32_t len, uint32_t index
     return static_cast<SkUnichar>(first);
 }
 
-inline SkFontStyle MakeFontStyle(bool bold = false, bool italic = false) {
+inline SkFontStyle MakeFontStyle(bool bold = false, bool italic = false, uint16_t weight = 0) {
+    const int resolvedWeight = (weight >= 100 && weight <= 900)
+        ? static_cast<int>(weight)
+        : (bold ? SkFontStyle::kBold_Weight : SkFontStyle::kNormal_Weight);
     return SkFontStyle(
-        bold ? SkFontStyle::kBold_Weight : SkFontStyle::kNormal_Weight,
+        resolvedWeight,
         SkFontStyle::kNormal_Width,
         italic ? SkFontStyle::kItalic_Slant : SkFontStyle::kUpright_Slant);
 }
 
-inline sk_sp<SkTypeface> TryMatchFamily(SkFontMgr* fontMgr, const char* familyName, bool bold = false, bool italic = false) {
+inline sk_sp<SkTypeface> TryMatchFamily(SkFontMgr* fontMgr,
+                                        const char* familyName,
+                                        bool bold = false,
+                                        bool italic = false,
+                                        uint16_t weight = 0) {
     if (!fontMgr || !familyName || !familyName[0]) {
         return nullptr;
     }
-    return fontMgr->matchFamilyStyle(familyName, MakeFontStyle(bold, italic));
+    return fontMgr->matchFamilyStyle(familyName, MakeFontStyle(bold, italic, weight));
 }
 
-inline sk_sp<SkTypeface> CreateDefaultTypeface(SkFontMgr* fontMgr, bool bold = false, bool italic = false) {
+inline sk_sp<SkTypeface> CreateDefaultTypeface(SkFontMgr* fontMgr,
+                                               bool bold = false,
+                                               bool italic = false,
+                                               uint16_t weight = 0,
+                                               const std::wstring& customFamily = {}) {
     if (!fontMgr) {
         return nullptr;
     }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Segoe UI", bold, italic)) {
+    if (!customFamily.empty()) {
+        const std::string familyUtf8 = WideToUtf8(customFamily.c_str(), static_cast<uint32_t>(customFamily.size()));
+        if (!familyUtf8.empty()) {
+            if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, familyUtf8.c_str(), bold, italic, weight)) {
+                return typeface;
+            }
+        }
+    }
+    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Segoe UI", bold, italic, weight)) {
         return typeface;
     }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Arial", bold, italic)) {
+    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Arial", bold, italic, weight)) {
         return typeface;
     }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Tahoma", bold, italic)) {
+    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Tahoma", bold, italic, weight)) {
         return typeface;
     }
-    return fontMgr->legacyMakeTypeface(nullptr, MakeFontStyle(bold, italic));
+    return fontMgr->legacyMakeTypeface(nullptr, MakeFontStyle(bold, italic, weight));
 }
 
 inline sk_sp<SkTypeface> MatchTypefaceForCharacter(SkFontMgr* fontMgr,
