@@ -8,6 +8,8 @@
 #include "ui_panels.h"
 #include "ui_chart.h"
 #include "ui_media.h"
+#include "ui_widgets.h"
+#include "ui_containers.h"
 #include "ui_inputs.h"
 #include "ui_pickers.h"
 #include "ui_text.h"

@@ -2040,6 +2040,7 @@ private:
 
         m_mouseCaptureTarget = m_root->FindHitElementAt(x, y);
         if (m_root->OnMouseDown(x, y)) {
+            UpdateLayout();
             UpdateImeWindow();
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }

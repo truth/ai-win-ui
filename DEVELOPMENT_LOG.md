@@ -2,8 +2,30 @@
 
 ## 2026-11-01
 
+- **现代基础组件库扩展 (Modern Components v2)**（分支 `feature/modern-components-v2`）
+  - **展示与导航微组件 (`src/ui_widgets.h`)**：
+    - `<Avatar>`：支持圆形/圆角方形、首字母缩写 (`initials`)、矢量图标回退 (`icon`) 及右下角在线状态指示点 (`status="online|busy|away|offline"`)；
+    - `<Badge>` / `<Tag>`：支持 6 种语义色预设 (`success|warning|danger|info|primary|neutral`)、前置状态圆点 (`dot="true"`) 与前置矢量图标 (`icon`)；
+    - `<Divider>`：支持水平/垂直分割线、实线/虚线 (`dashed="true"`) 及居中嵌入文字 (`text="..."`)；
+    - `<SegmentedControl>`：支持 `items="Daily|Weekly|Monthly"` 分段胶囊切换，选中项带高斯软阴影高光与 `onChange` 回调。
+  - **现代交互与表单控件 (`src/ui_widgets.h`)**：
+    - `<Switch>`：现代胶囊拨动开关，支持点击与键盘 Space/Enter 切换及 `UIA::CheckBoxControlType` 无障碍映射；
+    - `<SearchBox>`：复合搜索输入框，内置左侧搜索图标、占位符、非空态右侧一键清除按钮 (`clearable="true"`) 及空态快捷键胶囊徽标 (`shortcut="Ctrl+K"`)。
+  - **反馈与状态指示组件 (`src/ui_element.h`, `src/ui_widgets.h`)**：
+    - 基类级通用 `tooltip="..."` 属性：任意 `UIElement` 悬停时在 `RenderOverlay` 第二遍绘制通道自动弹出带高斯软阴影的深色气泡提示；
+    - `<Alert>`：页内嵌状态横幅 (`variant="info|success|warning|error"`)，支持主副标题与点击右侧关闭按钮收起；
+    - `<CircularProgress>`：双后端 SVG 圆弧环形进度指示器 (`0..100%`)，支持自定义环宽、颜色与中心百分比文字；
+    - `<EmptyState>`：标准空数据占位组件（浅色圆形图标底座 + 矢量图标 + 标题 + 描述 + 操作按钮）。
+  - **桌面级容器与环形图扩展 (`src/ui_containers.h`, `src/ui_chart.h`)**：
+    - `<Expander>`：可折叠手风琴容器，点击 Header 栏动态展开/收起子容器并触发宿主 `UpdateLayout()` 重排；
+    - `<SplitView>`：可拖拽双面板分栏容器，支持鼠标按住分隔条实时调整 `splitRatio` 并重排两侧子面板；
+    - `<Chart>` 饼图/环形图 (`type="pie|donut"`)：支持 `innerRadiusRatio`、`centerValue`、`centerTitle`、自定义 `colors` 色板、扇区悬停外扩高亮及 Tooltip 联动。
+  - **画廊与看板升级验证**：新增 `resource/layouts/modern_components_v2.xml` 挂载至 `demo_gallery.xml`，并升级 `medlio_dashboard.xml` 及子组件；`build.ps1` 编译通过，`run_ci_local.ps1 -SkipBuild` 7/7 项回归测试 100% PASS。
+
 - **UI 视觉渲染与绘制表现力升级 (Visual Rendering v2)**（分支 eature/visual-rendering-v2）
-  - **盒模型与高斯软阴影 (ox_decoration.*, enderer_skia.cpp, enderer.cpp)**：
+  - **盒模型与高斯软阴影 (ox_decoration.*, 
+enderer_skia.cpp, 
+enderer.cpp)**：
     - Skia 后端 FillSoftShadow 接入 SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, sigma) 真高斯模糊阴影，Direct2D 后端升级为 12 步高斯衰减阴影，消除浅色卡片阴影阶梯感；
     - 新增四角独立圆角 (FillRRect / DrawRRect，支持 cornerRadius="tl,tr,br,bl") 与四边独立边框绘制（支持 orderBottom="1,#EEF2F7"、order="1,#EAEFF5" 等单边分割线及微边框）；
     - 修复 XML 解析器此前忽略 order、orderTop/Bottom/Left/Right 与 marginLeft/Top/Right/Bottom 简写属性的问题。
@@ -15,7 +37,8 @@
     - Skia (SkParsePath::FromSVGString) 与 Direct2D（内置轻量 SVG Path M/L/H/V/C/A/Z 解析器）双后端原生渲染矢量图标与任意路径。
   - **图表平滑曲线与渐变精修 (src/ui_chart.h)**：
     - 新增 Catmull-Rom 平滑样条曲线（smooth="true"）、面积图垂直线性渐变填充（FillPolygonLinearGradient）、圆角胶囊柱（arRadius）、背景轨道槽（arTrackColor）、单柱高亮与柱顶悬浮胶囊标签（highlightIndex / highlightColor）以及柔和虚线网格（DrawDashedLine）。
-  - **Medlio 看板全面升级与验证**：应用 <Icon> 矢量图标、多级字重、单边分割线、真高斯阴影与平滑渐变图表升级 medlio_dashboard.xml 及子组件；uild.ps1 编译通过，un_ci_local.ps1 -SkipBuild 7/7 项自动化回归测试 100% PASS。
+  - **Medlio 看板全面升级与验证**：应用 <Icon> 矢量图标、多级字重、单边分割线、真高斯阴影与平滑渐变图表升级 medlio_dashboard.xml 及子组件；uild.ps1 编译通过，
+un_ci_local.ps1 -SkipBuild 7/7 项自动化回归测试 100% PASS。
 
 - **Medlio 医疗看板高保真 UI 对齐测试与视觉重构**（分支 `feature/medlio-dashboard`）
   - **架构层级颠覆与修复**：将旧方案中包裹在白底卡片内的 Sidebar 移至外部深蓝画布（`#2764FF`），确立“左深蓝侧边栏 + 右嵌入式浅灰白工作卡片（`#F6F8FB`，圆角 20px）”的经典高质感层级，解决整体对齐还原度偏低的问题。

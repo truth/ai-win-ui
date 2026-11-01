@@ -1,0 +1,175 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Panel name="modernComponentsRoot" direction="column" background="#F6F8FB" padding="24,20,24,20" spacing="18" alignItems="stretch">
+
+  <!-- Top Header Bar with SearchBox & SegmentedControl -->
+  <Panel direction="row" background="#FFFFFF" cornerRadius="14" border="1,#EAEFF5" shadowBlur="12" shadowColor="#0A0F1D0A" shadowOffsetY="3" padding="18,12,18,12" alignItems="center" justifyContent="space-between" height="64">
+    <Panel direction="row" spacing="12" alignItems="center">
+      <Avatar initials="UI" size="38" background="#2764FF" color="#FFFFFF" status="online" tooltip="AI WinUI Design System v2" />
+      <Panel direction="column" spacing="2">
+        <Panel direction="row" spacing="8" alignItems="center">
+          <Label text="Modern Components v2" fontSize="17" fontWeight="700" color="#181D27" />
+          <Badge text="12 New Primitives" variant="primary" />
+          <Badge text="Dual-Backend" variant="success" dot="true" />
+        </Panel>
+        <Label text="Avatar · Badge · Divider · SegmentedControl · Switch · SearchBox · Alert · CircularProgress · DonutChart · Expander · SplitView · EmptyState" fontSize="11.5" color="#697586" />
+      </Panel>
+    </Panel>
+
+    <Panel direction="row" spacing="12" alignItems="center">
+      <SearchBox width="240" placeholder="Quick filter components..." shortcut="Ctrl+K" tooltip="Type to filter or press Esc to clear" />
+      <SegmentedControl items="Overview|Interactive|Analytics" selectedIndex="0" tooltip="Switch component view mode" />
+    </Panel>
+  </Panel>
+
+  <ScrollViewer flexGrow="1" scrollY="true" scrollX="false" showScrollbars="true" background="transparent" barThickness="8">
+    <Panel direction="column" spacing="16" alignItems="stretch">
+
+      <!-- Row 1: Alert Banners (Info / Success / Warning / Error) -->
+      <Panel direction="row" spacing="12" alignItems="stretch">
+        <Alert flexGrow="1" variant="info" title="System Update Ready" message="Visual Rendering v2 &amp; Modern Components v2 are active on Skia and Direct2D." closable="true" />
+        <Alert flexGrow="1" variant="success" title="All 7 CI Checks Passed" message="Golden layout measurements and dual-backend headless smoke verified." closable="true" />
+      </Panel>
+
+      <!-- Row 2: 3-Column Bento Grid -->
+      <Panel direction="row" spacing="16" alignItems="stretch">
+
+        <!-- Card 1: Identity, Avatars, Badges & Dividers -->
+        <Panel flexGrow="1" flexBasis="0" direction="column" background="#FFFFFF" cornerRadius="14" border="1,#EAEFF5" shadowBlur="12" shadowColor="#0A0F1D0A" shadowOffsetY="3" padding="18" spacing="14">
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="Identity · Avatars &amp; Badges" fontSize="14.5" fontWeight="700" color="#181D27" />
+            <Badge text="Semantic" variant="info" icon="check-circle" />
+          </Panel>
+
+          <!-- Avatars row -->
+          <Panel direction="row" spacing="14" alignItems="center">
+            <Avatar initials="DC" size="42" background="#E0E7FF" color="#2764FF" status="online" tooltip="Dr. Chen · Online" />
+            <Avatar initials="AL" size="42" background="#FCE7F3" color="#DB2777" status="busy" tooltip="Anna Lopez · Busy" />
+            <Avatar initials="MK" size="42" shape="rounded" cornerRadius="10" background="#FEF3C7" color="#D97706" status="away" tooltip="Mark Kim · Away" />
+            <Avatar icon="user" size="42" background="#DCFCE7" color="#15803D" status="online" tooltip="Guest Doctor · Online" />
+            <Avatar icon="settings" size="42" shape="rounded" cornerRadius="10" background="#F1F5F9" color="#475569" status="offline" tooltip="System Bot · Offline" />
+          </Panel>
+
+          <Divider text="SEMANTIC BADGES" dashed="true" />
+
+          <!-- Badges row 1 -->
+          <Panel direction="row" spacing="8" alignItems="center">
+            <Badge text="Checked in" variant="success" dot="true" />
+            <Badge text="Pending Review" variant="warning" dot="true" />
+            <Badge text="Urgent Lab" variant="danger" dot="true" />
+          </Panel>
+          <!-- Badges row 2 -->
+          <Panel direction="row" spacing="8" alignItems="center">
+            <Badge text="+18.4% Growth" variant="success" icon="trending-up" />
+            <Badge text="Scheduled" variant="info" icon="clock" />
+            <Badge text="v2.4 Release" variant="primary" />
+            <Badge text="Archived" variant="neutral" />
+          </Panel>
+        </Panel>
+
+        <!-- Card 2: Modern Toggles, Switches & Search -->
+        <Panel flexGrow="1" flexBasis="0" direction="column" background="#FFFFFF" cornerRadius="14" border="1,#EAEFF5" shadowBlur="12" shadowColor="#0A0F1D0A" shadowOffsetY="3" padding="18" spacing="14">
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="Form Controls · Switch &amp; Segmented" fontSize="14.5" fontWeight="700" color="#181D27" />
+            <Badge text="Interactive" variant="primary" />
+          </Panel>
+
+          <SegmentedControl items="Daily|Weekly|Monthly|Yearly" selectedIndex="1" />
+
+          <Divider />
+
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Panel direction="column" spacing="2">
+              <Label text="GPU Hardware Acceleration" fontSize="13" fontWeight="600" color="#181D27" />
+              <Label text="Use Gaussian blur shadows and anti-aliased paths" fontSize="11.5" color="#697586" />
+            </Panel>
+            <Switch checked="true" activeColor="#2764FF" tooltip="Toggle GPU acceleration" />
+          </Panel>
+
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Panel direction="column" spacing="2">
+              <Label text="Real-time Telemetry Sync" fontSize="13" fontWeight="600" color="#181D27" />
+              <Label text="Stream live patient vitals to dashboard" fontSize="11.5" color="#697586" />
+            </Panel>
+            <Switch checked="true" activeColor="#10B981" tooltip="Toggle live telemetry" />
+          </Panel>
+
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Panel direction="column" spacing="2">
+              <Label text="Maintenance Mode" fontSize="13" fontWeight="600" color="#181D27" />
+              <Label text="Temporarily pause external appointment booking" fontSize="11.5" color="#697586" />
+            </Panel>
+            <Switch checked="false" activeColor="#F59E0B" />
+          </Panel>
+        </Panel>
+
+        <!-- Card 3: CircularProgress & Donut Chart -->
+        <Panel flexGrow="1" flexBasis="0" direction="column" background="#FFFFFF" cornerRadius="14" border="1,#EAEFF5" shadowBlur="12" shadowColor="#0A0F1D0A" shadowOffsetY="3" padding="18" spacing="12">
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="Donut Chart &amp; Circular Rings" fontSize="14.5" fontWeight="700" color="#181D27" />
+            <Badge text="Chart v2" variant="success" />
+          </Panel>
+
+          <Panel direction="row" spacing="14" alignItems="center" justifyContent="space-around">
+            <CircularProgress value="86" size="68" thickness="6.5" color="#2764FF" trackColor="#EEF2F7" tooltip="CPU Efficiency: 86%" />
+            <CircularProgress value="94" size="68" thickness="6.5" color="#10B981" trackColor="#ECFDF5" tooltip="SLA Uptime: 94%" />
+            <CircularProgress value="62" size="68" thickness="6.5" color="#F59E0B" trackColor="#FFFBEB" tooltip="Storage Quota: 62%" />
+          </Panel>
+
+          <Chart height="150" categories="Cardiology|Neurology|Pediatrics|Orthopedics" background="transparent" borderColor="transparent" textColor="#697586" fontSize="11" showLegend="true" innerRadiusRatio="0.64" centerValue="1,420" centerTitle="Patients">
+            <Series name="Departments" type="donut" values="480,360,320,260" colors="#2764FF|#10B981|#F59E0B|#8B5CF6" />
+          </Chart>
+        </Panel>
+
+      </Panel>
+
+      <!-- Row 3: Expander Accordion + Resizable SplitView + EmptyState -->
+      <Panel direction="row" spacing="16" alignItems="stretch">
+
+        <!-- Left column: Expanders -->
+        <Panel flexGrow="1" flexBasis="0" direction="column" spacing="12" alignItems="stretch">
+          <Expander title="Rendering Pipeline Configuration" subtitle="Click header to collapse" icon="sliders" expanded="true">
+            <Panel direction="row" justifyContent="space-between" alignItems="center" height="28">
+              <Label text="Shadow Blur Kernel" fontSize="12.5" color="#475569" />
+              <Badge text="SkMaskFilter Gaussian" variant="info" />
+            </Panel>
+            <Panel direction="row" justifyContent="space-between" alignItems="center" height="28">
+              <Label text="Vector Icon Engine" fontSize="12.5" color="#475569" />
+              <Badge text="32 Built-in Lucide Paths" variant="success" />
+            </Panel>
+            <Panel direction="row" justifyContent="space-between" alignItems="center" height="28">
+              <Label text="Spline Interpolation" fontSize="12.5" color="#475569" />
+              <Badge text="Catmull-Rom 12x" variant="primary" />
+            </Panel>
+          </Expander>
+
+          <Expander title="Security &amp; Audit Policies" subtitle="Collapsed by default" icon="settings" expanded="false">
+            <Label text="Role-based access control and HIPAA audit logging are enforced for all clinical records." fontSize="12.5" color="#697586" />
+          </Expander>
+        </Panel>
+
+        <!-- Right column: Interactive SplitView + EmptyState -->
+        <Panel flexGrow="1" flexBasis="0" direction="column" background="#FFFFFF" cornerRadius="14" border="1,#EAEFF5" shadowBlur="12" shadowColor="#0A0F1D0A" shadowOffsetY="3" padding="16" spacing="10">
+          <Panel direction="row" justifyContent="space-between" alignItems="center">
+            <Label text="Resizable SplitView &amp; EmptyState (Drag Divider)" fontSize="14.5" fontWeight="700" color="#181D27" />
+            <Badge text="Drag ↔" variant="neutral" />
+          </Panel>
+
+          <SplitView height="168" splitRatio="0.38" splitterSize="8" minPaneSize="90">
+            <Panel direction="column" background="#F8FAFC" cornerRadius="10" border="1,#E6ECF5" padding="12" spacing="8">
+              <Label text="Navigation Pane" fontSize="12.5" fontWeight="700" color="#181D27" />
+              <Badge text="Active Queue (0)" variant="info" dot="true" />
+              <Badge text="Completed (24)" variant="success" dot="true" />
+              <Badge text="Flagged (2)" variant="warning" dot="true" />
+            </Panel>
+            <Panel direction="column" background="#F8FAFC" cornerRadius="10" border="1,#E6ECF5" padding="6" justifyContent="center">
+              <EmptyState icon="inbox" title="No Pending Diagnostic Tasks" description="All lab reports have been reviewed and signed off." actionText="Refresh Queue" />
+            </Panel>
+          </SplitView>
+        </Panel>
+
+      </Panel>
+
+    </Panel>
+  </ScrollViewer>
+</Panel>
+

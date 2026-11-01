@@ -70,10 +70,7 @@
         <!-- Top Header Bar (Search & User Profile) -->
         <Panel direction="row" alignItems="center" height="40">
           <!-- Search Bar -->
-          <Panel direction="row" background="#FFFFFF" cornerRadius="10" border="1,#E2E8F0" padding="12,6,12,6" alignItems="center" width="340">
-            <Icon name="search" size="15" color="#94A3B8" strokeWidth="2.0" marginRight="8" />
-            <TextInput text="Search patients, records..." fontSize="13" background="transparent" textColor="#64748B" width="280" />
-          </Panel>
+          <SearchBox width="340" placeholder="Search patients, records..." shortcut="Ctrl+K" borderColor="#E2E8F0" tooltip="Search clinical database" />
 
           <Spacer flexGrow="1" />
 
@@ -87,9 +84,7 @@
 
           <!-- User Profile Card -->
           <Panel direction="row" alignItems="center" padding="6,4,10,4" background="#FFFFFF" cornerRadius="10" border="1,#E2E8F0">
-            <Panel width="30" height="30" cornerRadius="15" background="#DBEAFE" justifyContent="center" alignItems="center" marginRight="8">
-              <Icon name="user" size="15" color="#2764FF" strokeWidth="2.0" />
-            </Panel>
+            <Avatar initials="DD" size="30" background="#DBEAFE" color="#2764FF" status="online" marginRight="8" tooltip="Dr. Dsouza · Online" />
             <Panel direction="column" marginRight="8">
               <Label text="Dr. Dsouza" fontSize="11" color="#0F172A" fontWeight="600" />
               <Label text="drdsouza@medlio.com" fontSize="9" color="#94A3B8" />
@@ -138,13 +133,7 @@
               <Label text="Daily appointment count" fontSize="14" color="#1E293B" fontWeight="600" />
               <Spacer flexGrow="1" />
               <!-- Filter Segmented Tabs -->
-              <Panel direction="row" padding="3,3,3,3" background="#F1F5F9" cornerRadius="8" alignItems="center">
-                <Label text="Today" fontSize="11" color="#64748B" marginLeft="6" marginRight="6" />
-                <Label text="Monthly" fontSize="11" color="#64748B" marginLeft="6" marginRight="6" />
-                <Panel background="#2764FF" cornerRadius="6" padding="8,3,8,3">
-                  <Label text="Weekly" fontSize="11" color="#FFFFFF" fontWeight="600" />
-                </Panel>
-              </Panel>
+              <SegmentedControl items="Today|Monthly|Weekly" selectedIndex="2" fontSize="11" thumbColor="#2764FF" activeTextColor="#FFFFFF" />
             </Panel>
 
             <!-- Pill-like Bar Chart with Wednesday Peak Highlight & Background Track -->
@@ -170,9 +159,7 @@
             <Panel direction="row" alignItems="center" marginTop="8">
               <Label text="4,820" fontSize="26" color="#0F172A" fontWeight="700" />
               <Label text=".89" fontSize="15" color="#64748B" fontWeight="600" />
-              <Panel background="#DCFCE7" cornerRadius="6" padding="6,2,6,2" marginLeft="8">
-                <Label text="+12.8%" fontSize="10" color="#16A34A" fontWeight="600" />
-              </Panel>
+              <Badge text="+12.8%" variant="success" icon="trending-up" marginLeft="8" />
             </Panel>
 
             <Chart categories="W1|W2|W3|W4" height="120" showLegend="false" showGrid="false" smooth="true" textColor="#94A3B8" background="transparent" borderColor="transparent" fontSize="10">

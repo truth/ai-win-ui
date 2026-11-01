@@ -156,6 +156,9 @@ public:
     void SetUiaHelpText(std::string text) { m_uiaHelpText = std::move(text); }
     const std::string& UiaHelpText() const { return m_uiaHelpText; }
 
+    void SetTooltip(std::wstring tooltip) { m_tooltip = std::move(tooltip); }
+    const std::wstring& Tooltip() const { return m_tooltip; }
+
     virtual long GetUiaControlType() const { return UIA::CustomControlType; }
 
 
@@ -222,6 +225,56 @@ public:
         for (auto& child : m_children) {
             child->RenderOverlay(renderer);
         }
+        RenderTooltipOverlay(renderer);
+    }
+
+    void DrawStyledText(IRenderer& renderer,
+                        const std::wstring& text,
+                        const Rect& rect,
+                        float fontSizePx,
+                        const Color& color,
+                        TextHorizontalAlign hAlign = TextHorizontalAlign::Start,
+                        TextVerticalAlign vAlign = TextVerticalAlign::Center,
+                        uint16_t weight = 400) const {
+        if (text.empty()) return;
+        TextRenderOptions opts;
+        opts.horizontalAlign = hAlign;
+        opts.verticalAlign = vAlign;
+        opts.wrap = TextWrapMode::NoWrap;
+        opts.fontWeight = weight;
+        opts.bold = (weight >= 600);
+        renderer.DrawTextW(text.c_str(), static_cast<UINT32>(text.size()), rect, color, fontSizePx, opts);
+    }
+
+    void RenderTooltipOverlay(IRenderer& renderer) const {
+        if (!m_hovered || m_tooltip.empty()) {
+            return;
+        }
+        const float fontPx = ScaleValue(12.0f);
+        const Size ts = MeasureTextValue(m_tooltip, 12.0f, 360.0f, TextWrapMode::NoWrap);
+        const float padX = ScaleValue(10.0f);
+        const float padY = ScaleValue(6.0f);
+        const float tipW = std::max(ScaleValue(44.0f), ts.width + padX * 2.0f);
+        const float tipH = std::max(ScaleValue(26.0f), ts.height + padY * 2.0f);
+        const float cx = (m_bounds.left + m_bounds.right) * 0.5f;
+        float tx = std::max(ScaleValue(6.0f), cx - tipW * 0.5f);
+        float ty = m_bounds.top - tipH - ScaleValue(6.0f);
+        if (ty < ScaleValue(6.0f)) {
+            ty = m_bounds.bottom + ScaleValue(6.0f);
+        }
+        const Rect tipRect{tx, ty, tx + tipW, ty + tipH};
+        const float r = ScaleValue(6.0f);
+        renderer.FillSoftShadow(tipRect, r, 0.0f, ScaleValue(3.0f), ScaleValue(10.0f), Color{0.0f, 0.0f, 0.0f, 0.22f});
+        renderer.FillRoundedRect(tipRect, Color{0.09f, 0.12f, 0.18f, 0.96f}, r);
+        DrawStyledText(
+            renderer,
+            m_tooltip,
+            Rect{tipRect.left + padX, tipRect.top, tipRect.right - padX, tipRect.bottom},
+            fontPx,
+            Color{0.97f, 0.98f, 1.0f, 1.0f},
+            TextHorizontalAlign::Center,
+            TextVerticalAlign::Center,
+            500);
     }
 
     // Prefer overlay hit targets (expanded dropdowns) over normal tree order.
@@ -386,6 +439,10 @@ public:
 
     virtual bool OnMouseMove(float x, float y) {
         bool changed = false;
+        if (!m_tooltip.empty() && !m_hovered) {
+            m_hovered = true;
+            changed = true;
+        }
         bool hitChild = false;
         for (auto it = m_children.rbegin(); it != m_children.rend(); ++it) {
             if (!hitChild && (*it)->HitTest(x, y)) {
@@ -417,6 +474,10 @@ public:
 
     virtual bool OnMouseLeave() {
         bool changed = false;
+        if (m_hovered) {
+            m_hovered = false;
+            changed = true;
+        }
         for (auto& child : m_children) {
             changed = child->OnMouseLeave() || changed;
         }
@@ -573,6 +634,7 @@ protected:
     std::string                             m_name;
     std::string                             m_uiaName;
     std::string                             m_uiaHelpText;
+    std::wstring                            m_tooltip;
     std::vector<std::unique_ptr<UIElement>> m_children;
     UIContext*                              m_context = nullptr;
 

@@ -75,11 +75,29 @@ public:
         if (iconName == "check") {
             return "M20 6L9 17l-5-5";
         }
+        if (iconName == "check-circle" || iconName == "success") {
+            return "M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20z M9 12l2 2 4-4";
+        }
+        if (iconName == "info") {
+            return "M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20z M12 16v-4 M12 8h.01";
+        }
+        if (iconName == "alert-circle" || iconName == "danger" || iconName == "error") {
+            return "M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20z M12 8v4 M12 16h.01";
+        }
+        if (iconName == "alert-triangle" || iconName == "warning") {
+            return "M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z M12 9v4 M12 17h.01";
+        }
+        if (iconName == "x" || iconName == "close") {
+            return "M18 6L6 18 M6 6l12 12";
+        }
         if (iconName == "plus") {
             return "M12 5v14 M5 12h14";
         }
         if (iconName == "chevron-down") {
             return "M6 9l6 6 6-6";
+        }
+        if (iconName == "chevron-up") {
+            return "M18 15l-6-6-6 6";
         }
         if (iconName == "chevron-right") {
             return "M9 18l6-6-6-6";
@@ -108,6 +126,12 @@ public:
         if (iconName == "settings") {
             return "M12 8a4 4 0 1 0 0 8 4 4 0 1 0 0-8z M12 2v2 M12 20v2 M4.93 4.93l1.41 1.41 M17.66 17.66l1.41 1.41 M2 12h2 M20 12h2 M4.93 19.07l1.41-1.41 M17.66 6.34l1.41-1.41";
         }
+        if (iconName == "sliders") {
+            return "M4 21v-7 M4 10V3 M12 21v-9 M12 8V3 M20 21v-5 M20 12V3 M1 14h6 M9 8h6 M17 16h6";
+        }
+        if (iconName == "inbox" || iconName == "empty") {
+            return "M22 12h-6l-2 3h-4l-2-3H2 M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z";
+        }
         if (iconName == "help-circle" || iconName == "support") {
             return "M12 2a10 10 0 1 0 0 20 10 10 0 1 0 0-20z M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3 M12 17h.01";
         }
@@ -122,6 +146,18 @@ public:
         }
         if (iconName == "share" || iconName == "referrals") {
             return "M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8 M16 6l-4-4-4 4 M12 2v13";
+        }
+        if (iconName == "heart") {
+            return "M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z";
+        }
+        if (iconName == "star") {
+            return "M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z";
+        }
+        if (iconName == "more-horizontal") {
+            return "M12 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2z M19 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2z M5 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2z";
+        }
+        if (iconName == "arrow-up-right") {
+            return "M7 17L17 7 M7 7h10v10";
         }
         if (iconName == "dot") {
             outFilledDefault = true;
@@ -163,4 +199,3 @@ public:
             ScaleValue(strokeWidth));
     }
 };
-

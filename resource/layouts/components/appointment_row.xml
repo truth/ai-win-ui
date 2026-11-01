@@ -1,8 +1,6 @@
 <Panel direction="row" spacing="0" padding="0,0,0,0" background="#FFFFFF" alignItems="center" height="54" borderBottom="1,#F1F5F9">
-  <!-- Avatar -->
-  <Panel width="34" height="34" marginLeft="4" cornerRadius="17" background="#EFF6FF" justifyContent="center" alignItems="center">
-    <Icon name="user" size="15" color="#2764FF" strokeWidth="2.0" />
-  </Panel>
+  <!-- Avatar with Online Dot -->
+  <Avatar initials="AS" size="34" marginLeft="4" background="#EFF6FF" color="#2764FF" status="online" tooltip="Adesh Shetty · Checked in" />
 
   <!-- Name & Contact -->
   <Panel direction="column" marginLeft="14" width="230">
@@ -20,13 +18,11 @@
   <Label text="16 Feb 2026" fontSize="12" color="#64748B" width="100" marginLeft="12" />
 
   <!-- Status Badge: Checked_in -->
-  <Panel padding="10,4,10,4" cornerRadius="6" background="#DCFCE7" justifyContent="center" alignItems="center" marginLeft="10">
-    <Label text="Checked_in" fontSize="11" color="#15803D" fontWeight="600" />
-  </Panel>
+  <Badge text="Checked_in" variant="success" dot="true" marginLeft="10" />
 
   <Spacer flexGrow="1" />
 
   <!-- Action buttons -->
-  <Button text="Start Session" height="28" padding="12,0,12,0" fontSize="11" background="#EFF6FF" border="1,#BFDBFE" color="#2563EB" cornerRadius="6" marginRight="8" />
-  <Button text="EMR" height="28" padding="12,0,12,0" fontSize="11" background="#FFFFFF" border="1,#CBD5E1" color="#475569" cornerRadius="6" marginRight="8" />
+  <Button text="Start Session" height="28" padding="12,0,12,0" fontSize="11" background="#EFF6FF" border="1,#BFDBFE" color="#2563EB" cornerRadius="6" marginRight="8" tooltip="Launch clinical session" />
+  <Button text="EMR" height="28" padding="12,0,12,0" fontSize="11" background="#FFFFFF" border="1,#CBD5E1" color="#475569" cornerRadius="6" marginRight="8" tooltip="Open electronic medical record" />
 </Panel>

@@ -1,6 +1,7 @@
 #pragma once
-// Chart: multi-series line / bar / area chart with axes, grid, legend and hover tooltip.
-// Visual Rendering v2: smooth spline curves, vertical area gradients, pill bars, highlight badges & dashed grids.
+// Chart: multi-series line / bar / area / pie / donut chart with axes, grid, legend and hover tooltip.
+// Visual Rendering v2 + Modern Components v2: smooth spline curves, vertical area gradients, pill bars,
+// highlight badges, dashed grids, and Pie / Donut ring charts with center summary labels.
 #include "ui_element.h"
 
 #include <algorithm>
@@ -13,7 +14,7 @@
 #include <vector>
 
 struct ChartSeries {
-    enum class Type { Line, Bar, Area };
+    enum class Type { Line, Bar, Area, Pie, Donut };
 
     std::wstring name;
     Type type = Type::Line;
@@ -34,6 +35,7 @@ struct ChartSeries {
     Color barTrackColor{};
     bool hasBarTrack = false;
     bool showPoints = true;
+    std::vector<Color> sliceColors;
 };
 
 class Chart : public UIElement {
@@ -87,6 +89,11 @@ public:
     bool dashedGrid = true;
     bool showAxes = false;
 
+    // Pie / Donut options
+    float innerRadiusRatio = 0.62f;
+    std::wstring centerTitle;
+    std::wstring centerValue;
+
 protected:
     float MeasurePreferredWidth(float availableWidth) const override {
         return std::min(availableWidth, ScaleValue(360.0f));
@@ -97,6 +104,15 @@ protected:
     }
 
 public:
+    bool HasPieOrDonut() const {
+        for (const auto& s : m_series) {
+            if (s.visible && (s.type == ChartSeries::Type::Pie || s.type == ChartSeries::Type::Donut)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     // ---- rendering --------------------------------------------------------
     void Render(IRenderer& renderer) override {
         if (!renderer.IntersectsDirtyRect(m_bounds)) return;
@@ -113,6 +129,11 @@ public:
         DrawLegend(renderer);
 
         if (m_plot.Width() <= 2.0f || m_plot.Height() <= 2.0f) return;
+
+        if (HasPieOrDonut()) {
+            DrawPieOrDonut(renderer);
+            return;
+        }
 
         DrawYAxisAndGrid(renderer);
         DrawXAxis(renderer);
@@ -136,6 +157,7 @@ public:
     }
 
     void RenderOverlay(IRenderer& renderer) override {
+        UIElement::RenderOverlay(renderer);
         if (m_hoverIndex < 0 || !showTooltip) return;
         DrawTooltip(renderer);
     }
@@ -144,7 +166,11 @@ public:
     bool OnMouseMove(float x, float y) override {
         int newIndex = -1;
         if (x >= m_plot.left && x <= m_plot.right && y >= m_plot.top && y <= m_plot.bottom) {
-            newIndex = NearestIndex(x);
+            if (HasPieOrDonut()) {
+                newIndex = HitPieSlice(x, y);
+            } else {
+                newIndex = NearestIndex(x);
+            }
         }
         const bool changed = newIndex != m_hoverIndex ||
             (newIndex >= 0 && (x != m_mouseX || y != m_mouseY));
@@ -155,18 +181,21 @@ public:
     }
 
     bool OnMouseLeave() override {
+        const bool baseChanged = UIElement::OnMouseLeave();
         const bool changed = m_hoverIndex >= 0;
         m_hoverIndex = -1;
-        return changed;
+        return changed || baseChanged;
     }
 
     bool OnMouseDown(float x, float y) override {
-        for (size_t i = 0; i < m_legendRects.size(); ++i) {
-            const Rect& r = m_legendRects[i];
-            if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
-                m_series[i].visible = !m_series[i].visible;
-                m_hoverIndex = -1;
-                return true;
+        if (!HasPieOrDonut()) {
+            for (size_t i = 0; i < m_legendRects.size() && i < m_series.size(); ++i) {
+                const Rect& r = m_legendRects[i];
+                if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) {
+                    m_series[i].visible = !m_series[i].visible;
+                    m_hoverIndex = -1;
+                    return true;
+                }
             }
         }
         return false;
@@ -186,7 +215,7 @@ public:
 
     static Color DefaultPaletteColor(size_t index) {
         static const unsigned palette[] = {
-            0x53B3FF, 0xFFB454, 0x5FD38D, 0xFF6B81, 0xB48CFF, 0x4FD1C5};
+            0x2764FF, 0x10B981, 0xF59E0B, 0x8B5CF6, 0xEC4899, 0x06B6D4};
         return ColorFromHex(palette[index % (sizeof(palette) / sizeof(palette[0]))]);
     }
 
@@ -216,6 +245,11 @@ private:
 
     Color SeriesColor(size_t i) const {
         return m_series[i].hasColor ? m_series[i].color : DefaultPaletteColor(i);
+    }
+
+    Color SliceColor(const ChartSeries& s, size_t idx) const {
+        if (idx < s.sliceColors.size()) return s.sliceColors[idx];
+        return DefaultPaletteColor(idx);
     }
 
     size_t MaxPointCount() const {
@@ -249,15 +283,16 @@ private:
     }
 
     void DrawText(IRenderer& renderer, const std::wstring& text, const Rect& rect,
-                  const Color& color, TextHorizontalAlign align, uint16_t weight = 400) const {
+                  const Color& color, TextHorizontalAlign align, uint16_t weight = 400, float customFontSize = 0.0f) const {
         TextRenderOptions opts;
         opts.wrap = TextWrapMode::NoWrap;
         opts.horizontalAlign = align;
         opts.verticalAlign = TextVerticalAlign::Center;
         opts.fontWeight = weight;
         opts.bold = (weight >= 600);
+        const float fs = customFontSize > 0.0f ? customFontSize : fontSize;
         renderer.DrawTextW(text.c_str(), static_cast<UINT32>(text.size()), rect, color,
-                           ScaleValue(fontSize), opts);
+                           ScaleValue(fs), opts);
     }
 
     void BuildLayout() {
@@ -270,12 +305,27 @@ private:
         if (showLegend && !m_series.empty()) {
             float x = m_bounds.left + pad;
             const float sw = ScaleValue(10.0f);
-            for (const auto& s : m_series) {
-                const float w = sw + gap + TextW(s.name) + ScaleValue(14.0f);
-                m_legendRects.push_back(Rect::Make(x, top, x + w, top + th + gap));
-                x += w;
+            if (HasPieOrDonut()) {
+                const size_t n = std::max(m_categories.size(), m_series.front().values.size());
+                for (size_t i = 0; i < n; ++i) {
+                    const std::wstring lbl = i < m_categories.size() ? m_categories[i] : std::to_wstring(i + 1);
+                    const float w = sw + gap + TextW(lbl) + ScaleValue(12.0f);
+                    m_legendRects.push_back(Rect::Make(x, top, x + w, top + th + gap));
+                    x += w;
+                }
+            } else {
+                for (const auto& s : m_series) {
+                    const float w = sw + gap + TextW(s.name) + ScaleValue(14.0f);
+                    m_legendRects.push_back(Rect::Make(x, top, x + w, top + th + gap));
+                    x += w;
+                }
             }
-            top += th + gap + ScaleValue(6.0f);
+            top += th + gap + ScaleValue(4.0f);
+        }
+
+        if (HasPieOrDonut()) {
+            m_plot = Rect::Make(m_bounds.left + pad, top, m_bounds.right - pad, m_bounds.bottom - pad);
+            return;
         }
 
         float lo = std::numeric_limits<float>::max();
@@ -351,9 +401,143 @@ private:
         return best;
     }
 
+    int HitPieSlice(float x, float y) {
+        size_t sIdx = 0;
+        for (size_t i = 0; i < m_series.size(); ++i) {
+            if (m_series[i].visible && (m_series[i].type == ChartSeries::Type::Pie || m_series[i].type == ChartSeries::Type::Donut)) {
+                sIdx = i;
+                break;
+            }
+        }
+        if (sIdx >= m_series.size()) return -1;
+        m_hoverSeries = sIdx;
+        const auto& s = m_series[sIdx];
+        float total = 0.0f;
+        for (float v : s.values) {
+            if (std::isfinite(v) && v > 0.0f) total += v;
+        }
+        if (total <= 0.0f) return -1;
+
+        const float cx = (m_plot.left + m_plot.right) * 0.5f;
+        const float cy = (m_plot.top + m_plot.bottom) * 0.5f;
+        const float outerR = std::max(8.0f, std::min(m_plot.Width(), m_plot.Height()) * 0.46f);
+        const float innerR = (s.type == ChartSeries::Type::Donut) ? (outerR * std::clamp(innerRadiusRatio, 0.2f, 0.85f)) : 0.0f;
+
+        const float dx = x - cx;
+        const float dy = y - cy;
+        const float dist = std::sqrt(dx * dx + dy * dy);
+        if (dist < innerR || dist > outerR + ScaleValue(6.0f)) return -1;
+
+        constexpr float kPi = 3.14159265f;
+        float ang = std::atan2(dy, dx) + kPi * 0.5f;
+        if (ang < 0.0f) ang += 2.0f * kPi;
+        const float frac = ang / (2.0f * kPi);
+
+        float accum = 0.0f;
+        for (size_t i = 0; i < s.values.size(); ++i) {
+            const float v = std::max(0.0f, s.values[i]);
+            const float next = accum + v / total;
+            if (frac >= accum && frac <= next) {
+                return static_cast<int>(i);
+            }
+            accum = next;
+        }
+        return -1;
+    }
+
+    void DrawPieOrDonut(IRenderer& renderer) const {
+        size_t sIdx = 0;
+        for (size_t i = 0; i < m_series.size(); ++i) {
+            if (m_series[i].visible && (m_series[i].type == ChartSeries::Type::Pie || m_series[i].type == ChartSeries::Type::Donut)) {
+                sIdx = i;
+                break;
+            }
+        }
+        if (sIdx >= m_series.size()) return;
+        const auto& s = m_series[sIdx];
+        float total = 0.0f;
+        for (float v : s.values) {
+            if (std::isfinite(v) && v > 0.0f) total += v;
+        }
+        if (total <= 0.0f) return;
+
+        const float cx = (m_plot.left + m_plot.right) * 0.5f;
+        const float cy = (m_plot.top + m_plot.bottom) * 0.5f;
+        const float baseOuterR = std::max(10.0f, std::min(m_plot.Width(), m_plot.Height()) * 0.45f);
+        const bool isDonut = (s.type == ChartSeries::Type::Donut);
+        const float innerR = isDonut ? (baseOuterR * std::clamp(innerRadiusRatio, 0.25f, 0.85f)) : 0.0f;
+
+        constexpr float kPi = 3.14159265f;
+        const float padAngle = (s.values.size() > 1) ? 0.025f : 0.0f;
+        float startAngle = -kPi * 0.5f;
+
+        for (size_t i = 0; i < s.values.size(); ++i) {
+            const float v = std::max(0.0f, s.values[i]);
+            if (v <= 0.0f) continue;
+            const float sweep = (v / total) * 2.0f * kPi;
+            const float a0 = startAngle + padAngle * 0.5f;
+            const float a1 = std::max(a0 + 0.01f, startAngle + sweep - padAngle * 0.5f);
+            startAngle += sweep;
+
+            const bool isHovered = (m_hoverIndex == static_cast<int>(i));
+            const float outerR = isHovered ? (baseOuterR + ScaleValue(4.0f)) : baseOuterR;
+            const int steps = std::max(12, static_cast<int>(sweep * 20.0f));
+            std::vector<PointF> poly;
+            poly.reserve(static_cast<size_t>(steps) * 2 + 4);
+
+            for (int step = 0; step <= steps; ++step) {
+                const float t = static_cast<float>(step) / static_cast<float>(steps);
+                const float a = a0 + (a1 - a0) * t;
+                poly.push_back(PointF{cx + outerR * std::cos(a), cy + outerR * std::sin(a)});
+            }
+            if (isDonut) {
+                for (int step = steps; step >= 0; --step) {
+                    const float t = static_cast<float>(step) / static_cast<float>(steps);
+                    const float a = a0 + (a1 - a0) * t;
+                    poly.push_back(PointF{cx + innerR * std::cos(a), cy + innerR * std::sin(a)});
+                }
+            } else {
+                poly.push_back(PointF{cx, cy});
+            }
+
+            renderer.FillPolygon(poly, SliceColor(s, i));
+        }
+
+        if (isDonut && (!centerValue.empty() || !centerTitle.empty())) {
+            const Rect holeBox{cx - innerR * 0.85f, cy - innerR * 0.6f, cx + innerR * 0.85f, cy + innerR * 0.6f};
+            if (!centerValue.empty() && !centerTitle.empty()) {
+                DrawText(renderer, centerValue,
+                         Rect{holeBox.left, cy - ScaleValue(18.0f), holeBox.right, cy + ScaleValue(2.0f)},
+                         ColorFromHex(0x181D27), TextHorizontalAlign::Center, 700, fontSize + 4.0f);
+                DrawText(renderer, centerTitle,
+                         Rect{holeBox.left, cy + ScaleValue(2.0f), holeBox.right, cy + ScaleValue(18.0f)},
+                         textColor, TextHorizontalAlign::Center, 500, std::max(10.0f, fontSize - 1.0f));
+            } else {
+                const std::wstring& single = !centerValue.empty() ? centerValue : centerTitle;
+                DrawText(renderer, single, holeBox, ColorFromHex(0x181D27), TextHorizontalAlign::Center, 700, fontSize + 3.0f);
+            }
+        }
+    }
+
     void DrawLegend(IRenderer& renderer) const {
         const float sw = ScaleValue(10.0f);
-        for (size_t i = 0; i < m_legendRects.size(); ++i) {
+        if (HasPieOrDonut() && !m_series.empty()) {
+            const auto& s = m_series.front();
+            for (size_t i = 0; i < m_legendRects.size(); ++i) {
+                const Rect& r = m_legendRects[i];
+                const Color c = SliceColor(s, i);
+                const float cy = (r.top + r.bottom) * 0.5f;
+                renderer.FillRoundedRect(Rect::Make(r.left, cy - sw * 0.5f, r.left + sw, cy + sw * 0.5f),
+                                         c, ScaleValue(3.0f));
+                const std::wstring lbl = i < m_categories.size() ? m_categories[i] : std::to_wstring(i + 1);
+                DrawText(renderer, lbl,
+                         Rect::Make(r.left + sw + ScaleValue(6.0f), r.top, r.right, r.bottom),
+                         textColor,
+                         TextHorizontalAlign::Start, 500);
+            }
+            return;
+        }
+        for (size_t i = 0; i < m_legendRects.size() && i < m_series.size(); ++i) {
             const Rect& r = m_legendRects[i];
             const Color c = m_series[i].visible ? SeriesColor(i) : ColorFromHex(0x4A5C6E);
             const float cy = (r.top + r.bottom) * 0.5f;
@@ -598,7 +782,8 @@ private:
         const float sw = ScaleValue(8.0f);
         for (const auto& [s, line] : lines) {
             const float cy = ty + lineH * 0.5f;
-            renderer.FillRect(Rect::Make(x + pad, cy - sw * 0.5f, x + pad + sw, cy + sw * 0.5f), SeriesColor(s));
+            const Color swatchCol = HasPieOrDonut() ? SliceColor(m_series[s], idx) : SeriesColor(s);
+            renderer.FillRect(Rect::Make(x + pad, cy - sw * 0.5f, x + pad + sw, cy + sw * 0.5f), swatchCol);
             DrawText(renderer, line, Rect::Make(x + pad + sw + ScaleValue(6.0f), ty, x + w - pad, ty + lineH),
                      ColorFromHex(0xE6EDF3), TextHorizontalAlign::Start);
             ty += lineH;
