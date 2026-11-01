@@ -618,9 +618,11 @@ std::vector<float> ParseNumberList(const std::string& value, char separator = ',
 }
 
 ChartSeries::Type ParseChartSeriesType(const std::string& value) {
-    const std::string v = TrimString(value);
+    const std::string v = ToLowerAscii(TrimString(value));
     if (v == "bar") return ChartSeries::Type::Bar;
     if (v == "area") return ChartSeries::Type::Area;
+    if (v == "pie") return ChartSeries::Type::Pie;
+    if (v == "donut" || v == "doughnut") return ChartSeries::Type::Donut;
     return ChartSeries::Type::Line;
 }
 
@@ -1160,6 +1162,9 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
     if (auto it = node.attributes.find("allowDrop"); it != node.attributes.end()) {
         const std::string value = ToLowerAscii(TrimString(it->second));
         element.SetAllowDrop(value == "true" || value == "1" || value == "yes");
+    }
+    if (auto it = node.attributes.find("tooltip"); it != node.attributes.end()) {
+        element.SetTooltip(LayoutParser::Utf8ToUtf16(it->second));
     }
 }
 
@@ -2995,6 +3000,13 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             if (auto a = child.attributes.find("showPoints"); a != child.attributes.end()) {
                 s.showPoints = ParseBoolString(a->second, true);
             }
+            if (auto a = child.attributes.find("colors"); a != child.attributes.end()) {
+                for (const auto& cstr : SplitString(a->second, '|')) {
+                    if (!TrimString(cstr).empty()) {
+                        s.sliceColors.push_back(LayoutParser::ColorFromString(TrimString(cstr)));
+                    }
+                }
+            }
             chart->AddSeries(std::move(s));
         }
         if (auto it = node.attributes.find("showLegend"); it != node.attributes.end()) {
@@ -3035,6 +3047,15 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
             chart->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("innerRadiusRatio"); it != node.attributes.end()) {
+            chart->innerRadiusRatio = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("centerTitle"); it != node.attributes.end()) {
+            chart->centerTitle = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("centerValue"); it != node.attributes.end()) {
+            chart->centerValue = LayoutParser::Utf8ToUtf16(it->second);
         }
         if (auto it = node.attributes.find("minValue"); it != node.attributes.end()) {
             if (auto it2 = node.attributes.find("maxValue"); it2 != node.attributes.end()) {
@@ -4084,6 +4105,366 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*vpath, node);
         element = std::move(vpath);
+    } else if (node.name == "Avatar") {
+        auto avatar = std::make_unique<Avatar>();
+        if (auto it = node.attributes.find("initials"); it != node.attributes.end()) {
+            avatar->initials = LayoutParser::Utf8ToUtf16(it->second);
+        } else if (auto it2 = node.attributes.find("text"); it2 != node.attributes.end()) {
+            avatar->initials = LayoutParser::Utf8ToUtf16(it2->second);
+        }
+        if (auto it = node.attributes.find("icon"); it != node.attributes.end()) {
+            avatar->icon = TrimString(it->second);
+        }
+        if (auto it = node.attributes.find("size"); it != node.attributes.end()) {
+            avatar->size = std::stof(it->second);
+            avatar->SetFixedWidth(avatar->size);
+            avatar->SetFixedHeight(avatar->size);
+        }
+        if (auto it = node.attributes.find("shape"); it != node.attributes.end()) {
+            const std::string sh = ToLowerAscii(TrimString(it->second));
+            avatar->circle = (sh != "rounded" && sh != "square");
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            avatar->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            avatar->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("color"); it != node.attributes.end()) {
+            avatar->color = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            avatar->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderWidth"); it != node.attributes.end()) {
+            avatar->borderWidth = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("status"); it != node.attributes.end()) {
+            avatar->status = ToLowerAscii(TrimString(it->second));
+        }
+        ApplyCommonXmlAttributes(*avatar, node);
+        element = std::move(avatar);
+    } else if (node.name == "Badge" || node.name == "Tag") {
+        auto badge = std::make_unique<Badge>();
+        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
+            badge->text = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("variant"); it != node.attributes.end()) {
+            badge->variant = ToLowerAscii(TrimString(it->second));
+        } else if (auto it2 = node.attributes.find("type"); it2 != node.attributes.end()) {
+            badge->variant = ToLowerAscii(TrimString(it2->second));
+        }
+        if (auto it = node.attributes.find("dot"); it != node.attributes.end()) {
+            badge->dot = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("icon"); it != node.attributes.end()) {
+            badge->icon = TrimString(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            badge->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            badge->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            badge->customBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("color"); it != node.attributes.end()) {
+            badge->customColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            badge->customBorderColor = LayoutParser::ColorFromString(it->second);
+        }
+        ApplyCommonXmlAttributes(*badge, node);
+        element = std::move(badge);
+    } else if (node.name == "Divider") {
+        auto div = std::make_unique<Divider>();
+        if (auto it = node.attributes.find("orientation"); it != node.attributes.end()) {
+            div->vertical = (ToLowerAscii(TrimString(it->second)) == "vertical");
+        } else if (auto it2 = node.attributes.find("vertical"); it2 != node.attributes.end()) {
+            div->vertical = ParseBoolString(it2->second, false);
+        }
+        if (auto it = node.attributes.find("dashed"); it != node.attributes.end()) {
+            div->dashed = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("thickness"); it != node.attributes.end()) {
+            div->thickness = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("color"); it != node.attributes.end()) {
+            div->color = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
+            div->text = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            div->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            div->fontSize = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*div, node);
+        element = std::move(div);
+    } else if (node.name == "SegmentedControl") {
+        auto seg = std::make_unique<SegmentedControl>();
+        if (auto it = node.attributes.find("items"); it != node.attributes.end()) {
+            seg->items = ParseWideStringList(it->second, '|');
+        }
+        if (auto it = node.attributes.find("selectedIndex"); it != node.attributes.end()) {
+            seg->selectedIndex = std::stoi(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            seg->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            seg->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("trackColor"); it != node.attributes.end()) {
+            seg->trackColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("thumbColor"); it != node.attributes.end()) {
+            seg->thumbColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("activeTextColor"); it != node.attributes.end()) {
+            seg->activeTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("inactiveTextColor"); it != node.attributes.end()) {
+            seg->inactiveTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("onChange"); it != node.attributes.end() && eventResolver) {
+            seg->onChange = eventResolver(it->second);
+        }
+        ApplyCommonXmlAttributes(*seg, node);
+        element = std::move(seg);
+    } else if (node.name == "Switch") {
+        auto sw = std::make_unique<Switch>();
+        if (auto it = node.attributes.find("checked"); it != node.attributes.end()) {
+            sw->checked = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("label"); it != node.attributes.end()) {
+            sw->label = LayoutParser::Utf8ToUtf16(it->second);
+        } else if (auto it2 = node.attributes.find("text"); it2 != node.attributes.end()) {
+            sw->label = LayoutParser::Utf8ToUtf16(it2->second);
+        }
+        if (auto it = node.attributes.find("onText"); it != node.attributes.end()) {
+            sw->onText = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("offText"); it != node.attributes.end()) {
+            sw->offText = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("activeColor"); it != node.attributes.end()) {
+            sw->activeColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("inactiveColor"); it != node.attributes.end()) {
+            sw->inactiveColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("labelColor"); it != node.attributes.end()) {
+            sw->labelColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            sw->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("onChange"); it != node.attributes.end() && eventResolver) {
+            sw->onChange = eventResolver(it->second);
+        }
+        ApplyCommonXmlAttributes(*sw, node);
+        element = std::move(sw);
+    } else if (node.name == "SearchBox") {
+        auto sb = std::make_unique<SearchBox>();
+        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
+            sb->text = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("placeholder"); it != node.attributes.end()) {
+            sb->placeholder = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("icon"); it != node.attributes.end()) {
+            sb->icon = TrimString(it->second);
+        }
+        if (auto it = node.attributes.find("shortcut"); it != node.attributes.end()) {
+            sb->shortcut = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("clearable"); it != node.attributes.end()) {
+            sb->clearable = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            sb->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            sb->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            sb->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            sb->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("focusBorderColor"); it != node.attributes.end()) {
+            sb->focusBorderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            sb->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("placeholderColor"); it != node.attributes.end()) {
+            sb->placeholderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("iconColor"); it != node.attributes.end()) {
+            sb->iconColor = LayoutParser::ColorFromString(it->second);
+        }
+        ApplyCommonXmlAttributes(*sb, node);
+        element = std::move(sb);
+    } else if (node.name == "Alert") {
+        auto alert = std::make_unique<AlertBanner>();
+        if (auto it = node.attributes.find("variant"); it != node.attributes.end()) {
+            alert->variant = ToLowerAscii(TrimString(it->second));
+        } else if (auto it2 = node.attributes.find("type"); it2 != node.attributes.end()) {
+            alert->variant = ToLowerAscii(TrimString(it2->second));
+        }
+        if (auto it = node.attributes.find("title"); it != node.attributes.end()) {
+            alert->title = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("message"); it != node.attributes.end()) {
+            alert->message = LayoutParser::Utf8ToUtf16(it->second);
+        } else if (auto it2 = node.attributes.find("text"); it2 != node.attributes.end()) {
+            alert->message = LayoutParser::Utf8ToUtf16(it2->second);
+        }
+        if (auto it = node.attributes.find("closable"); it != node.attributes.end()) {
+            alert->closable = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            alert->cornerRadius = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*alert, node);
+        element = std::move(alert);
+    } else if (node.name == "CircularProgress" || node.name == "Spinner") {
+        auto cp = std::make_unique<CircularProgress>();
+        if (auto it = node.attributes.find("value"); it != node.attributes.end()) {
+            cp->value = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("size"); it != node.attributes.end()) {
+            cp->size = std::stof(it->second);
+            cp->SetFixedWidth(cp->size);
+            cp->SetFixedHeight(cp->size);
+        }
+        if (auto it = node.attributes.find("thickness"); it != node.attributes.end()) {
+            cp->thickness = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("color"); it != node.attributes.end()) {
+            cp->color = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("trackColor"); it != node.attributes.end()) {
+            cp->trackColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            cp->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("showText"); it != node.attributes.end()) {
+            cp->showText = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("label"); it != node.attributes.end()) {
+            cp->label = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            cp->fontSize = std::stof(it->second);
+        }
+        ApplyCommonXmlAttributes(*cp, node);
+        element = std::move(cp);
+    } else if (node.name == "EmptyState") {
+        auto es = std::make_unique<EmptyState>();
+        if (auto it = node.attributes.find("icon"); it != node.attributes.end()) {
+            es->icon = TrimString(it->second);
+        }
+        if (auto it = node.attributes.find("title"); it != node.attributes.end()) {
+            es->title = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("description"); it != node.attributes.end()) {
+            es->description = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("actionText"); it != node.attributes.end()) {
+            es->actionText = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("accentColor"); it != node.attributes.end()) {
+            es->accentColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("titleColor"); it != node.attributes.end()) {
+            es->titleColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("descriptionColor"); it != node.attributes.end()) {
+            es->descriptionColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("onAction"); it != node.attributes.end() && eventResolver) {
+            es->onAction = eventResolver(it->second);
+        }
+        ApplyCommonXmlAttributes(*es, node);
+        element = std::move(es);
+    } else if (node.name == "Expander" || node.name == "Accordion") {
+        auto exp = std::make_unique<Expander>();
+        if (auto it = node.attributes.find("title"); it != node.attributes.end()) {
+            exp->title = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("subtitle"); it != node.attributes.end()) {
+            exp->subtitle = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("icon"); it != node.attributes.end()) {
+            exp->icon = TrimString(it->second);
+        }
+        if (auto it = node.attributes.find("expanded"); it != node.attributes.end()) {
+            exp->expanded = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("headerHeight"); it != node.attributes.end()) {
+            exp->headerHeight = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            exp->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("spacing"); it != node.attributes.end()) {
+            exp->spacing = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("padding"); it != node.attributes.end()) {
+            const auto values = SplitString(it->second, ',');
+            if (values.size() == 4) {
+                exp->contentPadding = ParseThickness(values);
+            } else if (values.size() == 1 && !TrimString(values[0]).empty()) {
+                const float p = std::stof(TrimString(values[0]));
+                exp->contentPadding = Thickness{p, p, p, p};
+            }
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            exp->background = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("headerBackground"); it != node.attributes.end()) {
+            exp->headerBackground = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            exp->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        ApplyCommonXmlAttributes(*exp, node);
+        element = std::move(exp);
+    } else if (node.name == "SplitView") {
+        auto sv = std::make_unique<SplitView>();
+        if (auto it = node.attributes.find("orientation"); it != node.attributes.end()) {
+            sv->vertical = (ToLowerAscii(TrimString(it->second)) == "vertical");
+        } else if (auto it2 = node.attributes.find("vertical"); it2 != node.attributes.end()) {
+            sv->vertical = ParseBoolString(it2->second, false);
+        }
+        if (auto it = node.attributes.find("splitRatio"); it != node.attributes.end()) {
+            sv->splitRatio = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("splitterSize"); it != node.attributes.end()) {
+            sv->splitterSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("minPaneSize"); it != node.attributes.end()) {
+            sv->minPaneSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("splitterColor"); it != node.attributes.end()) {
+            sv->splitterColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("splitterHoverColor"); it != node.attributes.end()) {
+            sv->splitterHoverColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("handleColor"); it != node.attributes.end()) {
+            sv->handleColor = LayoutParser::ColorFromString(it->second);
+        }
+        ApplyCommonXmlAttributes(*sv, node);
+        element = std::move(sv);
     } else if (node.name == "Spacer") {
         auto spacer = std::make_unique<Spacer>();
         ApplyCommonXmlAttributes(*spacer, node);

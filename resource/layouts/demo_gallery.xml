@@ -79,6 +79,11 @@
       <Label text="Controls" fontSize="15" color="#6EA0FF" />
       <Grid name="gridControls" columns="3" spacing="12" cellSpacing="12" rowHeight="148" background="transparent" padding="0,0,0,0">
         <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="Modern Components v2" fontSize="14" color="#F2F6FB" />
+          <Label text="Avatar · Badge · Switch · Donut · SplitView" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/modern_components_v2.xml||1280x860" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
           <Label text="Core Controls v2" fontSize="14" color="#F2F6FB" />
           <Label text="Progress · ListBox · Combo · Tab" fontSize="11" color="#8FA3B8" />
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/core_controls_v2.xml||1100x720" height="32" />
