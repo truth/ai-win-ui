@@ -57,6 +57,7 @@ older design snapshot.
   - archived examples: declarative style v1, theme tokens, layered window v2
 - `doc/reports/`
   - dated test and QA regression reports
+  - **Frame Profiler & Smoothness Optimization Report (MD + HTML):** `2026-11-02-frame-profiler-and-smoothness-report.md` / `2026-11-02-frame-profiler-and-smoothness-report.html`
   - **Modular Parsers Test Report:** `2026-10-31-modular-parsers-test-report.md`
 
 ## Current System Snapshot

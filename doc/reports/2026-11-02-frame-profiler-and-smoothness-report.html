@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ai-win-ui 帧耗时剖析与交互丝滑度优化过程报表</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --border: #e6ecf5;
+      --text: #181d27;
+      --muted: #697586;
+      --primary: #2764ff;
+      --primary-soft: #eff4ff;
+      --success: #10b981;
+      --success-soft: #ecfdf5;
+      --warning: #f59e0b;
+      --warning-soft: #fffbeb;
+      --danger: #ef4444;
+      --danger-soft: #fef2f2;
+      --code-bg: #0f172a;
+      --code-fg: #e2e8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 28px 20px 60px;
+    }
+    .container {
+      max-width: 1160px;
+      margin: 0 auto;
+    }
+    .header-card {
+      background: linear-gradient(135deg, #1e3a8a 0%, #2764ff 100%);
+      color: #ffffff;
+      border-radius: 18px;
+      padding: 28px 32px;
+      box-shadow: 0 12px 32px rgba(39, 100, 255, 0.18);
+      margin-bottom: 22px;
+    }
+    .header-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+    .badge-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 11px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.16);
+      color: #ffffff;
+      backdrop-filter: blur(4px);
+    }
+    .pill.pass { background: #10b981; color: #ffffff; }
+    h1 {
+      margin: 0 0 8px 0;
+      font-size: 25px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .subtitle {
+      margin: 0;
+      font-size: 14px;
+      color: rgba(255, 255, 255, 0.86);
+    }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(235px, 1fr));
+      gap: 16px;
+      margin-bottom: 22px;
+    }
+    .kpi-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px 20px;
+      box-shadow: 0 3px 10px rgba(10, 15, 29, 0.03);
+    }
+    .kpi-label {
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+    .kpi-value {
+      font-size: 26px;
+      font-weight: 800;
+      color: var(--text);
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+    .kpi-delta {
+      font-size: 12.5px;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 999px;
+      background: var(--success-soft);
+      color: #059669;
+    }
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 24px 26px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 14px rgba(10, 15, 29, 0.03);
+    }
+    h2 {
+      margin: 0 0 14px 0;
+      font-size: 18px;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    h2 .sec-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: var(--primary-soft);
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 800;
+    }
+    h3 {
+      margin: 18px 0 10px 0;
+      font-size: 15px;
+      font-weight: 700;
+      color: var(--text);
+    }
+    p { margin: 0 0 12px 0; font-size: 14px; color: #334155; }
+    .pipeline {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      margin: 14px 0 18px;
+      padding: 14px 16px;
+      background: #f8fafc;
+      border: 1px dashed #cbd5e1;
+      border-radius: 12px;
+    }
+    .pipe-step {
+      padding: 8px 13px;
+      border-radius: 9px;
+      font-size: 12.5px;
+      font-weight: 600;
+      background: #ffffff;
+      border: 1px solid var(--border);
+      color: var(--text);
+    }
+    .pipe-step.hot {
+      background: var(--danger-soft);
+      border-color: #fecaca;
+      color: #b91c1c;
+    }
+    .pipe-arrow { color: var(--muted); font-weight: 700; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin: 10px 0 6px;
+    }
+    th, td {
+      padding: 10px 12px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: #f8fafc;
+      font-weight: 700;
+      color: #475569;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+    tr:last-child td { border-bottom: none; }
+    .num { font-variant-numeric: tabular-nums; font-family: "Cascadia Mono", Consolas, monospace; }
+    .bad { color: #dc2626; font-weight: 700; }
+    .good { color: #059669; font-weight: 700; }
+    .tag {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      font-weight: 700;
+    }
+    .tag-pass { background: var(--success-soft); color: #047857; }
+    .tag-warn { background: var(--warning-soft); color: #b45309; }
+    .tag-info { background: var(--primary-soft); color: var(--primary); }
+
+    /* Bar chart */
+    .bar-group { margin: 12px 0; }
+    .bar-row {
+      display: grid;
+      grid-template-columns: 220px 1fr 110px;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 10px;
+      font-size: 13px;
+    }
+    .bar-track {
+      height: 22px;
+      background: #f1f5f9;
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+    .bar-fill {
+      height: 100%;
+      border-radius: 999px;
+      transition: width 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    .bar-fill.danger { background: linear-gradient(90deg, #ef4444, #f97316); }
+    .bar-fill.warn { background: linear-gradient(90deg, #f59e0b, #eab308); }
+    .bar-fill.primary { background: linear-gradient(90deg, #2764ff, #3b82f6); }
+    .bar-fill.success { background: linear-gradient(90deg, #10b981, #34d399); }
+
+    /* Interactive simulator */
+    .sim-box {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 16px;
+      margin-top: 12px;
+    }
+    .sim-pane {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px 18px;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .sim-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .ui-switch {
+      width: 44px;
+      height: 24px;
+      border-radius: 999px;
+      background: #cbd5e1;
+      position: relative;
+      cursor: pointer;
+      user-select: none;
+    }
+    .ui-switch .knob {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      position: absolute;
+      top: 3px;
+      left: 3px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.22);
+    }
+    .ui-switch.smooth {
+      transition: background-color 140ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .ui-switch.smooth .knob {
+      transition: transform 140ms cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .ui-switch.active { background: #2764ff; }
+    .ui-switch.active .knob { transform: translateX(20px); }
+    pre {
+      background: var(--code-bg);
+      color: var(--code-fg);
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 12.5px;
+      overflow-x: auto;
+      margin: 8px 0;
+    }
+    .tab-btns {
+      display: flex;
+      gap: 6px;
+      background: #f1f5f9;
+      padding: 4px;
+      border-radius: 10px;
+      width: fit-content;
+      margin-bottom: 12px;
+    }
+    .tab-btn {
+      border: none;
+      background: transparent;
+      padding: 6px 14px;
+      border-radius: 7px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--muted);
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: #ffffff;
+      color: var(--text);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header-card">
+      <div class="header-top">
+        <div>
+          <div class="badge-row">
+            <span class="pill pass">7 / 7 CI 100% PASS</span>
+            <span class="pill">Branch: feature/frame-profiler → master</span>
+            <span class="pill">Layout: modern_components_v2.xml</span>
+            <span class="pill">Date: 2026-11-02</span>
+          </div>
+          <h1>ai-win-ui 帧耗时剖析与交互丝滑度优化过程报表</h1>
+          <p class="subtitle">从主观“迟钝感”到 QPC 微秒级分阶段实测，定位 28× 软光栅瓶颈并完成 5 项靶向加速</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top KPI Cards -->
+    <div class="kpi-grid">
+      <div class="kpi-card">
+        <div class="kpi-label">拖拽窗口端到端延迟 (Resize Latency)</div>
+        <div class="kpi-value">
+          <span class="num">8.86 ms</span>
+          <span class="kpi-delta">快 21.9×</span>
+        </div>
+        <div class="kpi-sub">优化前默认 <code>194.14 ms</code> (~5.1 FPS) → 现 <code>~113 FPS</code></div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">单帧 CPU 控件树渲染 (Render Phase)</div>
+        <div class="kpi-value">
+          <span class="num">4.41 ms</span>
+          <span class="kpi-delta">快 30.8×</span>
+        </div>
+        <div class="kpi-sub">优化前默认 <code>135.93 ms</code> (P95 <code>183.71 ms</code>)</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">点击 Switch 触发整页布局 (Layout on Click)</div>
+        <div class="kpi-value">
+          <span class="num">0.00 ms</span>
+          <span class="kpi-delta">100% 消除</span>
+        </div>
+        <div class="kpi-sub">优化前每次点击耗费 <code>27.74 ms</code> 重排整棵 Yoga 树</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label">缩放时 DIB 画布分配 (Surface Resize)</div>
+        <div class="kpi-value">
+          <span class="num">0.04 ms</span>
+          <span class="kpi-delta">快 31.5×</span>
+        </div>
+        <div class="kpi-sub">64px 步进容量复用，消除每像素 <code>CreateDIBSection</code></div>
+      </div>
+    </div>
+
+    <!-- Section 1: Problem & Pipeline -->
+    <div class="card">
+      <h2><span class="sec-num">1</span> 问题现象与渲染链路剖析</h2>
+      <p>
+        在执行 <code>.\scripts\run_layout_demo.ps1 -Layout "modern_components_v2" -Renderer "skia"</code> 时，拖拽调整窗口尺寸与点击圆角 <code>&lt;Switch&gt;</code> 开关存在肉眼可见的卡顿与滞后。通过梳理宿主消息循环与渲染器管线，定位出优化前单次交互的 6 步串行链路：
+      </p>
+      <div class="pipeline">
+        <div class="pipe-step">1. WM_LBUTTONDOWN / WM_SIZE</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step hot">2. 无条件整页 UpdateLayout (55.3 ms)</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">3. InvalidateRect 整窗脏标记</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step hot">4. 等待低优先级 WM_PAINT</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step hot">5. Debug 软光栅全量重绘 (135.9 ms)</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step">6. BitBlt 上屏 (0.6 ms)</div>
+      </div>
+
+      <h3>交互手感对比模拟器（点击下方两个开关直观对比“194ms 延迟硬跳”与“3.8ms + 140ms 缓动”）</h3>
+      <div class="sim-box">
+        <div class="sim-pane">
+          <div class="sim-row">
+            <div>
+              <strong>优化前（Before）</strong>
+              <div style="font-size:12px;color:var(--muted);">点击后阻塞 ~165ms 才响应，且无过渡帧直接硬跳</div>
+            </div>
+            <div id="sw-before" class="ui-switch active" title="点击体验优化前约 165ms 延迟 + 瞬移">
+              <div class="knob"></div>
+            </div>
+          </div>
+        </div>
+        <div class="sim-pane" style="background:#eff4ff;border-color:#bfdbfe;">
+          <div class="sim-row">
+            <div>
+              <strong style="color:var(--primary);">优化后（After）</strong>
+              <div style="font-size:12px;color:var(--muted);">0ms 布局开销 + 3.8ms 即时响应 + 140ms Smoothstep 缓动</div>
+            </div>
+            <div id="sw-after" class="ui-switch smooth active" title="点击体验优化后即时响应 + 140ms 丝滑过渡">
+              <div class="knob"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Section 2: Frame Profiler & 2x2 Baseline -->
+    <div class="card">
+      <h2><span class="sec-num">2</span> 帧耗时统计器建设与 2×2 基线实测数据</h2>
+      <p>
+        新增 <code>src/frame_profiler.h</code>（基于 <code>QueryPerformanceCounter</code>）与自动化基准脚本 <code>scripts/bench_frame_stats.ps1</code>，将每帧拆解为 <code>resize</code>、<code>layout</code>、<code>render</code>、<code>present</code>、<code>paint</code> 与端到端 <code>latency</code> 六个维度，并在窗口内支持 <code>F12</code> 实时监控面板与 CSV 逐帧导出。
+      </p>
+
+      <div class="tab-btns">
+        <button class="tab-btn active" onclick="switchChart('latency', this)">端到端延迟 (latency_ms)</button>
+        <button class="tab-btn" onclick="switchChart('render', this)">渲染耗时 (render_ms)</button>
+        <button class="tab-btn" onclick="switchChart('layout', this)">布局耗时 (layout_ms)</button>
+        <button class="tab-btn" onclick="switchChart('resize', this)">画布分配 (resize_ms)</button>
+      </div>
+
+      <div id="chart-container" class="bar-group"></div>
+
+      <h3>表 2.1：拖拽窗口大小（trigger = resize，61~62 帧连续采样，格式：avg / p95 / max ms）</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>配置组</th>
+            <th>resize_ms (DIB 分配)</th>
+            <th>layout_ms (Yoga+文本测量)</th>
+            <th>render_ms (控件树绘制)</th>
+            <th>present_ms (上屏)</th>
+            <th>latency_ms (端到端延迟 / FPS)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>优化前 · skia-Debug (原默认)</strong></td>
+            <td class="num">1.26 / 1.89 / 2.82</td>
+            <td class="num bad">55.27 / 82.90 / 87.52</td>
+            <td class="num bad">135.93 / 183.71 / 266.22</td>
+            <td class="num">0.63 / 1.00 / 1.82</td>
+            <td class="num bad">194.14 / 260.85 / 333.10 (~5.1 FPS)</td>
+          </tr>
+          <tr>
+            <td><strong>优化后 · skia-Debug</strong></td>
+            <td class="num good">0.12 / 0.47 / 0.55</td>
+            <td class="num">35.71 / 44.08 / 163.77</td>
+            <td class="num">85.68 / 121.67 / 187.81</td>
+            <td class="num">0.50 / 0.72 / 0.76</td>
+            <td class="num">122.64 / 179.29 / 255.80 (~8.2 FPS)</td>
+          </tr>
+          <tr>
+            <td><strong>优化前 · skia-Release</strong></td>
+            <td class="num">1.25 / 1.82 / 2.63</td>
+            <td class="num">3.81 / 5.91 / 6.16</td>
+            <td class="num">4.87 / 7.06 / 9.34</td>
+            <td class="num">0.38 / 0.84 / 1.03</td>
+            <td class="num">10.65 / 14.34 / 18.38 (~93.9 FPS)</td>
+          </tr>
+          <tr style="background:#f0fdf4;">
+            <td><strong>优化后 · skia-Release (现默认)</strong></td>
+            <td class="num good">0.04 / 0.27 / 0.47</td>
+            <td class="num good">3.60 / 5.66 / 19.53</td>
+            <td class="num good">4.41 / 6.38 / 9.74</td>
+            <td class="num good">0.39 / 0.85 / 1.24</td>
+            <td class="num good">8.86 / 11.34 / 33.78 (~112.9 FPS)</td>
+          </tr>
+          <tr>
+            <td><strong>基线对比 · direct2d-Debug</strong></td>
+            <td class="num">0.18 / 0.27 / 0.32</td>
+            <td class="num">19.18 / 23.97 / 26.21</td>
+            <td class="num">5.13 / 6.98 / 7.26</td>
+            <td class="num">0.70 / 1.12 / 1.25</td>
+            <td class="num">25.34 / 29.98 / 32.98 (~39.5 FPS)</td>
+          </tr>
+          <tr>
+            <td><strong>基线对比 · direct2d-Release</strong></td>
+            <td class="num">0.18 / 0.28 / 0.40</td>
+            <td class="num">3.38 / 4.97 / 5.51</td>
+            <td class="num">3.61 / 5.32 / 5.83</td>
+            <td class="num">0.73 / 1.33 / 1.62</td>
+            <td class="num good">8.01 / 10.39 / 10.85 (~124.8 FPS)</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>表 2.2：点击 Switch 开关（20 次连续点击采样）</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>配置组</th>
+            <th>点击触发 layout_count</th>
+            <th>layout_ms (布局耗时)</th>
+            <th>render_ms (绘制耗时)</th>
+            <th>paint_ms (整帧耗时)</th>
+            <th>过渡动画表现</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>优化前 · skia-Debug (原默认)</strong></td>
+            <td class="num bad">1 次 / 点击</td>
+            <td class="num bad">27.74 ms</td>
+            <td class="num bad">136.32 ms</td>
+            <td class="num bad">137.74 ms</td>
+            <td><span class="tag tag-warn">0 帧（硬跳瞬移）</span></td>
+          </tr>
+          <tr>
+            <td><strong>优化后 · skia-Debug</strong></td>
+            <td class="num good">0 次 / 点击</td>
+            <td class="num good">0.00 ms</td>
+            <td class="num">67.20 ~ 79.25 ms</td>
+            <td class="num">68.05 ~ 80.37 ms</td>
+            <td><span class="tag tag-info">Smoothstep 缓动</span></td>
+          </tr>
+          <tr style="background:#f0fdf4;">
+            <td><strong>优化后 · skia-Release (现默认)</strong></td>
+            <td class="num good">0 次 / 点击</td>
+            <td class="num good">0.00 ms</td>
+            <td class="num good">2.46 ~ 3.19 ms</td>
+            <td class="num good">2.83 ~ 3.83 ms</td>
+            <td><span class="tag tag-pass">101 帧 60fps 丝滑缓动</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Section 3: 5 Optimizations -->
+    <div class="card">
+      <h2><span class="sec-num">3</span> 五项靶向优化技术细节</h2>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:52px;">序号</th>
+            <th style="width:230px;">优化模块</th>
+            <th style="width:230px;">修改文件</th>
+            <th>根因与修复方案</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="tag tag-info">#1</span></td>
+            <td><strong>启动脚本默认 Release 构建</strong></td>
+            <td class="num">scripts/run_layout_demo.ps1</td>
+            <td>原脚本固定启动 <code>Debug\ai_win_ui.exe</code>，链接了未优化的 <code>Debug-x64/skia.lib</code>（CPU 软光栅慢 28 倍）。现新增 <code>-Configuration Auto|Release|Debug</code>，交互式运行默认采用 <code>Release</code>，CI <code>-NoLaunch</code> 自动保持 <code>Debug</code> 兼容。</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-info">#2</span></td>
+            <td><strong>Skia 字体、排版与 SVG 路径三级缓存</strong></td>
+            <td class="num">src/skia_font_shared.h<br>src/skia_text_layout.cpp<br>src/renderer_skia.cpp</td>
+            <td>原实现每次调用 <code>CreateDefaultTypeface</code> 均通过 DirectWrite 重新创建 <code>SkTypeface</code>，导致 Skia 内部字形缓存 <code>SkStrikeCache</code> 失效。现对 <code>CreateDefaultTypeface</code>、<code>CreateSkiaTextLayout</code>（4096 项）及 <code>DrawSvgPath</code> 增加哈希缓存。</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-info">#3</span></td>
+            <td><strong>按需触发 UpdateLayout()</strong></td>
+            <td class="num">src/ui_host.cpp<br>src/ui_containers.h<br>src/ui_widgets.h</td>
+            <td>移除 <code>UiHost::OnMouseDown</code> 中无条件执行的整页 <code>UpdateLayout()</code>，改为仅在改变组件尺寸的 <code>Expander</code>（折叠/展开）和 <code>AlertBanner</code>（关闭隐藏）中调用 <code>m_context-&gt;requestLayout()</code>。</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-info">#4</span></td>
+            <td><strong>Switch 与 SegmentedControl 140ms 缓动</strong></td>
+            <td class="num">src/ui_widgets.h</td>
+            <td>在 16ms <code>OnTimer</code> 帧循环中推进动画进度：<code>Switch</code> 使用 Smoothstep ($3t^2 - 2t^3$) 插值圆钮水平位置与轨道颜色；<code>SegmentedControl</code> 平滑滑动选中态白色胶囊背景。</td>
+          </tr>
+          <tr>
+            <td><span class="tag tag-info">#5</span></td>
+            <td><strong>DIB 64px 步进容量复用与同步重绘</strong></td>
+            <td class="num">src/renderer_skia.cpp<br>src/ui_host.cpp</td>
+            <td><code>SkiaRenderer</code> 按 64px 步进对齐分配 GDI DIB 容量（<code>m_dibCapWidth × m_dibCapHeight</code>），拖拽缩放时复用已有位图内存并以 <code>rowBytes = m_dibCapWidth * 4</code> 重新包装 <code>SkSurface</code>；<code>UiHost::OnResize</code> 调用 <code>RedrawWindow(..., RDW_INVALIDATE | RDW_UPDATENOW)</code> 同步上屏。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Section 4: CI Verification & Commands -->
+    <div class="card">
+      <h2><span class="sec-num">4</span> 回归验证与使用指南</h2>
+      <p>7 项本地 CI 自动化回归测试（<code>.\scripts\run_ci_local.ps1 -SkipBuild</code>）全部通过（Passed: 7, Failed: 0）：</p>
+      <div class="badge-row" style="margin-bottom:14px;">
+        <span class="tag tag-pass">✓ build (0 Error / 0 Warning)</span>
+        <span class="tag tag-pass">✓ gallery coverage</span>
+        <span class="tag tag-pass">✓ headless smoke (skia)</span>
+        <span class="tag tag-pass">✓ headless smoke (direct2d)</span>
+        <span class="tag tag-pass">✓ golden: core-validation</span>
+        <span class="tag tag-pass">✓ golden: yoga-measure</span>
+        <span class="tag tag-pass">✓ golden: scroll-viewer</span>
+      </div>
+      <pre># 1. 启动 modern_components_v2（默认自动使用 Release 高性能构建，运行中按 F12 查看实时帧耗时浮层）
+.\scripts\run_layout_demo.ps1 -Layout "modern_components_v2" -Renderer "skia"
+
+# 2. 运行自动化帧耗时基准测试（生成 build/bench/frame_stats_*.csv 报表）
+.\scripts\bench_frame_stats.ps1 -Renderer skia -Config Release</pre>
+    </div>
+  </div>
+
+  <script>
+    const datasets = {
+      latency: {
+        max: 200,
+        unit: 'ms',
+        rows: [
+          { label: '优化前 · skia-Debug (原默认)', val: 194.14, cls: 'danger', note: '194.14 ms (~5.1 FPS)' },
+          { label: '优化后 · skia-Debug', val: 122.64, cls: 'warn', note: '122.64 ms (~8.2 FPS)' },
+          { label: '优化前 · skia-Release', val: 10.65, cls: 'primary', note: '10.65 ms (~93.9 FPS)' },
+          { label: '优化后 · skia-Release (现默认)', val: 8.86, cls: 'success', note: '8.86 ms (~112.9 FPS)' }
+        ]
+      },
+      render: {
+        max: 145,
+        unit: 'ms',
+        rows: [
+          { label: '优化前 · skia-Debug (原默认)', val: 135.93, cls: 'danger', note: '135.93 ms' },
+          { label: '优化后 · skia-Debug', val: 85.68, cls: 'warn', note: '85.68 ms' },
+          { label: '优化前 · skia-Release', val: 4.87, cls: 'primary', note: '4.87 ms' },
+          { label: '优化后 · skia-Release (现默认)', val: 4.41, cls: 'success', note: '4.41 ms' }
+        ]
+      },
+      layout: {
+        max: 60,
+        unit: 'ms',
+        rows: [
+          { label: '优化前 · skia-Debug (拖拽)', val: 55.27, cls: 'danger', note: '55.27 ms' },
+          { label: '优化后 · skia-Debug (拖拽)', val: 35.71, cls: 'warn', note: '35.71 ms' },
+          { label: '优化后 · skia-Release (拖拽)', val: 3.60, cls: 'primary', note: '3.60 ms' },
+          { label: '优化后 · 点击 Switch 布局耗时', val: 0.0, cls: 'success', note: '0.00 ms (100% 消除)' }
+        ]
+      },
+      resize: {
+        max: 1.4,
+        unit: 'ms',
+        rows: [
+          { label: '优化前 · skia-Debug (每像素重建)', val: 1.26, cls: 'danger', note: '1.26 ms' },
+          { label: '优化前 · skia-Release (每像素重建)', val: 1.25, cls: 'warn', note: '1.25 ms' },
+          { label: '优化后 · skia-Debug (64px 复用)', val: 0.12, cls: 'primary', note: '0.12 ms' },
+          { label: '优化后 · skia-Release (64px 复用)', val: 0.04, cls: 'success', note: '0.04 ms (快 31.5×)' }
+        ]
+      }
+    };
+
+    function switchChart(key, btn) {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      if (btn) btn.classList.add('active');
+      const d = datasets[key];
+      const container = document.getElementById('chart-container');
+      container.innerHTML = d.rows.map(r => {
+        const pct = Math.max(r.val > 0 ? 2.5 : 0.4, Math.min(100, (r.val / d.max) * 100));
+        return `
+          <div class="bar-row">
+            <div><strong>${r.label}</strong></div>
+            <div class="bar-track"><div class="bar-fill ${r.cls}" style="width:${pct}%"></div></div>
+            <div class="num" style="text-align:right;font-weight:700;">${r.note}</div>
+          </div>
+        `;
+      }).join('');
+    }
+    switchChart('latency', document.querySelector('.tab-btn.active'));
+
+    // Interactive Switch Simulator
+    document.getElementById('sw-before').addEventListener('click', function() {
+      const el = this;
+      setTimeout(() => { el.classList.toggle('active'); }, 165);
+    });
+    document.getElementById('sw-after').addEventListener('click', function() {
+      this.classList.toggle('active');
+    });
+  </script>
+</body>
+</html>
