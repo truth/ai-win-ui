@@ -1,4 +1,5 @@
 #include "application.h"
+#include "frame_profiler.h"
 #include "host_options.h"
 #include "ui_host.h"
 #include "ai_win_ui/host.h"
@@ -386,6 +387,16 @@ public:
         BuildUI();
         if (m_root) {
             m_root->SetContext(&m_uiContext);
+        }
+        {
+            const std::wstring statsPath = GetEnvironmentValue(L"AI_WIN_UI_FRAME_STATS");
+            if (!statsPath.empty()) {
+                m_frameProfiler.OpenCsv(Utf16ToUtf8(statsPath));
+            }
+            const std::wstring devtools = GetEnvironmentValue(L"AI_WIN_UI_DEVTOOLS");
+            if (!devtools.empty() && devtools != L"0") {
+                m_uiContext.showDevTools = true;
+            }
         }
         ApplyChromeFromRootIfNeeded();
         m_isInitialized = true;
@@ -1630,12 +1641,19 @@ private:
         m_viewportHeight = static_cast<float>(std::max<LONG>(0, rc.bottom - rc.top));
         m_uiContext.viewportWidth = m_viewportWidth;
         m_uiContext.viewportHeight = m_viewportHeight;
+        m_frameProfiler.MarkInput("resize");
         if (m_renderer) {
+            const double resizeBegin = ai_win_ui::FrameProfiler::NowMs();
             m_renderer->Resize(static_cast<UINT>(m_viewportWidth), static_cast<UINT>(m_viewportHeight));
+            m_frameProfiler.AddResize(ai_win_ui::FrameProfiler::NowMs() - resizeBegin);
         }
         SyncLayeredShellForWindowState();
         UpdateLayout();
-        InvalidateRect(m_hwnd, nullptr, FALSE);
+        if (IsWindowVisible(m_hwnd)) {
+            RedrawWindow(m_hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW);
+        } else {
+            InvalidateRect(m_hwnd, nullptr, FALSE);
+        }
     }
 
     // When layered is maximized, collapse floating margins / radius so the card
@@ -1719,6 +1737,12 @@ private:
     }
 
     void UpdateLayout() {
+        const double layoutBegin = ai_win_ui::FrameProfiler::NowMs();
+        UpdateLayoutImpl();
+        m_frameProfiler.AddLayout(ai_win_ui::FrameProfiler::NowMs() - layoutBegin);
+    }
+
+    void UpdateLayoutImpl() {
         if (m_root) {
             m_root->Measure(m_viewportWidth, kUnboundedLayoutHeight);
             m_contentHeight = std::max(m_viewportHeight, m_root->DesiredSize().height);
@@ -1855,16 +1879,89 @@ private:
         OutputDebugStringW((L"[TextDump] wrote " + outPathW + L"\n").c_str());
     }
 
+    void DrawFrameStatsOverlay(IRenderer& renderer) {
+        using ai_win_ui::FramePhaseStats;
+        using ai_win_ui::FrameSample;
+        const auto& fp = m_frameProfiler;
+        const FramePhaseStats paint = fp.Stats([](const FrameSample& f) { return f.paintMs; });
+        const FramePhaseStats render = fp.Stats([](const FrameSample& f) { return f.renderMs; });
+        const FramePhaseStats present = fp.Stats([](const FrameSample& f) { return f.presentMs; });
+        const FramePhaseStats layout = fp.Stats([](const FrameSample& f) { return f.layoutCount > 0 ? f.layoutMs : -1.0; });
+        const FramePhaseStats resize = fp.Stats([](const FrameSample& f) { return f.resizeMs > 0.0 ? f.resizeMs : -1.0; });
+        const FramePhaseStats latency = fp.Stats([](const FrameSample& f) { return f.latencyMs; });
+        const FrameSample& last = fp.Last();
+
+        auto fmt = [](const wchar_t* name, const FramePhaseStats& st) {
+            wchar_t buf[128];
+            swprintf_s(buf, L"%-8s avg %6.2f  p95 %6.2f  max %6.2f ms", name, st.avg, st.p95, st.max);
+            return std::wstring(buf);
+        };
+
+        std::vector<std::wstring> lines;
+        {
+            wchar_t head[160];
+#ifdef _DEBUG
+            const wchar_t* cfg = L"Debug";
+#else
+            const wchar_t* cfg = L"Release";
+#endif
+            const double fps = last.intervalMs > 0.0 ? 1000.0 / last.intervalMs : 0.0;
+            swprintf_s(head, L"[F12] %s %s | %dx%d | frames %llu | %s",
+                renderer.Backend() == RendererBackend::Skia ? L"Skia" : L"Direct2D",
+                cfg,
+                static_cast<int>(m_viewportWidth), static_cast<int>(m_viewportHeight),
+                fp.FrameCount(),
+                m_frameStatsLive ? L"live" : L"F11=live");
+            lines.push_back(head);
+            (void)fps;
+        }
+        lines.push_back(fmt(L"paint", paint));
+        lines.push_back(fmt(L"render", render));
+        lines.push_back(fmt(L"present", present));
+        lines.push_back(fmt(L"layout", layout));
+        lines.push_back(fmt(L"resize", resize));
+        lines.push_back(fmt(L"latency", latency));
+        {
+            wchar_t buf[200];
+            swprintf_s(buf, L"last: %S  paint %.2f  layout %.2f x%d  render %.2f  present %.2f",
+                last.trigger, last.paintMs, last.layoutMs, last.layoutCount, last.renderMs, last.presentMs);
+            lines.push_back(buf);
+        }
+
+        const float lineH = 16.0f;
+        const float overlayW = 430.0f;
+        const float overlayH = 10.0f + lineH * static_cast<float>(lines.size());
+        const Rect devRect = Rect::Make(
+            std::max(10.0f, m_viewportWidth - overlayW - 10.0f),
+            10.0f,
+            std::max(10.0f + overlayW, m_viewportWidth - 10.0f),
+            10.0f + overlayH);
+        renderer.FillRoundedRect(devRect, Color{0.05f, 0.08f, 0.12f, 0.92f}, 6.0f);
+        renderer.DrawRoundedRect(devRect, Color{0.2f, 0.6f, 1.0f, 0.85f}, 1.0f, 6.0f);
+
+        TextRenderOptions opt{};
+        opt.horizontalAlign = TextHorizontalAlign::Start;
+        opt.verticalAlign = TextVerticalAlign::Center;
+        for (size_t i = 0; i < lines.size(); ++i) {
+            const float top = devRect.top + 5.0f + lineH * static_cast<float>(i);
+            const Rect lineRect = Rect::Make(devRect.left + 10.0f, top, devRect.right - 8.0f, top + lineH);
+            renderer.DrawTextW(lines[i].c_str(), static_cast<UINT32>(lines[i].size()), lineRect,
+                i == 0 ? Color{0.55f, 0.8f, 1.0f, 1.0f} : Color{1.0f, 1.0f, 1.0f, 0.95f}, 11.5f, opt);
+        }
+    }
+
     void OnPaint() {
         PAINTSTRUCT ps{};
         BeginPaint(m_hwnd, &ps);
 
         if (m_isInitialized && m_renderer) {
+            m_frameProfiler.BeginPaint();
             // Layered present clears to transparent so desktop shows in empty regions.
             const Color clearColor = m_windowChrome.IsLayered()
                 ? Color{0.0f, 0.0f, 0.0f, 0.0f}
                 : ColorFromHex(0x101010);
             m_renderer->BeginFrame(clearColor);
+            m_frameProfiler.MarkRenderBegin();
             if (m_windowChrome.IsLayered()) {
                 DrawLayeredCardShadow(*m_renderer);
             }
@@ -1898,28 +1995,16 @@ private:
             }
 
             if (m_uiContext.showDevTools) {
-                const float overlayW = 240.0f;
-                const float overlayH = 26.0f;
-                const Rect devRect = Rect::Make(
-                    std::max(10.0f, m_viewportWidth - overlayW - 10.0f),
-                    10.0f,
-                    std::max(10.0f + overlayW, m_viewportWidth - 10.0f),
-                    10.0f + overlayH);
-                m_renderer->FillRoundedRect(devRect, Color{0.05f, 0.08f, 0.12f, 0.90f}, 6.0f);
-                m_renderer->DrawRoundedRect(devRect, Color{0.2f, 0.6f, 1.0f, 0.85f}, 1.0f, 6.0f);
-
-                std::wstring devText = L"[F12] ";
-                devText += (m_renderer->Backend() == RendererBackend::Skia ? L"Skia" : L"Direct2D");
-                devText += L" | 60 FPS | ";
-                devText += std::to_wstring(static_cast<int>(m_viewportWidth)) + L"x" + std::to_wstring(static_cast<int>(m_viewportHeight));
-
-                TextRenderOptions opt{};
-                opt.horizontalAlign = TextHorizontalAlign::Center;
-                opt.verticalAlign = TextVerticalAlign::Center;
-                m_renderer->DrawTextW(devText.c_str(), static_cast<UINT32>(devText.size()), devRect, Color{1.0f, 1.0f, 1.0f, 0.95f}, 12.0f, opt);
+                DrawFrameStatsOverlay(*m_renderer);
             }
+            m_frameProfiler.MarkRenderEnd();
 
             m_renderer->EndFrame();
+            m_frameProfiler.EndPaint();
+            if (m_uiContext.showDevTools && m_frameStatsLive) {
+                // Keep overlay numbers fresh without user input.
+                InvalidateRect(m_hwnd, nullptr, FALSE);
+            }
         }
 
         EndPaint(m_hwnd, &ps);
@@ -2040,7 +2125,6 @@ private:
 
         m_mouseCaptureTarget = m_root->FindHitElementAt(x, y);
         if (m_root->OnMouseDown(x, y)) {
-            UpdateLayout();
             UpdateImeWindow();
             InvalidateRect(m_hwnd, nullptr, FALSE);
         }
@@ -2431,6 +2515,16 @@ private:
         }
 
         switch (msg) {
+            case WM_LBUTTONDOWN: m_frameProfiler.MarkInput("mousedown"); break;
+            case WM_LBUTTONUP: m_frameProfiler.MarkInput("mouseup"); break;
+            case WM_MOUSEMOVE: m_frameProfiler.MarkInput("mousemove"); break;
+            case WM_MOUSEWHEEL: m_frameProfiler.MarkInput("wheel"); break;
+            case WM_KEYDOWN: m_frameProfiler.MarkInput("key"); break;
+            case WM_CHAR: m_frameProfiler.MarkInput("char"); break;
+            default: break;
+        }
+
+        switch (msg) {
             case WM_GETOBJECT: {
                 if (static_cast<long>(lParam) == static_cast<long>(UiaRootObjectId)) {
                     if (!m_uiaHostProvider) {
@@ -2606,6 +2700,11 @@ private:
             case WM_KEYDOWN:
                 if (wParam == VK_F12) {
                     m_uiContext.showDevTools = !m_uiContext.showDevTools;
+                    InvalidateRect(m_hwnd, nullptr, FALSE);
+                    return 0;
+                }
+                if (wParam == VK_F11 && m_uiContext.showDevTools) {
+                    m_frameStatsLive = !m_frameStatsLive;
                     InvalidateRect(m_hwnd, nullptr, FALSE);
                     return 0;
                 }
@@ -2811,6 +2910,8 @@ private:
 
     std::vector<std::pair<ai_win_ui::Observable<std::wstring>*, size_t>> m_bindings;
     uint32_t m_lastTickMs = 0;
+    ai_win_ui::FrameProfiler m_frameProfiler;
+    bool m_frameStatsLive = false;
 };
 
 class HostDropTarget : public IDropTarget {

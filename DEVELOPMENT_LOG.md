@@ -1,5 +1,20 @@
 # 开发日志
 
+## 2026-11-02
+
+- **帧耗时剖析器与交互丝滑度优化 (Frame Profiler & Smoothness Optimization)**（分支 `feature/frame-profiler`）
+  - **高精度帧耗时统计器 (`src/frame_profiler.h`, `src/ui_host.cpp`, `scripts/bench_frame_stats.ps1`)**：
+    - 基于 `QueryPerformanceCounter` 采集每帧 `resize`、`layout`（含调用次数）、`render`、`present`、`paint` 与输入到上屏端到端 `latency` 耗时；
+    - 升级 F12 调试面板 (`UiHost::DrawFrameStatsOverlay`) 实时展示最近 120 帧各阶段 `avg / p95 / max`（支持 `F11` 切换持续刷新及 `AI_WIN_UI_DEVTOOLS=1` 启动开启），并支持 `AI_WIN_UI_FRAME_STATS=<csv>` 逐帧导出；
+    - 新增 `scripts/bench_frame_stats.ps1` 自动化帧耗时基准测试脚本，量化定位出 `skia-Debug` 下链接未优化 `Debug-x64/skia.lib` 及重复字体查询导致的 28 倍软光栅耗时瓶颈。
+  - **五项靶向丝滑度优化**：
+    - **默认 Release 交互启动 (`scripts/run_layout_demo.ps1`)**：新增 `-Configuration Auto|Release|Debug` 参数，交互演示默认启用 `Release`，将 `modern_components_v2` 拖拽端到端帧延迟从 `194.14 ms`（~5 FPS）降至 `8.86 ms`（~113 FPS，提速 21.9×）；
+    - **Skia 字体与文本排版缓存 (`src/skia_font_shared.h`, `src/skia_text_layout.cpp`, `src/renderer_skia.cpp`)**：缓存 `CreateDefaultTypeface` DirectWrite 字体对象、`CreateSkiaTextLayout` 排版结果（上限 4096 项）及 `DrawSvgPath` 路径解析结果；
+    - **按需 `UpdateLayout()` (`src/ui_host.cpp`, `src/ui_containers.h`, `src/ui_widgets.h`)**：移除 `UiHost::OnMouseDown` 无条件整页重排，改为仅在 `Expander` 展开/收起与 `AlertBanner` 关闭时调用 `requestLayout()`，使点击 `Switch` 等控件的布局开销从 `27.7 ms` 降至 `0.00 ms`；
+    - **`Switch` 与 `SegmentedControl` 缓动动画 (`src/ui_widgets.h`)**：为 `Switch` 圆钮与轨道颜色、以及 `SegmentedControl` 胶囊滑块增加 Smoothstep 平滑过渡动画（`Release` 下单帧重绘仅 `3.19 ms`）；
+    - **拖拽 DIB 64px 步进容量复用与同步重绘 (`src/renderer_skia.cpp`, `src/ui_host.cpp`)**：`SkiaRenderer` 按 64px 对齐容量复用 GDI DIB 位图（`resize` 分配耗时从 `1.26 ms` 降至 `0.04 ms`，提速 31.5×），并在 `UiHost::OnResize` 中调用 `RedrawWindow(..., RDW_INVALIDATE | RDW_UPDATENOW)` 同步上屏。
+  - **验证**：`build.ps1` 编译 0 Error / 0 Warning，`run_ci_local.ps1 -SkipBuild` 7/7 项回归测试 100% PASS。
+
 ## 2026-11-01
 
 - **现代基础组件库扩展 (Modern Components v2)**（分支 `feature/modern-components-v2`）

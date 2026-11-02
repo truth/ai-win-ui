@@ -377,10 +377,34 @@ public:
         int idx = static_cast<int>((x - (m_bounds.left + pad)) / segW);
         idx = std::clamp(idx, 0, static_cast<int>(items.size()) - 1);
         if (selectedIndex != idx) {
+            if (!m_animInitialized) {
+                m_animPos = static_cast<float>(selectedIndex);
+                m_animInitialized = true;
+            }
             selectedIndex = idx;
             if (onChange) onChange();
         }
         return true;
+    }
+
+    bool OnTimer(UINT_PTR timerId, uint32_t dtMs) override {
+        bool changed = UIElement::OnTimer(timerId, dtMs);
+        const float target = static_cast<float>(std::clamp(selectedIndex, 0, std::max(0, static_cast<int>(items.size()) - 1)));
+        if (!m_animInitialized) {
+            m_animPos = target;
+            m_animInitialized = true;
+            return changed;
+        }
+        const float diff = target - m_animPos;
+        if (std::fabs(diff) > 0.005f) {
+            const float step = std::min(1.0f, static_cast<float>(dtMs) / 90.0f);
+            m_animPos += diff * step;
+            if (std::fabs(target - m_animPos) <= 0.005f) {
+                m_animPos = target;
+            }
+            return true;
+        }
+        return changed;
     }
 
     void Render(IRenderer& renderer) override {
@@ -394,19 +418,28 @@ public:
         const float innerW = std::max(1.0f, (m_bounds.right - m_bounds.left) - pad * 2.0f);
         const float segW = innerW / static_cast<float>(items.size());
         const int sel = std::clamp(selectedIndex, 0, static_cast<int>(items.size()) - 1);
+        if (!m_animInitialized) {
+            m_animPos = static_cast<float>(sel);
+            m_animInitialized = true;
+        }
+
+        const float segR = std::max(ScaleValue(4.0f), r - pad * 0.5f);
+        if (m_hoverIndex >= 0 && m_hoverIndex < static_cast<int>(items.size()) && m_hoverIndex != sel) {
+            const float hLeft = m_bounds.left + pad + static_cast<float>(m_hoverIndex) * segW;
+            const Rect hoverRect{hLeft, m_bounds.top + pad, hLeft + segW, m_bounds.bottom - pad};
+            renderer.FillRoundedRect(hoverRect, Color{1.0f, 1.0f, 1.0f, 0.45f}, segR);
+        }
+
+        const float thumbLeft = m_bounds.left + pad + m_animPos * segW;
+        const Rect thumbRect{thumbLeft, m_bounds.top + pad, thumbLeft + segW, m_bounds.bottom - pad};
+        renderer.FillSoftShadow(thumbRect, segR, 0.0f, ScaleValue(1.5f), ScaleValue(6.0f), Color{0.06f, 0.09f, 0.16f, 0.08f});
+        renderer.FillRoundedRect(thumbRect, thumbColor, segR);
+        renderer.DrawRoundedRect(thumbRect, ColorFromHex(0xE6ECF5), ScaleValue(1.0f), segR);
 
         for (std::size_t i = 0; i < items.size(); ++i) {
             const float left = m_bounds.left + pad + static_cast<float>(i) * segW;
             const Rect segRect{left, m_bounds.top + pad, left + segW, m_bounds.bottom - pad};
-            const float segR = std::max(ScaleValue(4.0f), r - pad * 0.5f);
             const bool isSel = (static_cast<int>(i) == sel);
-            if (isSel) {
-                renderer.FillSoftShadow(segRect, segR, 0.0f, ScaleValue(1.5f), ScaleValue(6.0f), Color{0.06f, 0.09f, 0.16f, 0.08f});
-                renderer.FillRoundedRect(segRect, thumbColor, segR);
-                renderer.DrawRoundedRect(segRect, ColorFromHex(0xE6ECF5), ScaleValue(1.0f), segR);
-            } else if (static_cast<int>(i) == m_hoverIndex) {
-                renderer.FillRoundedRect(segRect, Color{1.0f, 1.0f, 1.0f, 0.45f}, segR);
-            }
 
             DrawStyledText(
                 renderer,
@@ -422,6 +455,8 @@ public:
 
 private:
     int m_hoverIndex = -1;
+    float m_animPos = 0.0f;
+    bool m_animInitialized = false;
 };
 
 class Switch : public UIElement {
@@ -462,6 +497,10 @@ protected:
 public:
     bool OnMouseDown(float /*x*/, float /*y*/) override {
         if (m_disabled) return false;
+        if (!m_animInitialized) {
+            m_animProgress = checked ? 1.0f : 0.0f;
+            m_animInitialized = true;
+        }
         checked = !checked;
         if (onChange) onChange();
         return true;
@@ -470,6 +509,10 @@ public:
     bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
         if (m_disabled) return false;
         if (keyCode == VK_SPACE || keyCode == VK_RETURN) {
+            if (!m_animInitialized) {
+                m_animProgress = checked ? 1.0f : 0.0f;
+                m_animInitialized = true;
+            }
             checked = !checked;
             if (onChange) onChange();
             return true;
@@ -477,10 +520,38 @@ public:
         return false;
     }
 
+    bool OnTimer(UINT_PTR timerId, uint32_t dtMs) override {
+        bool changed = UIElement::OnTimer(timerId, dtMs);
+        const float target = checked ? 1.0f : 0.0f;
+        if (!m_animInitialized) {
+            m_animProgress = target;
+            m_animInitialized = true;
+            return changed;
+        }
+        if (std::fabs(target - m_animProgress) > 0.004f) {
+            const float step = static_cast<float>(dtMs) / 140.0f;
+            if (m_animProgress < target) {
+                m_animProgress = std::min(target, m_animProgress + step);
+            } else {
+                m_animProgress = std::max(target, m_animProgress - step);
+            }
+            return true;
+        }
+        return changed;
+    }
+
     void Render(IRenderer& renderer) override {
         if (!renderer.IntersectsDirtyRect(m_bounds)) {
             return;
         }
+        if (!m_animInitialized) {
+            m_animProgress = checked ? 1.0f : 0.0f;
+            m_animInitialized = true;
+        }
+        // Smoothstep easing on the linear progress
+        const float t = std::clamp(m_animProgress, 0.0f, 1.0f);
+        const float eased = t * t * (3.0f - 2.0f * t);
+
         const float trackW = ScaleValue(40.0f);
         const float trackH = ScaleValue(22.0f);
         const float cy = (m_bounds.top + m_bounds.bottom) * 0.5f;
@@ -491,12 +562,19 @@ public:
             cy + trackH * 0.5f
         };
         const float r = trackH * 0.5f;
-        const Color trackBg = checked ? activeColor : inactiveColor;
+        const Color trackBg{
+            inactiveColor.r + (activeColor.r - inactiveColor.r) * eased,
+            inactiveColor.g + (activeColor.g - inactiveColor.g) * eased,
+            inactiveColor.b + (activeColor.b - inactiveColor.b) * eased,
+            inactiveColor.a + (activeColor.a - inactiveColor.a) * eased
+        };
         renderer.FillRoundedRect(trackRect, trackBg, r);
 
         const float pad = ScaleValue(2.5f);
         const float knobD = trackH - pad * 2.0f;
-        const float knobLeft = checked ? (trackRect.right - pad - knobD) : (trackRect.left + pad);
+        const float minLeft = trackRect.left + pad;
+        const float maxLeft = trackRect.right - pad - knobD;
+        const float knobLeft = minLeft + (maxLeft - minLeft) * eased;
         const Rect knobRect{
             knobLeft,
             trackRect.top + pad,
@@ -520,6 +598,10 @@ public:
                 500);
         }
     }
+
+private:
+    float m_animProgress = 0.0f;
+    bool m_animInitialized = false;
 };
 
 class SearchBox : public UIElement {
@@ -744,6 +826,9 @@ public:
         if (dismissed) return false;
         if (closable && x >= m_bounds.right - ScaleValue(34.0f)) {
             dismissed = true;
+            if (m_context && m_context->requestLayout) {
+                m_context->requestLayout();
+            }
             return true;
         }
         return false;

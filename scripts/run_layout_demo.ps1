@@ -2,6 +2,8 @@ param(
     [string]$Layout = "layouts/ui.xml",
     [ValidateSet("skia", "direct2d")]
     [string]$Renderer = "skia",
+    [ValidateSet("Auto", "Release", "Debug")]
+    [string]$Configuration = "Auto",
     [switch]$BuildIfMissing,
     [switch]$Rebuild,
     [switch]$NoLaunch
@@ -12,20 +14,12 @@ $ErrorActionPreference = "Stop"
 function Resolve-LauncherConfig {
     param(
         [string]$RepoRoot,
-        [string]$Backend
+        [string]$Backend,
+        [string]$BuildConfig
     )
 
-    $presetExe = switch ($Backend) {
-        "skia" {
-            Join-Path $RepoRoot "build\presets\dev-debug-skia-local-sdk\Debug\ai_win_ui.exe"
-        }
-        "direct2d" {
-            Join-Path $RepoRoot "build\presets\dev-debug\Debug\ai_win_ui.exe"
-        }
-        default {
-            throw "Unsupported renderer: $Backend"
-        }
-    }
+    $presetDirName = if ($Backend -eq "skia") { "dev-debug-skia-local-sdk" } else { "dev-debug" }
+    $presetExe = Join-Path $RepoRoot "build\presets\$presetDirName\$BuildConfig\ai_win_ui.exe"
 
     $configurePreset = if ($Backend -eq "skia") { "dev-debug-skia-local-sdk" } else { "dev-debug" }
     $buildPreset = if ($Backend -eq "skia") { "build-dev-debug-skia-local-sdk" } else { "build-dev-debug" }
@@ -47,6 +41,8 @@ function Resolve-LauncherConfig {
         PreferredExePath = $presetExe
         ConfigurePreset = $configurePreset
         BuildPreset = $buildPreset
+        PresetDir = (Join-Path $RepoRoot "build\presets\$presetDirName")
+        BuildConfig = $BuildConfig
     }
 }
 
@@ -233,10 +229,10 @@ function Ensure-Build {
         throw "Configure failed for preset '$($Config.ConfigurePreset)'."
     }
 
-    Write-Host "Building preset '$($Config.BuildPreset)'..."
-    & cmake --build --preset $Config.BuildPreset
+    Write-Host "Building '$($Config.PresetDir)' ($($Config.BuildConfig))..."
+    & cmake --build $Config.PresetDir --config $Config.BuildConfig --target ai_win_ui
     if ($LASTEXITCODE -ne 0) {
-        throw "Build failed for preset '$($Config.BuildPreset)'."
+        throw "Build failed for '$($Config.PresetDir)' ($($Config.BuildConfig))."
     }
 }
 
@@ -258,8 +254,13 @@ function Sync-Resources {
     Copy-Item -Path (Join-Path $sourceResourceDir "*") -Destination $targetResourceDir -Recurse -Force
 }
 
+$effectiveConfig = if ($Configuration -eq "Auto") {
+    if ($NoLaunch) { "Debug" } else { "Release" }
+} else {
+    $Configuration
+}
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
-$config = Resolve-LauncherConfig -RepoRoot $repoRoot -Backend $Renderer
+$config = Resolve-LauncherConfig -RepoRoot $repoRoot -Backend $Renderer -BuildConfig $effectiveConfig
 $resolvedLayout = Resolve-LayoutPath -RepoRoot $repoRoot -RequestedLayout $Layout
 
 $exeExists = Test-Path $config.ExePath

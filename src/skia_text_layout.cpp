@@ -10,6 +10,7 @@
 #include <cmath>
 #include <cwctype>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -297,6 +298,43 @@ void ApplyEllipsisToFirstLine(
     line.width = MeasureWideTextWidth(fontMgr, typeface, fontSize, line.text);
 }
 
+struct TextLayoutCacheKey {
+    std::wstring text;
+    int32_t fontSizeQ = 0;
+    int32_t maxWidthQ = 0;
+    uint8_t wrapMode = 0;
+    bool bold = false;
+    bool italic = false;
+    bool ellipsis = false;
+    uint16_t fontWeight = 0;
+    std::wstring fontFamily;
+    int32_t lineHeightFactorQ = 0;
+
+    bool operator==(const TextLayoutCacheKey& o) const {
+        return fontSizeQ == o.fontSizeQ && maxWidthQ == o.maxWidthQ &&
+               wrapMode == o.wrapMode && bold == o.bold && italic == o.italic &&
+               ellipsis == o.ellipsis && fontWeight == o.fontWeight &&
+               lineHeightFactorQ == o.lineHeightFactorQ &&
+               text == o.text && fontFamily == o.fontFamily;
+    }
+};
+
+struct TextLayoutCacheKeyHash {
+    size_t operator()(const TextLayoutCacheKey& k) const {
+        size_t h = std::hash<std::wstring>{}(k.text);
+        h ^= std::hash<int32_t>{}(k.fontSizeQ) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        h ^= std::hash<int32_t>{}(k.maxWidthQ) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        const uint32_t flags = (static_cast<uint32_t>(k.fontWeight) << 8) |
+                               (static_cast<uint32_t>(k.wrapMode) << 4) |
+                               (k.bold ? 4u : 0u) | (k.italic ? 2u : 0u) | (k.ellipsis ? 1u : 0u);
+        h ^= std::hash<uint32_t>{}(flags) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        if (!k.fontFamily.empty()) {
+            h ^= std::hash<std::wstring>{}(k.fontFamily) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        }
+        return h;
+    }
+};
+
 bool CreateSkiaTextLayout(const wchar_t* text,
                           uint32_t len,
                           float fontSize,
@@ -315,6 +353,27 @@ bool CreateSkiaTextLayout(const wchar_t* text,
 
     *layout = SkiaTextLayout{};
     if (!text || len == 0 || fontSize <= 0.0f) {
+        return true;
+    }
+
+    static std::unordered_map<TextLayoutCacheKey, SkiaTextLayout, TextLayoutCacheKeyHash> s_layoutCache;
+    const float widthBudgetForKey = (wrapMode == TextWrapMode::NoWrap && !ellipsis)
+        ? 0.0f
+        : std::max(1.0f, maxWidth);
+    TextLayoutCacheKey cacheKey{
+        std::wstring(text, len),
+        static_cast<int32_t>(std::lround(fontSize * 64.0f)),
+        static_cast<int32_t>(std::lround(widthBudgetForKey * 4.0f)),
+        static_cast<uint8_t>(wrapMode),
+        bold,
+        italic,
+        ellipsis,
+        fontWeight,
+        fontFamily,
+        static_cast<int32_t>(std::lround(lineHeightFactor * 100.0f))
+    };
+    if (auto it = s_layoutCache.find(cacheKey); it != s_layoutCache.end()) {
+        *layout = it->second;
         return true;
     }
 
@@ -361,6 +420,10 @@ bool CreateSkiaTextLayout(const wchar_t* text,
         ? 0.0f
         : static_cast<float>(layout->lines.size() - 1) * layout->lineHeight + layout->textHeight;
 
+    if (s_layoutCache.size() >= 4096) {
+        s_layoutCache.clear();
+    }
+    s_layoutCache.emplace(std::move(cacheKey), *layout);
     return true;
 }
 
