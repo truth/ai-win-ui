@@ -1595,6 +1595,28 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*chart, props);
         }
         element = std::move(chart);
+    } else if (type == "FinancialChart") {
+        auto chart = std::make_unique<FinancialChart>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["preClose"].IsNumber()) {
+                chart->SetPreClose(static_cast<float>(props["preClose"].numberValue));
+            }
+            if (props["modernTheme"].IsBool()) {
+                chart->SetThemeMode(props["modernTheme"].boolValue);
+            }
+            if (props["showCrosshair"].IsBool()) {
+                chart->showCrosshair = props["showCrosshair"].boolValue;
+            }
+            if (props["showHeaderInfo"].IsBool()) {
+                chart->showHeaderInfo = props["showHeaderInfo"].boolValue;
+            }
+            if (props["background"].IsString()) {
+                chart->bg = LayoutParser::ColorFromString(props["background"].stringValue);
+            }
+            ApplyCommonJsonProps(*chart, props);
+        }
+        element = std::move(chart);
     } else if (type == "SparklineChart") {
         auto chart = std::make_unique<SparklineChart>();
         if (node["props"].IsObject()) {
@@ -3061,6 +3083,25 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
             if (auto it2 = node.attributes.find("maxValue"); it2 != node.attributes.end()) {
                 chart->SetYRange(std::stof(it->second), std::stof(it2->second));
             }
+        }
+        ApplyCommonXmlAttributes(*chart, node);
+        element = std::move(chart);
+    } else if (node.name == "FinancialChart") {
+        auto chart = std::make_unique<FinancialChart>();
+        if (auto it = node.attributes.find("preClose"); it != node.attributes.end()) {
+            chart->SetPreClose(std::stof(it->second));
+        }
+        if (auto it = node.attributes.find("modernTheme"); it != node.attributes.end()) {
+            chart->SetThemeMode(ParseBoolString(it->second, false));
+        }
+        if (auto it = node.attributes.find("showCrosshair"); it != node.attributes.end()) {
+            chart->showCrosshair = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("showHeaderInfo"); it != node.attributes.end()) {
+            chart->showHeaderInfo = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("background"); it != node.attributes.end()) {
+            chart->bg = LayoutParser::ColorFromString(it->second);
         }
         ApplyCommonXmlAttributes(*chart, node);
         element = std::move(chart);

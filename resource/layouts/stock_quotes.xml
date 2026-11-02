@@ -1,0 +1,305 @@
+<Panel direction="column" padding="0,0,0,0" spacing="0" background="#050505" alignItems="stretch">
+  <!-- 1. 顶部菜单栏 (Menu Strip) -->
+  <Panel direction="row" height="26" padding="2,8,2,8" spacing="8" background="#101010" alignItems="center">
+    <Label text="同花顺" fontSize="13" color="#EE2222" bold="true" />
+    <Label text="• 上证指数" fontSize="12" color="#DDDDDD" />
+    <Spacer width="12" />
+    <Label text="系统" fontSize="11" color="#AAAAAA" />
+    <Label text="报价" fontSize="11" color="#AAAAAA" />
+    <Label text="行情" fontSize="11" color="#AAAAAA" />
+    <Label text="分析" fontSize="11" color="#AAAAAA" />
+    <Label text="交易" fontSize="11" color="#AAAAAA" />
+    <Label text="智能" fontSize="11" color="#AAAAAA" />
+    <Label text="工具" fontSize="11" color="#AAAAAA" />
+    <Label text="资讯" fontSize="11" color="#AAAAAA" />
+    <Label text="帮助" fontSize="11" color="#AAAAAA" />
+    <Label text="决策" fontSize="11" color="#EE2222" bold="true" />
+    <Spacer flexGrow="1" flexBasis="0" />
+    <Label text="注册" fontSize="11" color="#AAAAAA" />
+    <Label text="登录" fontSize="11" color="#AAAAAA" />
+    <Spacer width="8" />
+    <TextInput id="top_search" text="代码/名称" width="90" height="20" fontSize="11" background="#202020" textColor="#AAAAAA" />
+    <Button text="资讯" width="36" height="20" fontSize="11" background="#1C355E" textColor="#88CCFF" />
+    <Button text="委托" width="36" height="20" fontSize="11" background="#4A1818" textColor="#FF8888" />
+  </Panel>
+
+  <!-- 2. 第一层快捷操作工具条 -->
+  <Panel direction="row" height="28" padding="2,6,2,6" spacing="4" background="#181818" alignItems="center">
+    <Button text="买入" width="42" height="22" fontSize="11" background="#EE2222" textColor="#FFFFFF" />
+    <Button text="卖出" width="42" height="22" fontSize="11" background="#00AA00" textColor="#FFFFFF" />
+    <Button text="撤单" width="42" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="自选" width="42" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="F10" width="36" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="周期" width="40" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="画线" width="40" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="选股" width="40" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="研报" width="40" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="资金" width="40" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="两融" width="40" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="热点" width="40" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="龙虎" width="40" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="数据" width="40" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Button text="创/科" width="44" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
+    <Spacer flexGrow="1" flexBasis="0" />
+    <Button id="btn_toggle_theme" text="双主题切换 (T)" width="96" height="22" fontSize="11" background="#333333" textColor="#FFD700" />
+  </Panel>
+
+  <!-- 3. 第二层市场分类 Tab -->
+  <Panel direction="row" height="24" padding="1,6,1,6" spacing="3" background="#0D0D0D" alignItems="center">
+    <Button text="全景" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
+    <Button text="个股" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
+    <Button text="指数" width="38" height="20" fontSize="11" background="#EE2222" textColor="#FFFFFF" />
+    <Button text="期指" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
+    <Button text="期权" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
+    <Button text="基金" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
+    <Button text="外汇" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
+    <Button text="美股" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
+    <Button text="自定" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
+    <Button text="多窗" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
+  </Panel>
+
+  <!-- 4. 主体工作区 (左侧Dock + 中央行情走势 + 右侧盘口看板) -->
+  <Panel direction="row" flexGrow="1" flexBasis="0" padding="0,0,0,0" spacing="0" alignItems="stretch">
+    <!-- 左侧极窄垂直快捷条 -->
+    <Panel direction="column" width="28" padding="4,2,4,2" spacing="6" background="#121212" alignItems="center">
+      <Button text="分时" width="24" height="24" fontSize="10" background="#EE2222" textColor="#FFFFFF" />
+      <Button text="应用" width="24" height="24" fontSize="10" background="#222222" textColor="#AAAAAA" />
+      <Button text="指数" width="24" height="24" fontSize="10" background="#222222" textColor="#AAAAAA" />
+      <Button text="K线" width="24" height="24" fontSize="10" background="#222222" textColor="#AAAAAA" />
+      <Button text="大盘" width="24" height="24" fontSize="10" background="#222222" textColor="#AAAAAA" />
+      <Button text="自选" width="24" height="24" fontSize="10" background="#222222" textColor="#AAAAAA" />
+      <Button text="排名" width="24" height="24" fontSize="10" background="#222222" textColor="#AAAAAA" />
+      <Button text="更多" width="24" height="24" fontSize="10" background="#222222" textColor="#AAAAAA" />
+    </Panel>
+
+    <!-- 中央核心分时行情区 -->
+    <Panel direction="column" flexGrow="1" flexBasis="0" padding="0,0,0,0" spacing="0" alignItems="stretch">
+      <!-- 周期快捷按钮条 -->
+      <Panel direction="row" height="24" padding="1,4,1,4" spacing="2" background="#0C0C0C" alignItems="center">
+        <Button text="分时" width="40" height="20" fontSize="11" background="#EE2222" textColor="#FFFFFF" />
+        <Button text="1分" width="34" height="20" fontSize="11" background="#181818" textColor="#999999" />
+        <Button text="5分" width="34" height="20" fontSize="11" background="#181818" textColor="#999999" />
+        <Button text="15分" width="38" height="20" fontSize="11" background="#181818" textColor="#999999" />
+        <Button text="30分" width="38" height="20" fontSize="11" background="#181818" textColor="#999999" />
+        <Button text="60分" width="38" height="20" fontSize="11" background="#181818" textColor="#999999" />
+        <Button text="日" width="28" height="20" fontSize="11" background="#181818" textColor="#999999" />
+        <Button text="周" width="28" height="20" fontSize="11" background="#181818" textColor="#999999" />
+        <Button text="月" width="28" height="20" fontSize="11" background="#181818" textColor="#999999" />
+        <Button text="多周期" width="46" height="20" fontSize="11" background="#181818" textColor="#999999" />
+        <Spacer flexGrow="1" flexBasis="0" />
+        <Label text="九转  数据看盘  大盘异动" fontSize="11" color="#666666" />
+      </Panel>
+
+      <!-- 核心金融分时图表控件 -->
+      <FinancialChart id="stock_chart" preClose="3518.76" flexGrow="1" flexBasis="0" width="100%" showCrosshair="true" showHeaderInfo="true" />
+
+      <!-- 主图下方资讯分类标签条 -->
+      <Panel direction="row" height="22" padding="1,4,1,4" spacing="6" background="#101010" alignItems="center">
+        <Label text="股市直播" fontSize="11" color="#EE2222" bold="true" />
+        <Label text="投资机会" fontSize="11" color="#888888" />
+        <Label text="观点评论" fontSize="11" color="#888888" />
+        <Label text="资金流向" fontSize="11" color="#888888" />
+        <Label text="主力增仓" fontSize="11" color="#888888" />
+        <Label text="短线涨跌" fontSize="11" color="#888888" />
+        <Label text="板块热点" fontSize="11" color="#888888" />
+        <Label text="关联指数" fontSize="11" color="#888888" />
+        <Label text="相关ETF" fontSize="11" color="#888888" />
+      </Panel>
+
+      <!-- 大盘快讯列表条目 -->
+      <Panel direction="row" height="60" padding="4,8,4,8" spacing="12" background="#080808" alignItems="stretch">
+        <Panel direction="column" flexGrow="1" flexBasis="0" spacing="2" alignItems="start">
+          <Label text="[解盘] 港股收评：恒指收跌0.59% 腾讯控股跌3.57%          16:20" fontSize="11" color="#DDDDDD" />
+          <Label text="[解盘] 沪深两市成交额突破1万亿元                          15:01" fontSize="11" color="#EE2222" />
+          <Label text="[解盘] 第三代半导体板块持续走强                          14:22" fontSize="11" color="#EE2222" />
+        </Panel>
+        <Panel direction="column" flexGrow="1" flexBasis="0" spacing="2" alignItems="start">
+          <Label text="[要闻] 华银电力：公司与张家界市签订能源开发战略协议...    16:20" fontSize="11" color="#44AAFF" />
+          <Label text="[要闻] 凯撒文化：预计2021年前半年盈利同比增长50%...      16:19" fontSize="11" color="#44AAFF" />
+          <Label text="[要闻] 华鲁恒升：预计上半年净利润同比增长314.82%...       16:13" fontSize="11" color="#EE2222" />
+        </Panel>
+      </Panel>
+    </Panel>
+
+    <!-- 右侧盘口与深度看板区 -->
+    <Panel direction="column" width="310" padding="4,6,4,6" spacing="3" background="#080808" alignItems="stretch">
+      <!-- 标的标题与现价大字体 -->
+      <Panel direction="row" height="32" padding="0,2,0,2" spacing="6" alignItems="center">
+        <Label text="上证指数 1A0001" fontSize="15" color="#E5B800" bold="true" />
+        <Spacer flexGrow="1" flexBasis="0" />
+        <Label id="label_current_price" text="3534.32" fontSize="20" color="#EE2222" bold="true" />
+        <Label id="label_change" text="+15.56" fontSize="12" color="#EE2222" />
+        <Label id="label_change_pct" text="+0.44%" fontSize="12" color="#EE2222" />
+      </Panel>
+
+      <!-- 盘口核心指标双列 Grid -->
+      <Panel direction="column" padding="2,4,2,4" spacing="2" background="#0F0F0F">
+        <Panel direction="row" height="16" alignItems="center">
+          <Label text="委比" fontSize="11" color="#777777" width="40" />
+          <Label text="-2.11%" fontSize="11" color="#00CC00" width="70" />
+          <Label text="昨收" fontSize="11" color="#777777" width="40" />
+          <Label text="3518.76" fontSize="11" color="#DDDDDD" flexGrow="1" />
+        </Panel>
+        <Panel direction="row" height="16" alignItems="center">
+          <Label text="涨跌" fontSize="11" color="#777777" width="40" />
+          <Label id="grid_change" text="+15.56" fontSize="11" color="#EE2222" width="70" />
+          <Label text="今开" fontSize="11" color="#777777" width="40" />
+          <Label text="3516.92" fontSize="11" color="#00CC00" flexGrow="1" />
+        </Panel>
+        <Panel direction="row" height="16" alignItems="center">
+          <Label text="振幅" fontSize="11" color="#777777" width="40" />
+          <Label text="0.67%" fontSize="11" color="#DDDDDD" width="70" />
+          <Label text="最高" fontSize="11" color="#777777" width="40" />
+          <Label id="grid_high" text="3534.32" fontSize="11" color="#EE2222" flexGrow="1" />
+        </Panel>
+        <Panel direction="row" height="16" alignItems="center">
+          <Label text="总手" fontSize="11" color="#777777" width="40" />
+          <Label id="grid_total_hand" text="28809万" fontSize="11" color="#E5B800" width="70" />
+          <Label text="最低" fontSize="11" color="#777777" width="40" />
+          <Label text="3510.58" fontSize="11" color="#00CC00" flexGrow="1" />
+        </Panel>
+        <Panel direction="row" height="16" alignItems="center">
+          <Label text="金额" fontSize="11" color="#777777" width="40" />
+          <Label text="4454亿" fontSize="11" color="#44AAFF" width="70" />
+          <Label text="两市额" fontSize="11" color="#777777" width="40" />
+          <Label text="10060亿" fontSize="11" color="#44AAFF" flexGrow="1" />
+        </Panel>
+        <Panel direction="row" height="16" alignItems="center">
+          <Label text="上涨" fontSize="11" color="#777777" width="40" />
+          <Label text="1311家" fontSize="11" color="#EE2222" width="70" />
+          <Label text="下跌" fontSize="11" color="#777777" width="40" />
+          <Label text="597家" fontSize="11" color="#00CC00" flexGrow="1" />
+        </Panel>
+      </Panel>
+
+      <!-- 个股贡献度排行榜 -->
+      <Panel direction="row" height="20" padding="0,2,0,2" background="#141414" alignItems="center">
+        <Label text="个股贡献度" fontSize="11" color="#E5B800" bold="true" flexGrow="1" />
+        <Label text="涨幅" fontSize="11" color="#777777" width="55" />
+        <Label text="现价" fontSize="11" color="#777777" width="55" />
+        <Label text="贡献" fontSize="11" color="#777777" width="40" />
+      </Panel>
+      <Panel direction="column" height="110" spacing="1" background="#0A0A0A">
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="贵州茅台" fontSize="11" color="#DDDDDD" flexGrow="1" />
+          <Label text="-0.94%" fontSize="11" color="#00CC00" width="55" />
+          <Label text="1994.00" fontSize="11" color="#00CC00" width="55" />
+          <Label text="+0.17" fontSize="11" color="#EE2222" width="40" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="招商银行" fontSize="11" color="#DDDDDD" flexGrow="1" />
+          <Label text="-0.21%" fontSize="11" color="#00CC00" width="55" />
+          <Label text="52.94" fontSize="11" color="#00CC00" width="55" />
+          <Label text="+0.07" fontSize="11" color="#EE2222" width="40" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="兴业银行" fontSize="11" color="#DDDDDD" flexGrow="1" />
+          <Label text="+1.20%" fontSize="11" color="#EE2222" width="55" />
+          <Label text="21.04" fontSize="11" color="#EE2222" width="55" />
+          <Label text="+0.06" fontSize="11" color="#EE2222" width="40" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="复星医药" fontSize="11" color="#DDDDDD" flexGrow="1" />
+          <Label text="+0.68%" fontSize="11" color="#EE2222" width="55" />
+          <Label text="72.49" fontSize="11" color="#EE2222" width="55" />
+          <Label text="+0.05" fontSize="11" color="#EE2222" width="40" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="中国神华" fontSize="11" color="#DDDDDD" flexGrow="1" />
+          <Label text="+3.53%" fontSize="11" color="#EE2222" width="55" />
+          <Label text="19.96" fontSize="11" color="#EE2222" width="55" />
+          <Label text="+0.03" fontSize="11" color="#EE2222" width="40" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="北方稀土" fontSize="11" color="#DDDDDD" flexGrow="1" />
+          <Label text="+9.99%" fontSize="11" color="#EE2222" width="55" />
+          <Label text="22.68" fontSize="11" color="#EE2222" width="55" />
+          <Label text="+0.02" fontSize="11" color="#EE2222" width="40" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="中国平安" fontSize="11" color="#DDDDDD" flexGrow="1" />
+          <Label text="-0.63%" fontSize="11" color="#00CC00" width="55" />
+          <Label text="61.91" fontSize="11" color="#00CC00" width="55" />
+          <Label text="+0.03" fontSize="11" color="#EE2222" width="40" />
+        </Panel>
+      </Panel>
+
+      <!-- 短线精灵 / 逐笔成交异动 -->
+      <Panel direction="row" height="20" padding="0,2,0,2" background="#141414" alignItems="center">
+        <Label text="短线精灵" fontSize="11" color="#EE2222" bold="true" flexGrow="1" />
+        <Label text="A股" fontSize="11" color="#888888" />
+      </Panel>
+      <Panel id="tick_container" direction="column" flexGrow="1" flexBasis="0" spacing="1" background="#0A0A0A">
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="14:58:33" fontSize="10" color="#777777" width="55" />
+          <Label text="大笔买入" fontSize="10" color="#EE2222" flexGrow="1" />
+          <Label text="171手" fontSize="10" color="#EE2222" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="14:58:35" fontSize="10" color="#777777" width="55" />
+          <Label text="大笔买入" fontSize="10" color="#EE2222" flexGrow="1" />
+          <Label text="11006手" fontSize="10" color="#EE2222" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="14:58:38" fontSize="10" color="#777777" width="55" />
+          <Label text="大笔买入" fontSize="10" color="#EE2222" flexGrow="1" />
+          <Label text="2438手" fontSize="10" color="#EE2222" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="14:58:39" fontSize="10" color="#777777" width="55" />
+          <Label text="大笔卖出" fontSize="10" color="#00CC00" flexGrow="1" />
+          <Label text="1920手" fontSize="10" color="#00CC00" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="14:58:45" fontSize="10" color="#777777" width="55" />
+          <Label text="大笔卖出" fontSize="10" color="#00CC00" flexGrow="1" />
+          <Label text="5612手" fontSize="10" color="#00CC00" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="14:58:48" fontSize="10" color="#777777" width="55" />
+          <Label text="大笔买入" fontSize="10" color="#EE2222" flexGrow="1" />
+          <Label text="23357手" fontSize="10" color="#EE2222" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="14:58:51" fontSize="10" color="#777777" width="55" />
+          <Label text="急速拉升" fontSize="10" color="#EE2222" bold="true" flexGrow="1" />
+          <Label text="1.66%" fontSize="10" color="#EE2222" />
+        </Panel>
+        <Panel direction="row" height="15" alignItems="center">
+          <Label text="14:58:53" fontSize="10" color="#777777" width="55" />
+          <Label text="区间放量(涨)" fontSize="10" color="#EE2222" flexGrow="1" />
+          <Label text="6.02倍" fontSize="10" color="#EE2222" />
+        </Panel>
+      </Panel>
+    </Panel>
+  </Panel>
+
+  <!-- 5. 底部跨市场指数条与状态跑马灯 -->
+  <Panel direction="row" height="26" padding="2,8,2,8" spacing="10" background="#121212" alignItems="center">
+    <Label text="沪" fontSize="11" color="#888888" />
+    <Label id="bottom_sh_price" text="3534.32" fontSize="11" color="#EE2222" bold="true" />
+    <Label id="bottom_sh_diff" text="+15.56 (+0.44%)" fontSize="10" color="#EE2222" />
+    <Label text="4454亿" fontSize="10" color="#44AAFF" />
+
+    <Spacer width="8" />
+    <Label text="深" fontSize="11" color="#888888" />
+    <Label text="14718.66" fontSize="11" color="#EE2222" bold="true" />
+    <Label text="+47.95 (+0.33%)" fontSize="10" color="#EE2222" />
+    <Label text="5606亿" fontSize="10" color="#44AAFF" />
+
+    <Spacer width="8" />
+    <Label text="创" fontSize="11" color="#888888" />
+    <Label text="3352.12" fontSize="11" color="#EE2222" bold="true" />
+    <Label text="+18.22 (+0.55%)" fontSize="10" color="#EE2222" />
+
+    <Spacer width="8" />
+    <Label text="科" fontSize="11" color="#888888" />
+    <Label text="1575.89" fontSize="11" color="#EE2222" bold="true" />
+    <Label text="+37.73 (+2.45%)" fontSize="10" color="#EE2222" />
+
+    <Spacer flexGrow="1" flexBasis="0" />
+    <Label text="16:20 华银电力：公司与张家界市签订战略开发..." fontSize="11" color="#E5B800" />
+    <Spacer width="8" />
+    <TextInput id="genie_input" text="代码/简拼/功能" width="120" height="20" fontSize="11" background="#222222" textColor="#888888" />
+  </Panel>
+</Panel>

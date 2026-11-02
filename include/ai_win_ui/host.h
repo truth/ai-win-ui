@@ -125,6 +125,11 @@ public:
     bool SetChartSeriesData(const char* name, int seriesIndex, const float* values, size_t count);
     bool SetChartSeriesVisible(const char* name, int seriesIndex, bool visible);
 
+    // FinancialChart support (stock terminal / time-share charts)
+    bool ResetFinancialChart(const char* name, float preClose);
+    bool AppendFinancialChartPoint(const char* name, float price, float leadPrice, float volume, bool isUp, const char* timeStr);
+    bool SetFinancialChartTheme(const char* name, bool modern);
+
     void Invalidate();
 
 private:

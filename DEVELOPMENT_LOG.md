@@ -2,6 +2,23 @@
 
 ## 2026-11-02
 
+- **同花顺风格金融看盘终端与 FinancialChart 复合控件 (Flush Stock Terminal & FinancialChart)**（分支 `feature/stock-terminal`）
+  - **金融复合图表控件 (`src/ui_financial_chart.h`, `src/ui.h`)**：
+    - 继承自 `ai_win_ui::UIElement`，注册 `<FinancialChart>` XML/JSON 标签；
+    - 内部划分 `PricePane`（58% 分时主图走势，含加权白线、领先黄线、昨收虚线中轴与网格分割线）、`VolumePane`（20% 红绿成交量柱）、`IndicatorPane`（18% 大盘涨跌指标线）；
+    - 实现双 Y 轴自适应价格算法（以昨收基准为中心对称映射振幅与百分比）及时间 X 轴换算；
+    - 实现十字准星 Crosshair 追踪与 Tooltip 浮动数据标签（左轴价格、右轴涨跌幅、底轴时间及顶部状态汇总）；
+  - **模拟行情推流引擎与键盘精灵 (`src/mock_market_engine.h/cpp`, `src/keyboard_genie.h/cpp`)**：
+    - `MockMarketEngine` 生成 09:30~15:00 真实感分时走势与实时 Tick 行情，驱动 500ms 定时器跳动与短线精灵逐笔异动成交流；
+    - `KeyboardGenie` 实现证券代码（如 `600519`）、拼音简拼（如 `GZMT`）极速联想匹配；
+  - **同花顺经典布局与双主题 Tokens (`resource/layouts/stock_quotes.xml`, `resource/themes/theme_stock_classic.json`, `resource/themes/theme_stock_modern.json`)**：
+    - `stock_quotes.xml` 完整还原顶部双层工具栏、左侧竖直 Dock、主图、资讯列表、右侧指标与逐笔面板、底部跨市场指数条与状态跑马灯；
+    - 提供经典同花顺黑底模式与现代质感暗黑模式，支持按 `T` 键平滑热切换；
+  - **独立示例工程与宿主控制 API (`samples/stock_terminal/main.cpp`, `include/ai_win_ui/host.h`, `src/ui_host.cpp`, `CMakeLists.txt`)**：
+    - 在 `Host` 暴露 `ResetFinancialChart`、`AppendFinancialChartPoint`、`SetFinancialChartTheme` 接口；
+    - 新增独立目标 `stock_terminal.exe`；
+  - **验证**：`build.ps1` 编译 0 Error / 0 Warning，`run_ci_local.ps1 -SkipBuild` 7/7 项回归测试 100% PASS。
+
 - **P0 + P1 局部脏矩形重绘与二次命中高斯阴影缓存 (Dirty-Rect Partial Repaint & Two-Hit Shadow Cache)**（分支 `feature/dirty-rect-and-shadow-cache`）
   - **真局部脏矩形重绘管线 (`src/ui_context.h`, `src/ui_element.h`, `src/ui_panels.h`, `src/ui_scroll.h`, `src/ui_widgets.h`, `src/renderer_skia.cpp`, `src/ui_host.cpp`)**：
     - `UIElement::InvalidateSelf(float padDip)` 通过 `UIContext::invalidateRect` 向宿主 `UiHost::AccumulateDirtyRect` 提交控件局部包围盒（含阴影外扩边距）；

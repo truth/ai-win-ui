@@ -743,6 +743,40 @@ public:
         return true;
     }
 
+    bool ResetFinancialChart(const std::string& name, float preClose) {
+        if (!m_root) return false;
+        auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
+        if (!chart) return false;
+        chart->ClearPoints();
+        chart->SetPreClose(preClose);
+        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
+
+    bool AppendFinancialChartPoint(const std::string& name, float price, float leadPrice, float volume, bool isUp, const std::string& timeStr) {
+        if (!m_root) return false;
+        auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
+        if (!chart) return false;
+        FinancialPoint pt;
+        pt.price = price;
+        pt.leadPrice = leadPrice;
+        pt.volume = volume;
+        pt.isUp = isUp;
+        pt.timeStr = timeStr;
+        chart->AppendPoint(pt);
+        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
+
+    bool SetFinancialChartTheme(const std::string& name, bool modern) {
+        if (!m_root) return false;
+        auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
+        if (!chart) return false;
+        chart->SetThemeMode(modern);
+        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
+
     bool SelectTab(const std::string& name, int index) {
         if (!m_root) return false;
         UIElement* el = m_root->FindElementByName(name);
@@ -3320,6 +3354,21 @@ bool Host::SetChartSeriesData(const char* name, int seriesIndex, const float* va
 bool Host::SetChartSeriesVisible(const char* name, int seriesIndex, bool visible) {
     if (!m_impl || !m_impl->host || !name || seriesIndex < 0) return false;
     return m_impl->host->SetChartSeriesVisible(name, seriesIndex, visible);
+}
+
+bool Host::ResetFinancialChart(const char* name, float preClose) {
+    if (!m_impl || !m_impl->host || !name) return false;
+    return m_impl->host->ResetFinancialChart(name, preClose);
+}
+
+bool Host::AppendFinancialChartPoint(const char* name, float price, float leadPrice, float volume, bool isUp, const char* timeStr) {
+    if (!m_impl || !m_impl->host || !name) return false;
+    return m_impl->host->AppendFinancialChartPoint(name, price, leadPrice, volume, isUp, timeStr ? timeStr : "");
+}
+
+bool Host::SetFinancialChartTheme(const char* name, bool modern) {
+    if (!m_impl || !m_impl->host || !name) return false;
+    return m_impl->host->SetFinancialChartTheme(name, modern);
 }
 
 void Host::Invalidate() {

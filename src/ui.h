@@ -7,6 +7,7 @@
 #include "ui_element.h"
 #include "ui_panels.h"
 #include "ui_chart.h"
+#include "ui_financial_chart.h"
 #include "ui_media.h"
 #include "ui_widgets.h"
 #include "ui_containers.h"

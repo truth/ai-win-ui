@@ -70,6 +70,8 @@ set(AI_WIN_UI_LIB_SOURCES
     src/c_api.cpp
     src/window_chrome.cpp
     src/uia_provider.cpp
+    src/mock_market_engine.cpp
+    src/keyboard_genie.cpp
     ${CMAKE_SOURCE_DIR}/third_party/pugixml/pugixml.cpp
     ${CMAKE_SOURCE_DIR}/third_party/yyjson/yyjson.c
 )
@@ -208,6 +210,9 @@ endfunction()
 ai_win_ui_add_app(ai_win_ui src/main.cpp)
 
 if(AI_WIN_UI_BUILD_SAMPLES)
+    # 金融看盘终端 — stock_terminal sample
+    ai_win_ui_add_app(stock_terminal samples/stock_terminal/main.cpp)
+
     ai_win_ui_add_app(embed_host samples/embed_host/main.cpp)
 
     # 便签 — sticky-notes desktop app (multi-file).
