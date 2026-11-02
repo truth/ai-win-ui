@@ -224,7 +224,15 @@ public:
 
         canvas->resetMatrix();
         canvas->restoreToCount(1);
-        canvas->clear(ToSkColor(clearColor));
+        if (HasDirtyRect() && m_presentMode == PresentMode::Hwnd && !m_surfaceNeedsFullPaint) {
+            canvas->save();
+            canvas->clipRect(ToSkRect(GetDirtyRect()), false);
+            canvas->drawColor(ToSkColor(clearColor), SkBlendMode::kSrc);
+        } else {
+            ClearDirtyRect();
+            canvas->clear(ToSkColor(clearColor));
+            m_surfaceNeedsFullPaint = false;
+        }
         m_frameDirty = true;
     }
 
@@ -326,9 +334,61 @@ public:
                 rect.right + offsetX,
                 rect.bottom + offsetY);
 
-            // Visual Rendering v2: True Gaussian blur shadow via SkMaskFilter::MakeBlur.
+            // Visual Rendering v2 + P1 Shadow Raster Cache:
+            // Cache blurred shadow as an offscreen SkImage keyed by quantized size, radius, blur, and color.
             const float sigma = blurPx * 0.45f;
             if (sigma > 0.25f) {
+                const float w = rect.Width();
+                const float h = rect.Height();
+                if (w > 1.0f && h > 1.0f && w <= 2200.0f && h <= 1600.0f) {
+                    const ShadowCacheKey key{
+                        static_cast<int32_t>(std::lround(w * 2.0f)),
+                        static_cast<int32_t>(std::lround(h * 2.0f)),
+                        static_cast<int32_t>(std::lround(cornerRadius * 2.0f)),
+                        static_cast<int32_t>(std::lround(blurPx * 2.0f)),
+                        ToSkColor(color)
+                    };
+                    auto it = m_shadowCache.find(key);
+                    if (it == m_shadowCache.end()) {
+                        if (m_shadowCache.size() >= 256) {
+                            m_shadowCache.clear();
+                        }
+                        // Two-hit admission: skip offscreen allocation on one-off transient resize sizes.
+                        it = m_shadowCache.emplace(key, ShadowCacheEntry{nullptr, 0, 1}).first;
+                    } else if (!it->second.image && ++it->second.hits >= 2) {
+                        const int pad = static_cast<int>(std::ceil(sigma * 3.0f + 3.0f));
+                        const int imgW = static_cast<int>(std::ceil(w)) + pad * 2;
+                        const int imgH = static_cast<int>(std::ceil(h)) + pad * 2;
+                        if (sk_sp<SkSurface> off = SkSurfaces::Raster(SkImageInfo::MakeN32Premul(imgW, imgH))) {
+                            if (sk_sp<SkMaskFilter> mf = SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, sigma)) {
+                                SkPaint sp;
+                                sp.setColor(ToSkColor(color));
+                                sp.setStyle(SkPaint::kFill_Style);
+                                sp.setAntiAlias(true);
+                                sp.setMaskFilter(std::move(mf));
+                                const SkRect localRect = SkRect::MakeXYWH(
+                                    static_cast<float>(pad),
+                                    static_cast<float>(pad),
+                                    w,
+                                    h);
+                                if (cornerRadius > 0.5f) {
+                                    off->getCanvas()->drawRoundRect(localRect, cornerRadius, cornerRadius, sp);
+                                } else {
+                                    off->getCanvas()->drawRect(localRect, sp);
+                                }
+                                it->second.image = off->makeImageSnapshot();
+                                it->second.pad = pad;
+                            }
+                        }
+                    }
+                    if (it != m_shadowCache.end() && it->second.image) {
+                        canvas->drawImage(
+                            it->second.image.get(),
+                            shadowRect.left() - static_cast<float>(it->second.pad),
+                            shadowRect.top() - static_cast<float>(it->second.pad));
+                        return;
+                    }
+                }
                 if (sk_sp<SkMaskFilter> mf = SkMaskFilter::MakeBlur(kNormal_SkBlurStyle, sigma)) {
                     SkPaint paint;
                     paint.setColor(ToSkColor(color));
@@ -851,16 +911,31 @@ private:
         if (!dc) {
             return;
         }
-        BitBlt(
-            dc,
-            0,
-            0,
-            static_cast<int>(m_width),
-            static_cast<int>(m_height),
-            m_memDC,
-            0,
-            0,
-            SRCCOPY);
+        int bx = 0;
+        int by = 0;
+        int bw = static_cast<int>(m_width);
+        int bh = static_cast<int>(m_height);
+        if (HasDirtyRect()) {
+            const Rect d = GetDirtyRect();
+            bx = std::max(0, static_cast<int>(std::floor(d.left)));
+            by = std::max(0, static_cast<int>(std::floor(d.top)));
+            const int br = std::min(static_cast<int>(m_width), static_cast<int>(std::ceil(d.right)));
+            const int bb = std::min(static_cast<int>(m_height), static_cast<int>(std::ceil(d.bottom)));
+            bw = std::max(0, br - bx);
+            bh = std::max(0, bb - by);
+        }
+        if (bw > 0 && bh > 0) {
+            BitBlt(
+                dc,
+                bx,
+                by,
+                bw,
+                bh,
+                m_memDC,
+                bx,
+                by,
+                SRCCOPY);
+        }
         ReleaseDC(m_hwnd, dc);
     }
 
@@ -907,6 +982,7 @@ private:
             m_presentMode == PresentMode::Layered ? kUnknown_SkPixelGeometry : kRGB_H_SkPixelGeometry);
         m_surface = SkSurfaces::WrapPixels(info, m_dibBits, rowBytes, &surfaceProps);
         m_frameDirty = true;
+        m_surfaceNeedsFullPaint = true;
         return static_cast<bool>(m_surface);
     }
 
@@ -918,10 +994,37 @@ private:
     PresentMode m_presentMode = PresentMode::Hwnd;
     UINT m_width = 0;
     UINT m_height = 0;
+    struct ShadowCacheKey {
+        int32_t wQ = 0;
+        int32_t hQ = 0;
+        int32_t rQ = 0;
+        int32_t bQ = 0;
+        SkColor color = 0;
+        bool operator==(const ShadowCacheKey& o) const {
+            return wQ == o.wQ && hQ == o.hQ && rQ == o.rQ && bQ == o.bQ && color == o.color;
+        }
+    };
+    struct ShadowCacheKeyHash {
+        size_t operator()(const ShadowCacheKey& k) const {
+            size_t h = std::hash<int32_t>{}(k.wQ);
+            h ^= std::hash<int32_t>{}(k.hQ) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            h ^= std::hash<int32_t>{}((k.rQ << 16) ^ k.bQ) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            h ^= std::hash<uint32_t>{}(k.color) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+    struct ShadowCacheEntry {
+        sk_sp<SkImage> image;
+        int pad = 0;
+        int hits = 0;
+    };
+
     UINT m_dibCapWidth = 0;
     UINT m_dibCapHeight = 0;
     bool m_frameDirty = false;
+    bool m_surfaceNeedsFullPaint = true;
     std::unordered_map<std::string, SkPath> m_svgPathCache;
+    std::unordered_map<ShadowCacheKey, ShadowCacheEntry, ShadowCacheKeyHash> m_shadowCache;
     HDC m_memDC = nullptr;
     HBITMAP m_dib = nullptr;
     HBITMAP m_oldBitmap = nullptr;

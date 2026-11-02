@@ -1,5 +1,6 @@
 #pragma once
 
+#include "graphics_types.h"
 #include <functional>
 #include <Windows.h>
 #include <string>
@@ -25,6 +26,7 @@ struct UIContext {
     UIEventResolver eventResolver;
     std::function<void()> requestLayout;
     std::function<void()> invalidate;
+    std::function<void(const Rect&)> invalidateRect;
     std::function<void(UIElement*)> requestFocus;
     UINT dpi = 96;
     float dpiScale = 1.0f;
