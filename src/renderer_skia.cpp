@@ -500,8 +500,16 @@ public:
             return;
         }
         SkPath path;
-        if (!SkParsePath::FromSVGString(svgPathData.c_str(), &path)) {
-            return;
+        if (auto it = m_svgPathCache.find(svgPathData); it != m_svgPathCache.end()) {
+            path = it->second;
+        } else {
+            if (!SkParsePath::FromSVGString(svgPathData.c_str(), &path)) {
+                return;
+            }
+            if (m_svgPathCache.size() >= 256) {
+                m_svgPathCache.clear();
+            }
+            m_svgPathCache.emplace(svgPathData, path);
         }
         const float vbW = std::max(1.0f, viewBoxWidth);
         const float vbH = std::max(1.0f, viewBoxHeight);
@@ -774,11 +782,13 @@ private:
             m_dib = nullptr;
         }
         m_dibBits = nullptr;
+        m_dibCapWidth = 0;
+        m_dibCapHeight = 0;
     }
 
-    bool CreatePresentSurface() {
+    bool CreatePresentSurface(UINT capWidth, UINT capHeight) {
         ReleasePresentSurface();
-        if (m_width == 0 || m_height == 0) {
+        if (capWidth == 0 || capHeight == 0) {
             return false;
         }
 
@@ -794,8 +804,8 @@ private:
 
         BITMAPINFO bmi{};
         bmi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-        bmi.bmiHeader.biWidth = static_cast<LONG>(m_width);
-        bmi.bmiHeader.biHeight = -static_cast<LONG>(m_height); // top-down
+        bmi.bmiHeader.biWidth = static_cast<LONG>(capWidth);
+        bmi.bmiHeader.biHeight = -static_cast<LONG>(capHeight); // top-down
         bmi.bmiHeader.biPlanes = 1;
         bmi.bmiHeader.biBitCount = 32;
         bmi.bmiHeader.biCompression = BI_RGB;
@@ -806,7 +816,8 @@ private:
             return false;
         }
         m_oldBitmap = static_cast<HBITMAP>(SelectObject(m_memDC, m_dib));
-        ZeroMemory(m_dibBits, static_cast<size_t>(m_width) * m_height * 4u);
+        m_dibCapWidth = capWidth;
+        m_dibCapHeight = capHeight;
         return true;
     }
 
@@ -870,11 +881,26 @@ private:
             return false;
         }
 
-        if (!CreatePresentSurface()) {
-            return false;
+        const UINT desiredCapW = (m_presentMode == PresentMode::Layered)
+            ? m_width
+            : ((m_width + 63u) & ~63u);
+        const UINT desiredCapH = (m_presentMode == PresentMode::Layered)
+            ? m_height
+            : ((m_height + 63u) & ~63u);
+
+        const bool needRealloc = !m_dibBits || !m_memDC ||
+            (m_presentMode == PresentMode::Layered
+                ? (m_dibCapWidth != desiredCapW || m_dibCapHeight != desiredCapH)
+                : (m_width > m_dibCapWidth || m_height > m_dibCapHeight ||
+                   m_dibCapWidth > desiredCapW + 256u || m_dibCapHeight > desiredCapH + 256u));
+
+        if (needRealloc) {
+            if (!CreatePresentSurface(desiredCapW, desiredCapH)) {
+                return false;
+            }
         }
 
-        const size_t rowBytes = static_cast<size_t>(m_width) * 4;
+        const size_t rowBytes = static_cast<size_t>(m_dibCapWidth) * 4;
         const SkImageInfo info = SkImageInfo::MakeN32Premul(static_cast<int>(m_width), static_cast<int>(m_height));
         const SkSurfaceProps surfaceProps(
             0,
@@ -892,7 +918,10 @@ private:
     PresentMode m_presentMode = PresentMode::Hwnd;
     UINT m_width = 0;
     UINT m_height = 0;
+    UINT m_dibCapWidth = 0;
+    UINT m_dibCapHeight = 0;
     bool m_frameDirty = false;
+    std::unordered_map<std::string, SkPath> m_svgPathCache;
     HDC m_memDC = nullptr;
     HBITMAP m_dib = nullptr;
     HBITMAP m_oldBitmap = nullptr;

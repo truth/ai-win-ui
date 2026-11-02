@@ -37,6 +37,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **Frame Profiler & Interaction Smoothness:** `2026-11-02-frame-profiler-and-smoothness.md`
   - **Modern Components v2 (Avatar, Badge, Switch, SearchBox, CircularProgress, Donut, Expander, SplitView):** `2026-11-01-modern-components-v2.md`
   - **Visual Rendering v2 (Shadows, Typography, Vector Icons & Smooth Charts):** `2026-11-01-visual-rendering-v2.md`
   - **Medlio Dashboard UI Alignment:** `2026-11-01-medlio-dashboard-alignment.md`
@@ -77,7 +78,7 @@ abstractions:
 | Theme tokens | `src/theme.*` |
 | Window chrome | `src/window_chrome.*` |
 | Layout parse | `src/json_parser.*`, `src/xml_parser.*`, `src/layout_parser.*`, `src/layout_parser_panels.*`, `src/layout_parser_controls.*` |
-| **UiHost / multi-host** | **`src/ui_host.h`**, `src/ui_host_input.cpp`, `src/ui_host_overlay.cpp`, `src/application.*` |
+| **UiHost / multi-host** | **`src/ui_host.h`**, `src/ui_host_input.cpp`, `src/ui_host_overlay.cpp`, `src/application.*`, **`src/frame_profiler.h`** (F12 per-phase frame profiler & CSV export) |
 | Animation & Reactive | `src/animation_controller.*`, `<ai_win_ui/observable.h>` |
 | **C-API Interop** | **`<ai_win_ui/c_api.h>`**, `src/c_api.cpp` |
 | Host impl (TU) | `src/main.cpp` (`class UiHost`) |

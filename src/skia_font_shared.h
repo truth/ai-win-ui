@@ -84,6 +84,29 @@ inline sk_sp<SkTypeface> TryMatchFamily(SkFontMgr* fontMgr,
     return fontMgr->matchFamilyStyle(familyName, MakeFontStyle(bold, italic, weight));
 }
 
+struct TypefaceCacheKey {
+    const SkFontMgr* fontMgr = nullptr;
+    bool bold = false;
+    bool italic = false;
+    uint16_t weight = 0;
+    std::wstring family;
+    bool operator==(const TypefaceCacheKey& o) const {
+        return fontMgr == o.fontMgr && bold == o.bold && italic == o.italic &&
+               weight == o.weight && family == o.family;
+    }
+};
+
+struct TypefaceCacheKeyHash {
+    size_t operator()(const TypefaceCacheKey& k) const {
+        size_t h = std::hash<const void*>{}(k.fontMgr);
+        h ^= std::hash<uint32_t>{}((static_cast<uint32_t>(k.weight) << 2) |
+                                   (k.bold ? 2u : 0u) | (k.italic ? 1u : 0u)) +
+             0x9e3779b9 + (h << 6) + (h >> 2);
+        h ^= std::hash<std::wstring>{}(k.family) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        return h;
+    }
+};
+
 inline sk_sp<SkTypeface> CreateDefaultTypeface(SkFontMgr* fontMgr,
                                                bool bold = false,
                                                bool italic = false,
@@ -92,24 +115,33 @@ inline sk_sp<SkTypeface> CreateDefaultTypeface(SkFontMgr* fontMgr,
     if (!fontMgr) {
         return nullptr;
     }
+    static std::unordered_map<TypefaceCacheKey, sk_sp<SkTypeface>, TypefaceCacheKeyHash> s_cache;
+    const TypefaceCacheKey key{fontMgr, bold, italic, weight, customFamily};
+    if (auto it = s_cache.find(key); it != s_cache.end()) {
+        return it->second;
+    }
+
+    sk_sp<SkTypeface> resolved;
     if (!customFamily.empty()) {
         const std::string familyUtf8 = WideToUtf8(customFamily.c_str(), static_cast<uint32_t>(customFamily.size()));
         if (!familyUtf8.empty()) {
-            if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, familyUtf8.c_str(), bold, italic, weight)) {
-                return typeface;
-            }
+            resolved = TryMatchFamily(fontMgr, familyUtf8.c_str(), bold, italic, weight);
         }
     }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Segoe UI", bold, italic, weight)) {
-        return typeface;
+    if (!resolved) {
+        resolved = TryMatchFamily(fontMgr, "Segoe UI", bold, italic, weight);
     }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Arial", bold, italic, weight)) {
-        return typeface;
+    if (!resolved) {
+        resolved = TryMatchFamily(fontMgr, "Arial", bold, italic, weight);
     }
-    if (sk_sp<SkTypeface> typeface = TryMatchFamily(fontMgr, "Tahoma", bold, italic, weight)) {
-        return typeface;
+    if (!resolved) {
+        resolved = TryMatchFamily(fontMgr, "Tahoma", bold, italic, weight);
     }
-    return fontMgr->legacyMakeTypeface(nullptr, MakeFontStyle(bold, italic, weight));
+    if (!resolved) {
+        resolved = fontMgr->legacyMakeTypeface(nullptr, MakeFontStyle(bold, italic, weight));
+    }
+    s_cache.emplace(key, resolved);
+    return resolved;
 }
 
 inline sk_sp<SkTypeface> MatchTypefaceForCharacter(SkFontMgr* fontMgr,

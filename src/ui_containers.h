@@ -153,6 +153,9 @@ public:
         if (y <= hdrBottom) {
             expanded = !expanded;
             LayoutChildren();
+            if (m_context && m_context->requestLayout) {
+                m_context->requestLayout();
+            }
             return true;
         }
         if (expanded) {

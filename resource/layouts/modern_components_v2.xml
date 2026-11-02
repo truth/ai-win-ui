@@ -82,7 +82,7 @@
               <Label text="GPU Hardware Acceleration" fontSize="13" fontWeight="600" color="#181D27" />
               <Label text="Use Gaussian blur shadows and anti-aliased paths" fontSize="11.5" color="#697586" />
             </Panel>
-            <Switch checked="true" activeColor="#2764FF" tooltip="Toggle GPU acceleration" />
+            <Switch name="bench_switch" checked="true" activeColor="#2764FF" tooltip="Toggle GPU acceleration" />
           </Panel>
 
           <Panel direction="row" justifyContent="space-between" alignItems="center">
