@@ -776,6 +776,42 @@ public:
         if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
         return true;
     }
+    bool SetFinancialChartMode(const std::string& name, int mode) {
+        if (!m_root) return false;
+        auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
+        if (!chart) return false;
+        chart->SetChartMode(mode == 1 ? FinancialChartMode::Candlestick : FinancialChartMode::TimeSharing);
+        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
+
+    bool ClearFinancialChartCandles(const std::string& name) {
+        if (!m_root) return false;
+        auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
+        if (!chart) return false;
+        chart->SetCandles({});
+        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
+
+    bool AppendFinancialChartCandle(const std::string& name, const std::string& date, float open, float high, float low, float close, float volume, float ma5, float ma10, float ma20) {
+        if (!m_root) return false;
+        auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
+        if (!chart) return false;
+        CandleBar c;
+        c.date = date;
+        c.open = open;
+        c.high = high;
+        c.low = low;
+        c.close = close;
+        c.volume = volume;
+        c.ma5 = ma5;
+        c.ma10 = ma10;
+        c.ma20 = ma20;
+        chart->AppendCandle(c);
+        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        return true;
+    }
 
     bool SelectTab(const std::string& name, int index) {
         if (!m_root) return false;
@@ -3369,6 +3405,21 @@ bool Host::AppendFinancialChartPoint(const char* name, float price, float leadPr
 bool Host::SetFinancialChartTheme(const char* name, bool modern) {
     if (!m_impl || !m_impl->host || !name) return false;
     return m_impl->host->SetFinancialChartTheme(name, modern);
+}
+
+bool Host::SetFinancialChartMode(const char* name, int mode) {
+    if (!m_impl || !m_impl->host || !name) return false;
+    return m_impl->host->SetFinancialChartMode(name, mode);
+}
+
+bool Host::ClearFinancialChartCandles(const char* name) {
+    if (!m_impl || !m_impl->host || !name) return false;
+    return m_impl->host->ClearFinancialChartCandles(name);
+}
+
+bool Host::AppendFinancialChartCandle(const char* name, const char* date, float open, float high, float low, float close, float volume, float ma5, float ma10, float ma20) {
+    if (!m_impl || !m_impl->host || !name) return false;
+    return m_impl->host->AppendFinancialChartCandle(name, date ? date : "", open, high, low, close, volume, ma5, ma10, ma20);
 }
 
 void Host::Invalidate() {

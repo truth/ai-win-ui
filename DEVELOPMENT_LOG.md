@@ -2,6 +2,24 @@
 
 ## 2026-11-02
 
+- **同花顺终端 UI 对齐修复、全量 Mock 数据与 K 线图（Candlestick）功能 (FinancialChart K-Line & Layout Align)**（分支 `feature/kline-and-layout-align`）
+  - **FinancialChart K 线模式支持 (src/ui_financial_chart.h)**：
+    - 扩展支持 `FinancialChartMode::Candlestick` 与 `FinancialChartMode::TimeSharing` 双模；
+    - 实现蜡烛实体柱（阳线红实心、阴线绿实心）、上下影线、MA5（白）/ MA10（黄）/ MA20（紫）三条均线平滑折线绘制；
+    - 副图成交量与量均线适配，K 线十字光标与 OHLCV 详情信息 Header 追踪；
+  - **模拟行情与全量 Mock 数据扩充 (src/mock_market_engine.h/cpp)**：
+    - `GenerateCandles(90)` 生成 90 根日 K 线模拟行情，计算真实 MA5/MA10/MA20 移动平均线；
+    - 盘口核心指标全量补充（委比、委差、委买量、委卖量、外盘、内盘、市盈(动)、市净率、换手率、两市成交额、上涨/平盘/下跌家数）；
+    - 扩充 16 支权重股贡献度榜单与 16+ 条短线精灵逐笔推流；
+  - **布局重构与字体截断修复 (esource/layouts/stock_quotes.xml)**：
+    - 顶部菜单行高提升至 28px，字号 12px，消除 DPI 缩放下的文本压扁与裁切；
+    - 盘口网格行高调整为安全的 19px，个股贡献度与短线精灵列表行高 18px，填满界面，彻底杜绝黑屏留白；
+    - 周期栏与左侧 Dock 接入分时、日K、周K、月K一键无缝切换动作；
+  - **独立终端应用与 Host API (samples/stock_terminal/main.cpp, include/ai_win_ui/host.h, src/ui_host.cpp)**：
+    - `Host` 暴露 `SetFinancialChartMode`、`ClearFinancialChartCandles`、`AppendFinancialChartCandle`；
+    - 响应周期切换 action，实现分时走势与多周期 K 线图无缝交互；
+  - **验证**：`build.ps1` 编译 0 Error / 0 Warning，`run_ci_local.ps1 -SkipBuild` 7/7 项回归测试 100% PASS。
+
 - **同花顺风格金融看盘终端与 FinancialChart 复合控件 (Flush Stock Terminal & FinancialChart)**（分支 `feature/stock-terminal`）
   - **金融复合图表控件 (`src/ui_financial_chart.h`, `src/ui.h`)**：
     - 继承自 `ai_win_ui::UIElement`，注册 `<FinancialChart>` XML/JSON 标签；

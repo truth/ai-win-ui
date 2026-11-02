@@ -1,97 +1,86 @@
-# Implementation Plan: 同花顺风格金融看盘工作台 (Stock Terminal Prototype)
+# 实施计划 - 同花顺金融终端 UI 对齐、文字截断修复与 K 线图功能实现
 
-## 1. 目标 (Goals)
-在 `ai-win-ui` 体系下，构建一个高保真还原同花顺风格的上证指数分时工作台原型 (`samples/stock_terminal`)。
-系统涵盖高密度分时图表复合控件 (`FinancialChart`)、右侧盘口与高频逐笔异动、键盘精灵检索弹窗、内置模拟行情推流引擎 (`MockMarketEngine`) 以及双主题切换（经典黑底模式 & 现代暗黑模式）。
+## 1. 问题复盘与需求分析
 
----
-
-## 2. 总体技术架构与方案
-
-### 2.1 模块分层与实现策略
-1. **金融复合图表控件 (`FinancialChart`)**：
-   - 继承自 `ai_win_ui::Element`，并在 `LayoutParser` 中注册 `<financial-chart>` 标签。
-   - 内部三区域统一划分与绘制：
-     - `PricePane`（顶部 60%）：白线（加权点位）、黄线（领先不加权点位）、0.00% 昨收参考中轴虚线、双 Y 轴（左点位、右百分比涨跌幅）、时间 X 轴标尺（09:30、10:30、11:30/13:00、14:00、15:00）。
-     - `VolumePane`（中部 20%）：红绿成交量柱状图、成交量 Y 轴刻度。
-     - `IndicatorPane`（底部 20%）：大盘涨跌停指标线 / 多空曲线。
-   - **交互特性**：
-     - 鼠标移动追踪（Crosshair 十字光标），并显示悬浮信息提示（价格、涨跌、成交量、时间）。
-     - 支持局部 `InvalidateRect`，高频绘制避免全树重新 Layout。
-2. **模拟行情推流引擎 (`MockMarketEngine`)**：
-   - 生成符合真实 A 股分时波动逻辑的模拟数据（开盘 09:30 至收盘 15:00 对应 240 个数据点）。
-   - 提供定时器 Tick 驱动（默认 500ms 刷新），实时追加点位并通知 UI 重绘。
-   - 生成盘口五档/十档明细与逐笔成交异动（大笔买入/大笔卖出），支持红绿闪烁。
-3. **右侧盘口与排行榜看板 (`MarketDepthPanel` & `VirtualListBox`)**：
-   - 上半部分：指数关键指标概览（昨收、今开、现价、涨跌幅、委比、成交额、涨跌家数比）。
-   - 中间部分：个股贡献度排行榜。
-   - 下半部分：短线精灵逐笔异动流（带时间、成交量、方向以及高亮背景动画）。
-4. **键盘精灵 (`KeyboardGenie`)**：
-   - 监听宿主窗口按键事件，用户输入代码或拼音首字母（如 `600`、`GZMT`）即时呼出右下角联想面板，支持键盘上下切换与回车。
-5. **双主题支持 (`theme_stock_classic.json` & `theme_stock_modern.json`)**：
-   - 经典同花顺黑底主题：高饱和红绿白黄对比，暗红/暗灰网格。
-   - 现代暗黑主题：科技深灰底色，低饱和柔和配色。
+在用户提供的最新运行截图（`media_1793629935816_1b8fd61b.png`）中，发现以下关键缺陷需要彻底解决：
+1. **上方菜单与字体截断/消失**：
+   - 顶部菜单行高仅 `22px`，在 DPI 缩放（125%/150%）下文字被严重压扁、重叠与裁剪。
+   - 右侧盘口栏与列表大量行高被写死为 `height="14"` 或 `height="15"`，导致 DirectWrite / Direct2D 测出的文本边界超过容器高度，整行被父容器 clip 或完全不绘制，导致右侧出现大片黑屏留白。
+   - 顶部工具条密度与参考原图（`media_1793625014431_f9d54b2e.png`）风格不匹配。
+2. **新增 K 线图支持**：
+   - 核心图表控件当前仅支持分时图（Time-Sharing），需扩展支持 **K 线图（Candlestick）** 模式。
+   - K 线图需支持：红绿蜡烛实体柱（阳线红实心、阴线绿实心）、上下影线、MA5（白）、MA10（黄）、MA20（紫）三条均线、成交量副图、完整十字光标与悬停 OHLCV 信息窗。
+   - 支持通过顶部周期按钮（“分时” vs “日K/周K/月K”）或左侧“K线”按钮进行**分时/K线模式一键无缝切换**。
 
 ---
 
-## 3. 具体修改与新建内容清单
+## 2. 总体设计方案与技术架构
 
-### 3.1 核心组件与扩展 (`src/` & `include/`)
-- `include/ai_win_ui/financial_chart.h` & `src/financial_chart.cpp`：
-  - 定义 `FinancialChart` 控件，实现多 Pane 划分、坐标变换、Direct2D 路径绘制与十字光标。
-- `src/mock_market_engine.h` & `src/mock_market_engine.cpp`：
-  - 实现行情数据模型、分时走势生成算法与定时 Tick 推流器。
-- `src/keyboard_genie.h` & `src/keyboard_genie.cpp`：
-  - 键盘精灵逻辑与浮层弹出控制器。
-- `src/layout_parser_controls.cpp`：
-  - 注册 `<financial-chart>` 标签解析，支持属性如 `gridRows`、`gridCols`、`showCrosshair` 等。
+### 2.1 UI 布局与字体渲染重构 (`stock_quotes.xml`)
+- **顶部菜单条（Menu Bar）**：
+  - 高度提升至 `28px`，内边距 `0, 10px`，字号 `12px`，背景为同花顺经典深灰 `#141414`，菜单项增加间距 `10px`，彻底杜绝文字截断。
+- **第二层工具栏（Toolbar）**：
+  - 高度设为 `30px`，按钮高度 `22px`，增加边框与同花顺红绿高对比色彩。
+- **第三层周期切换栏（Period Bar）**：
+  - 增加清晰的按钮点击 action 回调：`btn_period_timeshare`（分时）、`btn_period_day_k`（日K）、`btn_period_week_k`（周K）、`btn_period_month_k`（月K）。
+- **右侧盘口看板与列表**：
+  - 彻底移除 `height="14/15"` 的危险硬编码，统一行高为 `19px`（行间距 `1px`），文字 `11px`，垂直居中 `verticalAlign="center"`。
+  - 右侧盘口重新梳理为标准两列双值（委比、最新、涨跌、涨幅、振幅、最高、最低、现手、量比、总手、金额、两市额、上涨家数、下跌家数），字字清晰，杜绝空白。
+  - “个股贡献度”与“短线精灵”列表行高调整为 `18px`，增加文本水平对齐和颜色高亮。
 
-### 3.2 布局与资源文件 (`resource/`)
-- `resource/layouts/stock_quotes.xml`：
-  - 完整的同花顺分时工作台布局（Top Menu + Left Dock + Center Chart + Right Depth + Bottom Status）。
-- `resource/themes/theme_stock_classic.json`：
-  - 经典同花顺配色主题 Tokens。
-- `resource/themes/theme_stock_modern.json`：
-  - 现代扁平暗黑配色主题 Tokens。
+### 2.2 FinancialChart 升级支持 K 线模式 (`src/ui_financial_chart.h`)
+- 引入枚举 `FinancialChartMode { TimeSharing, Candlestick }`。
+- 引入 `CandleBar` 结构：
+  ```cpp
+  struct CandleBar {
+      std::string date;      // "2026-03-12"
+      float open = 0.0f;
+      float high = 0.0f;
+      float low = 0.0f;
+      float close = 0.0f;
+      float volume = 0.0f;
+      float ma5 = 0.0f;
+      float ma10 = 0.0f;
+      float ma20 = 0.0f;
+  };
+  ```
+- 绘制逻辑划分：
+  - `Render()` 根据 `m_mode` 分流调用 `DrawTimeSharingPane()` 或 `DrawCandlestickPane()`。
+  - **K线主图**：绘制蜡烛实体（收盘 >= 开盘 为红，收盘 < 开盘 为绿）、上下细影线（DrawLine）、MA5/MA10/MA20 多段折线。
+  - **副图**：根据当日涨跌显示红/绿量柱。
+  - **K线十字光标**：十字交叉定位到当前选中蜡烛，顶部 Header 显示：`日期 2026-xx-xx  开: 3512.10  高: 3540.20  低: 3505.30  收: 3534.32  涨跌: +22.22 (+0.63%)  MA5: 3520.12  MA10: 3515.80  MA20: 3498.40`。
 
-### 3.3 示例程序入口与构建配置 (`samples/stock_terminal/` & `CMakeLists.txt`)
-- `samples/stock_terminal/main.cpp`：
-  - 创建独立金融工作台窗口，加载 `stock_quotes.xml`，绑定 `MockMarketEngine` 与 `KeyboardGenie`，支持按 `T` 键热切换双主题。
-- `CMakeLists.txt`：
-  - 添加 `ai_win_ui_add_app(stock_terminal samples/stock_terminal/main.cpp)` 编译目标。
-
----
-
-## 4. 实施阶段与步骤
-
-- [ ] **Step 1: 编写核心图表控件 `FinancialChart`**
-  - 实现双 Y 轴自适应价格算法、时间 X 轴换算；
-  - 实现分时曲线、成交量柱、指标线 Direct2D 绘制；
-  - 实现鼠标十字光标与 Tooltip 浮窗。
-- [ ] **Step 2: 实现模拟行情引擎 `MockMarketEngine` 与键盘精灵 `KeyboardGenie`**
-  - 构建开盘分时走势生成器、逐笔成交发生器；
-  - 注册股票代码与简拼字典，实现快速联想查询。
-- [ ] **Step 3: 编写布局与主题资源**
-  - 编写 `stock_quotes.xml` 完整工作台；
-  - 编写经典黑底与现代暗黑两套主题 Tokens。
-- [ ] **Step 4: 注册 `<financial-chart>` 标签并集成 `samples/stock_terminal`**
-  - 扩展 `LayoutParser`；
-  - 编写 `samples/stock_terminal/main.cpp`，配置编译目标。
-- [ ] **Step 5: 编译测试与自动化回归验证**
-  - 使用 `.\build.ps1` 校验编译通过；
-  - 运行 `.\scripts\run_ci_local.ps1 -SkipBuild` 确保 7 项 CI 回归测试 100% PASS。
-- [ ] **Step 6: 合并分支与文档归档**
-  - 合并 `feature/stock-terminal` 到 `master`；
-  - 更新 `DEVELOPMENT_LOG.md`、在 `doc/plan/` 增加设计归档文档、更新 `doc/README.md`。
+### 2.3 宿主与模拟引擎扩展 (`src/ui_host.cpp`, `src/mock_market_engine.h/cpp`)
+- `MockMarketEngine` 增加 120 根历史日 K 线数据生成器（自适应计算真实 MA5、MA10、MA20 及波动走势）。
+- `Host` 增加 `SetFinancialChartMode`、`SetFinancialChartCandles` 接口。
+- `stock_terminal/main.cpp` 支持周期按钮事件响应，点击“日/周/月/K线”即刻切换并加载 K 线数据，点击“分时”无缝切回动态跳动的分时数据。
 
 ---
 
-## 5. 验证指标 (Verification Criteria)
-1. **编译构建**：`stock_terminal.exe` 成功生成并可独立启动运行，零编译警告与报错。
-2. **视觉保真度**：分时图白黄双曲线、昨收中轴基准、红绿成交量柱、右侧指数指标与逐笔成交布局与截图高度吻合。
-3. **动态与交互**：
-   - 鼠标悬停分时图区域时，十字光标准确定位并显示对应时间与点位；
-   - 模拟行情平滑跳动，右侧逐笔成交流实时滚动；
-   - 按下键盘（如代码 `6`）弹出键盘精灵搜索框；
-   - 按 `T` 键可平滑在“经典同花顺黑底模式”与“现代暗黑模式”之间切换主题。
-4. **CI 质量红线**：7 项本地 CI 回归测试 **100% PASS**（不破坏现有任何控件、XML 解析与 Golden Tests）。
+## 3. 实施步骤与分工
+
+| 步骤 | 内容 | 文件 |
+| :--- | :--- | :--- |
+| **Step 1** | 在 `src/ui_financial_chart.h` 中实现 K 线图数据结构、绘制引擎（蜡烛图、均线、量柱、K线十字光标）与模式切换 | `src/ui_financial_chart.h` |
+| **Step 2** | 在 `src/mock_market_engine.h/cpp` 中实现日 K 线生成与均线计算逻辑 | `src/mock_market_engine.h`, `src/mock_market_engine.cpp` |
+| **Step 3** | 在 `src/ui_host.cpp` 与 `include/ai_win_ui/host.h` 增加 K 线数据灌入与模式切换接口 | `src/ui_host.cpp`, `include/ai_win_ui/host.h` |
+| **Step 4** | 重构 `resource/layouts/stock_quotes.xml`，调整行高与间距，消除文本截断，对齐参考图配色与紧凑度，绑定分时与K线按钮 action | `resource/layouts/stock_quotes.xml` |
+| **Step 5** | 在 `samples/stock_terminal/main.cpp` 中实现分时与 K 线模式切换响应逻辑 | `samples/stock_terminal/main.cpp` |
+| **Step 6** | 执行本地构建 `.\build.ps1` 校验编译通过 | - |
+| **Step 7** | 运行自动化回归测试 `.\scripts\run_ci_local.ps1 -SkipBuild`，确保 7 项测试 100% PASS | - |
+| **Step 8** | 启动 `stock_terminal.exe` 验证渲染效果与周期切换，确认字体无截断，K线图流畅展示 | - |
+
+---
+
+## 4. 验证指标与验收标准
+
+1. **界面文字完整性**：
+   - 顶部菜单项（“同花顺”、“系统”、“报价”、“行情”等）清晰完整，无挤压重叠。
+   - 右侧 16 行核心指标盘口（委比、涨跌、昨收、今开、最高、最低、总手、两市额等）全部清晰显示，数值高亮。
+   - 个股贡献度与短线精灵列表行文字不被下边缘裁剪。
+2. **K 线图功能**：
+   - 点击“日”、“周”、“月”或左侧“K线”按钮，图表立即切换为红绿 K 线蜡烛图及 MA5/MA10/MA20 均线图。
+   - 鼠标悬停显示精确的 K 线十字光标与 OHLCV 信息框。
+   - 点击“分时”按钮，瞬间切回分时走势图并继续接受 500ms 行情 Tick 跳动。
+3. **CI 回归**：
+   - 本地 CI 7 项测试保持 **100% PASS**。

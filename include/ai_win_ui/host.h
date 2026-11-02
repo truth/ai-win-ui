@@ -129,6 +129,9 @@ public:
     bool ResetFinancialChart(const char* name, float preClose);
     bool AppendFinancialChartPoint(const char* name, float price, float leadPrice, float volume, bool isUp, const char* timeStr);
     bool SetFinancialChartTheme(const char* name, bool modern);
+    bool SetFinancialChartMode(const char* name, int mode);
+    bool ClearFinancialChartCandles(const char* name);
+    bool AppendFinancialChartCandle(const char* name, const char* date, float open, float high, float low, float close, float volume, float ma5, float ma10, float ma20);
 
     void Invalidate();
 
