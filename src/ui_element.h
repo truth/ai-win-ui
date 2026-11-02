@@ -353,11 +353,26 @@ public:
         return false;
     }
 
+    void InvalidateSelf(float padDip = 10.0f) const {
+        if (m_context && m_context->invalidateRect) {
+            const float p = ScaleValue(padDip);
+            m_context->invalidateRect(Rect{
+                m_bounds.left - p,
+                m_bounds.top - p,
+                m_bounds.right + p,
+                m_bounds.bottom + p
+            });
+        }
+    }
+
     virtual bool OnTimer(UINT_PTR timerId, uint32_t dtMs) {
-        bool changed = false;
-        changed = m_animBackground.Tick(dtMs) || changed;
-        changed = m_animBorder.Tick(dtMs) || changed;
-        
+        bool selfChanged = false;
+        selfChanged = m_animBackground.Tick(dtMs) || selfChanged;
+        selfChanged = m_animBorder.Tick(dtMs) || selfChanged;
+        if (selfChanged) {
+            InvalidateSelf(10.0f);
+        }
+        bool changed = selfChanged;
         for (auto& child : m_children) {
             changed = child->OnTimer(timerId, dtMs) || changed;
         }

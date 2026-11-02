@@ -109,6 +109,9 @@ public:
     }
 
     void Render(IRenderer& renderer) override {
+        if (!renderer.IntersectsDirtyRect(m_bounds)) {
+            return;
+        }
         if (background.a > 0.0f) {
             renderer.FillRect(m_bounds, background);
         }

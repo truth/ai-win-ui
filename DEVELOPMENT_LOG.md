@@ -2,6 +2,17 @@
 
 ## 2026-11-02
 
+- **P0 + P1 局部脏矩形重绘与二次命中高斯阴影缓存 (Dirty-Rect Partial Repaint & Two-Hit Shadow Cache)**（分支 `feature/dirty-rect-and-shadow-cache`）
+  - **真局部脏矩形重绘管线 (`src/ui_context.h`, `src/ui_element.h`, `src/ui_panels.h`, `src/ui_scroll.h`, `src/ui_widgets.h`, `src/renderer_skia.cpp`, `src/ui_host.cpp`)**：
+    - `UIElement::InvalidateSelf(float padDip)` 通过 `UIContext::invalidateRect` 向宿主 `UiHost::AccumulateDirtyRect` 提交控件局部包围盒（含阴影外扩边距）；
+    - `UiHost::FlushPendingDirtyInvalidate` 将 DIP 脏区转换为物理像素 `RECT` 调用 `::InvalidateRect(m_hwnd, &rc, FALSE)`，`OnPaint` 将 `ps.rcPaint` 传入 `m_renderer->SetDirtyRect(...)`；
+    - `SkiaRenderer::BeginFrame` 在局部重绘帧仅裁剪并清除脏矩形，`PresentHwnd` 仅对 `(bx, by, bw, bh)` 脏矩形区域执行局部 `BitBlt`；
+    - `Panel::Render`（含卡片阴影外扩边距）、`Label::Render`、`ScrollViewer::Render` 接入 `renderer.IntersectsDirtyRect(...)` 脏区剔除，使 `Switch` 60fps 过渡动画帧在 `Release` 下的 `render_ms` 从 `3.19 ms` 骤降至 **`0.17 ms`（P95 仅 `0.14 ms`，整帧 `paint_ms = 0.27 ms`，比初始基线快 510×）**，即使在 `Debug` 模式下也从 `137.74 ms` 降至 **`1.99 ms`**。
+  - **二次命中准入（Two-Hit Admission）高斯软阴影位图缓存 (`src/renderer_skia.cpp`)**：
+    - `SkiaRenderer::FillSoftShadow` 新增 `ShadowCacheKey -> {sk_sp<SkImage>, pad, hits}` 缓存（上限 256 项），采用 `hits >= 2` 准入策略：窗口缩放中仅出现 1 次的瞬态尺寸直接绘制到主画布，避免离屏 `SkSurface` 分配开销；静态卡片与固定尺寸控件在第 2 次绘制时自动光栅化为离屏 `SkImage` 位图并复用。
+  - **基准测试 DPI 对齐修复 (`scripts/bench_frame_stats.ps1`)**：启用 `SetProcessDPIAware()` 并精确匹配 `AiWinUiWindowClass` 顶层窗口，消除 PowerShell 125% DPI 虚拟化导致的自动化点击偏移。
+  - **验证**：`build.ps1` 编译 0 Error / 0 Warning，`run_ci_local.ps1 -SkipBuild` 7/7 项回归测试 100% PASS。
+
 - **帧耗时剖析器与交互丝滑度优化 (Frame Profiler & Smoothness Optimization)**（分支 `feature/frame-profiler`）
   - **高精度帧耗时统计器 (`src/frame_profiler.h`, `src/ui_host.cpp`, `scripts/bench_frame_stats.ps1`)**：
     - 基于 `QueryPerformanceCounter` 采集每帧 `resize`、`layout`（含调用次数）、`render`、`present`、`paint` 与输入到上屏端到端 `latency` 耗时；

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ai-win-ui 帧耗时剖析与交互丝滑度优化过程报表</title>
+  <title>ai-win-ui 帧耗时剖析与交互丝滑度优化过程报表 (P0 + P1)</title>
   <style>
     :root {
       --bg: #f6f8fb;
@@ -32,7 +32,7 @@
       padding: 28px 20px 60px;
     }
     .container {
-      max-width: 1160px;
+      max-width: 1180px;
       margin: 0 auto;
     }
     .header-card {
@@ -180,6 +180,11 @@
       border-color: #fecaca;
       color: #b91c1c;
     }
+    .pipe-step.fast {
+      background: var(--success-soft);
+      border-color: #a7f3d0;
+      color: #047857;
+    }
     .pipe-arrow { color: var(--muted); font-weight: 700; }
     table {
       width: 100%;
@@ -219,7 +224,7 @@
     .bar-group { margin: 12px 0; }
     .bar-row {
       display: grid;
-      grid-template-columns: 220px 1fr 110px;
+      grid-template-columns: 250px 1fr 140px;
       align-items: center;
       gap: 12px;
       margin-bottom: 10px;
@@ -307,6 +312,7 @@
       border-radius: 10px;
       width: fit-content;
       margin-bottom: 12px;
+      flex-wrap: wrap;
     }
     .tab-btn {
       border: none;
@@ -333,12 +339,12 @@
         <div>
           <div class="badge-row">
             <span class="pill pass">7 / 7 CI 100% PASS</span>
-            <span class="pill">Branch: feature/frame-profiler → master</span>
+            <span class="pill">P0 + P1 Complete (Dirty-Rect + Two-Hit Shadow Cache)</span>
             <span class="pill">Layout: modern_components_v2.xml</span>
             <span class="pill">Date: 2026-11-02</span>
           </div>
-          <h1>ai-win-ui 帧耗时剖析与交互丝滑度优化过程报表</h1>
-          <p class="subtitle">从主观“迟钝感”到 QPC 微秒级分阶段实测，定位 28× 软光栅瓶颈并完成 5 项靶向加速</p>
+          <h1>ai-win-ui 帧耗时剖析与交互丝滑度优化过程报表 (P0 + P1)</h1>
+          <p class="subtitle">从主观“迟钝感”到 QPC 微秒级实测，完成 5 项 P0 基础优化 + P1 局部脏矩形重绘 (DirtyRect) 与二次命中高斯阴影位图缓存</p>
         </div>
       </div>
     </div>
@@ -346,20 +352,20 @@
     <!-- Top KPI Cards -->
     <div class="kpi-grid">
       <div class="kpi-card">
-        <div class="kpi-label">拖拽窗口端到端延迟 (Resize Latency)</div>
+        <div class="kpi-label">Switch 动画帧局部渲染 (Dirty-Rect Render)</div>
         <div class="kpi-value">
-          <span class="num">8.86 ms</span>
-          <span class="kpi-delta">快 21.9×</span>
+          <span class="num">0.17 ms</span>
+          <span class="kpi-delta">快 801.9×</span>
         </div>
-        <div class="kpi-sub">优化前默认 <code>194.14 ms</code> (~5.1 FPS) → 现 <code>~113 FPS</code></div>
+        <div class="kpi-sub">基线 <code>136.32 ms</code> → Phase 1 <code>3.19 ms</code> → 终版 <code>0.17 ms</code> (P95 <code>0.14 ms</code>)</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">单帧 CPU 控件树渲染 (Render Phase)</div>
+        <div class="kpi-label">Switch 动画整帧上屏 (Dirty-Rect Paint)</div>
         <div class="kpi-value">
-          <span class="num">4.41 ms</span>
-          <span class="kpi-delta">快 30.8×</span>
+          <span class="num">0.27 ms</span>
+          <span class="kpi-delta">快 510.1×</span>
         </div>
-        <div class="kpi-sub">优化前默认 <code>135.93 ms</code> (P95 <code>183.71 ms</code>)</div>
+        <div class="kpi-sub">连 <code>skia-Debug</code> 模式也从 <code>137.74 ms</code> 降至 <code>1.99 ms</code></div>
       </div>
       <div class="kpi-card">
         <div class="kpi-label">点击 Switch 触发整页布局 (Layout on Click)</div>
@@ -370,42 +376,51 @@
         <div class="kpi-sub">优化前每次点击耗费 <code>27.74 ms</code> 重排整棵 Yoga 树</div>
       </div>
       <div class="kpi-card">
-        <div class="kpi-label">缩放时 DIB 画布分配 (Surface Resize)</div>
+        <div class="kpi-label">拖拽窗口画布分配 & 端到端延迟</div>
         <div class="kpi-value">
           <span class="num">0.04 ms</span>
           <span class="kpi-delta">快 31.5×</span>
         </div>
-        <div class="kpi-sub">64px 步进容量复用，消除每像素 <code>CreateDIBSection</code></div>
+        <div class="kpi-sub">64px 步进 DIB 复用，拖拽延迟从 <code>194.14 ms</code> 降至 <code>8.86~11.17 ms</code></div>
       </div>
     </div>
 
     <!-- Section 1: Problem & Pipeline -->
     <div class="card">
-      <h2><span class="sec-num">1</span> 问题现象与渲染链路剖析</h2>
+      <h2><span class="sec-num">1</span> 问题现象与 P0 + P1 渲染管线对比</h2>
       <p>
-        在执行 <code>.\scripts\run_layout_demo.ps1 -Layout "modern_components_v2" -Renderer "skia"</code> 时，拖拽调整窗口尺寸与点击圆角 <code>&lt;Switch&gt;</code> 开关存在肉眼可见的卡顿与滞后。通过梳理宿主消息循环与渲染器管线，定位出优化前单次交互的 6 步串行链路：
+        在执行 <code>.\scripts\run_layout_demo.ps1 -Layout "modern_components_v2" -Renderer "skia"</code> 时，拖拽调整窗口尺寸与点击圆角 <code>&lt;Switch&gt;</code> 开关存在肉眼可见的卡顿与滞后。对比优化前与 P0+P1 优化后的单次交互执行链路：
       </p>
       <div class="pipeline">
-        <div class="pipe-step">1. WM_LBUTTONDOWN / WM_SIZE</div>
+        <div class="pipe-step">优化前：WM_LBUTTONDOWN</div>
         <span class="pipe-arrow">→</span>
-        <div class="pipe-step hot">2. 无条件整页 UpdateLayout (55.3 ms)</div>
+        <div class="pipe-step hot">无条件整页 UpdateLayout (27.7 ms)</div>
         <span class="pipe-arrow">→</span>
-        <div class="pipe-step">3. InvalidateRect 整窗脏标记</div>
+        <div class="pipe-step hot">InvalidateRect(NULL) 整窗脏区</div>
         <span class="pipe-arrow">→</span>
-        <div class="pipe-step hot">4. 等待低优先级 WM_PAINT</div>
+        <div class="pipe-step hot">Debug 全窗口软光栅 (136.3 ms)</div>
         <span class="pipe-arrow">→</span>
-        <div class="pipe-step hot">5. Debug 软光栅全量重绘 (135.9 ms)</div>
+        <div class="pipe-step">整窗 BitBlt (0.63 ms)</div>
+      </div>
+      <div class="pipeline" style="border-color:#86efac;background:#f0fdf4;">
+        <div class="pipe-step fast">P0+P1 后：Switch::OnTimer / Click</div>
         <span class="pipe-arrow">→</span>
-        <div class="pipe-step">6. BitBlt 上屏 (0.6 ms)</div>
+        <div class="pipe-step fast">0 次 Layout (0.00 ms)</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step fast">InvalidateSelf(8dp) 局部脏框</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step fast">IntersectsDirtyRect 裁剪重绘 (0.17 ms)</div>
+        <span class="pipe-arrow">→</span>
+        <div class="pipe-step fast">局部 BitBlt (0.09 ms)</div>
       </div>
 
-      <h3>交互手感对比模拟器（点击下方两个开关直观对比“194ms 延迟硬跳”与“3.8ms + 140ms 缓动”）</h3>
+      <h3>交互手感对比模拟器（点击下方两个开关直观对比“165ms 延迟硬跳”与“0.27ms 局部重绘 + 140ms 缓动”）</h3>
       <div class="sim-box">
         <div class="sim-pane">
           <div class="sim-row">
             <div>
               <strong>优化前（Before）</strong>
-              <div style="font-size:12px;color:var(--muted);">点击后阻塞 ~165ms 才响应，且无过渡帧直接硬跳</div>
+              <div style="font-size:12px;color:var(--muted);">点击后阻塞 ~165ms 才响应，整窗重绘且无过渡帧直接硬跳</div>
             </div>
             <div id="sw-before" class="ui-switch active" title="点击体验优化前约 165ms 延迟 + 瞬移">
               <div class="knob"></div>
@@ -415,8 +430,8 @@
         <div class="sim-pane" style="background:#eff4ff;border-color:#bfdbfe;">
           <div class="sim-row">
             <div>
-              <strong style="color:var(--primary);">优化后（After）</strong>
-              <div style="font-size:12px;color:var(--muted);">0ms 布局开销 + 3.8ms 即时响应 + 140ms Smoothstep 缓动</div>
+              <strong style="color:var(--primary);">P0 + P1 优化后（After）</strong>
+              <div style="font-size:12px;color:var(--muted);">0ms 布局 + 0.17ms 局部脏矩形重绘 + 140ms Smoothstep 缓动</div>
             </div>
             <div id="sw-after" class="ui-switch smooth active" title="点击体验优化后即时响应 + 140ms 丝滑过渡">
               <div class="knob"></div>
@@ -426,23 +441,79 @@
       </div>
     </div>
 
-    <!-- Section 2: Frame Profiler & 2x2 Baseline -->
+    <!-- Section 2: Frame Profiler & Multi-stage Comparison -->
     <div class="card">
-      <h2><span class="sec-num">2</span> 帧耗时统计器建设与 2×2 基线实测数据</h2>
+      <h2><span class="sec-num">2</span> 帧耗时统计器建设与四阶段演进实测数据</h2>
       <p>
-        新增 <code>src/frame_profiler.h</code>（基于 <code>QueryPerformanceCounter</code>）与自动化基准脚本 <code>scripts/bench_frame_stats.ps1</code>，将每帧拆解为 <code>resize</code>、<code>layout</code>、<code>render</code>、<code>present</code>、<code>paint</code> 与端到端 <code>latency</code> 六个维度，并在窗口内支持 <code>F12</code> 实时监控面板与 CSV 逐帧导出。
+        通过 <code>src/frame_profiler.h</code>（基于 <code>QueryPerformanceCounter</code>）与自动化基准脚本 <code>scripts/bench_frame_stats.ps1</code>（启用 Per-Monitor DPI 对齐），对 <strong>基线</strong>、<strong>Phase 1</strong> 与 <strong>P0 + P1 终版</strong> 进行了完整采样对比。
       </p>
 
       <div class="tab-btns">
-        <button class="tab-btn active" onclick="switchChart('latency', this)">端到端延迟 (latency_ms)</button>
-        <button class="tab-btn" onclick="switchChart('render', this)">渲染耗时 (render_ms)</button>
-        <button class="tab-btn" onclick="switchChart('layout', this)">布局耗时 (layout_ms)</button>
-        <button class="tab-btn" onclick="switchChart('resize', this)">画布分配 (resize_ms)</button>
+        <button class="tab-btn active" onclick="switchChart('switch_anim', this)">Switch 60fps 动画帧耗时 (paint_ms)</button>
+        <button class="tab-btn" onclick="switchChart('latency', this)">拖拽窗口端到端延迟 (latency_ms)</button>
+        <button class="tab-btn" onclick="switchChart('render', this)">整窗渲染耗时 (render_ms)</button>
+        <button class="tab-btn" onclick="switchChart('resize', this)">DIB 画布分配 (resize_ms)</button>
       </div>
 
       <div id="chart-container" class="bar-group"></div>
 
-      <h3>表 2.1：拖拽窗口大小（trigger = resize，61~62 帧连续采样，格式：avg / p95 / max ms）</h3>
+      <h3>表 2.1：点击 Switch 开关与 60fps 缓动帧（20 次点击 + 101 帧动画采样，格式：avg / p95 / max ms）</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>演进阶段与配置</th>
+            <th>点击触发 layout_count</th>
+            <th>动画帧 render_ms</th>
+            <th>动画帧 present_ms (BitBlt)</th>
+            <th>动画帧 paint_ms (整帧总计)</th>
+            <th>抬起帧 mouseup paint_ms</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>优化前基线 · skia-Debug (原默认)</strong></td>
+            <td class="num bad">1 次 (27.74 ms)</td>
+            <td class="num bad">136.32 ms (无动画)</td>
+            <td class="num">0.63 / 1.00 / 1.82</td>
+            <td class="num bad">137.74 ms (硬跳)</td>
+            <td class="num bad">119.25 ms</td>
+          </tr>
+          <tr>
+            <td><strong>Phase 1 后 · skia-Debug (整窗重绘)</strong></td>
+            <td class="num good">0 次 (0.00 ms)</td>
+            <td class="num">66.10 / 79.25 / 118.40</td>
+            <td class="num">0.50 / 0.72 / 0.76</td>
+            <td class="num">67.20 / 80.37 / 119.50</td>
+            <td class="num">68.05 ms</td>
+          </tr>
+          <tr style="background:#eff6ff;">
+            <td><strong>P0+P1 终版 · skia-Debug (局部脏矩形)</strong></td>
+            <td class="num good">0 次 (0.00 ms)</td>
+            <td class="num good">1.75 / 1.36 / 93.77</td>
+            <td class="num good">0.09 / 0.21 / 0.56</td>
+            <td class="num good">1.99 / 1.96 / 98.71 (快 69×)</td>
+            <td class="num good">0.99 / 2.16 / 2.16</td>
+          </tr>
+          <tr>
+            <td><strong>Phase 1 后 · skia-Release (整窗重绘)</strong></td>
+            <td class="num good">0 次 (0.00 ms)</td>
+            <td class="num">3.19 / 4.35 / 8.12</td>
+            <td class="num">0.40 / 0.85 / 1.10</td>
+            <td class="num">3.83 / 5.22 / 9.40</td>
+            <td class="num">3.18 / 4.46 / 4.46</td>
+          </tr>
+          <tr style="background:#f0fdf4;">
+            <td><strong>P0+P1 终版 · skia-Release (现默认)</strong></td>
+            <td class="num good">0 次 (0.00 ms)</td>
+            <td class="num good">0.17 / 0.14 / 7.70</td>
+            <td class="num good">0.09 / 0.19 / 0.59</td>
+            <td class="num good">0.27 / 0.31 / 8.50 (快 510×)</td>
+            <td class="num good">0.19 / 0.36 / 0.36</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h3>表 2.2：拖拽窗口大小（trigger = resize，61~62 帧连续采样，格式：avg / p95 / max ms）</h3>
       <table>
         <thead>
           <tr>
@@ -464,12 +535,12 @@
             <td class="num bad">194.14 / 260.85 / 333.10 (~5.1 FPS)</td>
           </tr>
           <tr>
-            <td><strong>优化后 · skia-Debug</strong></td>
-            <td class="num good">0.12 / 0.47 / 0.55</td>
-            <td class="num">35.71 / 44.08 / 163.77</td>
-            <td class="num">85.68 / 121.67 / 187.81</td>
-            <td class="num">0.50 / 0.72 / 0.76</td>
-            <td class="num">122.64 / 179.29 / 255.80 (~8.2 FPS)</td>
+            <td><strong>P0+P1 后 · skia-Debug</strong></td>
+            <td class="num good">0.16 / 0.55 / 1.04</td>
+            <td class="num">49.01 / 74.95 / 235.80</td>
+            <td class="num">104.28 / 154.97 / 228.30</td>
+            <td class="num">0.66 / 1.27 / 2.94</td>
+            <td class="num">154.19 / 235.11 / 338.80 (~6.5 FPS)</td>
           </tr>
           <tr>
             <td><strong>优化前 · skia-Release</strong></td>
@@ -480,20 +551,12 @@
             <td class="num">10.65 / 14.34 / 18.38 (~93.9 FPS)</td>
           </tr>
           <tr style="background:#f0fdf4;">
-            <td><strong>优化后 · skia-Release (现默认)</strong></td>
-            <td class="num good">0.04 / 0.27 / 0.47</td>
-            <td class="num good">3.60 / 5.66 / 19.53</td>
-            <td class="num good">4.41 / 6.38 / 9.74</td>
-            <td class="num good">0.39 / 0.85 / 1.24</td>
-            <td class="num good">8.86 / 11.34 / 33.78 (~112.9 FPS)</td>
-          </tr>
-          <tr>
-            <td><strong>基线对比 · direct2d-Debug</strong></td>
-            <td class="num">0.18 / 0.27 / 0.32</td>
-            <td class="num">19.18 / 23.97 / 26.21</td>
-            <td class="num">5.13 / 6.98 / 7.26</td>
-            <td class="num">0.70 / 1.12 / 1.25</td>
-            <td class="num">25.34 / 29.98 / 32.98 (~39.5 FPS)</td>
+            <td><strong>P0+P1 后 · skia-Release (现默认)</strong></td>
+            <td class="num good">0.04 / 0.43 / 0.60</td>
+            <td class="num good">4.05 / 5.58 / 28.91</td>
+            <td class="num good">6.22 / 9.03 / 10.06</td>
+            <td class="num good">0.49 / 1.10 / 1.21</td>
+            <td class="num good">11.17 / 13.72 / 40.58 (~90 FPS)</td>
           </tr>
           <tr>
             <td><strong>基线对比 · direct2d-Release</strong></td>
@@ -505,90 +568,62 @@
           </tr>
         </tbody>
       </table>
-
-      <h3>表 2.2：点击 Switch 开关（20 次连续点击采样）</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>配置组</th>
-            <th>点击触发 layout_count</th>
-            <th>layout_ms (布局耗时)</th>
-            <th>render_ms (绘制耗时)</th>
-            <th>paint_ms (整帧耗时)</th>
-            <th>过渡动画表现</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td><strong>优化前 · skia-Debug (原默认)</strong></td>
-            <td class="num bad">1 次 / 点击</td>
-            <td class="num bad">27.74 ms</td>
-            <td class="num bad">136.32 ms</td>
-            <td class="num bad">137.74 ms</td>
-            <td><span class="tag tag-warn">0 帧（硬跳瞬移）</span></td>
-          </tr>
-          <tr>
-            <td><strong>优化后 · skia-Debug</strong></td>
-            <td class="num good">0 次 / 点击</td>
-            <td class="num good">0.00 ms</td>
-            <td class="num">67.20 ~ 79.25 ms</td>
-            <td class="num">68.05 ~ 80.37 ms</td>
-            <td><span class="tag tag-info">Smoothstep 缓动</span></td>
-          </tr>
-          <tr style="background:#f0fdf4;">
-            <td><strong>优化后 · skia-Release (现默认)</strong></td>
-            <td class="num good">0 次 / 点击</td>
-            <td class="num good">0.00 ms</td>
-            <td class="num good">2.46 ~ 3.19 ms</td>
-            <td class="num good">2.83 ~ 3.83 ms</td>
-            <td><span class="tag tag-pass">101 帧 60fps 丝滑缓动</span></td>
-          </tr>
-        </tbody>
-      </table>
     </div>
 
-    <!-- Section 3: 5 Optimizations -->
+    <!-- Section 3: 7 Optimizations -->
     <div class="card">
-      <h2><span class="sec-num">3</span> 五项靶向优化技术细节</h2>
+      <h2><span class="sec-num">3</span> P0 + P1 七项靶向优化技术细节</h2>
       <table>
         <thead>
           <tr>
-            <th style="width:52px;">序号</th>
+            <th style="width:65px;">级别</th>
             <th style="width:230px;">优化模块</th>
-            <th style="width:230px;">修改文件</th>
+            <th style="width:240px;">修改文件</th>
             <th>根因与修复方案</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td><span class="tag tag-info">#1</span></td>
+            <td><span class="tag tag-info">P0 #1</span></td>
             <td><strong>启动脚本默认 Release 构建</strong></td>
             <td class="num">scripts/run_layout_demo.ps1</td>
             <td>原脚本固定启动 <code>Debug\ai_win_ui.exe</code>，链接了未优化的 <code>Debug-x64/skia.lib</code>（CPU 软光栅慢 28 倍）。现新增 <code>-Configuration Auto|Release|Debug</code>，交互式运行默认采用 <code>Release</code>，CI <code>-NoLaunch</code> 自动保持 <code>Debug</code> 兼容。</td>
           </tr>
           <tr>
-            <td><span class="tag tag-info">#2</span></td>
+            <td><span class="tag tag-info">P0 #2</span></td>
             <td><strong>Skia 字体、排版与 SVG 路径三级缓存</strong></td>
             <td class="num">src/skia_font_shared.h<br>src/skia_text_layout.cpp<br>src/renderer_skia.cpp</td>
             <td>原实现每次调用 <code>CreateDefaultTypeface</code> 均通过 DirectWrite 重新创建 <code>SkTypeface</code>，导致 Skia 内部字形缓存 <code>SkStrikeCache</code> 失效。现对 <code>CreateDefaultTypeface</code>、<code>CreateSkiaTextLayout</code>（4096 项）及 <code>DrawSvgPath</code> 增加哈希缓存。</td>
           </tr>
           <tr>
-            <td><span class="tag tag-info">#3</span></td>
+            <td><span class="tag tag-info">P0 #3</span></td>
             <td><strong>按需触发 UpdateLayout()</strong></td>
             <td class="num">src/ui_host.cpp<br>src/ui_containers.h<br>src/ui_widgets.h</td>
             <td>移除 <code>UiHost::OnMouseDown</code> 中无条件执行的整页 <code>UpdateLayout()</code>，改为仅在改变组件尺寸的 <code>Expander</code>（折叠/展开）和 <code>AlertBanner</code>（关闭隐藏）中调用 <code>m_context-&gt;requestLayout()</code>。</td>
           </tr>
           <tr>
-            <td><span class="tag tag-info">#4</span></td>
+            <td><span class="tag tag-info">P0 #4</span></td>
             <td><strong>Switch 与 SegmentedControl 140ms 缓动</strong></td>
             <td class="num">src/ui_widgets.h</td>
             <td>在 16ms <code>OnTimer</code> 帧循环中推进动画进度：<code>Switch</code> 使用 Smoothstep ($3t^2 - 2t^3$) 插值圆钮水平位置与轨道颜色；<code>SegmentedControl</code> 平滑滑动选中态白色胶囊背景。</td>
           </tr>
           <tr>
-            <td><span class="tag tag-info">#5</span></td>
+            <td><span class="tag tag-info">P0 #5</span></td>
             <td><strong>DIB 64px 步进容量复用与同步重绘</strong></td>
             <td class="num">src/renderer_skia.cpp<br>src/ui_host.cpp</td>
             <td><code>SkiaRenderer</code> 按 64px 步进对齐分配 GDI DIB 容量（<code>m_dibCapWidth × m_dibCapHeight</code>），拖拽缩放时复用已有位图内存并以 <code>rowBytes = m_dibCapWidth * 4</code> 重新包装 <code>SkSurface</code>；<code>UiHost::OnResize</code> 调用 <code>RedrawWindow(..., RDW_INVALIDATE | RDW_UPDATENOW)</code> 同步上屏。</td>
+          </tr>
+          <tr style="background:#f0fdf4;">
+            <td><span class="tag tag-pass">P1 #6</span></td>
+            <td><strong>真局部脏矩形重绘 (Dirty-Rect Culling &amp; Partial BitBlt)</strong></td>
+            <td class="num">src/ui_context.h<br>src/ui_element.h<br>src/ui_panels.h / ui_scroll.h<br>src/renderer_skia.cpp<br>src/ui_host.cpp</td>
+            <td>① <code>UIElement::InvalidateSelf(padDip)</code> 通过 <code>UIContext::invalidateRect</code> 提交控件局部包围盒；② <code>UiHost</code> 转换为物理像素调用 <code>::InvalidateRect(m_hwnd, &amp;rc, FALSE)</code>，并在 <code>OnPaint</code> 将 <code>ps.rcPaint</code> 传入 <code>SetDirtyRect</code>；③ <code>SkiaRenderer::BeginFrame</code> 裁剪并仅清除脏区，<code>PresentHwnd</code> 仅对脏矩形区域执行局部 <code>BitBlt</code>；④ <code>Panel</code>、<code>Label</code>、<code>ScrollViewer</code> 通过 <code>IntersectsDirtyRect</code> 剔除不相交子树，将 Switch 动画帧渲染耗时压缩至 <strong>0.17 ms</strong>。</td>
+          </tr>
+          <tr style="background:#f0fdf4;">
+            <td><span class="tag tag-pass">P1 #7</span></td>
+            <td><strong>二次命中 (Two-Hit) 高斯阴影位图缓存</strong></td>
+            <td class="num">src/renderer_skia.cpp</td>
+            <td>针对 <code>FillSoftShadow</code> 的 CPU 高斯模糊滤镜，建立 <code>ShadowCacheKey -&gt; {sk_sp&lt;SkImage&gt;, pad, hits}</code> 缓存（上限 256 项）。采用 <strong><code>hits &gt;= 2</code> 二次命中准入策略</strong>：窗口缩放中仅出现 1 次的瞬态尺寸直接绘制到主画布，避免离屏表面分配开销；静态卡片与固定控件在第 2 次命中时自动缓存为离屏 <code>SkImage</code> 位图并复用。</td>
           </tr>
         </tbody>
       </table>
@@ -611,40 +646,42 @@
 .\scripts\run_layout_demo.ps1 -Layout "modern_components_v2" -Renderer "skia"
 
 # 2. 运行自动化帧耗时基准测试（生成 build/bench/frame_stats_*.csv 报表）
-.\scripts\bench_frame_stats.ps1 -Renderer skia -Config Release</pre>
+.\scripts\bench_frame_stats.ps1 -Renderer skia -Config Release
+.\scripts\bench_frame_stats.ps1 -Renderer skia -Config Debug</pre>
     </div>
   </div>
 
   <script>
     const datasets = {
+      switch_anim: {
+        max: 140,
+        unit: 'ms',
+        rows: [
+          { label: '优化前基线 · skia-Debug (整窗重绘)', val: 137.74, cls: 'danger', note: '137.74 ms (~7.3 FPS)' },
+          { label: 'Phase 1 后 · skia-Debug (整窗重绘)', val: 67.20, cls: 'warn', note: '67.20 ms (~14.9 FPS)' },
+          { label: 'P0+P1 终版 · skia-Debug (局部脏矩形)', val: 1.99, cls: 'primary', note: '1.99 ms (~502 FPS)' },
+          { label: 'Phase 1 后 · skia-Release (整窗重绘)', val: 3.83, cls: 'primary', note: '3.83 ms (~261 FPS)' },
+          { label: 'P0+P1 终版 · skia-Release (局部脏矩形)', val: 0.27, cls: 'success', note: '0.27 ms (>3,700 FPS)' }
+        ]
+      },
       latency: {
         max: 200,
         unit: 'ms',
         rows: [
           { label: '优化前 · skia-Debug (原默认)', val: 194.14, cls: 'danger', note: '194.14 ms (~5.1 FPS)' },
-          { label: '优化后 · skia-Debug', val: 122.64, cls: 'warn', note: '122.64 ms (~8.2 FPS)' },
+          { label: 'P0+P1 后 · skia-Debug', val: 154.19, cls: 'warn', note: '154.19 ms (~6.5 FPS)' },
           { label: '优化前 · skia-Release', val: 10.65, cls: 'primary', note: '10.65 ms (~93.9 FPS)' },
-          { label: '优化后 · skia-Release (现默认)', val: 8.86, cls: 'success', note: '8.86 ms (~112.9 FPS)' }
+          { label: 'P0+P1 后 · skia-Release (现默认)', val: 11.17, cls: 'success', note: '11.17 ms (~90 FPS)' }
         ]
       },
       render: {
         max: 145,
         unit: 'ms',
         rows: [
-          { label: '优化前 · skia-Debug (原默认)', val: 135.93, cls: 'danger', note: '135.93 ms' },
-          { label: '优化后 · skia-Debug', val: 85.68, cls: 'warn', note: '85.68 ms' },
-          { label: '优化前 · skia-Release', val: 4.87, cls: 'primary', note: '4.87 ms' },
-          { label: '优化后 · skia-Release (现默认)', val: 4.41, cls: 'success', note: '4.41 ms' }
-        ]
-      },
-      layout: {
-        max: 60,
-        unit: 'ms',
-        rows: [
-          { label: '优化前 · skia-Debug (拖拽)', val: 55.27, cls: 'danger', note: '55.27 ms' },
-          { label: '优化后 · skia-Debug (拖拽)', val: 35.71, cls: 'warn', note: '35.71 ms' },
-          { label: '优化后 · skia-Release (拖拽)', val: 3.60, cls: 'primary', note: '3.60 ms' },
-          { label: '优化后 · 点击 Switch 布局耗时', val: 0.0, cls: 'success', note: '0.00 ms (100% 消除)' }
+          { label: '优化前 · skia-Debug (拖拽整窗)', val: 135.93, cls: 'danger', note: '135.93 ms' },
+          { label: 'P0+P1 后 · skia-Release (拖拽整窗)', val: 6.22, cls: 'primary', note: '6.22 ms' },
+          { label: 'P0+P1 后 · skia-Debug (Switch 局部)', val: 1.75, cls: 'primary', note: '1.75 ms' },
+          { label: 'P0+P1 后 · skia-Release (Switch 局部)', val: 0.17, cls: 'success', note: '0.17 ms (快 801.9×)' }
         ]
       },
       resize: {
@@ -653,8 +690,8 @@
         rows: [
           { label: '优化前 · skia-Debug (每像素重建)', val: 1.26, cls: 'danger', note: '1.26 ms' },
           { label: '优化前 · skia-Release (每像素重建)', val: 1.25, cls: 'warn', note: '1.25 ms' },
-          { label: '优化后 · skia-Debug (64px 复用)', val: 0.12, cls: 'primary', note: '0.12 ms' },
-          { label: '优化后 · skia-Release (64px 复用)', val: 0.04, cls: 'success', note: '0.04 ms (快 31.5×)' }
+          { label: 'P0+P1 后 · skia-Debug (64px 复用)', val: 0.16, cls: 'primary', note: '0.16 ms' },
+          { label: 'P0+P1 后 · skia-Release (64px 复用)', val: 0.04, cls: 'success', note: '0.04 ms (快 31.5×)' }
         ]
       }
     };
@@ -665,7 +702,7 @@
       const d = datasets[key];
       const container = document.getElementById('chart-container');
       container.innerHTML = d.rows.map(r => {
-        const pct = Math.max(r.val > 0 ? 2.5 : 0.4, Math.min(100, (r.val / d.max) * 100));
+        const pct = Math.max(r.val > 0 ? 1.8 : 0.4, Math.min(100, (r.val / d.max) * 100));
         return `
           <div class="bar-row">
             <div><strong>${r.label}</strong></div>
@@ -675,7 +712,7 @@
         `;
       }).join('');
     }
-    switchChart('latency', document.querySelector('.tab-btn.active'));
+    switchChart('switch_anim', document.querySelector('.tab-btn.active'));
 
     // Interactive Switch Simulator
     document.getElementById('sw-before').addEventListener('click', function() {
@@ -688,4 +725,3 @@
   </script>
 </body>
 </html>
-

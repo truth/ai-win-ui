@@ -140,6 +140,9 @@ public:
                 InvalidateRect(m_hwnd, nullptr, FALSE);
             }
         };
+        m_uiContext.invalidateRect = [this](const Rect& rect) {
+            AccumulateDirtyRect(rect);
+        };
         m_uiContext.requestFocus = [this](UIElement* element) {
             SetFocusedElement(element);
         };
@@ -1950,12 +1953,63 @@ private:
         }
     }
 
+    void AccumulateDirtyRect(const Rect& rect) {
+        if (rect.right <= rect.left || rect.bottom <= rect.top) {
+            return;
+        }
+        if (!m_hasPendingDirtyRect) {
+            m_pendingDirtyRect = rect;
+            m_hasPendingDirtyRect = true;
+        } else {
+            m_pendingDirtyRect.left = std::min(m_pendingDirtyRect.left, rect.left);
+            m_pendingDirtyRect.top = std::min(m_pendingDirtyRect.top, rect.top);
+            m_pendingDirtyRect.right = std::max(m_pendingDirtyRect.right, rect.right);
+            m_pendingDirtyRect.bottom = std::max(m_pendingDirtyRect.bottom, rect.bottom);
+        }
+    }
+
+    void FlushPendingDirtyInvalidate() {
+        if (!m_hwnd) {
+            m_hasPendingDirtyRect = false;
+            return;
+        }
+        if (m_hasPendingDirtyRect && !m_windowChrome.IsLayered() && !m_uiContext.showDevTools) {
+            RECT rc{
+                std::max<LONG>(0, static_cast<LONG>(std::floor(m_pendingDirtyRect.left))),
+                std::max<LONG>(0, static_cast<LONG>(std::floor(m_pendingDirtyRect.top))),
+                static_cast<LONG>(std::ceil(m_pendingDirtyRect.right)),
+                static_cast<LONG>(std::ceil(m_pendingDirtyRect.bottom))
+            };
+            m_hasPendingDirtyRect = false;
+            InvalidateRect(m_hwnd, &rc, FALSE);
+        } else {
+            m_hasPendingDirtyRect = false;
+            InvalidateRect(m_hwnd, nullptr, FALSE);
+        }
+    }
+
     void OnPaint() {
         PAINTSTRUCT ps{};
         BeginPaint(m_hwnd, &ps);
 
         if (m_isInitialized && m_renderer) {
             m_frameProfiler.BeginPaint();
+            const float paintW = static_cast<float>(ps.rcPaint.right - ps.rcPaint.left);
+            const float paintH = static_cast<float>(ps.rcPaint.bottom - ps.rcPaint.top);
+            const bool isPartialPaint = !m_windowChrome.IsLayered() &&
+                !m_uiContext.showDevTools &&
+                paintW > 0.0f && paintH > 0.0f &&
+                (paintW < m_viewportWidth - 2.0f || paintH < m_viewportHeight - 2.0f);
+            if (isPartialPaint) {
+                m_renderer->SetDirtyRect(Rect::Make(
+                    static_cast<float>(ps.rcPaint.left),
+                    static_cast<float>(ps.rcPaint.top),
+                    static_cast<float>(ps.rcPaint.right),
+                    static_cast<float>(ps.rcPaint.bottom)));
+            } else {
+                m_renderer->ClearDirtyRect();
+            }
+
             // Layered present clears to transparent so desktop shows in empty regions.
             const Color clearColor = m_windowChrome.IsLayered()
                 ? Color{0.0f, 0.0f, 0.0f, 0.0f}
@@ -2000,6 +2054,7 @@ private:
             m_frameProfiler.MarkRenderEnd();
 
             m_renderer->EndFrame();
+            m_renderer->ClearDirtyRect();
             m_frameProfiler.EndPaint();
             if (m_uiContext.showDevTools && m_frameStatsLive) {
                 // Keep overlay numbers fresh without user input.
@@ -2123,10 +2178,17 @@ private:
             return;
         }
 
+        m_hasPendingDirtyRect = false;
+        UIElement* prevFocus = m_focusedElement;
         m_mouseCaptureTarget = m_root->FindHitElementAt(x, y);
         if (m_root->OnMouseDown(x, y)) {
             UpdateImeWindow();
-            InvalidateRect(m_hwnd, nullptr, FALSE);
+            if (prevFocus == focusTarget && m_hasPendingDirtyRect) {
+                FlushPendingDirtyInvalidate();
+            } else {
+                m_hasPendingDirtyRect = false;
+                InvalidateRect(m_hwnd, nullptr, FALSE);
+            }
         }
     }
 
@@ -2764,8 +2826,9 @@ private:
                         if (dtMs > 100) dtMs = 100;
                         m_lastTickMs = now;
                         
+                        m_hasPendingDirtyRect = false;
                         if (m_root->OnTimer(wParam, dtMs)) {
-                            InvalidateRect(m_hwnd, nullptr, FALSE);
+                            FlushPendingDirtyInvalidate();
                         }
                     }
                     return 0;
@@ -2912,6 +2975,8 @@ private:
     uint32_t m_lastTickMs = 0;
     ai_win_ui::FrameProfiler m_frameProfiler;
     bool m_frameStatsLive = false;
+    Rect m_pendingDirtyRect{};
+    bool m_hasPendingDirtyRect = false;
 };
 
 class HostDropTarget : public IDropTarget {

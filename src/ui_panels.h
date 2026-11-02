@@ -285,6 +285,18 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float shadowMargin = (shadow.enabled || m_styleFromLayout)
+            ? ScaleValue(std::max(24.0f, shadow.blur * 2.0f + std::fabs(shadow.offsetX) + std::fabs(shadow.offsetY)))
+            : ScaleValue(4.0f);
+        const Rect panelVisualBounds{
+            m_bounds.left - shadowMargin,
+            m_bounds.top - shadowMargin,
+            m_bounds.right + shadowMargin,
+            m_bounds.bottom + shadowMargin
+        };
+        if (!renderer.IntersectsDirtyRect(panelVisualBounds)) {
+            return;
+        }
         Color drawBackground = background;
         Color drawBorderColor = borderColor;
         CornerRadius drawRadii = !cornerRadii.IsZero() ? cornerRadii : CornerRadius::Uniform(cornerRadius);
@@ -659,6 +671,9 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        if (!renderer.IntersectsDirtyRect(m_bounds)) {
+            return;
+        }
         TextRenderOptions textOptions{};
         textOptions.wrap = m_ellipsis ? TextWrapMode::NoWrap : TextWrapMode::Wrap;
         textOptions.horizontalAlign = m_horizontalAlign;
@@ -2488,6 +2503,7 @@ public:
     bool OnTimer(UINT_PTR timerId, uint32_t dtMs) override {
         const bool childChanged = UIElement::OnTimer(timerId, dtMs);
         m_elapsed += (dtMs / 1000.0f);
+        InvalidateSelf(4.0f);
         return childChanged || true;
     }
 

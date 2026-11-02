@@ -382,6 +382,7 @@ public:
                 m_animInitialized = true;
             }
             selectedIndex = idx;
+            InvalidateSelf(8.0f);
             if (onChange) onChange();
         }
         return true;
@@ -402,6 +403,7 @@ public:
             if (std::fabs(target - m_animPos) <= 0.005f) {
                 m_animPos = target;
             }
+            InvalidateSelf(8.0f);
             return true;
         }
         return changed;
@@ -502,6 +504,7 @@ public:
             m_animInitialized = true;
         }
         checked = !checked;
+        InvalidateSelf(8.0f);
         if (onChange) onChange();
         return true;
     }
@@ -514,6 +517,7 @@ public:
                 m_animInitialized = true;
             }
             checked = !checked;
+            InvalidateSelf(8.0f);
             if (onChange) onChange();
             return true;
         }
@@ -535,6 +539,7 @@ public:
             } else {
                 m_animProgress = std::max(target, m_animProgress - step);
             }
+            InvalidateSelf(8.0f);
             return true;
         }
         return changed;
