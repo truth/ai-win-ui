@@ -147,3 +147,4 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_ci_local.ps1 -SkipBuild
    .\scripts\bench_frame_stats.ps1 -Renderer skia -Config Debug
    ```
    - 原始逐帧 CSV 自动保存在 `build/bench/frame_stats_<renderer>-<config>.csv`。
+
