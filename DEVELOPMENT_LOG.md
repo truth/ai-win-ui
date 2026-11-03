@@ -2,6 +2,16 @@
 
 ## 2026-11-03
 
+- **架构避坑与排错最佳实践知识库沉淀 (Troubleshooting & Pitfall Guide)**
+  - 创建正式排坑手册 [`doc/troubleshooting-and-pitfalls.md`](doc/troubleshooting-and-pitfalls.md)，总结 6 大核心陷阱与避坑准则：
+    1. Thickness 顺序陷阱（L, T, R, B vs CSS T, R, B, L）；
+    2. 容器默认内边距与紧凑单行高度塌陷机制（Padding vs Row Height）；
+    3. Direct2D 双缓冲误清屏与局部脏矩形剪裁边界（D2D 全帧 + 几何缓存 vs Skia 局部重绘）；
+    4. 高频行情更新与 Yoga 全树重排风暴（Batch Update 机制）；
+    5. DPI 动态缩放排障工具（`run_measure_dump.ps1` NDJSON 转储）；
+    6. Windows GUI 进程生命周期与文件锁处理。
+  - 同步更新 [`.agents/AGENTS.md`](.agents/AGENTS.md) 核心规约与 [`doc/README.md`](doc/README.md) 主文档索引。
+
 - **列表文字高度塌陷修复、Panel 默认内边距安全保护与通用解析扩展 (List Label Height Collapse & Panel Padding Safety Fix)**（分支 `feature/fix-list-labels-height-collapse`）
   - **根本原因排查与定位**：
     - 排查发现 C++ `Panel` 默认赋予 `padding{8, 8, 8, 8}`（上下内边距各 8px，在 1.25x DPI 缩放下为 10px+10px=20px）；

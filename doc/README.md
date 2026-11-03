@@ -9,6 +9,8 @@ older design snapshot.
 
 - `doc/README.md`
   - high-level overview and document index
+- `doc/troubleshooting-and-pitfalls.md`
+  - **key pitfalls & architectural guidelines** (Thickness order, compact row padding, D2D/Skia partial repaint, batch updates)
 - `doc/layout-spec.md`
   - **layout DSL authoring** (XML/JSON rules, style forms, ShapePanel, chrome attrs)
 - `doc/style-catalog.md`
