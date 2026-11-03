@@ -1,6 +1,6 @@
 <Panel direction="column" padding="0,0,0,0" spacing="0" background="#050505" alignItems="stretch">
   <!-- 1. 顶部菜单栏 (Menu Bar) -->
-  <Panel direction="row" height="28" padding="0,10,0,10" spacing="10" background="#121212" alignItems="center">
+  <Panel direction="row" height="28" padding="10,0,10,0" spacing="10" background="#121212" alignItems="center">
     <Label text="同花顺" fontSize="13" color="#EE2222" bold="true" />
     <Label text="• 上证指数" fontSize="12" color="#EEEEEE" />
     <Spacer width="8" />
@@ -24,7 +24,7 @@
   </Panel>
 
   <!-- 2. 第一层快捷操作工具条 -->
-  <Panel direction="row" height="30" padding="0,8,0,8" spacing="4" background="#181818" alignItems="center">
+  <Panel direction="row" height="30" padding="8,0,8,0" spacing="4" background="#181818" alignItems="center">
     <Button text="买入" width="42" height="22" fontSize="11" background="#EE2222" textColor="#FFFFFF" />
     <Button text="卖出" width="42" height="22" fontSize="11" background="#00AA00" textColor="#FFFFFF" />
     <Button text="撤单" width="42" height="22" fontSize="11" background="#282828" textColor="#DDDDDD" />
@@ -45,7 +45,7 @@
   </Panel>
 
   <!-- 3. 第二层市场分类 Tab -->
-  <Panel direction="row" height="24" padding="0,6,0,6" spacing="3" background="#0E0E0E" alignItems="center">
+  <Panel direction="row" height="24" padding="6,0,6,0" spacing="3" background="#0E0E0E" alignItems="center">
     <Button text="全景" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
     <Button text="个股" width="38" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" />
     <Button text="指数" width="38" height="20" fontSize="11" background="#EE2222" textColor="#FFFFFF" />
@@ -77,7 +77,7 @@
     <!-- 中央核心分时/K线行情区 -->
     <Panel direction="column" flexGrow="1" flexBasis="0" padding="0,0,0,0" spacing="0" alignItems="stretch">
       <!-- 周期快捷按钮条 (支持分时与K线切换) -->
-      <Panel direction="row" height="26" padding="0,4,0,4" spacing="3" background="#0C0C0C" alignItems="center">
+      <Panel direction="row" height="26" padding="6,0,6,0" spacing="3" background="#0C0C0C" alignItems="center">
         <Button id="btn_timeshare" text="分时" width="40" height="20" fontSize="11" background="#EE2222" textColor="#FFFFFF" onClick="btn_period_timeshare" />
         <Button id="btn_day_k" text="日K" width="36" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" onClick="btn_period_day_k" />
         <Button id="btn_week_k" text="周K" width="36" height="20" fontSize="11" background="#202020" textColor="#CCCCCC" onClick="btn_period_week_k" />
@@ -96,7 +96,7 @@
       <FinancialChart id="stock_chart" preClose="3518.76" flexGrow="1" flexBasis="0" showCrosshair="true" showHeaderInfo="true" />
 
       <!-- 主图下方资讯分类标签条 -->
-      <Panel direction="row" height="22" padding="0,6,0,6" spacing="6" background="#101010" alignItems="center">
+      <Panel direction="row" height="22" padding="6,0,6,0" spacing="6" background="#101010" alignItems="center">
         <Label text="股市直播" fontSize="11" color="#EE2222" bold="true" />
         <Label text="投资机会" fontSize="11" color="#777777" />
         <Label text="观点评论" fontSize="11" color="#777777" />
@@ -109,7 +109,7 @@
       </Panel>
 
       <!-- 快讯列表 -->
-      <Panel direction="row" height="54" padding="2,8,2,8" spacing="12" background="#080808" alignItems="stretch">
+      <Panel direction="row" height="54" padding="8,2,8,2" spacing="12" background="#080808" alignItems="stretch">
         <Panel direction="column" flexGrow="1" flexBasis="0" spacing="1" alignItems="start">
           <Label text="[解盘] 港股收评：恒指收跌0.59% 腾讯控股跌3.57%     16:09" fontSize="11" color="#CCCCCC" />
           <Label text="[解盘] 沪深两市成交额突破1万亿元                    15:01" fontSize="11" color="#EE4444" />
@@ -127,7 +127,7 @@
     <Panel direction="column" width="326" padding="0,0,0,0" spacing="0" background="#080808" alignItems="stretch">
 
       <!-- 标的标题与现价 -->
-      <Panel direction="row" height="32" padding="2,8,2,8" spacing="6" background="#0B0B0B" alignItems="center">
+      <Panel direction="row" height="32" padding="8,2,8,2" spacing="6" background="#0B0B0B" alignItems="center">
         <Label text="上证指数 1A0001" fontSize="14" color="#E5B800" bold="true" />
         <Spacer flexGrow="1" flexBasis="0" />
         <Label id="label_current_price" text="3534.32" fontSize="18" color="#EE2222" bold="true" />
@@ -139,7 +139,7 @@
       </Panel>
 
       <!-- 盘口核心指标双列 Grid (行高 19px，安全不截断) -->
-      <Panel direction="column" padding="2,6,2,6" spacing="0" background="#0E0E0E">
+      <Panel direction="column" padding="6,2,6,2" spacing="0" background="#0E0E0E">
         <Panel direction="row" height="19" alignItems="center">
           <Label text="委比" fontSize="11" color="#777777" width="38" />
           <Label id="grid_weibi" text="-2.11%" fontSize="11" color="#00CC00" width="62" />
@@ -203,14 +203,14 @@
       </Panel>
 
       <!-- 个股贡献度排行榜标题 -->
-      <Panel direction="row" height="20" padding="0,6,0,6" background="#161616" alignItems="center">
+      <Panel direction="row" height="20" padding="6,0,6,0" background="#161616" alignItems="center">
         <Label text="个股贡献度" fontSize="11" color="#E5B800" bold="true" flexGrow="1" />
         <Label text="涨幅%" fontSize="11" color="#666666" width="46" />
         <Label text="现价" fontSize="11" color="#666666" width="48" />
         <Label text="贡献" fontSize="11" color="#666666" width="38" />
       </Panel>
       <!-- 个股贡献度列表 (行高 18px，展示 10 支权重股) -->
-      <Panel direction="column" padding="1,4,1,4" spacing="0" background="#0A0A0A">
+      <Panel direction="column" padding="4,1,4,1" spacing="0" background="#0A0A0A">
         <Panel direction="row" height="18" alignItems="center">
           <Label text="贵州茅台" fontSize="11" color="#DDDDDD" flexGrow="1" />
           <Label text="-0.94%" fontSize="11" color="#00CC00" width="46" />
@@ -262,12 +262,12 @@
       </Panel>
 
       <!-- 短线精灵标题 -->
-      <Panel direction="row" height="20" padding="0,6,0,6" background="#161616" alignItems="center">
+      <Panel direction="row" height="20" padding="6,0,6,0" background="#161616" alignItems="center">
         <Label text="短线精灵" fontSize="11" color="#EE2222" bold="true" flexGrow="1" />
         <Label text="A股逐笔" fontSize="11" color="#666666" />
       </Panel>
       <!-- 短线精灵列表 (行高 18px，填满异动数据) -->
-      <Panel id="tick_container" direction="column" flexGrow="1" flexBasis="0" padding="1,4,1,4" spacing="0" background="#080808">
+      <Panel id="tick_container" direction="column" flexGrow="1" flexBasis="0" padding="4,1,4,1" spacing="0" background="#080808">
         <Panel direction="row" height="18" alignItems="center">
           <Label text="14:58:33" fontSize="10" color="#777777" width="56" />
           <Label text="大笔买入" fontSize="10" color="#EE2222" flexGrow="1" />
@@ -323,7 +323,7 @@
   </Panel>
 
   <!-- 5. 底部跨市场状态条 -->
-  <Panel direction="row" height="26" padding="0,8,0,8" spacing="10" background="#121212" alignItems="center">
+  <Panel direction="row" height="26" padding="8,0,8,0" spacing="10" background="#121212" alignItems="center">
     <Label text="沪" fontSize="11" color="#888888" />
     <Label id="bottom_sh_price" text="3534.32" fontSize="11" color="#EE2222" bold="true" />
     <Label id="bottom_sh_diff" text="+15.56 (+0.44%)" fontSize="10" color="#EE2222" />

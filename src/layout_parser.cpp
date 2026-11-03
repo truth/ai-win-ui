@@ -206,11 +206,27 @@ std::string ToLowerAscii(std::string value) {
 
 Thickness ParseThickness(const std::vector<std::string>& values) {
     Thickness thickness;
-    if (values.size() == 4) {
-        thickness.left = std::stof(TrimString(values[0]));
-        thickness.top = std::stof(TrimString(values[1]));
-        thickness.right = std::stof(TrimString(values[2]));
-        thickness.bottom = std::stof(TrimString(values[3]));
+    try {
+        if (values.size() == 4) {
+            thickness.left = std::stof(TrimString(values[0]));
+            thickness.top = std::stof(TrimString(values[1]));
+            thickness.right = std::stof(TrimString(values[2]));
+            thickness.bottom = std::stof(TrimString(values[3]));
+        } else if (values.size() == 2) {
+            const float h = std::stof(TrimString(values[0]));
+            const float v = std::stof(TrimString(values[1]));
+            thickness.left = h;
+            thickness.top = v;
+            thickness.right = h;
+            thickness.bottom = v;
+        } else if (values.size() == 1 && !TrimString(values[0]).empty()) {
+            const float v = std::stof(TrimString(values[0]));
+            thickness.left = v;
+            thickness.top = v;
+            thickness.right = v;
+            thickness.bottom = v;
+        }
+    } catch (...) {
     }
     return thickness;
 }

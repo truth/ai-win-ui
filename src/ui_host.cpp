@@ -2072,7 +2072,8 @@ private:
             m_hasPendingDirtyRect = false;
             return;
         }
-        if (m_hasPendingDirtyRect && !m_windowChrome.IsLayered() && !m_uiContext.showDevTools) {
+        const bool supportsPartial = (m_renderer && m_renderer->Backend() == RendererBackend::Skia);
+        if (supportsPartial && m_hasPendingDirtyRect && !m_windowChrome.IsLayered() && !m_uiContext.showDevTools) {
             RECT rc{
                 std::max<LONG>(0, static_cast<LONG>(std::floor(m_pendingDirtyRect.left))),
                 std::max<LONG>(0, static_cast<LONG>(std::floor(m_pendingDirtyRect.top))),
@@ -2095,7 +2096,9 @@ private:
             m_frameProfiler.BeginPaint();
             const float paintW = static_cast<float>(ps.rcPaint.right - ps.rcPaint.left);
             const float paintH = static_cast<float>(ps.rcPaint.bottom - ps.rcPaint.top);
-            const bool isPartialPaint = !m_windowChrome.IsLayered() &&
+            const bool supportsPartial = (m_renderer && m_renderer->Backend() == RendererBackend::Skia);
+            const bool isPartialPaint = supportsPartial &&
+                !m_windowChrome.IsLayered() &&
                 !m_uiContext.showDevTools &&
                 paintW > 0.0f && paintH > 0.0f &&
                 (paintW < m_viewportWidth - 2.0f || paintH < m_viewportHeight - 2.0f);
