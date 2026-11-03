@@ -2,6 +2,22 @@
 
 ## 2026-11-03
 
+- **列表文字高度塌陷修复、Panel 默认内边距安全保护与通用解析扩展 (List Label Height Collapse & Panel Padding Safety Fix)**（分支 `feature/fix-list-labels-height-collapse`）
+  - **根本原因排查与定位**：
+    - 排查发现 C++ `Panel` 默认赋予 `padding{8, 8, 8, 8}`（上下内边距各 8px，在 1.25x DPI 缩放下为 10px+10px=20px）；
+    - 右侧列表中的 28 个行容器（`<Panel direction="row" height="19" alignItems="center">` 及 `height="18"`）在 XML 中均未显式声明 padding，导致 19px 高度（缩放后 23.75px）扣除 20px 默认内边距后，内部可用内容高度被挤压至 3.75px；
+    - Yoga 布局引擎在测量阶段执行 `AtMost` 约束，将子元素 `<Label>` 高度硬截断为 `h = 3.0px`，导致 DirectWrite / Skia 无法在 3px 矩形内绘制 15px 高度的文字，产生“文字隐形/完全不显示”的严重 bug。
+  - **XML 紧凑行显式内边距定义 (`resource/layouts/stock_quotes.xml`)**：
+    - 为盘口指标双列 Grid（10 行）、个股贡献度列表（8 行）、短线精灵推流列表（10 行）共 28 处行容器显式添加 `padding="0,0,0,0"`；
+    - 使行内容可用高度达满高 23px，Label 拥有充裕排版空间垂直居中呈现。
+  - **C++ 解析器安全兜底与 Thickness 扩展 (`src/layout_parser.cpp`, `src/ui_element.h`)**：
+    - 在 XML 和 JSON Panel 解析中增加安全兜底机制：当 `<Panel>` 设置固定高度且 `height <= (padding.top + padding.bottom)` 或 `height <= 24.0f` 时，若未显式指定 padding，自动将内边距置 0，彻底根除类似单行紧凑容器由于默认 padding 挤压导致内容高度下溢的隐患；
+    - 放宽 `padding` 与 `margin` 的多参数解析限制，完整支持 1、2、4 个数值语法；
+    - 在 `UIElement` 中规范化补充 `FixedWidth()` 和 `FixedHeight()` getter。
+  - **度量与 CI 测试验证**：
+    - `run_measure_dump.ps1` 转储验证表明，所有列表内 Label 的排版高度由 3.0px 恢复为满高 23.0px；
+    - `build.ps1` 构建通过，`run_ci_local.ps1 -SkipBuild` 7/7 项回归测试 **100% PASS**。
+
 - **Direct2D 脏矩形误清屏修复、Thickness 解析增强与同花顺布局内边距校正 (Font Clipping & Direct2D Partial Repaint Fix)**（分支 `feature/fix-font-clipping-and-panel-display`）
   - **Direct2D 脏矩形防清屏保护 (`src/ui_host.cpp`)**：
     - 修复 Direct2D（默认后端）在双缓冲交换链下收到局部脏矩形时，无条件调用 `Clear()` 清屏但跳过非脏区元素（`IntersectsDirtyRect`），导致顶部菜单、右侧盘口指标、贡献度列表大面积黑屏与边缘裁切的致命缺陷；
