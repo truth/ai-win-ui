@@ -2,6 +2,18 @@
 
 ## 2026-11-03
 
+- **Direct2D 脏矩形误清屏修复、Thickness 解析增强与同花顺布局内边距校正 (Font Clipping & Direct2D Partial Repaint Fix)**（分支 `feature/fix-font-clipping-and-panel-display`）
+  - **Direct2D 脏矩形防清屏保护 (`src/ui_host.cpp`)**：
+    - 修复 Direct2D（默认后端）在双缓冲交换链下收到局部脏矩形时，无条件调用 `Clear()` 清屏但跳过非脏区元素（`IntersectsDirtyRect`），导致顶部菜单、右侧盘口指标、贡献度列表大面积黑屏与边缘裁切的致命缺陷；
+    - 仅在 Skia 后端（具备离屏持久 Surface）启用局部脏矩形，Direct2D 维持完整帧重绘；结合图表几何缓存，单帧绘制保持在 0.15ms 以内，兼顾完整呈现与 144Hz 丝滑。
+  - **Thickness 解析器多参数支持 (`src/layout_parser.cpp`)**：
+    - 增强 `ParseThickness`，支持 1 个值（四边等距）、2 个值（水平, 垂直）、4 个值（Left, Top, Right, Bottom），防止单值或双值输入时解析为全零。
+  - **同花顺布局 XML 内边距与高度校正 (`resource/layouts/stock_quotes.xml`)**：
+    - 纠正所有面板中错将 CSS `0, X, 0, X` 当作水平内边距的写法，统一修正为 Windows Thickness 标准顺序 `X, 0, X, 0`；
+    - 消除菜单栏、工具条、状态栏因上下 20px 巨大内边距造成的字体被挤压裁切只显半截的问题；
+    - 盘口 10 项指标、8 支权重股贡献度榜单、短线精灵与标的现价全部清晰完整居中显示。
+  - **验证**：`build.ps1` 编译 0 Warning / 0 Error，`run_ci_local.ps1 -SkipBuild` 7/7 项回归测试 100% PASS。
+
 - **同花顺 K 线操盘工作站全景、数据饱满度与 144Hz 极速丝滑度重构 (Stock Kline Workstation & Silky Smoothness Optimization)**（分支 `feature/stock-kline-workstation`）
   - **坐标几何缓存（Geometry Caching）与十字光标 144Hz 丝滑交互 (`src/ui_financial_chart.h`)**：
     - 引入 `m_geometryDirty` 预计算与坐标几何缓存（`m_cachedWhitePts`, `m_cachedCandles`, `m_cachedWicks`, `m_cachedMa5/10/20Pts`, `m_cachedVolMa5/10Pts` 等）；
