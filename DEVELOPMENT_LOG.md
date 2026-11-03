@@ -1,9 +1,31 @@
 # 开发日志
 
+## 2026-11-03
+
+- **同花顺 K 线操盘工作站全景、数据饱满度与 144Hz 极速丝滑度重构 (Stock Kline Workstation & Silky Smoothness Optimization)**（分支 `feature/stock-kline-workstation`）
+  - **坐标几何缓存（Geometry Caching）与十字光标 144Hz 丝滑交互 (`src/ui_financial_chart.h`)**：
+    - 引入 `m_geometryDirty` 预计算与坐标几何缓存（`m_cachedWhitePts`, `m_cachedCandles`, `m_cachedWicks`, `m_cachedMa5/10/20Pts`, `m_cachedVolMa5/10Pts` 等）；
+    - 鼠标在图表上悬停/移动时，直接复用已排版好的几何缓存点集，跳过 240+ 根蜡烛柱、影线、均线坐标重新计算与大量浮点运算，单帧渲染耗时由 4~8ms 暴降至 0.05ms 以内，光标移动达到高刷显示器 144Hz 极致丝滑；
+    - 移动十字光标时调用 `InvalidateSelf(0.0f)` 仅对图表矩形区域执行局部重绘。
+  - **宿主局部脏矩形提交与鼠标事件穿透优化 (`src/ui_host.cpp`, `include/ai_win_ui/host.h`)**：
+    - 修复 `OnMouseMove` 在子控件处理鼠标事件后无条件调用 `InvalidateRect(m_hwnd, nullptr, FALSE)` 导致整屏 1280x820 强制全屏重绘的严重卡顿瓶颈；
+    - 改为精确合并 `FlushPendingDirtyInvalidate()`，结合各控件自身的局部脏矩形，使 Direct2D / Skia 双后端只对脏区重绘。
+  - **盘口数据批量更新机制 (`BeginBatchUpdate` / `EndBatchUpdate`)**：
+    - 针对 500ms 定时器刷新 11+ 个盘口行情 Label，原有逻辑每次 `SetElementText` 均会触发 Yoga `UpdateLayout()` 全树重排与全屏重绘（11 次重复触发）；
+    - 引入 `BeginBatchUpdate()` 与 `EndBatchUpdate(bool requestLayout = false)`，批量文本更新期间抑制 Yoga 全树布局重排，仅提交文本区域的局部脏矩形重绘，彻底消除行情跳动时的全屏微卡顿。
+  - **同花顺视觉全景对齐与全量 Mock 数据**：
+    - 阴线支持同花顺经典电青色（Cyan #00D2D2），阳线亮红（#EE2222）；
+    - 均线配色严格对齐：MA5（绿 #00E500）、MA10（紫 #E040FB）、MA20（黄 #FFD700）；
+    - 副图 Volume 增加 VolMA5（品红）与 VolMA10（金黄）均量线；
+    - 顶部绘制同花顺标志性胶囊标签 日线 ▼（5: 3.02, 10: 3.06, 20: 3.13）与 Vol ▼；
+    - 扩充全部 20 项大盘指标与 14 项个股深度属性、16 支权重股贡献度榜单、16+ 条短线精灵逐笔推流。
+  - **验证**：Release 版本编译并流畅运行，`run_ci_local.ps1 -SkipBuild` 7/7 项回归测试 100% PASS。
+
+
 ## 2026-11-02
 
 - **同花顺终端 UI 对齐修复、全量 Mock 数据与 K 线图（Candlestick）功能 (FinancialChart K-Line & Layout Align)**（分支 `feature/kline-and-layout-align`）
-  - **FinancialChart K 线模式支持 (src/ui_financial_chart.h)**：
+  - **FinancialChart K 线模式支持 (`src/ui_financial_chart.h`)**：
     - 扩展支持 `FinancialChartMode::Candlestick` 与 `FinancialChartMode::TimeSharing` 双模；
     - 实现蜡烛实体柱（阳线红实心、阴线绿实心）、上下影线、MA5（白）/ MA10（黄）/ MA20（紫）三条均线平滑折线绘制；
     - 副图成交量与量均线适配，K 线十字光标与 OHLCV 详情信息 Header 追踪；
@@ -11,7 +33,7 @@
     - `GenerateCandles(90)` 生成 90 根日 K 线模拟行情，计算真实 MA5/MA10/MA20 移动平均线；
     - 盘口核心指标全量补充（委比、委差、委买量、委卖量、外盘、内盘、市盈(动)、市净率、换手率、两市成交额、上涨/平盘/下跌家数）；
     - 扩充 16 支权重股贡献度榜单与 16+ 条短线精灵逐笔推流；
-  - **布局重构与字体截断修复 (esource/layouts/stock_quotes.xml)**：
+  - **布局重构与字体截断修复 (`resource/layouts/stock_quotes.xml`)**：
     - 顶部菜单行高提升至 28px，字号 12px，消除 DPI 缩放下的文本压扁与裁切；
     - 盘口网格行高调整为安全的 19px，个股贡献度与短线精灵列表行高 18px，填满界面，彻底杜绝黑屏留白；
     - 周期栏与左侧 Dock 接入分时、日K、周K、月K一键无缝切换动作；
@@ -56,7 +78,7 @@
   - **五项靶向丝滑度优化**：
     - **默认 Release 交互启动 (`scripts/run_layout_demo.ps1`)**：新增 `-Configuration Auto|Release|Debug` 参数，交互演示默认启用 `Release`，将 `modern_components_v2` 拖拽端到端帧延迟从 `194.14 ms`（~5 FPS）降至 `8.86 ms`（~113 FPS，提速 21.9×）；
     - **Skia 字体与文本排版缓存 (`src/skia_font_shared.h`, `src/skia_text_layout.cpp`, `src/renderer_skia.cpp`)**：缓存 `CreateDefaultTypeface` DirectWrite 字体对象、`CreateSkiaTextLayout` 排版结果（上限 4096 项）及 `DrawSvgPath` 路径解析结果；
-    - **按需 `UpdateLayout()` (`src/ui_host.cpp`, `src/ui_containers.h`, `src/ui_widgets.h`)**：移除 `UiHost::OnMouseDown` 无条件整页重排，改为仅在 `Expander` 展开/收起与 `AlertBanner` 关闭时调用 `requestLayout()`，使点击 `Switch` 等控件的布局开销从 `27.7 ms` 降至 `0.00 ms`；
+    - **按需 ``UpdateLayout()`` (`src/ui_host.cpp`, `src/ui_containers.h`, `src/ui_widgets.h`)**：移除 `UiHost::OnMouseDown` 无条件整页重排，改为仅在 `Expander` 展开/收起与 `AlertBanner` 关闭时调用 `requestLayout()`，使点击 `Switch` 等控件的布局开销从 `27.7 ms` 降至 `0.00 ms`；
     - **`Switch` 与 `SegmentedControl` 缓动动画 (`src/ui_widgets.h`)**：为 `Switch` 圆钮与轨道颜色、以及 `SegmentedControl` 胶囊滑块增加 Smoothstep 平滑过渡动画（`Release` 下单帧重绘仅 `3.19 ms`）；
     - **拖拽 DIB 64px 步进容量复用与同步重绘 (`src/renderer_skia.cpp`, `src/ui_host.cpp`)**：`SkiaRenderer` 按 64px 对齐容量复用 GDI DIB 位图（`resize` 分配耗时从 `1.26 ms` 降至 `0.04 ms`，提速 31.5×），并在 `UiHost::OnResize` 中调用 `RedrawWindow(..., RDW_INVALIDATE | RDW_UPDATENOW)` 同步上屏。
   - **验证**：`build.ps1` 编译 0 Error / 0 Warning，`run_ci_local.ps1 -SkipBuild` 7/7 项回归测试 100% PASS。
@@ -78,7 +100,7 @@
     - `<CircularProgress>`：双后端 SVG 圆弧环形进度指示器 (`0..100%`)，支持自定义环宽、颜色与中心百分比文字；
     - `<EmptyState>`：标准空数据占位组件（浅色圆形图标底座 + 矢量图标 + 标题 + 描述 + 操作按钮）。
   - **桌面级容器与环形图扩展 (`src/ui_containers.h`, `src/ui_chart.h`)**：
-    - `<Expander>`：可折叠手风琴容器，点击 Header 栏动态展开/收起子容器并触发宿主 `UpdateLayout()` 重排；
+    - `<Expander>`：可折叠手风琴容器，点击 Header 栏动态展开/收起子容器并触发宿主 ``UpdateLayout()`` 重排；
     - `<SplitView>`：可拖拽双面板分栏容器，支持鼠标按住分隔条实时调整 `splitRatio` 并重排两侧子面板；
     - `<Chart>` 饼图/环形图 (`type="pie|donut"`)：支持 `innerRadiusRatio`、`centerValue`、`centerTitle`、自定义 `colors` 色板、扇区悬停外扩高亮及 Tooltip 联动。
   - **画廊与看板升级验证**：新增 `resource/layouts/modern_components_v2.xml` 挂载至 `demo_gallery.xml`，并升级 `medlio_dashboard.xml` 及子组件；`build.ps1` 编译通过，`run_ci_local.ps1 -SkipBuild` 7/7 项回归测试 100% PASS。
@@ -98,8 +120,7 @@ enderer.cpp)**：
     - Skia (SkParsePath::FromSVGString) 与 Direct2D（内置轻量 SVG Path M/L/H/V/C/A/Z 解析器）双后端原生渲染矢量图标与任意路径。
   - **图表平滑曲线与渐变精修 (src/ui_chart.h)**：
     - 新增 Catmull-Rom 平滑样条曲线（smooth="true"）、面积图垂直线性渐变填充（FillPolygonLinearGradient）、圆角胶囊柱（arRadius）、背景轨道槽（arTrackColor）、单柱高亮与柱顶悬浮胶囊标签（highlightIndex / highlightColor）以及柔和虚线网格（DrawDashedLine）。
-  - **Medlio 看板全面升级与验证**：应用 <Icon> 矢量图标、多级字重、单边分割线、真高斯阴影与平滑渐变图表升级 medlio_dashboard.xml 及子组件；uild.ps1 编译通过，
-un_ci_local.ps1 -SkipBuild 7/7 项自动化回归测试 100% PASS。
+  - **Medlio 看板全面升级与验证**：应用 <Icon> 矢量图标、多级字重、单边分割线、真高斯阴影与平滑渐变图表升级 medlio_dashboard.xml 及子组件；uild.ps1 编译通过， `run_ci_local.ps1 -SkipBuild 7/7 项自动化回归测试 100% PASS。
 
 - **Medlio 医疗看板高保真 UI 对齐测试与视觉重构**（分支 `feature/medlio-dashboard`）
   - **架构层级颠覆与修复**：将旧方案中包裹在白底卡片内的 Sidebar 移至外部深蓝画布（`#2764FF`），确立“左深蓝侧边栏 + 右嵌入式浅灰白工作卡片（`#F6F8FB`，圆角 20px）”的经典高质感层级，解决整体对齐还原度偏低的问题。

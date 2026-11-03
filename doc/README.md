@@ -37,6 +37,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **Stock Kline Workstation & 144Hz Smoothness Optimization:** 2026-11-03-stock-kline-workstation-and-smoothness.md
   - **Flush Stock Terminal K-Line & Layout Align:** `2026-11-02-kline-and-layout-align.md`
   - **Flush Stock Terminal & FinancialChart Component:** `2026-11-02-flush-stock-terminal-v1.md`
   - **Frame Profiler & Interaction Smoothness:** `2026-11-02-frame-profiler-and-smoothness.md`
