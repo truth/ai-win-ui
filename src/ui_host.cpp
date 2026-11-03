@@ -665,6 +665,31 @@ public:
         return el ? ReadElementText(el) : std::wstring();
     }
 
+    int m_batchUpdateDepth = 0;
+    bool m_batchNeedsLayout = false;
+
+    void BeginBatchUpdate() {
+        m_batchUpdateDepth++;
+    }
+
+    void EndBatchUpdate(bool requestLayout = false) {
+        if (m_batchUpdateDepth > 0) {
+            m_batchUpdateDepth--;
+            if (requestLayout) {
+                m_batchNeedsLayout = true;
+            }
+            if (m_batchUpdateDepth == 0 && m_hwnd) {
+                if (m_batchNeedsLayout) {
+                    UpdateLayout();
+                    m_batchNeedsLayout = false;
+                    InvalidateRect(m_hwnd, nullptr, FALSE);
+                } else {
+                    FlushPendingDirtyInvalidate();
+                }
+            }
+        }
+    }
+
     bool SetElementText(const std::string& name, const std::wstring& text) {
         if (!m_root) {
             return false;
@@ -672,6 +697,10 @@ public:
         UIElement* el = m_root->FindElementByName(name);
         if (!el || !WriteElementText(el, text)) {
             return false;
+        }
+        if (m_batchUpdateDepth > 0) {
+            el->InvalidateSelf(2.0f);
+            return true;
         }
         if (m_hwnd) {
             UpdateLayout();
@@ -2161,7 +2190,7 @@ private:
             handled = m_root->OnMouseMove(x, y);
         }
         if (handled) {
-            InvalidateRect(m_hwnd, nullptr, FALSE);
+            FlushPendingDirtyInvalidate();
         }
         DispatchHoverChange(x, y);
     }
@@ -3420,6 +3449,18 @@ bool Host::ClearFinancialChartCandles(const char* name) {
 bool Host::AppendFinancialChartCandle(const char* name, const char* date, float open, float high, float low, float close, float volume, float ma5, float ma10, float ma20) {
     if (!m_impl || !m_impl->host || !name) return false;
     return m_impl->host->AppendFinancialChartCandle(name, date ? date : "", open, high, low, close, volume, ma5, ma10, ma20);
+}
+
+void Host::BeginBatchUpdate() {
+    if (m_impl && m_impl->host) {
+        m_impl->host->BeginBatchUpdate();
+    }
+}
+
+void Host::EndBatchUpdate(bool requestLayout) {
+    if (m_impl && m_impl->host) {
+        m_impl->host->EndBatchUpdate(requestLayout);
+    }
 }
 
 void Host::Invalidate() {

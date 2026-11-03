@@ -133,6 +133,10 @@ public:
     bool ClearFinancialChartCandles(const char* name);
     bool AppendFinancialChartCandle(const char* name, const char* date, float open, float high, float low, float close, float volume, float ma5, float ma10, float ma20);
 
+    // Performance & Batching
+    void BeginBatchUpdate();
+    void EndBatchUpdate(bool requestLayout = false);
+
     void Invalidate();
 
 private:

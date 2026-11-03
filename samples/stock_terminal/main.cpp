@@ -97,6 +97,7 @@ static void SwitchToMode(AppState* state, int mode) {
 
 static void UpdateUiFromSnapshot(ai_win_ui::Host* host, const MarketSnapshot& snap) {
     if (!host) return;
+    host->BeginBatchUpdate();
 
     wchar_t buf[64];
 
@@ -132,6 +133,7 @@ static void UpdateUiFromSnapshot(ai_win_ui::Host* host, const MarketSnapshot& sn
 
     swprintf_s(buf, L"%.2f%%", snap.weiBi);
     host->SetElementText("grid_weibi", buf);
+    host->EndBatchUpdate();
 }
 
 static void OnAction(const char* actionId, void* userData) {
