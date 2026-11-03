@@ -1098,11 +1098,8 @@ void ApplyCommonXmlAttributes(UIElement& element, const XmlNode& node) {
     }
     if (auto it = node.attributes.find("margin"); it != node.attributes.end()) {
         const auto values = SplitString(it->second, ',');
-        if (values.size() == 4) {
+        if (!values.empty()) {
             element.SetMargin(ParseThickness(values));
-        } else if (values.size() == 1 && !TrimString(values[0]).empty()) {
-            const float m = std::stof(TrimString(values[0]));
-            element.SetMargin(Thickness{m, m, m, m});
         }
     }
     {
@@ -1450,8 +1447,10 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
             TryAssignNumber(props["cornerRadius"], Theme::NumberCategory::Radius, panel->cornerRadius);
             TryAssignNumber(props["spacing"], Theme::NumberCategory::Spacing, panel->spacing);
-            if (props["padding"].IsArray() && props["padding"].arrayValue.size() == 4) {
+            bool hasExplicitPadding = false;
+            if (props.HasKey("padding")) {
                 panel->padding = ParseThickness(props["padding"]);
+                hasExplicitPadding = true;
             }
             if (props["direction"].IsString()) {
                 panel->direction = ParseDirection(props["direction"].stringValue);
@@ -1471,6 +1470,11 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             }
             ApplyPanelVisualEffectsFromJson(*panel, props);
             ApplyCommonJsonProps(*panel, props);
+            if (!hasExplicitPadding && panel->HasFixedHeight()) {
+                if (panel->FixedHeight() <= (panel->padding.top + panel->padding.bottom) || panel->FixedHeight() <= 24.0f) {
+                    panel->padding = Thickness{0.0f, 0.0f, 0.0f, 0.0f};
+                }
+            }
         }
         element = std::move(panel);
     } else if (type == "ScrollViewer") {
@@ -2846,10 +2850,12 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         if (auto it = node.attributes.find("spacing"); it != node.attributes.end()) {
             panel->spacing = std::stof(it->second);
         }
+        bool hasExplicitPadding = false;
         if (auto it = node.attributes.find("padding"); it != node.attributes.end()) {
             const auto values = SplitString(it->second, ',');
-            if (values.size() == 4) {
+            if (!values.empty()) {
                 panel->padding = ParseThickness(values);
+                hasExplicitPadding = true;
             }
         }
         if (auto it = node.attributes.find("direction"); it != node.attributes.end()) {
@@ -2870,6 +2876,11 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyPanelVisualEffectsFromXml(*panel, node);
         ApplyCommonXmlAttributes(*panel, node);
+        if (!hasExplicitPadding && panel->HasFixedHeight()) {
+            if (panel->FixedHeight() <= (panel->padding.top + panel->padding.bottom) || panel->FixedHeight() <= 24.0f) {
+                panel->padding = Thickness{0.0f, 0.0f, 0.0f, 0.0f};
+            }
+        }
         element = std::move(panel);
     } else if (node.name == "ScrollViewer") {
         auto viewer = std::make_unique<ScrollViewer>();

@@ -122,6 +122,8 @@ public:
     void SetAlignSelf(SelfAlign alignSelf) { m_alignSelf = alignSelf; }
     bool HasFixedWidth() const { return m_fixedWidth >= 0.0f; }
     bool HasFixedHeight() const { return m_fixedHeight >= 0.0f; }
+    float FixedWidth() const { return m_fixedWidth; }
+    float FixedHeight() const { return m_fixedHeight; }
     bool HasMinWidth() const { return m_minWidth >= 0.0f; }
     bool HasMaxWidth() const { return m_maxWidth >= 0.0f; }
     bool HasMinHeight() const { return m_minHeight >= 0.0f; }

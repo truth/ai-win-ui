@@ -1,49 +1,54 @@
-# 实施计划 - 修复字体截断、菜单只显示一半与右侧面板内容黑屏问题
+# 实施计划 - 修复同花顺金融终端右侧列表文字无法显示（高度塌陷）
 
-## 1. 现状与根因分析
+## 问题现象与根因定位
 
-用户在运行最新优化版本时反馈：“界面中的字比如菜单等，字体只显示一半出来。最上方和最下方，以及右侧列表的标题和内容都无法正常显示”，并附带了运行截图。
+### 1. 现象描述
+在运行 `stock_terminal.exe` 时，截图红框标注的右侧 3 处核心列表文字无法正常显示：
+- **红框 1**：盘口核心指标双列 Grid（委比、委差、昨收、今开、涨跌、最高、最低、振幅、总手、金额等 10 行）。
+- **红框 2**：个股贡献度列表（贵州茅台、招商银行、兴业银行等 8 支权重股的涨跌、现价、贡献）。
+- **红框 3**：短线精灵逐笔推流列表（14:58:33 大笔买入 171手等 10 行异动列表）。
 
-通过对 Direct2D 渲染管线、宿主刷新机制与 XAML 布局解析的逐行排查，定位到两处致命根因：
-
-### 根因 1：Direct2D 渲染器误用脏矩形裁剪导致大面积黑屏与文字残缺
-- `src/ui_host.cpp` 中的 `isPartialPaint` 和 `FlushPendingDirtyInvalidate()` 此前被改为针对局部脏矩形提交。
-- Direct2D（默认渲染后端）使用的是 `ID2D1HwndRenderTarget` 双缓冲交换链，每次 `BeginFrame` 均会调用 `m_renderTarget->Clear(clearColor)` 清屏为黑底；
-- 同时，所有 UIElement 在 `Render()` 中均会检查 `renderer.IntersectsDirtyRect(m_bounds)`；
-- 当局部脏矩形生效时，Direct2D 清空了整屏，却跳过了所有不在脏矩形内的控件（顶部菜单栏、右侧 10 行盘口指标、权重股贡献度列表、短线精灵、底部状态栏）；
-- 结果：未在脏矩形内的控件完全未被绘制而呈现大面积黑屏；处于脏矩形边缘的控件则被裁掉一半！
-- **对比**：Skia 后端拥有持久化离屏 `SkSurface`，支持局部脏矩形；而 Direct2D 双缓冲交换链必须进行全量绘制（得益于图表几何缓存，Direct2D 全量绘制单帧仅 0.15ms，完全保持 144Hz 丝滑）。
-
-### 根因 2：布局 XML 中 Padding 参数顺序混淆（Windows Thickness 顺序为 Left, Top, Right, Bottom）
-- `resource/layouts/stock_quotes.xml` 中将 CSS 的 `padding: 0 10px 0 10px` 误写为 `padding="0,10,0,10"`；
-- `ParseThickness` 按照 `values[0]=Left, values[1]=Top, values[2]=Right, values[3]=Bottom` 解析；
-- 导致顶部菜单栏（高 28px）被施加了 `Top: 10px, Bottom: 10px` 的垂直内边距，仅剩 8px 高度，13px 的字体被挤压裁切只显半截；
-- 同理，底部状态栏、右侧标题栏等均因垂直 padding 过大导致文本被裁切。
-
----
-
-## 2. 详细技术方案
-
-### 2.1 修复 Direct2D 脏矩形机制 (`src/ui_host.cpp`)
-- 仅在渲染器后端为 `Skia` 且具备离屏持久 Surface 时才启用局部脏矩形裁剪；
-- 在 Direct2D 后端下，`isPartialPaint` 设为 `false`，`FlushPendingDirtyInvalidate` 统一调用 `InvalidateRect(m_hwnd, nullptr, FALSE)`，确保 Direct2D 每帧完整绘制双缓冲，绝不擦除已有控件；
-- 保持 `FinancialChart` 内部的几何缓存（Geometry Cache），确保即使 Direct2D 全量绘制，单帧耗时也仅 0.1~0.2ms，丝滑度完全不减。
-
-### 2.2 修正布局 XML 内边距与高度 (`resource/layouts/stock_quotes.xml`)
-- 将所有工具条、菜单栏的内边距由 `0, X, 0, X` 纠正为 `X, 0, X, 0`（水平内边距 X，垂直内边距 0）；
-- 修正标的标题栏内边距为 `8, 2, 8, 2`；
-- 修正右侧盘口 10 行指标、8 行权重股贡献度、短线精灵的 padding 与行高，确保纵向自适应，不发生内容挤压或越界。
-
-### 2.3 增强 Thickness 解析器鲁棒性 (`src/layout_parser.cpp`)
-- 扩展 `ParseThickness`，支持 1 个值（四边等宽）、2 个值（水平, 垂直）、4 个值（Left, Top, Right, Bottom），防止单值或双值误写时解析为全零。
+### 2. 根因剖析 (Root Cause)
+通过 `scripts/run_measure_dump.ps1` 转储 UI 几何排版数据并分析 `scratch/stock_dump.ndjson` 查明：
+1. **默认内边距挤压**：
+   - C++ 中 `Panel` 的默认属性为 `padding{8, 8, 8, 8}`（上下各 8px，DPI 1.25 缩放下为 10px + 10px = 20px）。
+   - 右侧列表中的 28 个行容器（`<Panel direction="row" height="19" alignItems="center">` 及 `height="18"`）在 XML 中均**未显式声明 `padding`**。
+2. **Yoga 内容高度下溢**：
+   - 行容器的高为 19px（DPI 1.25 缩放下为 23.75px），扣除默认内边距上下各 10px 后，`contentHeight = 23.75 - 20 = 3.75px`！
+   - Yoga 在叶子节点测量阶段传入 `YGMeasureModeAtMost`，要求 `Label` 的最大高度不得超过 3.75px。
+   - `MeasureLeafNode` 将子元素的高度硬截断为 `h = 3.0px`。
+3. **渲染器文本垂直裁剪**：
+   - 11pt 字体渲染需要约 15px 垂直空间。当其包围盒 `m_bounds` 高度被压缩至 3px 时，DirectWrite 与 Skia 无法在 3px 区域内正常居中绘制完整字形，导致文字视觉上完全消失。
 
 ---
 
-## 3. 验证指标
-1. `build.ps1` 编译 0 Warning, 0 Error；
-2. `.\scripts\run_ci_local.ps1 -SkipBuild` 7 项回归测试 100% PASS；
-3. 运行 `stock_terminal.exe`：
-   - 顶部菜单栏与按钮文字完整居中显示，字体无半截或裁切；
-   - 底部跨市场状态栏文字饱满无截断；
-   - 右侧盘口 10 项核心指标、8 支个股贡献度、短线精灵标题与列表全部清晰可见，不再出现黑屏丢失；
-   - 鼠标悬停及十字光标交互继续保持 144Hz 极致丝滑。
+## 修改范围与技术方案
+
+### 1. XML 布局层（核心修复）
+- **文件**：`resource/layouts/stock_quotes.xml`
+- **改动**：
+  - 为盘口指标双列 Grid 的 10 个行容器显式添加 `padding="0,0,0,0"`。
+  - 为个股贡献度列表的 8 个行容器显式添加 `padding="0,0,0,0"`。
+  - 为短线精灵逐笔推流列表的 10 个行容器显式添加 `padding="0,0,0,0"`。
+  - 确保行内容高度饱满，Label 可以在 18-19px 高度内垂直居中排版。
+
+### 2. C++ 解析与布局引擎层（防御性兜底）
+- **文件**：`src/layout_parser.cpp`
+- **改动**：
+  - 增强 XML/JSON 的 `padding` 属性解析，放宽 `values.size() == 4` 限制，完整支持 1、2、4 个数值（如 `padding="0"`、`padding="6,2"`）。
+  - 增加紧凑行安全兜底保护：当 `<Panel>` 设置了固定高度 `height` 且 `height <= 24.0f` 时，若未显式指定 `padding`，自动将上下内边距安全置 0，杜绝单行紧凑容器由于默认 padding 导致内部叶子节点被挤压下溢的结构性隐患。
+
+### 3. 验证与回归测试
+- 运行 `scripts/run_measure_dump.ps1` 转储验证：
+  - 验证 `grid_weibi` 及列表内所有 Label 的 `h` 从 3.0px 恢复为正常的高度（15~19px）。
+- 运行 `build.ps1` 校验编译通过。
+- 运行 `scripts/run_ci_local.ps1 -SkipBuild`，确保 7 项 CI 回归测试 **100% PASS**。
+- 启动 `stock_terminal.exe`，直观核验 3 个红框区域内的所有列表文字完整、饱满、清晰显示。
+
+---
+
+## 交付与归档计划
+1. 完成代码修改并执行本地 CI 全绿校验；
+2. 合并 `feature/fix-list-labels-height-collapse` 分支至 `master`；
+3. 更新 `DEVELOPMENT_LOG.md` 顶部开发日志；
+4. 归档设计文档 `doc/plan/2026-11-03-fix-list-labels-height-collapse.md`，更新 `doc/README.md`。
