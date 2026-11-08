@@ -30,3 +30,7 @@ vcpkg_installed/
 
 # Claude Code workspace (per-session plans, agent state, settings)
 .claude/
+
+# Scratch & temporary scripts
+scratch/
+
