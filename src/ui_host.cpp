@@ -646,6 +646,28 @@ public:
         m_inlineLayoutXml = std::move(utf8);
         m_inlineLayoutIsJson = isJson;
     }
+    bool UpdateInlineLayout(std::string utf8, bool isJson) {
+        if (utf8.empty()) return false;
+        auto newRoot = LayoutParser::BuildFromXmlText(m_uiContext, utf8, isJson);
+        if (!newRoot) return false;
+
+        m_inlineLayoutXml = std::move(utf8);
+        m_inlineLayoutIsJson = isJson;
+        m_root = std::move(newRoot);
+        m_root->SetContext(&m_uiContext);
+        m_activeLayoutPath = "inline";
+        UpdateWindowTitle();
+        SetFocusedElement(GetFirstFocusable());
+
+        ApplyChromeFromRootIfNeeded();
+        m_layeredShellCaptured = false;
+        SyncLayeredShellForWindowState();
+        UpdateLayout();
+        if (m_hwnd) {
+            RedrawWindow(m_hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_INTERNALPAINT);
+        }
+        return true;
+    }
     void SetActionCallback(ai_win_ui::HostActionCallback cb, void* user) {
         m_actionCallback = cb;
         m_actionUser = user;
@@ -3383,6 +3405,13 @@ bool Host::SetElementText(const char* name, const wchar_t* text) {
         return false;
     }
     return m_impl->host->SetElementText(name, text ? std::wstring(text) : std::wstring());
+}
+
+bool Host::UpdateInlineLayout(const char* inlineLayoutXml, bool inlineLayoutIsJson) {
+    if (!m_impl || !m_impl->host || !inlineLayoutXml) {
+        return false;
+    }
+    return m_impl->host->UpdateInlineLayout(inlineLayoutXml, inlineLayoutIsJson);
 }
 
 bool Host::BindText(const char* name, Observable<std::wstring>* observable) {

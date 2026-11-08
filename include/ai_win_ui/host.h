@@ -110,6 +110,10 @@ public:
     // Set the text of a named element and re-layout. Returns false if not found.
     bool SetElementText(const char* name, const wchar_t* text);
 
+    // Replaces current inline layout with new XML/JSON and updates layout in-place
+    // on the existing window (no HWND destruction/recreation, zero flicker).
+    bool UpdateInlineLayout(const char* inlineLayoutXml, bool inlineLayoutIsJson = false);
+
     // Bind a string observable to a named element. The element's text will update
     // automatically when the observable's value changes. The observable must outlive
     // this Host. Returns false if the element is not found.
