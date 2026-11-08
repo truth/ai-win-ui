@@ -78,3 +78,4 @@ In this release, we deliver:
 - Mounted card in `resource/layouts/demo_gallery.xml` under Controls section.
 - Executed `run_ci_local.ps1 -SkipBuild`:
   - **7/7 CI regression tests 100% PASS** (Build skipped, Gallery coverage, Skia smoke, Direct2D smoke, Core measure, Yoga measure, Scroll viewer measure).
+

@@ -53,9 +53,11 @@ and **JSON** describe the same tree; property names are largely shared.
 ### Core / nav / advanced (layout-parse supported)
 
 `Checkbox`, `RadioButton`, `Slider`, `ProgressBar`, `ListBox`, `ComboBox`,
-`TabControl`, `ListView`, `TreeView`, `MenuStrip`, `ToolStrip`, `StatusStrip`,
-`ContextMenu`, `StatCard`, `SparklineChart`, `DataTable`, `NumericUpDown`,
-`DateTimePicker`, `RichTextBox`, `SeagullAnimation`.
+`TabControl`, `ListView`, `TreeView`, `TreeItem`, `Breadcrumb`, `BreadcrumbItem`,
+`Pagination`, `Avatar`, `Badge`, `Switch`, `SearchBox`, `CircularProgress`,
+`MenuStrip`, `ToolStrip`, `StatusStrip`, `ContextMenu`, `StatCard`,
+`SparklineChart`, `DataTable`, `NumericUpDown`, `DateTimePicker`, `RichTextBox`,
+`SeagullAnimation`.
 
 ---
 
@@ -510,6 +512,75 @@ The current DSL does not yet offer:
 
 ---
 
+## Navigation & Data View Components (Wave3)
+
+### `<Breadcrumb>` & `<BreadcrumbItem>`
+Path navigation bar with automatic separators, hover styling, and clickable crumbs.
+
+| Attribute | Target | Notes |
+|-----------|--------|-------|
+| `separator` | `Breadcrumb` | Separator string (`/`, `>`, `›`, `\`), default `/` |
+| `separatorColor` | `Breadcrumb` | Color of the separator text |
+| `text` | `BreadcrumbItem` | Label text |
+| `active` | `BreadcrumbItem` | `true`/`false`: marks the leaf/current active page |
+| `color` | `BreadcrumbItem` | Inactive crumb text color |
+| `activeColor` | `BreadcrumbItem` | Active crumb text color |
+| `hoverColor` | `BreadcrumbItem` | Hovered crumb text color |
+| `href` / `onClick` | `BreadcrumbItem` | Navigation route target or action string |
+
+```xml
+<Breadcrumb separator="/" separatorColor="#64748B">
+  <BreadcrumbItem text="Home" href="/" />
+  <BreadcrumbItem text="Projects" href="/projects" />
+  <BreadcrumbItem text="ai-win-ui" active="true" />
+</Breadcrumb>
+```
+
+### `<Pagination>`
+Data table / list pagination control with Prev/Next buttons, sliding number window, and total count.
+
+| Attribute | Notes |
+|-----------|-------|
+| `page` | Current 1-based page index (default: `1`) |
+| `total` | Total number of items (default: `0`) |
+| `pageSize` | Number of items per page (default: `10`) |
+| `showTotal` | `true`/`false`: renders `Total {total} items` label |
+| `showJumper` | `true`/`false`: renders jump-to-page input box |
+| `accentColor` | Selected page button background color |
+| `fontSize` | Font size (default: `12`) |
+
+```xml
+<Pagination page="1" total="1000" pageSize="20" showTotal="true" />
+```
+
+### Modern `<TreeView>` & `<TreeItem>`
+Hierarchical tree structure with nested items, folder/file vector icons, chevrons, guide lines, and checkboxes.
+
+| Attribute | Target | Notes |
+|-----------|--------|-------|
+| `showLines` | `TreeView` | `true`/`false`: renders dashed/dotted connector lines between nodes |
+| `showCheckBox` | `TreeView` | `true`/`false`: renders interactive node checkboxes |
+| `itemHeight` | `TreeView` | Row height per node (default: `28`) |
+| `indent` | `TreeView` | Indentation per hierarchy level (default: `18`) |
+| `header` / `text` | `TreeItem` | Display label of the node |
+| `icon` | `TreeItem` | Vector icon name (`folder`, `file`, `home`, `code`, `database`, etc.) |
+| `expanded` | `TreeItem` | `true`/`false`: initial expanded state |
+| `checked` | `TreeItem` | `true`/`false`: checkbox state |
+| `selected` | `TreeItem` | `true`/`false`: selected state |
+| `value` | `TreeItem` | Custom identifier / key |
+
+```xml
+<TreeView showLines="true" showCheckBox="true" indent="18" itemHeight="28">
+  <TreeItem header="src" icon="folder" expanded="true">
+    <TreeItem header="ui_views.h" icon="code" checked="true" />
+    <TreeItem header="ui_widgets.h" icon="code" />
+  </TreeItem>
+  <TreeItem header="README.md" icon="file" />
+</TreeView>
+```
+
+---
+
 ## Workflow
 
 ```powershell
@@ -540,6 +611,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_headless_smoke.ps1 `
 | `advanced_inputs.xml` | Numeric / DateTime / RichText |
 | `stats_components.xml` | StatCard / Sparkline |
 | `table_components.xml` | DataTable v3 |
+| **`desktop_navigation_demo.xml`** | **TreeView (lines/checkbox/icons) · Breadcrumb · Pagination** |
 | `test_styles.json` | Inline multi-state `style` |
 | `test_theme.json` | Theme tokens + magenta fallback |
 | `test_svg.json` | SvgIcon |
