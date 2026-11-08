@@ -1856,6 +1856,16 @@ private:
             return;
         }
 
+        // Skip shadow if window edge has no padding (tight bounds)
+        if (bounds.left < 2.0f || bounds.top < 2.0f) {
+            return;
+        }
+
+        const std::wstring shadowEnv = GetEnvironmentValue(L"AI_WIN_UI_CARD_SHADOW");
+        if (shadowEnv == L"0" || shadowEnv == L"none" || shadowEnv == L"off" || shadowEnv == L"false") {
+            return;
+        }
+
         float radius = 18.0f * m_uiContext.dpiScale;
         if (const auto* cardPanel = dynamic_cast<const Panel*>(card)) {
             radius = cardPanel->cornerRadius * m_uiContext.dpiScale;
@@ -1865,10 +1875,11 @@ private:
             return;
         }
 
-        for (int i = 5; i >= 1; --i) {
-            const float expand = static_cast<float>(i) * 3.0f * m_uiContext.dpiScale;
-            const float drop = static_cast<float>(i) * 1.2f * m_uiContext.dpiScale;
-            const float alpha = 0.035f * static_cast<float>(6 - i);
+        // Modern subtle shadow: 2 light passes, narrow spread
+        for (int i = 2; i >= 1; --i) {
+            const float expand = static_cast<float>(i) * 1.5f * m_uiContext.dpiScale;
+            const float drop = static_cast<float>(i) * 0.8f * m_uiContext.dpiScale;
+            const float alpha = 0.045f * static_cast<float>(3 - i);
             Rect shadow = ExpandRect(bounds, expand);
             shadow.top += drop;
             shadow.bottom += drop;
