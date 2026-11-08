@@ -583,7 +583,7 @@ public:
 
     const std::vector<std::unique_ptr<UIElement>>& Children() const { return m_children; }
 
-    void AddChild(std::unique_ptr<UIElement> child) {
+    virtual void AddChild(std::unique_ptr<UIElement> child) {
         if (child) {
             child->SetContext(m_context);
         }

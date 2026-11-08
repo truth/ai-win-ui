@@ -1125,3 +1125,508 @@ public:
         }
     }
 };
+
+// ============================================================================
+// Breadcrumb and BreadcrumbItem (Modern Components v3)
+// ============================================================================
+
+class BreadcrumbItem : public UIElement {
+public:
+    BreadcrumbItem() = default;
+    explicit BreadcrumbItem(std::wstring t) : text(std::move(t)) {}
+
+    std::wstring text;
+    std::string icon;
+    std::string href;
+    bool active = false;
+    float fontSize = 13.0f;
+    Color color = ColorFromHex(0x64748B);
+    Color activeColor = ColorFromHex(0x0F172A);
+    Color hoverColor = ColorFromHex(0x2764FF);
+    std::function<void()> onClick;
+
+    bool isHovered = false;
+
+protected:
+    float MeasurePreferredWidth(float /*availableWidth*/) const override {
+        float w = 0.0f;
+        if (!icon.empty()) {
+            w += ScaleValue(16.0f) + ScaleValue(5.0f);
+        }
+        if (!text.empty()) {
+            const Size ts = const_cast<BreadcrumbItem*>(this)->MeasureTextValue(
+                text, fontSize, 4096.0f, TextWrapMode::NoWrap);
+            w += ts.width;
+        }
+        return w;
+    }
+
+    float MeasurePreferredHeight(float /*width*/) const override {
+        return ScaleValue(24.0f);
+    }
+
+public:
+    bool OnMouseMove(float /*x*/, float /*y*/) override {
+        if (active) return false;
+        if (!isHovered) {
+            isHovered = true;
+            InvalidateSelf(2.0f);
+        }
+        return false;
+    }
+
+    bool OnMouseLeave() override {
+        if (isHovered) {
+            isHovered = false;
+            InvalidateSelf(2.0f);
+            return true;
+        }
+        return false;
+    }
+
+    bool OnMouseDown(float /*x*/, float /*y*/) override {
+        if (!active && onClick) {
+            onClick();
+            return true;
+        }
+        return false;
+    }
+
+    void Render(IRenderer& renderer) override {
+        if (!renderer.IntersectsDirtyRect(m_bounds)) {
+            return;
+        }
+        float curX = m_bounds.left;
+        if (!icon.empty()) {
+            bool filled = false;
+            if (const char* path = VectorIcon::LookupIconPath(icon, filled)) {
+                const float isz = ScaleValue(14.0f);
+                const float iconTop = m_bounds.top + (m_bounds.bottom - m_bounds.top - isz) * 0.5f;
+                const Rect iconRect{curX, iconTop, curX + isz, iconTop + isz};
+                const Color ic = active ? activeColor : (isHovered ? hoverColor : color);
+                renderer.DrawSvgPath(path, 24.0f, 24.0f, iconRect, Color{0.0f, 0.0f, 0.0f, 0.0f}, ic, ScaleValue(1.8f));
+                curX += isz + ScaleValue(5.0f);
+            }
+        }
+        if (!text.empty()) {
+            const Rect textRect{curX, m_bounds.top, m_bounds.right, m_bounds.bottom};
+            const Color tc = active ? activeColor : (isHovered ? hoverColor : color);
+            const int weight = active ? 600 : 400;
+            DrawStyledText(
+                renderer,
+                text,
+                textRect,
+                ScaleValue(fontSize),
+                tc,
+                TextHorizontalAlign::Start,
+                TextVerticalAlign::Center,
+                weight);
+        }
+    }
+};
+
+class Breadcrumb : public UIElement {
+public:
+    Breadcrumb() = default;
+
+    std::wstring separator = L"/";
+    float spacing = 8.0f;
+    float fontSize = 13.0f;
+    Color separatorColor = ColorFromHex(0x94A3B8);
+
+    bool IsLayoutLeaf() const override { return true; }
+
+protected:
+    float MeasurePreferredWidth(float availableWidth) const override {
+        float totalW = 0.0f;
+        const float gap = ScaleValue(spacing);
+        const Size sepSize = const_cast<Breadcrumb*>(this)->MeasureTextValue(
+            separator, fontSize, 200.0f, TextWrapMode::NoWrap);
+        bool first = true;
+        for (const auto& child : m_children) {
+            if (!child) continue;
+            child->Measure(availableWidth, 40.0f);
+            if (!first) {
+                totalW += gap + sepSize.width + gap;
+            }
+            totalW += child->DesiredSize().width;
+            first = false;
+        }
+        return totalW;
+    }
+
+    float MeasurePreferredHeight(float /*width*/) const override {
+        float maxH = ScaleValue(24.0f);
+        for (const auto& child : m_children) {
+            if (child) {
+                maxH = std::max(maxH, child->DesiredSize().height);
+            }
+        }
+        return maxH;
+    }
+
+public:
+    void Measure(float availableWidth, float /*availableHeight*/) override {
+        const float width = GetPreferredWidth(availableWidth);
+        m_desiredSize.width = width;
+        if (HasFixedHeight()) {
+            m_desiredSize.height = GetPreferredHeight(width);
+        } else {
+            m_desiredSize.height = ClampHeight(MeasurePreferredHeight(width));
+        }
+    }
+
+    void Arrange(const Rect& finalRect) override {
+        UIElement::Arrange(finalRect);
+        float curX = finalRect.left;
+        const float gap = ScaleValue(spacing);
+        const Size sepSize = MeasureTextValue(separator, fontSize, 200.0f, TextWrapMode::NoWrap);
+
+        // Auto mark last item as active if none is explicitly active
+        bool anyExplicitActive = false;
+        for (const auto& child : m_children) {
+            if (auto* bi = dynamic_cast<BreadcrumbItem*>(child.get())) {
+                if (bi->active) {
+                    anyExplicitActive = true;
+                    break;
+                }
+            }
+        }
+        if (!anyExplicitActive && !m_children.empty()) {
+            if (auto* lastBi = dynamic_cast<BreadcrumbItem*>(m_children.back().get())) {
+                lastBi->active = true;
+            }
+        }
+
+        bool first = true;
+        for (auto& child : m_children) {
+            if (!child) continue;
+            if (!first) {
+                curX += gap + sepSize.width + gap;
+            }
+            const float cw = child->DesiredSize().width;
+            const Rect childRect{curX, finalRect.top, curX + cw, finalRect.bottom};
+            child->Arrange(childRect);
+            curX += cw;
+            first = false;
+        }
+    }
+
+    void Render(IRenderer& renderer) override {
+        if (!renderer.IntersectsDirtyRect(m_bounds)) {
+            return;
+        }
+        const float gap = ScaleValue(spacing);
+        const Size sepSize = MeasureTextValue(separator, fontSize, 200.0f, TextWrapMode::NoWrap);
+
+        for (size_t i = 0; i < m_children.size(); ++i) {
+            const auto& child = m_children[i];
+            if (!child) continue;
+            child->Render(renderer);
+
+            if (i + 1 < m_children.size()) {
+                const Rect childBounds = child->Bounds();
+                const Rect sepRect{
+                    childBounds.right + gap,
+                    m_bounds.top,
+                    childBounds.right + gap + sepSize.width,
+                    m_bounds.bottom
+                };
+                DrawStyledText(
+                    renderer,
+                    separator,
+                    sepRect,
+                    ScaleValue(fontSize),
+                    separatorColor,
+                    TextHorizontalAlign::Center,
+                    TextVerticalAlign::Center,
+                    400);
+            }
+        }
+    }
+};
+
+// ============================================================================
+// Pagination (Modern Components v3)
+// ============================================================================
+
+class Pagination : public UIElement {
+public:
+    Pagination() = default;
+
+    int current = 1;
+    int total = 0;
+    int pageSize = 10;
+    bool showTotal = true;
+    float itemSize = 32.0f;
+    float spacing = 6.0f;
+    float fontSize = 12.5f;
+    float cornerRadius = 6.0f;
+    Color activeColor = ColorFromHex(0x2764FF);
+    Color activeTextColor = ColorFromHex(0xFFFFFF);
+    Color hoverColor = ColorFromHex(0xEFF6FF);
+    Color textColor = ColorFromHex(0x334155);
+    Color disabledColor = ColorFromHex(0xCBD5E1);
+    Color borderColor = ColorFromHex(0xE2E8F0);
+    std::function<void(int page, int pageSize)> onPageChange;
+
+    struct ButtonInfo {
+        int page; // -1: prev, -2: next, -3: left ellipsis, -4: right ellipsis, >= 1: page number
+        Rect rect;
+        bool isCurrent = false;
+        bool isDisabled = false;
+        bool isHovered = false;
+        std::wstring label;
+    };
+    mutable std::vector<ButtonInfo> m_buttons;
+
+    int GetTotalPages() const {
+        if (pageSize <= 0) return 1;
+        return std::max(1, (total + pageSize - 1) / pageSize);
+    }
+
+    void SetCurrent(int page) {
+        const int tp = GetTotalPages();
+        const int newPage = std::clamp(page, 1, tp);
+        if (newPage != current) {
+            current = newPage;
+            InvalidateSelf(4.0f);
+            if (onPageChange) {
+                onPageChange(current, pageSize);
+            }
+        }
+    }
+
+protected:
+    std::wstring GetTotalString() const {
+        return L"共 " + std::to_wstring(total) + L" 条";
+    }
+
+    std::vector<int> ComputePageNumbers() const {
+        std::vector<int> pages;
+        const int tp = GetTotalPages();
+        if (tp <= 7) {
+            for (int i = 1; i <= tp; ++i) pages.push_back(i);
+        } else {
+            if (current <= 4) {
+                for (int i = 1; i <= 5; ++i) pages.push_back(i);
+                pages.push_back(-4); // right ellipsis
+                pages.push_back(tp);
+            } else if (current >= tp - 3) {
+                pages.push_back(1);
+                pages.push_back(-3); // left ellipsis
+                for (int i = tp - 4; i <= tp; ++i) pages.push_back(i);
+            } else {
+                pages.push_back(1);
+                pages.push_back(-3);
+                pages.push_back(current - 1);
+                pages.push_back(current);
+                pages.push_back(current + 1);
+                pages.push_back(-4);
+                pages.push_back(tp);
+            }
+        }
+        return pages;
+    }
+
+    float MeasurePreferredWidth(float /*availableWidth*/) const override {
+        float w = 0.0f;
+        const float isz = ScaleValue(itemSize);
+        const float gap = ScaleValue(spacing);
+
+        if (showTotal) {
+            const Size ts = const_cast<Pagination*>(this)->MeasureTextValue(
+                GetTotalString(), fontSize, 400.0f, TextWrapMode::NoWrap);
+            w += ts.width + ScaleValue(12.0f);
+        }
+
+        // Prev + Next
+        w += isz * 2.0f;
+        const auto pages = ComputePageNumbers();
+        w += static_cast<float>(pages.size()) * isz;
+        w += static_cast<float>(pages.size() + 1) * gap;
+        return w;
+    }
+
+    float MeasurePreferredHeight(float /*width*/) const override {
+        return ScaleValue(itemSize);
+    }
+
+public:
+    void LayoutButtons() const {
+        m_buttons.clear();
+        const float isz = ScaleValue(itemSize);
+        const float gap = ScaleValue(spacing);
+        float curX = m_bounds.left;
+        const float top = m_bounds.top + (m_bounds.bottom - m_bounds.top - isz) * 0.5f;
+
+        if (showTotal) {
+            const Size ts = const_cast<Pagination*>(this)->MeasureTextValue(
+                GetTotalString(), fontSize, 400.0f, TextWrapMode::NoWrap);
+            curX += ts.width + ScaleValue(12.0f);
+        }
+
+        // Prev button
+        const int tp = GetTotalPages();
+        ButtonInfo prevBtn;
+        prevBtn.page = -1;
+        prevBtn.rect = Rect{curX, top, curX + isz, top + isz};
+        prevBtn.isDisabled = (current <= 1);
+        prevBtn.label = L"‹";
+        m_buttons.push_back(prevBtn);
+        curX += isz + gap;
+
+        // Number buttons
+        const auto pages = ComputePageNumbers();
+        for (int p : pages) {
+            ButtonInfo b;
+            b.page = p;
+            b.rect = Rect{curX, top, curX + isz, top + isz};
+            if (p == -3 || p == -4) {
+                b.label = L"•••";
+            } else {
+                b.label = std::to_wstring(p);
+                b.isCurrent = (p == current);
+            }
+            m_buttons.push_back(b);
+            curX += isz + gap;
+        }
+
+        // Next button
+        ButtonInfo nextBtn;
+        nextBtn.page = -2;
+        nextBtn.rect = Rect{curX, top, curX + isz, top + isz};
+        nextBtn.isDisabled = (current >= tp);
+        nextBtn.label = L"›";
+        m_buttons.push_back(nextBtn);
+    }
+
+    bool OnMouseMove(float x, float y) override {
+        bool changed = false;
+        for (auto& btn : m_buttons) {
+            const bool inside = (x >= btn.rect.left && x <= btn.rect.right &&
+                                 y >= btn.rect.top && y <= btn.rect.bottom);
+            if (inside != btn.isHovered) {
+                btn.isHovered = inside;
+                changed = true;
+            }
+        }
+        if (changed) {
+            InvalidateSelf(2.0f);
+        }
+        return false;
+    }
+
+    bool OnMouseLeave() override {
+        bool changed = false;
+        for (auto& btn : m_buttons) {
+            if (btn.isHovered) {
+                btn.isHovered = false;
+                changed = true;
+            }
+        }
+        if (changed) {
+            InvalidateSelf(2.0f);
+        }
+        return changed;
+    }
+
+    bool OnMouseDown(float x, float y) override {
+        LayoutButtons();
+        for (const auto& btn : m_buttons) {
+            if (x >= btn.rect.left && x <= btn.rect.right &&
+                y >= btn.rect.top && y <= btn.rect.bottom) {
+                if (btn.isDisabled) return false;
+                if (btn.page == -1) {
+                    SetCurrent(current - 1);
+                    return true;
+                }
+                if (btn.page == -2) {
+                    SetCurrent(current + 1);
+                    return true;
+                }
+                if (btn.page == -3) {
+                    SetCurrent(std::max(1, current - 5));
+                    return true;
+                }
+                if (btn.page == -4) {
+                    SetCurrent(std::min(GetTotalPages(), current + 5));
+                    return true;
+                }
+                if (btn.page >= 1) {
+                    SetCurrent(btn.page);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    void Render(IRenderer& renderer) override {
+        if (!renderer.IntersectsDirtyRect(m_bounds)) {
+            return;
+        }
+        LayoutButtons();
+
+        float curX = m_bounds.left;
+        if (showTotal) {
+            const std::wstring totalStr = GetTotalString();
+            const Size ts = MeasureTextValue(totalStr, fontSize, 400.0f, TextWrapMode::NoWrap);
+            const Rect totalRect{curX, m_bounds.top, curX + ts.width, m_bounds.bottom};
+            DrawStyledText(
+                renderer,
+                totalStr,
+                totalRect,
+                ScaleValue(fontSize),
+                textColor,
+                TextHorizontalAlign::Start,
+                TextVerticalAlign::Center,
+                400);
+        }
+
+        const float cr = ScaleValue(cornerRadius);
+        const float bw = ScaleValue(1.0f);
+
+        for (const auto& btn : m_buttons) {
+            if (btn.isCurrent) {
+                renderer.FillRoundedRect(btn.rect, activeColor, cr);
+                DrawStyledText(
+                    renderer,
+                    btn.label,
+                    btn.rect,
+                    ScaleValue(fontSize),
+                    activeTextColor,
+                    TextHorizontalAlign::Center,
+                    TextVerticalAlign::Center,
+                    600);
+            } else if (btn.isDisabled) {
+                renderer.DrawRoundedRect(btn.rect, borderColor, bw, cr);
+                DrawStyledText(
+                    renderer,
+                    btn.label,
+                    btn.rect,
+                    ScaleValue(fontSize),
+                    disabledColor,
+                    TextHorizontalAlign::Center,
+                    TextVerticalAlign::Center,
+                    400);
+            } else {
+                if (btn.isHovered) {
+                    renderer.FillRoundedRect(btn.rect, hoverColor, cr);
+                }
+                const Color bc = btn.isHovered ? activeColor : borderColor;
+                renderer.DrawRoundedRect(btn.rect, bc, bw, cr);
+                const Color tc = btn.isHovered ? activeColor : textColor;
+                DrawStyledText(
+                    renderer,
+                    btn.label,
+                    btn.rect,
+                    ScaleValue(fontSize),
+                    tc,
+                    TextHorizontalAlign::Center,
+                    TextVerticalAlign::Center,
+                    500);
+            }
+        }
+    }
+};

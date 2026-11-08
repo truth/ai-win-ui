@@ -156,6 +156,21 @@ public:
         if (iconName == "more-horizontal") {
             return "M12 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2z M19 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2z M5 11a1 1 0 1 0 0 2 1 1 0 1 0 0-2z";
         }
+        if (iconName == "folder") {
+            return "M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z";
+        }
+        if (iconName == "file" || iconName == "document") {
+            return "M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z M13 2v7h7";
+        }
+        if (iconName == "home") {
+            return "M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z M9 22V12h6v10";
+        }
+        if (iconName == "code") {
+            return "M16 18l6-6-6-6 M8 6l-6 6 6 6";
+        }
+        if (iconName == "database") {
+            return "M12 2C6.48 2 2 3.79 2 6v12c0 2.21 4.48 4 10 4s10-1.79 10-4V6c0-2.21-4.48-4-10-4z M2 12c0 2.21 4.48 4 10 4s10-1.79 10-4 M2 6c0 2.21 4.48 4 10 4s10-1.79 10-4";
+        }
         if (iconName == "arrow-up-right") {
             return "M7 17L17 7 M7 7h10v10";
         }
