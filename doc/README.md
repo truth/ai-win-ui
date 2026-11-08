@@ -39,7 +39,8 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
-  - **List Labels Height Collapse & Panel Padding Safety Fix:** 2026-11-03-fix-list-labels-height-collapse.md
+  - **Desktop Navigation & Data View Components v3 (TreeView, Breadcrumb, Pagination):** `2026-11-08-desktop-navigation-components.md`
+  - **List Labels Height Collapse & Panel Padding Safety Fix:** `2026-11-03-fix-list-labels-height-collapse.md`
   - **Font Clipping & Direct2D Repaint Fix:** 2026-11-03-font-clipping-and-direct2d-repaint-fix.md
   - **Stock Kline Workstation & 144Hz Smoothness Optimization:** 2026-11-03-stock-kline-workstation-and-smoothness.md
   - **Flush Stock Terminal K-Line & Layout Align:** `2026-11-02-kline-and-layout-align.md`
@@ -74,7 +75,7 @@ abstractions:
 
 | Area | Files |
 |------|--------|
-| Controls | `src/ui.h`, `src/ui_panels.*`, `src/ui_media.h`, **`src/ui_icons.h`** (`<Icon>` / `<Path>`), **`src/ui_widgets.h`** (`<Avatar>`, `<Badge>`, `<Divider>`, `<SegmentedControl>`, `<Switch>`, `<SearchBox>`, `<Alert>`, `<CircularProgress>`, `<EmptyState>`), **`src/ui_containers.h`** (`<Expander>`, `<SplitView>`) |
+| Controls | `src/ui.h`, `src/ui_panels.*`, `src/ui_media.h`, **`src/ui_icons.h`** (`<Icon>` / `<Path>`), **`src/ui_widgets.h`** (`<Avatar>`, `<Badge>`, `<Divider>`, `<SegmentedControl>`, `<Switch>`, `<SearchBox>`, `<Alert>`, `<CircularProgress>`, `<EmptyState>`, `<Breadcrumb>`, `<Pagination>`), **`src/ui_views.h`** (`<TreeView>`, `<TreeItem>`, `<TableView>`), **`src/ui_containers.h`** (`<Expander>`, `<SplitView>`) |
 | **Chart** | **`src/ui_chart.h`** (smooth spline line / vertical gradient area / rounded pill bar + highlight badge / pie & donut ring charts, dashed grid, axes, legend, tooltip) |
 | Renderer | `src/renderer.h`, `src/renderer.cpp` (D2D), `src/renderer_skia.cpp` (Skia) |
 | Text measure & layout | `src/text_measurer.h`, `src/skia_font_shared.h`, `src/skia_text_layout.*` (100..900 fontWeight, fontFamily, lineHeight) |

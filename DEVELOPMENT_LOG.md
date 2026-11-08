@@ -1,5 +1,31 @@
 # 开发日志
 
+## 2026-11-08
+
+- **桌面级高级导航与数据视图组件实现 (Desktop Navigation & Data View Components v3)**（分支 `feature/desktop-navigation-components`）
+  - **组件研发与特性落地**：
+    1. **`<Breadcrumb>` & `<BreadcrumbItem>`** (`src/ui_widgets.h`)：
+       - 实现路径导航面包屑，支持动态子项追加、悬停变色高亮、叶子节点激活样式、自定义分割符（`/`、`>`、`›`）及点击路由回调。
+    2. **`<Pagination>`** (`src/ui_widgets.h`)：
+       - 实现企业级桌面分页器，支持 `page`、`total`、`pageSize` 自动计算总页数；
+       - 提供“上一页 / 下一页”禁用态判断、数字页码滑动窗口计算、省略符（`...`）渲染、总条数标签（`Total {count} items`）与页码跳转事件响应。
+    3. **`<TreeView>` & `<TreeItem>` 现代化改造** (`src/ui_views.h`)：
+       - 升级现有 `TreeView`，在保持原有 `items="A/B/C"` 路径字符串兼容性的基础上，新增声明式嵌套 `<TreeItem>` 支持；
+       - 支持层级缩进（`indent`）、折叠/展开指示三角（`▼` / `▶`）、树状节点引导虚线（`showLines="true"`）、节点独立复选框（`showCheckBox="true"`）以及矢量图标前缀；
+       - 完善复选框与折叠箭头的独立点击命中测试（Hit Testing）。
+    4. **矢量图标扩展** (`src/ui_icons.h`)：
+       - 在 `VectorIcon::LookupIconPath` 中扩展标准桌面图标：`folder`、`file`、`home`、`code`、`database`。
+    5. **布局解析器无缝对接** (`src/layout_parser.cpp`)：
+       - 为 XML 和 JSON 解析引擎全面增加 `Breadcrumb`、`BreadcrumbItem`、`Pagination`、`TreeView`、`TreeItem` 的标签解析与属性绑定。
+  - **示例演示与画廊集成**：
+    - 创建高保真综合桌面演示布局 `resource/layouts/desktop_navigation_demo.xml`（1280x860），展示左侧项目资源管理器（带虚线与复选框的多级树）、顶部路径面包屑栏、以及底部数据分页条；
+    - 在组件画廊 `resource/layouts/demo_gallery.xml` Controls 区块挂载该演示入口。
+  - **CI 回归与工程验证**：
+    - `build.ps1` 编译 0 Error / 0 Warning，资源同步正常；
+    - 运行 `run_ci_local.ps1 -SkipBuild`，7/7 项回归测试全部 **100% PASS**（包含画廊覆盖率、Skia/Direct2D 无头冒烟与 Yoga 几何度量验证）。
+  - **设计归档**：
+    - 归档设计方案至 [`doc/plan/2026-11-08-desktop-navigation-components.md`](doc/plan/2026-11-08-desktop-navigation-components.md)。
+
 ## 2026-11-03
 
 - **架构避坑与排错最佳实践知识库沉淀 (Troubleshooting & Pitfall Guide)**
