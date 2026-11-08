@@ -2,6 +2,7 @@
 // ListView, TreeView
 // See ui.h for the full umbrella include.
 #include "ui_scroll.h"
+#include "ui_icons.h"
 
 class ListView : public UIElement {
 public:
@@ -594,6 +595,33 @@ private:
     float m_hScroll = 0.0f;
 };
 
+class TreeItem : public UIElement {
+public:
+    TreeItem() = default;
+    explicit TreeItem(std::wstring text) : header(std::move(text)) {}
+
+    std::wstring header;
+    std::string icon;
+    bool expanded = true;
+    bool selected = false;
+    bool isChecked = false;
+    std::vector<std::shared_ptr<TreeItem>> subItems;
+
+    void AddSubItem(std::shared_ptr<TreeItem> child) {
+        if (child) subItems.push_back(std::move(child));
+    }
+
+    void AddChild(std::unique_ptr<UIElement> child) override {
+        if (!child) return;
+        if (auto* ti = dynamic_cast<TreeItem*>(child.get())) {
+            std::shared_ptr<TreeItem> sp(static_cast<TreeItem*>(child.release()));
+            AddSubItem(sp);
+            return;
+        }
+        UIElement::AddChild(std::move(child));
+    }
+};
+
 class TreeView : public UIElement {
 public:
     TreeView() { m_style = DefaultStyle(nullptr); }
@@ -773,6 +801,20 @@ public:
 
         if (entry.node && !entry.node->children.empty() && ToggleGlyphRect(entry.depth, rowIndex).Contains(x, y)) {
             entry.node->expanded = !entry.node->expanded;
+            InvalidateSelf(4.0f);
+            return true;
+        }
+        if (showCheckBox && entry.node && CheckBoxRect(entry.depth, rowIndex).Contains(x, y)) {
+            entry.node->isChecked = !entry.node->isChecked;
+            InvalidateSelf(4.0f);
+            if (onCheck) onCheck(entry.path, entry.node->isChecked);
+            return true;
+        }
+        SetSelectedPath(entry.path);
+        EnsureSelectedVisible(visible);
+        InvalidateSelf(4.0f);
+        if (onSelect) {
+            onSelect(entry.path, entry.node ? entry.node->label : L"");
         }
         return true;
     }
@@ -945,25 +987,61 @@ public:
             const float glyphLeft = content.left + ScaleValue(4.0f) + indent;
             const float glyphCenterY = top + row * 0.5f;
 
+            if (showLines && entry.depth > 0) {
+                const float startX = glyphLeft - ScaleValue(8.0f);
+                renderer.DrawLine(PointF{startX, top}, PointF{startX, glyphCenterY}, lineColor, 1.0f);
+                renderer.DrawLine(PointF{startX, glyphCenterY}, PointF{glyphLeft - ScaleValue(2.0f), glyphCenterY}, lineColor, 1.0f);
+            }
+
             if (!entry.node->children.empty()) {
                 const Rect glyphRect = ToggleGlyphRect(entry.depth, globalIndex);
-                renderer.DrawRect(glyphRect, glyphColor, 1.0f);
-                renderer.DrawLine(
-                    PointF{glyphRect.left + ScaleValue(2.0f), glyphCenterY},
-                    PointF{glyphRect.right - ScaleValue(2.0f), glyphCenterY},
+                const std::wstring chevron = entry.node->expanded ? L"▼" : L"▶";
+                const TextRenderOptions chevronOptions{
+                    TextWrapMode::NoWrap,
+                    TextHorizontalAlign::Center,
+                    TextVerticalAlign::Center
+                };
+                renderer.DrawTextW(
+                    chevron.c_str(),
+                    static_cast<UINT32>(chevron.size()),
+                    glyphRect,
                     glyphColor,
-                    1.0f);
-                if (!entry.node->expanded) {
-                    renderer.DrawLine(
-                        PointF{glyphRect.left + glyphRect.Width() * 0.5f, glyphRect.top + ScaleValue(2.0f)},
-                        PointF{glyphRect.left + glyphRect.Width() * 0.5f, glyphRect.bottom - ScaleValue(2.0f)},
-                        glyphColor,
-                        1.0f);
+                    ScaleValue(8.5f),
+                    chevronOptions);
+            }
+
+            float itemContentLeft = glyphLeft + ScaleValue(16.0f);
+            if (showCheckBox) {
+                const Rect cbRect = CheckBoxRect(entry.depth, globalIndex);
+                if (entry.node->isChecked) {
+                    renderer.FillRoundedRect(cbRect, ColorFromHex(0x2764FF), ScaleValue(3.0f));
+                    const std::wstring checkGlyph = L"✓";
+                    const TextRenderOptions checkOptions{TextWrapMode::NoWrap, TextHorizontalAlign::Center, TextVerticalAlign::Center};
+                    renderer.DrawTextW(checkGlyph.c_str(), static_cast<UINT32>(checkGlyph.size()), cbRect, ColorFromHex(0xFFFFFF), ScaleValue(9.5f), checkOptions);
+                } else {
+                    renderer.DrawRoundedRect(cbRect, borderColor, 1.0f, ScaleValue(3.0f));
+                }
+                itemContentLeft += ScaleValue(18.0f);
+            }
+
+            if (!entry.node->icon.empty()) {
+                bool filled = false;
+                if (const char* path = VectorIcon::LookupIconPath(entry.node->icon, filled)) {
+                    const float isz = ScaleValue(14.0f);
+                    const float iconTop = top + (row - isz) * 0.5f;
+                    const Rect iconRect = Rect::Make(itemContentLeft, iconTop, itemContentLeft + isz, iconTop + isz);
+                    Color ic = ColorFromHex(0x64748B);
+                    if (entry.node->icon == "folder") {
+                        ic = ColorFromHex(0xF59E0B);
+                    } else if (entry.node->icon == "code" || entry.node->icon == "file") {
+                        ic = ColorFromHex(0x3B82F6);
+                    }
+                    renderer.DrawSvgPath(path, 24.0f, 24.0f, iconRect, Color{0.0f, 0.0f, 0.0f, 0.0f}, ic, ScaleValue(1.8f));
+                    itemContentLeft += isz + ScaleValue(6.0f);
                 }
             }
 
-            const float textLeft = glyphLeft + ScaleValue(16.0f);
-            const Rect textRect = Rect::Make(textLeft, top, content.right - ScaleValue(6.0f), bottom);
+            const Rect textRect = Rect::Make(itemContentLeft, top, content.right - ScaleValue(6.0f), bottom);
             const TextRenderOptions textOptions{
                 TextWrapMode::NoWrap,
                 TextHorizontalAlign::Start,
@@ -1024,10 +1102,47 @@ public:
     Color glyphColor = ColorFromHex(0xAFC3D9);
     Color scrollThumbColor = ColorFromHex(0x7A93AD);
     Color scrollTrackColor = ColorFromHex(0x162433);
+    Color lineColor = ColorFromHex(0x35506A);
     float cornerRadius = 10.0f;
     float fontSize = 13.0f;
     float itemHeight = 24.0f;
     float indentWidth = 18.0f;
+    bool showLines = true;
+    bool showCheckBox = false;
+
+    std::function<void(const std::vector<int>& path, const std::wstring& label)> onSelect;
+    std::function<void(const std::vector<int>& path, bool isChecked)> onCheck;
+
+    struct Node {
+        std::wstring label;
+        std::vector<Node> children;
+        bool expanded = true;
+        std::string icon;
+        bool isChecked = false;
+    };
+
+    void AddChild(std::unique_ptr<UIElement> child) override {
+        if (!child) return;
+        if (auto* ti = dynamic_cast<TreeItem*>(child.get())) {
+            std::function<Node(TreeItem*)> convert = [&](TreeItem* it) -> Node {
+                Node n;
+                n.label = it->header;
+                n.icon = it->icon;
+                n.expanded = it->expanded;
+                n.isChecked = it->isChecked;
+                for (const auto& sub : it->subItems) {
+                    if (sub) n.children.push_back(convert(sub.get()));
+                }
+                return n;
+            };
+            m_roots.push_back(convert(ti));
+            if (m_selectedPath.empty() && !m_roots.empty()) {
+                m_selectedPath = std::vector<int>{0};
+            }
+            return;
+        }
+        UIElement::AddChild(std::move(child));
+    }
 
 private:
     void SyncLegacyColorsFromStyle() {
@@ -1055,12 +1170,6 @@ private:
             }
         }
     }
-
-    struct Node {
-        std::wstring label;
-        std::vector<Node> children;
-        bool expanded = true;
-    };
 
     struct VisibleNode {
         Node* node = nullptr;
@@ -1144,6 +1253,17 @@ private:
         const float centerY = rowTop + row * 0.5f;
         const float left = content.left + ScaleValue(4.0f) + ScaleValue(indentWidth) * static_cast<float>(depth);
         return Rect::Make(left, centerY - ScaleValue(5.0f), left + ScaleValue(10.0f), centerY + ScaleValue(5.0f));
+    }
+
+    Rect CheckBoxRect(int depth, int globalIndex) const {
+        const Rect content = ContentRect();
+        const float row = std::max(1.0f, ScaleValue(itemHeight));
+        const int localIndex = globalIndex - m_scrollOffset;
+        const float rowTop = content.top + static_cast<float>(localIndex) * row;
+        const float centerY = rowTop + row * 0.5f;
+        const float left = content.left + ScaleValue(4.0f) + ScaleValue(indentWidth) * static_cast<float>(depth) + ScaleValue(14.0f);
+        const float cbDim = ScaleValue(14.0f);
+        return Rect::Make(left, centerY - cbDim * 0.5f, left + cbDim, centerY + cbDim * 0.5f);
     }
 
     std::vector<VisibleNode> BuildVisibleNodes() {

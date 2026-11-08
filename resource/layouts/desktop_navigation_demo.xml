@@ -1,0 +1,218 @@
+<!--
+  Desktop Composite Navigation & Data View Demo:
+  Showcases TreeView (hierarchical project tree with icons, lines and checkboxes),
+  Breadcrumb (path navigation with home icon and separators),
+  and Pagination (desktop multi-page switcher with total count and ellipsis).
+-->
+<Panel
+  name="desktopNavRoot"
+  direction="column"
+  background="#0B121A"
+  padding="18,16,18,16"
+  spacing="12"
+  alignItems="stretch">
+
+  <!-- Top Navigation & Profile Header Bar -->
+  <Panel direction="row" height="42" background="#121D2C" cornerRadius="10" borderColor="#22344A" border="1" padding="8,16,8,16" alignItems="center" justifyContent="spaceBetween">
+    <Panel direction="row" spacing="12" alignItems="center">
+      <Icon name="code" size="18" color="#38BDF8" />
+      <Label text="DevStudio · Resource Explorer" fontSize="15" color="#F8FAFC" />
+      <Badge text="v3.0 PRO" variant="primary" dot="true" />
+    </Panel>
+    <Panel direction="row" spacing="14" alignItems="center">
+      <SearchBox placeholder="搜索文件或组件 (Ctrl+K)..." width="240" height="28" shortcut="Ctrl+K" />
+      <Divider orientation="vertical" height="18" color="#263A50" />
+      <Avatar initials="AG" size="28" status="online" background="#1E3A8A" color="#60A5FA" />
+    </Panel>
+  </Panel>
+
+  <!-- Interactive Breadcrumb Location Bar -->
+  <Panel direction="row" height="36" background="#121D2C" cornerRadius="8" borderColor="#22344A" border="1" padding="6,16,6,16" alignItems="center">
+    <Breadcrumb separator="/" spacing="8" fontSize="12.5" separatorColor="#64748B">
+      <BreadcrumbItem text="工作台" icon="home" color="#94A3B8" hoverColor="#38BDF8" />
+      <BreadcrumbItem text="核心工程 (ai-win-ui)" icon="folder" color="#94A3B8" hoverColor="#38BDF8" />
+      <BreadcrumbItem text="src" icon="folder" color="#94A3B8" hoverColor="#38BDF8" />
+      <BreadcrumbItem text="ui_widgets.h" icon="code" color="#F8FAFC" active="true" />
+    </Breadcrumb>
+  </Panel>
+
+  <!-- Main Body: Left TreeView + Right Detail Management Dashboard -->
+  <Panel direction="row" flexGrow="1" spacing="12" alignItems="stretch">
+
+    <!-- Left Explorer Tree Sidebar -->
+    <Panel direction="column" width="280" background="#121D2C" cornerRadius="10" borderColor="#22344A" border="1" padding="12,12,12,12" spacing="8" alignItems="stretch">
+      <Panel direction="row" justifyContent="spaceBetween" alignItems="center" height="26">
+        <Panel direction="row" spacing="6" alignItems="center">
+          <Icon name="folder" size="14" color="#F59E0B" />
+          <Label text="PROJECT EXPLORER" fontSize="11.5" color="#94A3B8" />
+        </Panel>
+        <Badge text="18 项" variant="neutral" />
+      </Panel>
+      <Divider color="#22344A" margin="2,0,4,0" />
+
+      <!-- Declarative Hierarchical TreeView -->
+      <TreeView
+        name="workspaceTree"
+        flexGrow="1"
+        showLines="true"
+        showCheckBox="true"
+        background="transparent"
+        borderColor="#22344A"
+        selectedBackground="#1E3A5F"
+        hoverBackground="#16273C"
+        textColor="#E2E8F0"
+        selectedTextColor="#38BDF8"
+        lineColor="#263A50"
+        glyphColor="#94A3B8"
+        itemHeight="28"
+        indentWidth="18"
+        fontSize="12.5">
+        <TreeItem header="ai-win-ui" icon="folder" expanded="true">
+          <TreeItem header="src" icon="folder" expanded="true">
+            <TreeItem header="ui_widgets.h" icon="code" selected="true" checked="true" />
+            <TreeItem header="ui_views.h" icon="code" checked="true" />
+            <TreeItem header="ui_containers.h" icon="code" checked="true" />
+            <TreeItem header="layout_engine.h" icon="code" />
+            <TreeItem header="renderer_skia.cpp" icon="code" />
+          </TreeItem>
+          <TreeItem header="resource" icon="folder" expanded="true">
+            <TreeItem header="layouts" icon="folder" expanded="true">
+              <TreeItem header="desktop_nav.xml" icon="file" checked="true" />
+              <TreeItem header="medlio_dashboard.xml" icon="file" />
+              <TreeItem header="stock_terminal.xml" icon="file" />
+            </TreeItem>
+            <TreeItem header="styles" icon="folder">
+              <TreeItem header="styles.json" icon="file" />
+            </TreeItem>
+          </TreeItem>
+          <TreeItem header="doc" icon="folder" expanded="false">
+            <TreeItem header="README.md" icon="file" />
+            <TreeItem header="troubleshooting.md" icon="file" />
+          </TreeItem>
+          <TreeItem header="CMakeLists.txt" icon="file" />
+        </TreeItem>
+      </TreeView>
+    </Panel>
+
+    <!-- Right Workspace Area -->
+    <Panel direction="column" flexGrow="1" spacing="12" alignItems="stretch">
+
+      <!-- Summary KPI Bar -->
+      <Panel direction="row" spacing="12" height="72">
+        <Panel direction="column" flexGrow="1" background="#121D2C" cornerRadius="10" borderColor="#22344A" border="1" padding="10,14,10,14" justifyContent="center">
+          <Label text="当前目录文件数" fontSize="11" color="#94A3B8" />
+          <Panel direction="row" spacing="8" alignItems="baseline">
+            <Label text="128" fontSize="20" color="#F8FAFC" />
+            <Label text="个文件" fontSize="11" color="#64748B" />
+          </Panel>
+        </Panel>
+        <Panel direction="column" flexGrow="1" background="#121D2C" cornerRadius="10" borderColor="#22344A" border="1" padding="10,14,10,14" justifyContent="center">
+          <Label text="代码占用体积" fontSize="11" color="#94A3B8" />
+          <Panel direction="row" spacing="8" alignItems="baseline">
+            <Label text="2.45 MB" fontSize="20" color="#38BDF8" />
+            <Label text="32,480 行" fontSize="11" color="#64748B" />
+          </Panel>
+        </Panel>
+        <Panel direction="column" flexGrow="1" background="#121D2C" cornerRadius="10" borderColor="#22344A" border="1" padding="10,14,10,14" justifyContent="center">
+          <Label text="最新构建状态" fontSize="11" color="#94A3B8" />
+          <Panel direction="row" spacing="8" alignItems="center">
+            <Badge text="7/7 CI PASS" variant="success" dot="true" />
+            <Label text="100% 验证通过" fontSize="11" color="#10B981" />
+          </Panel>
+        </Panel>
+      </Panel>
+
+      <!-- Asset Table Card -->
+      <Panel direction="column" flexGrow="1" background="#121D2C" cornerRadius="10" borderColor="#22344A" border="1" padding="12,14,12,14" spacing="10" alignItems="stretch">
+        <Panel direction="row" justifyContent="spaceBetween" alignItems="center" height="30">
+          <Panel direction="row" spacing="8" alignItems="center">
+            <Label text="目录成员列表 (Directory Contents)" fontSize="13.5" color="#F8FAFC" />
+            <Badge text="已勾选 4 项" variant="info" />
+          </Panel>
+          <Panel direction="row" spacing="8">
+            <Button text="批量操作" style="$style.secondaryButton" height="26" />
+            <Button text="+ 上传资源" style="$style.primaryButton" height="26" />
+          </Panel>
+        </Panel>
+
+        <!-- Table Mock Rows -->
+        <Panel direction="column" background="#0E1724" cornerRadius="8" borderColor="#1E2F42" border="1" padding="4,8,4,8" spacing="4" flexGrow="1">
+          <!-- Table Header -->
+          <Panel direction="row" height="28" alignItems="center" padding="0,8,0,8" background="#142234" cornerRadius="4">
+            <Label text="资源名称" width="220" fontSize="11.5" color="#94A3B8" />
+            <Label text="类型" width="100" fontSize="11.5" color="#94A3B8" />
+            <Label text="大小" width="100" fontSize="11.5" color="#94A3B8" />
+            <Label text="状态" width="120" fontSize="11.5" color="#94A3B8" />
+            <Label text="更新时间" flexGrow="1" fontSize="11.5" color="#94A3B8" />
+          </Panel>
+          <!-- Row 1 -->
+          <Panel direction="row" height="32" alignItems="center" padding="0,8,0,8" background="#111D2D" cornerRadius="4">
+            <Panel direction="row" width="220" spacing="6" alignItems="center">
+              <Icon name="code" size="14" color="#38BDF8" />
+              <Label text="ui_widgets.h" fontSize="12" color="#F8FAFC" />
+            </Panel>
+            <Label text="C++ Header" width="100" fontSize="11.5" color="#94A3B8" />
+            <Label text="54.2 KB" width="100" fontSize="11.5" color="#CBD5E1" />
+            <Badge text="Active" variant="success" dot="true" width="80" />
+            <Label text="2026-11-08 12:25" flexGrow="1" fontSize="11.5" color="#64748B" />
+          </Panel>
+          <!-- Row 2 -->
+          <Panel direction="row" height="32" alignItems="center" padding="0,8,0,8" background="#0E1724" cornerRadius="4">
+            <Panel direction="row" width="220" spacing="6" alignItems="center">
+              <Icon name="code" size="14" color="#38BDF8" />
+              <Label text="ui_views.h" fontSize="12" color="#F8FAFC" />
+            </Panel>
+            <Label text="C++ Header" width="100" fontSize="11.5" color="#94A3B8" />
+            <Label text="42.8 KB" width="100" fontSize="11.5" color="#CBD5E1" />
+            <Badge text="Active" variant="success" dot="true" width="80" />
+            <Label text="2026-11-08 12:20" flexGrow="1" fontSize="11.5" color="#64748B" />
+          </Panel>
+          <!-- Row 3 -->
+          <Panel direction="row" height="32" alignItems="center" padding="0,8,0,8" background="#111D2D" cornerRadius="4">
+            <Panel direction="row" width="220" spacing="6" alignItems="center">
+              <Icon name="file" size="14" color="#F59E0B" />
+              <Label text="desktop_nav.xml" fontSize="12" color="#F8FAFC" />
+            </Panel>
+            <Label text="XML Layout" width="100" fontSize="11.5" color="#94A3B8" />
+            <Label text="6.8 KB" width="100" fontSize="11.5" color="#CBD5E1" />
+            <Badge text="New" variant="primary" width="80" />
+            <Label text="2026-11-08 12:30" flexGrow="1" fontSize="11.5" color="#64748B" />
+          </Panel>
+          <!-- Row 4 -->
+          <Panel direction="row" height="32" alignItems="center" padding="0,8,0,8" background="#0E1724" cornerRadius="4">
+            <Panel direction="row" width="220" spacing="6" alignItems="center">
+              <Icon name="file" size="14" color="#94A3B8" />
+              <Label text="troubleshooting.md" fontSize="12" color="#F8FAFC" />
+            </Panel>
+            <Label text="Markdown" width="100" fontSize="11.5" color="#94A3B8" />
+            <Label text="14.1 KB" width="100" fontSize="11.5" color="#CBD5E1" />
+            <Badge text="Archived" variant="neutral" width="80" />
+            <Label text="2026-11-03 16:15" flexGrow="1" fontSize="11.5" color="#64748B" />
+          </Panel>
+        </Panel>
+
+        <!-- Bottom Pagination Bar Component -->
+        <Panel direction="row" justifyContent="spaceBetween" alignItems="center" height="36" padding="2,4,2,4">
+          <Label text="显示第 11 至 20 条，共 128 条记录" fontSize="11.5" color="#64748B" />
+          <Pagination
+            name="assetPagination"
+            current="2"
+            total="128"
+            pageSize="10"
+            itemSize="30"
+            spacing="5"
+            fontSize="12"
+            cornerRadius="6"
+            activeColor="#2563EB"
+            activeTextColor="#FFFFFF"
+            hoverColor="#1E3A5F"
+            textColor="#CBD5E1"
+            borderColor="#22344A"
+            disabledColor="#475569"
+            showTotal="false" />
+        </Panel>
+      </Panel>
+    </Panel>
+  </Panel>
+</Panel>
+

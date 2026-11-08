@@ -2769,6 +2769,67 @@ std::unique_ptr<UIElement> CreateElementFromJson(const JsonValue& node, IResourc
             ApplyCommonJsonProps(*shape, props);
         }
         element = std::move(shape);
+    } else if (type == "BreadcrumbItem") {
+        auto bi = std::make_unique<BreadcrumbItem>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["text"].IsString()) bi->text = LayoutParser::Utf8ToUtf16(props["text"].stringValue);
+            if (props["icon"].IsString()) bi->icon = props["icon"].stringValue;
+            if (props["href"].IsString()) bi->href = props["href"].stringValue;
+            if (props["active"].IsBool()) bi->active = props["active"].boolValue;
+            if (props["fontSize"].IsNumber()) bi->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            if (props["color"].IsString()) bi->color = LayoutParser::ColorFromString(props["color"].stringValue);
+            if (props["activeColor"].IsString()) bi->activeColor = LayoutParser::ColorFromString(props["activeColor"].stringValue);
+            if (props["hoverColor"].IsString()) bi->hoverColor = LayoutParser::ColorFromString(props["hoverColor"].stringValue);
+            ApplyCommonJsonProps(*bi, props);
+        }
+        element = std::move(bi);
+    } else if (type == "Breadcrumb") {
+        auto bc = std::make_unique<Breadcrumb>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["separator"].IsString()) bc->separator = LayoutParser::Utf8ToUtf16(props["separator"].stringValue);
+            if (props["spacing"].IsNumber()) bc->spacing = static_cast<float>(props["spacing"].numberValue);
+            if (props["fontSize"].IsNumber()) bc->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            if (props["separatorColor"].IsString()) bc->separatorColor = LayoutParser::ColorFromString(props["separatorColor"].stringValue);
+            ApplyCommonJsonProps(*bc, props);
+        }
+        element = std::move(bc);
+    } else if (type == "Pagination") {
+        auto pg = std::make_unique<Pagination>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["current"].IsNumber()) pg->current = static_cast<int>(props["current"].numberValue);
+            if (props["total"].IsNumber()) pg->total = static_cast<int>(props["total"].numberValue);
+            if (props["pageSize"].IsNumber()) pg->pageSize = static_cast<int>(props["pageSize"].numberValue);
+            if (props["showTotal"].IsBool()) pg->showTotal = props["showTotal"].boolValue;
+            if (props["itemSize"].IsNumber()) pg->itemSize = static_cast<float>(props["itemSize"].numberValue);
+            if (props["spacing"].IsNumber()) pg->spacing = static_cast<float>(props["spacing"].numberValue);
+            if (props["fontSize"].IsNumber()) pg->fontSize = static_cast<float>(props["fontSize"].numberValue);
+            if (props["cornerRadius"].IsNumber()) pg->cornerRadius = static_cast<float>(props["cornerRadius"].numberValue);
+            if (props["activeColor"].IsString()) pg->activeColor = LayoutParser::ColorFromString(props["activeColor"].stringValue);
+            if (props["activeTextColor"].IsString()) pg->activeTextColor = LayoutParser::ColorFromString(props["activeTextColor"].stringValue);
+            if (props["hoverColor"].IsString()) pg->hoverColor = LayoutParser::ColorFromString(props["hoverColor"].stringValue);
+            if (props["textColor"].IsString()) pg->textColor = LayoutParser::ColorFromString(props["textColor"].stringValue);
+            if (props["borderColor"].IsString()) pg->borderColor = LayoutParser::ColorFromString(props["borderColor"].stringValue);
+            if (props["disabledColor"].IsString()) pg->disabledColor = LayoutParser::ColorFromString(props["disabledColor"].stringValue);
+            ApplyCommonJsonProps(*pg, props);
+        }
+        element = std::move(pg);
+    } else if (type == "TreeItem") {
+        auto ti = std::make_unique<TreeItem>();
+        if (node["props"].IsObject()) {
+            const JsonValue& props = node["props"];
+            if (props["header"].IsString()) ti->header = LayoutParser::Utf8ToUtf16(props["header"].stringValue);
+            else if (props["text"].IsString()) ti->header = LayoutParser::Utf8ToUtf16(props["text"].stringValue);
+            if (props["icon"].IsString()) ti->icon = props["icon"].stringValue;
+            if (props["expanded"].IsBool()) ti->expanded = props["expanded"].boolValue;
+            if (props["selected"].IsBool()) ti->selected = props["selected"].boolValue;
+            if (props["checked"].IsBool()) ti->isChecked = props["checked"].boolValue;
+            else if (props["isChecked"].IsBool()) ti->isChecked = props["isChecked"].boolValue;
+            ApplyCommonJsonProps(*ti, props);
+        }
+        element = std::move(ti);
     }
 
     if (!element) {
@@ -4573,6 +4634,124 @@ std::unique_ptr<UIElement> CreateElementFromXml(const XmlNode& node, IResourcePr
         }
         ApplyCommonXmlAttributes(*shape, node);
         element = std::move(shape);
+    } else if (node.name == "BreadcrumbItem") {
+        auto bi = std::make_unique<BreadcrumbItem>();
+        if (auto it = node.attributes.find("text"); it != node.attributes.end()) {
+            bi->text = LayoutParser::Utf8ToUtf16(it->second);
+        } else if (auto it2 = node.attributes.find("header"); it2 != node.attributes.end()) {
+            bi->text = LayoutParser::Utf8ToUtf16(it2->second);
+        }
+        if (auto it = node.attributes.find("icon"); it != node.attributes.end()) {
+            bi->icon = TrimString(it->second);
+        }
+        if (auto it = node.attributes.find("href"); it != node.attributes.end()) {
+            bi->href = TrimString(it->second);
+        }
+        if (auto it = node.attributes.find("active"); it != node.attributes.end()) {
+            bi->active = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            bi->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("color"); it != node.attributes.end()) {
+            bi->color = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("activeColor"); it != node.attributes.end()) {
+            bi->activeColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("hoverColor"); it != node.attributes.end()) {
+            bi->hoverColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("onClick"); it != node.attributes.end() && eventResolver) {
+            bi->onClick = eventResolver(it->second);
+        }
+        ApplyCommonXmlAttributes(*bi, node);
+        element = std::move(bi);
+    } else if (node.name == "Breadcrumb") {
+        auto bc = std::make_unique<Breadcrumb>();
+        if (auto it = node.attributes.find("separator"); it != node.attributes.end()) {
+            bc->separator = LayoutParser::Utf8ToUtf16(it->second);
+        }
+        if (auto it = node.attributes.find("spacing"); it != node.attributes.end()) {
+            bc->spacing = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            bc->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("separatorColor"); it != node.attributes.end()) {
+            bc->separatorColor = LayoutParser::ColorFromString(it->second);
+        }
+        ApplyCommonXmlAttributes(*bc, node);
+        element = std::move(bc);
+    } else if (node.name == "Pagination") {
+        auto pg = std::make_unique<Pagination>();
+        if (auto it = node.attributes.find("current"); it != node.attributes.end()) {
+            pg->current = std::stoi(it->second);
+        }
+        if (auto it = node.attributes.find("total"); it != node.attributes.end()) {
+            pg->total = std::stoi(it->second);
+        }
+        if (auto it = node.attributes.find("pageSize"); it != node.attributes.end()) {
+            pg->pageSize = std::stoi(it->second);
+        }
+        if (auto it = node.attributes.find("showTotal"); it != node.attributes.end()) {
+            pg->showTotal = ParseBoolString(it->second, true);
+        }
+        if (auto it = node.attributes.find("itemSize"); it != node.attributes.end()) {
+            pg->itemSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("spacing"); it != node.attributes.end()) {
+            pg->spacing = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("fontSize"); it != node.attributes.end()) {
+            pg->fontSize = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("cornerRadius"); it != node.attributes.end()) {
+            pg->cornerRadius = std::stof(it->second);
+        }
+        if (auto it = node.attributes.find("activeColor"); it != node.attributes.end()) {
+            pg->activeColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("activeTextColor"); it != node.attributes.end()) {
+            pg->activeTextColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("hoverColor"); it != node.attributes.end()) {
+            pg->hoverColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("textColor"); it != node.attributes.end()) {
+            pg->textColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("borderColor"); it != node.attributes.end()) {
+            pg->borderColor = LayoutParser::ColorFromString(it->second);
+        }
+        if (auto it = node.attributes.find("disabledColor"); it != node.attributes.end()) {
+            pg->disabledColor = LayoutParser::ColorFromString(it->second);
+        }
+        ApplyCommonXmlAttributes(*pg, node);
+        element = std::move(pg);
+    } else if (node.name == "TreeItem") {
+        auto ti = std::make_unique<TreeItem>();
+        if (auto it = node.attributes.find("header"); it != node.attributes.end()) {
+            ti->header = LayoutParser::Utf8ToUtf16(it->second);
+        } else if (auto it2 = node.attributes.find("text"); it2 != node.attributes.end()) {
+            ti->header = LayoutParser::Utf8ToUtf16(it2->second);
+        }
+        if (auto it = node.attributes.find("icon"); it != node.attributes.end()) {
+            ti->icon = TrimString(it->second);
+        }
+        if (auto it = node.attributes.find("expanded"); it != node.attributes.end()) {
+            ti->expanded = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("selected"); it != node.attributes.end()) {
+            ti->selected = ParseBoolString(it->second, false);
+        }
+        if (auto it = node.attributes.find("checked"); it != node.attributes.end()) {
+            ti->isChecked = ParseBoolString(it->second, false);
+        } else if (auto it2 = node.attributes.find("isChecked"); it2 != node.attributes.end()) {
+            ti->isChecked = ParseBoolString(it2->second, false);
+        }
+        ApplyCommonXmlAttributes(*ti, node);
+        element = std::move(ti);
     }
 
     if (!element) {
