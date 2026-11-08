@@ -651,18 +651,34 @@ public:
         auto newRoot = LayoutParser::BuildFromXmlText(m_uiContext, utf8, isJson);
         if (!newRoot) return false;
 
+        std::string prevFocusedName;
+        if (m_focusedElement && !m_focusedElement->Name().empty()) {
+            prevFocusedName = m_focusedElement->Name();
+        }
+
+        // Cleanly clear focus and capture before replacing the UI tree to avoid dangling pointers
+        SetFocusedElement(nullptr);
+        m_mouseCaptureTarget = nullptr;
+
         m_inlineLayoutXml = std::move(utf8);
         m_inlineLayoutIsJson = isJson;
         m_root = std::move(newRoot);
         m_root->SetContext(&m_uiContext);
         m_activeLayoutPath = "inline";
         UpdateWindowTitle();
-        SetFocusedElement(GetFirstFocusable());
 
         ApplyChromeFromRootIfNeeded();
         m_layeredShellCaptured = false;
         SyncLayeredShellForWindowState();
         UpdateLayout();
+
+        if (!prevFocusedName.empty()) {
+            UIElement* el = m_root->FindElementByName(prevFocusedName);
+            if (el && el->IsFocusable()) {
+                SetFocusedElement(el);
+            }
+        }
+
         if (m_hwnd) {
             RedrawWindow(m_hwnd, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_INTERNALPAINT);
         }
