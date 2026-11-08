@@ -1790,7 +1790,7 @@ private:
         if (!rootPanel) {
             return;
         }
-        if (!m_layeredShellCaptured) {
+        if (!m_layeredShellCaptured && !(m_hwnd && IsZoomed(m_hwnd))) {
             m_layeredRootPadding = rootPanel->padding;
             if (!rootPanel->Children().empty()) {
                 if (auto* card = dynamic_cast<Panel*>(rootPanel->Children().front().get())) {
