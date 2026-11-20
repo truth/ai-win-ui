@@ -196,6 +196,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {
 
     // 4. 行情数据更新回调
     state.engine.onDataUpdated = [&state]() {
+        if (!state.host) return;
+        state.host->BeginBatchUpdate();
         if (state.chartMode == 0) {
             const auto& pts = state.engine.GetPoints();
             if (!pts.empty()) {
@@ -205,6 +207,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {
             }
         }
         UpdateUiFromSnapshot(state.host.get(), state.engine.GetSnapshot());
+        state.host->EndBatchUpdate(false);
     };
 
     // 5. 设置 500ms 定时器驱动行情 Tick 跳动

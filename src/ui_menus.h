@@ -162,6 +162,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         const float scaledCornerRadius = ScaleValue(cornerRadius);
         renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
         renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
@@ -543,6 +549,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         const float scaledCornerRadius = ScaleValue(cornerRadius);
         renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
         renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
@@ -829,6 +841,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         const float scaledCornerRadius = ScaleValue(cornerRadius);
         renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
         renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);
@@ -1069,6 +1087,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         const float scaledCornerRadius = ScaleValue(cornerRadius);
         renderer.FillRoundedRect(m_bounds, background, scaledCornerRadius);
         renderer.DrawRoundedRect(m_bounds, borderColor, 1.0f, scaledCornerRadius);

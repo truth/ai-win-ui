@@ -39,6 +39,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **Skia TextBlob LRU Cache & Multi-Dirty-Rect Optimization:** `2026-11-20-skia-textblob-and-multi-dirty-rect.md`
   - **React JSX Native UI (QuickJS-ng + Dual-Thread Bridge):** `2026-11-20-react-jsx-native-ui.md`
   - **Desktop Navigation & Data View Components v3 (TreeView, Breadcrumb, Pagination):** `2026-11-08-desktop-navigation-components.md`
   - **List Labels Height Collapse & Panel Padding Safety Fix:** `2026-11-03-fix-list-labels-height-collapse.md`
@@ -66,6 +67,7 @@ older design snapshot.
   - archived examples: declarative style v1, theme tokens, layered window v2
 - `doc/reports/`
   - dated test and QA regression reports
+  - **Skia TextBlob & Multi-Dirty-Rect Optimization Report:** `2026-11-20-skia-opt-before-after-report.md`
   - **React (QuickJS-ng) vs XML (C++) Performance Evaluation Report (MD + HTML):** `2026-11-20-react-vs-xml-perf-report.md` / `2026-11-20-react-vs-xml-perf-report.html`
   - **Frame Profiler & Smoothness Optimization Report (MD + HTML):** `2026-11-02-frame-profiler-and-smoothness-report.md` / `2026-11-02-frame-profiler-and-smoothness-report.html`
   - **Modular Parsers Test Report:** `2026-10-31-modular-parsers-test-report.md`
@@ -79,8 +81,8 @@ abstractions:
 |------|--------|
 | Controls | `src/ui.h`, `src/ui_panels.*`, `src/ui_media.h`, **`src/ui_icons.h`** (`<Icon>` / `<Path>`), **`src/ui_widgets.h`** (`<Avatar>`, `<Badge>`, `<Divider>`, `<SegmentedControl>`, `<Switch>`, `<SearchBox>`, `<Alert>`, `<CircularProgress>`, `<EmptyState>`, `<Breadcrumb>`, `<Pagination>`), **`src/ui_views.h`** (`<TreeView>`, `<TreeItem>`, `<TableView>`), **`src/ui_containers.h`** (`<Expander>`, `<SplitView>`) |
 | **Chart** | **`src/ui_chart.h`** (smooth spline line / vertical gradient area / rounded pill bar + highlight badge / pie & donut ring charts, dashed grid, axes, legend, tooltip) |
-| Renderer | `src/renderer.h`, `src/renderer.cpp` (D2D), `src/renderer_skia.cpp` (Skia) |
-| Text measure & layout | `src/text_measurer.h`, `src/skia_font_shared.h`, `src/skia_text_layout.*` (100..900 fontWeight, fontFamily, lineHeight) |
+| Renderer | `src/renderer.h`, **`src/dirty_region.h`** (`DirtyRegion` multi-dirty-rect coalescing), `src/renderer.cpp` (D2D full-frame), `src/renderer_skia.cpp` (Skia `SkRegion` multi-dirty clip, per-rect `BitBlt`, `SkTextBlob`/metrics/dash LRU caches) |
+| Text measure & layout | `src/text_measurer.h`, `src/skia_font_shared.h` (UTF-16 `textToGlyphs`/`getWidths` batch measure), `src/skia_text_layout.*` (4096-entry zero-copy LRU `AcquireSkiaTextLayout`, 100..900 fontWeight, fontFamily, lineHeight) |
 | Layout engine | `src/layout_engine.h` (Yoga) |
 | Context | `src/ui_context.h` (includes `StyleCatalog*`) |
 | Box decoration | `src/box_decoration.*` (Gaussian soft shadow, 4-corner `CornerRadius`, 4-side independent borders) |
@@ -89,7 +91,7 @@ abstractions:
 | Theme tokens | `src/theme.*` |
 | Window chrome | `src/window_chrome.*` |
 | Layout parse | `src/json_parser.*`, `src/xml_parser.*`, `src/layout_parser.*`, `src/layout_parser_panels.*`, `src/layout_parser_controls.*` |
-| **UiHost / multi-host** | **`src/ui_host.h`**, `src/ui_host_input.cpp`, `src/ui_host_overlay.cpp`, `src/application.*`, **`src/frame_profiler.h`** (F12 per-phase frame profiler & CSV export) |
+| **UiHost / multi-host** | **`src/ui_host.h`**, `src/ui_host_input.cpp`, `src/ui_host_overlay.cpp`, `src/application.*`, **`src/frame_profiler.h`** (F12 corner-only overlay on Skia, `dirty_rects`/`dirty_area_pct` CSV export), `samples/skia_unit_test/`, `scripts/bench_skia_dirty_region.ps1` |
 | Animation & Reactive | `src/animation_controller.*`, `<ai_win_ui/observable.h>` |
 | **C-API Interop** | **`<ai_win_ui/c_api.h>`**, `src/c_api.cpp` |
 | **React JSX UI** | **`third_party/quickjs-ng/`** (QuickJS-ng v0.18.0), `src/react_bridge_iface.h`, **`src/react/*`** (`ai_win_ui_react`), **`react/runtime/*`** (TS reconciler + 19 JSX primitives incl. `FinancialChart` + `Spacer` + `useWindowKeyDown`), `react/demos/react_showcase.tsx`, **`react/demos/stock_terminal/*`**, `samples/react_demo/`, `samples/react_unit_test/`, `scripts/{build_react,run_react_demo,run_stock_react}.ps1` |

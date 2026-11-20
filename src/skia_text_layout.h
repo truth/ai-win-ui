@@ -4,6 +4,7 @@
 #include "renderer.h"
 
 #include <cstdint>
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -21,6 +22,19 @@ struct SkiaTextLayout {
     float blockHeight = 0.0f;
     float maxLineWidth = 0.0f;
 };
+
+std::shared_ptr<const SkiaTextLayout> AcquireSkiaTextLayout(
+    const wchar_t* text,
+    uint32_t len,
+    float fontSize,
+    float maxWidth,
+    TextWrapMode wrapMode,
+    bool bold = false,
+    bool italic = false,
+    bool ellipsis = false,
+    uint16_t fontWeight = 0,
+    const std::wstring& fontFamily = {},
+    float lineHeightFactor = 0.0f);
 
 bool CreateSkiaTextLayout(const wchar_t* text,
                           uint32_t len,

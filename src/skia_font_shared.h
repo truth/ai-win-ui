@@ -306,22 +306,55 @@ inline float MeasureTextWidthWithFallback(SkFontMgr* fontMgr,
         return 0.0f;
     }
 
-    if (TypefaceSupportsText(defaultTypeface, text, len)) {
-        SkFont font = CreateSkiaFont(fontSize, defaultTypeface);
-        StackUtf8Converter<> utf8(text, len);
-        if (!utf8.empty()) {
-            return font.measureText(utf8.c_str(), utf8.size(), SkTextEncoding::kUTF8);
+    if (defaultTypeface) {
+        SkFont defaultFont = CreateSkiaFont(fontSize, defaultTypeface);
+        constexpr uint32_t kStackCap = 128;
+        SkGlyphID stackGlyphs[kStackCap];
+        std::vector<SkGlyphID> heapGlyphs;
+        SkGlyphID* glyphs = stackGlyphs;
+        if (len > kStackCap) {
+            heapGlyphs.resize(len);
+            glyphs = heapGlyphs.data();
         }
-        return 0.0f;
+        const int glyphCount = defaultFont.textToGlyphs(
+            text,
+            static_cast<size_t>(len) * sizeof(wchar_t),
+            SkTextEncoding::kUTF16,
+            glyphs,
+            static_cast<int>(len));
+        if (glyphCount > 0) {
+            bool allSupported = true;
+            for (int i = 0; i < glyphCount; ++i) {
+                if (glyphs[i] == 0) {
+                    allSupported = false;
+                    break;
+                }
+            }
+            if (allSupported) {
+                SkScalar stackWidths[kStackCap];
+                std::vector<SkScalar> heapWidths;
+                SkScalar* widths = stackWidths;
+                if (static_cast<uint32_t>(glyphCount) > kStackCap) {
+                    heapWidths.resize(static_cast<size_t>(glyphCount));
+                    widths = heapWidths.data();
+                }
+                defaultFont.getWidths(glyphs, glyphCount, widths);
+                float width = 0.0f;
+                for (int i = 0; i < glyphCount; ++i) {
+                    width += widths[i];
+                }
+                return width;
+            }
+        }
     }
 
     float width = 0.0f;
     IterateTextRuns(fontMgr, defaultTypeface, text, len, [&](const wchar_t* runText, uint32_t runLen, SkTypeface* typeface) {
         SkFont font = CreateSkiaFont(fontSize, typeface);
-        StackUtf8Converter<> runUtf8(runText, runLen);
-        if (!runUtf8.empty()) {
-            width += font.measureText(runUtf8.c_str(), runUtf8.size(), SkTextEncoding::kUTF8);
-        }
+        width += font.measureText(
+            runText,
+            static_cast<size_t>(runLen) * sizeof(wchar_t),
+            SkTextEncoding::kUTF16);
     });
 
     return width;

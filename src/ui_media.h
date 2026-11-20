@@ -43,6 +43,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         if (!m_bitmap && !m_imageData.empty()) {
             m_bitmap = renderer.CreateBitmapFromBytes(m_imageData.data(), m_imageData.size());
         }
@@ -132,6 +138,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         if (!m_svg && !m_svgData.empty()) {
             const char* cacheKey = m_sourcePath.empty() ? nullptr : m_sourcePath.c_str();
             m_svg = renderer.CreateSvgFromBytes(m_svgData.data(), m_svgData.size(), cacheKey);

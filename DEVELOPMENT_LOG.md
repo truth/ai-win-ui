@@ -2,6 +2,20 @@
 
 ## 2026-11-20
 
+- **Skia 文本 `SkTextBlob` 缓存与多脏矩形渲染优化 (Skia TextBlob LRU Cache & Multi-Dirty-Rect v1)**（分支 `feature/skia-textblob-dirty-region`，暂未合并）
+  - **多脏矩形管线 (`DirtyRegion` + `SkRegion` + 局部 `BitBlt`)**：
+    1. 新增 [`src/dirty_region.h`](src/dirty_region.h)（`ai_win_ui::DirtyRegion`：`kMaxRects = 8`、`kAdjacentMergeWasteArea = 2048.0f`、`kFullRepaintAreaRatio = 0.85f`），并在 [`src/renderer.h`](src/renderer.h) 扩展 `SetDirtyRects` / `GetDirtyRects` 与 `O(1)` 外接框前置过滤。
+    2. [`src/ui_host.cpp`](src/ui_host.cpp) 升级为 `m_pendingDirtyRegion`，在 `OnPaint` 调用 `BeginPaint` **前**通过 `GetUpdateRgn` + `GetRegionData` 保留 Win32 离散更新块；抽出 `ComputeDevToolsOverlayRect` 限制 F12 HUD 局部刷新；字符输入仅标脏聚焦控件 `m_focusedElement`；[`samples/stock_terminal/main.cpp`](samples/stock_terminal/main.cpp) 的 `onDataUpdated` 包裹 `BeginBatchUpdate()` / `EndBatchUpdate(false)`。
+    3. [`src/renderer_skia.cpp`](src/renderer_skia.cpp) 使用 `SkRegion` 多矩形裁剪、图元级 `IntersectsDirtyRect` Early-Out 与局部 `BitBlt` 上屏；同时全控件补齐 `IntersectsDirtyRect` 剔除，并将 `TextInput` / `RichTextBox` 光标闪烁timer改为 `InvalidateSelf(4.0f)`；严格保持 Direct2D 全帧不变式（Rule #3）。
+  - **UTF-16 直通度量、零拷贝排版 LRU 与 `SkTextBlob` 缓存**：
+    1. [`src/skia_font_shared.h`](src/skia_font_shared.h) 改用批量 `SkFont::textToGlyphs(..., SkTextEncoding::kUTF16)` + `getWidths` 与 UTF-16 fallback 测量，消除 UTF-8 转码与逐字符 `unicharToGlyph`；
+    2. [`src/skia_text_layout.h`](src/skia_text_layout.h) / [`src/skia_text_layout.cpp`](src/skia_text_layout.cpp) 提供 4096 项真 LRU 零拷贝 `AcquireSkiaTextLayout`，修复 `lineHeightFactorQ` 哈希漏混；
+    3. [`src/renderer_skia.cpp`](src/renderer_skia.cpp) 移除 `DrawSimpleTextWithFallback`，新增 4096 项 `SkTextBlob` LRU 缓存（`allocRunPosH`）、`FontMetrics` 缓存、`SkDashPathEffect` 缓存及单行快路径。
+  - **单元测试、压测与 Release 实测**：
+    - [`src/frame_profiler.h`](src/frame_profiler.h) 增加 `dirty_rects,dirty_area_pct` 指标列；新增 [`samples/skia_unit_test/main.cpp`](samples/skia_unit_test/main.cpp)（**4/4 PASS**）与 [`scripts/bench_skia_dirty_region.ps1`](scripts/bench_skia_dirty_region.ps1)；`react_unit_test` **3/3 PASS**，`run_ci_local.ps1 -SkipBuild` **7/7 PASS**；
+    - Release 实测：纯全帧 `resizeSweep` 渲染降 **`-27.6%`**（XML）/ **`-21.3%`**（React），Stock XML `tick500ms` `paint` 降 **`-70.3%`**（`4.932 -> 1.464 ms`），快速输入 `typingChar` `paint` 降 **`-83.5% ~ -83.9%`**（端到端 `latency -61.3% ~ -63.3%`），Day-K 四角分散更新 XML Skia `dirtyArea 3.84%`、`paint 0.336 ms`（较 Direct2D `6.976 ms` 快 **20.8×**；React Skia `2.343 ms`，快 **2.65×**）。
+    - 归档设计方案至 [`doc/plan/2026-11-20-skia-textblob-and-multi-dirty-rect.md`](doc/plan/2026-11-20-skia-textblob-and-multi-dirty-rect.md)，实测报告至 [`doc/reports/2026-11-20-skia-opt-before-after-report.md`](doc/reports/2026-11-20-skia-opt-before-after-report.md)。
+
 - **React JSX 声明式 UI 运行时与双线程原生桥接 (React JSX Native UI v1)**（分支 `feature/react-jsx-ui`，暂未合并 `master`）
   - **零冗余 JS 运行时与引擎集成**：
     1. **Vendored QuickJS-ng (`v0.18.0`)** (`third_party/quickjs-ng/`)：引入 20 个纯 C 核心文件并构建静态库 `quickjs_ng`；通过 `src/react_bridge_iface.h` 纯虚接口与 `AI_WIN_UI_ENABLE_REACT=ON` 实现与 `ai_win_ui_lib` 完全解耦。

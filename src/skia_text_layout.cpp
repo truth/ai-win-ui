@@ -9,6 +9,8 @@
 #include <algorithm>
 #include <cmath>
 #include <cwctype>
+#include <list>
+#include <memory>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -324,6 +326,7 @@ struct TextLayoutCacheKeyHash {
         size_t h = std::hash<std::wstring>{}(k.text);
         h ^= std::hash<int32_t>{}(k.fontSizeQ) + 0x9e3779b9 + (h << 6) + (h >> 2);
         h ^= std::hash<int32_t>{}(k.maxWidthQ) + 0x9e3779b9 + (h << 6) + (h >> 2);
+        h ^= std::hash<int32_t>{}(k.lineHeightFactorQ) + 0x9e3779b9 + (h << 6) + (h >> 2);
         const uint32_t flags = (static_cast<uint32_t>(k.fontWeight) << 8) |
                                (static_cast<uint32_t>(k.wrapMode) << 4) |
                                (k.bold ? 4u : 0u) | (k.italic ? 2u : 0u) | (k.ellipsis ? 1u : 0u);
@@ -334,6 +337,106 @@ struct TextLayoutCacheKeyHash {
         return h;
     }
 };
+
+std::shared_ptr<const SkiaTextLayout> AcquireSkiaTextLayout(
+    const wchar_t* text,
+    uint32_t len,
+    float fontSize,
+    float maxWidth,
+    TextWrapMode wrapMode,
+    bool bold,
+    bool italic,
+    bool ellipsis,
+    uint16_t fontWeight,
+    const std::wstring& fontFamily,
+    float lineHeightFactor) {
+    if (!text || len == 0 || fontSize <= 0.0f) {
+        static const auto s_empty = std::make_shared<const SkiaTextLayout>();
+        return s_empty;
+    }
+
+    struct LayoutCacheEntry {
+        TextLayoutCacheKey key;
+        std::shared_ptr<const SkiaTextLayout> layout;
+    };
+    static constexpr size_t kMaxLayoutCacheSize = 4096;
+    static std::list<LayoutCacheEntry> s_layoutList;
+    static std::unordered_map<TextLayoutCacheKey, std::list<LayoutCacheEntry>::iterator, TextLayoutCacheKeyHash> s_layoutMap;
+    static TextLayoutCacheKey s_lookupKey;
+
+    const float widthBudgetForKey = (wrapMode == TextWrapMode::NoWrap && !ellipsis)
+        ? 0.0f
+        : std::max(1.0f, maxWidth);
+    s_lookupKey.text.assign(text, len);
+    s_lookupKey.fontSizeQ = static_cast<int32_t>(std::lround(fontSize * 64.0f));
+    s_lookupKey.maxWidthQ = static_cast<int32_t>(std::lround(widthBudgetForKey * 4.0f));
+    s_lookupKey.wrapMode = static_cast<uint8_t>(wrapMode);
+    s_lookupKey.bold = bold;
+    s_lookupKey.italic = italic;
+    s_lookupKey.ellipsis = ellipsis;
+    s_lookupKey.fontWeight = fontWeight;
+    s_lookupKey.fontFamily.assign(fontFamily);
+    s_lookupKey.lineHeightFactorQ = static_cast<int32_t>(std::lround(lineHeightFactor * 100.0f));
+
+    if (auto it = s_layoutMap.find(s_lookupKey); it != s_layoutMap.end()) {
+        s_layoutList.splice(s_layoutList.begin(), s_layoutList, it->second);
+        return it->second->layout;
+    }
+
+    FontBundle fonts = CreateFontBundle(fontSize, bold, italic, fontWeight, fontFamily);
+    if (!fonts.font.getTypeface()) {
+        return nullptr;
+    }
+
+    auto built = std::make_shared<SkiaTextLayout>();
+    const float widthBudget = std::max(1.0f, maxWidth);
+    built->lines = LayoutTextLines(
+        text,
+        len,
+        fonts.fontMgr.get(),
+        fonts.typeface.get(),
+        fontSize,
+        widthBudget,
+        wrapMode);
+
+    if (ellipsis && wrapMode == TextWrapMode::NoWrap && !built->lines.empty()) {
+        ApplyEllipsisToFirstLine(
+            built->lines.front(),
+            fonts.fontMgr.get(),
+            fonts.typeface.get(),
+            fontSize,
+            widthBudget);
+    }
+
+    SkFontMetrics metrics{};
+    fonts.font.getMetrics(&metrics);
+
+    built->ascent = std::isfinite(metrics.fAscent) ? -metrics.fAscent : fontSize * 0.8f;
+    built->descent = std::isfinite(metrics.fDescent) ? metrics.fDescent : fontSize * 0.25f;
+    built->lineHeight = std::max(fonts.font.getSpacing(), built->ascent + built->descent);
+    if (lineHeightFactor > 0.0f) {
+        built->lineHeight = fontSize * lineHeightFactor;
+    }
+    built->textHeight = built->ascent + built->descent;
+    built->maxLineWidth = 0.0f;
+    for (const auto& line : built->lines) {
+        built->maxLineWidth = std::max(built->maxLineWidth, line.width);
+    }
+
+    built->blockHeight = built->lines.empty()
+        ? 0.0f
+        : static_cast<float>(built->lines.size() - 1) * built->lineHeight + built->textHeight;
+
+    if (s_layoutList.size() >= kMaxLayoutCacheSize) {
+        auto last = std::prev(s_layoutList.end());
+        s_layoutMap.erase(last->key);
+        s_layoutList.pop_back();
+    }
+    TextLayoutCacheKey storedKey = s_lookupKey;
+    s_layoutList.push_front(LayoutCacheEntry{storedKey, built});
+    s_layoutMap.emplace(std::move(storedKey), s_layoutList.begin());
+    return built;
+}
 
 bool CreateSkiaTextLayout(const wchar_t* text,
                           uint32_t len,
@@ -351,79 +454,23 @@ bool CreateSkiaTextLayout(const wchar_t* text,
         return false;
     }
 
-    *layout = SkiaTextLayout{};
-    if (!text || len == 0 || fontSize <= 0.0f) {
-        return true;
-    }
-
-    static std::unordered_map<TextLayoutCacheKey, SkiaTextLayout, TextLayoutCacheKeyHash> s_layoutCache;
-    const float widthBudgetForKey = (wrapMode == TextWrapMode::NoWrap && !ellipsis)
-        ? 0.0f
-        : std::max(1.0f, maxWidth);
-    TextLayoutCacheKey cacheKey{
-        std::wstring(text, len),
-        static_cast<int32_t>(std::lround(fontSize * 64.0f)),
-        static_cast<int32_t>(std::lround(widthBudgetForKey * 4.0f)),
-        static_cast<uint8_t>(wrapMode),
+    auto cached = AcquireSkiaTextLayout(
+        text,
+        len,
+        fontSize,
+        maxWidth,
+        wrapMode,
         bold,
         italic,
         ellipsis,
         fontWeight,
         fontFamily,
-        static_cast<int32_t>(std::lround(lineHeightFactor * 100.0f))
-    };
-    if (auto it = s_layoutCache.find(cacheKey); it != s_layoutCache.end()) {
-        *layout = it->second;
-        return true;
-    }
-
-    FontBundle fonts = CreateFontBundle(fontSize, bold, italic, fontWeight, fontFamily);
-    if (!fonts.font.getTypeface()) {
+        lineHeightFactor);
+    if (!cached) {
+        *layout = SkiaTextLayout{};
         return false;
     }
-
-    const float widthBudget = std::max(1.0f, maxWidth);
-    layout->lines = LayoutTextLines(
-        text,
-        len,
-        fonts.fontMgr.get(),
-        fonts.typeface.get(),
-        fontSize,
-        widthBudget,
-        wrapMode);
-
-    if (ellipsis && wrapMode == TextWrapMode::NoWrap && !layout->lines.empty()) {
-        ApplyEllipsisToFirstLine(
-            layout->lines.front(),
-            fonts.fontMgr.get(),
-            fonts.typeface.get(),
-            fontSize,
-            widthBudget);
-    }
-
-    SkFontMetrics metrics{};
-    fonts.font.getMetrics(&metrics);
-
-    layout->ascent = std::isfinite(metrics.fAscent) ? -metrics.fAscent : fontSize * 0.8f;
-    layout->descent = std::isfinite(metrics.fDescent) ? metrics.fDescent : fontSize * 0.25f;
-    layout->lineHeight = std::max(fonts.font.getSpacing(), layout->ascent + layout->descent);
-    if (lineHeightFactor > 0.0f) {
-        layout->lineHeight = fontSize * lineHeightFactor;
-    }
-    layout->textHeight = layout->ascent + layout->descent;
-    layout->maxLineWidth = 0.0f;
-    for (const auto& line : layout->lines) {
-        layout->maxLineWidth = std::max(layout->maxLineWidth, line.width);
-    }
-
-    layout->blockHeight = layout->lines.empty()
-        ? 0.0f
-        : static_cast<float>(layout->lines.size() - 1) * layout->lineHeight + layout->textHeight;
-
-    if (s_layoutCache.size() >= 4096) {
-        s_layoutCache.clear();
-    }
-    s_layoutCache.emplace(std::move(cacheKey), *layout);
+    *layout = *cached;
     return true;
 }
 
@@ -438,26 +485,40 @@ Size MeasureSkiaTextLayout(const wchar_t* text,
                            uint16_t fontWeight,
                            const std::wstring& fontFamily,
                            float lineHeightFactor) {
-    SkiaTextLayout layout;
-    if (!CreateSkiaTextLayout(
-            text,
-            len,
-            fontSize,
-            maxWidth,
-            wrapMode,
-            &layout,
-            bold,
-            italic,
-            ellipsis,
-            fontWeight,
-            fontFamily,
-            lineHeightFactor)) {
+    auto cached = AcquireSkiaTextLayout(
+        text,
+        len,
+        fontSize,
+        maxWidth,
+        wrapMode,
+        bold,
+        italic,
+        ellipsis,
+        fontWeight,
+        fontFamily,
+        lineHeightFactor);
+    if (!cached) {
         return {};
     }
-    return Size{layout.maxLineWidth, layout.blockHeight};
+    return Size{cached->maxLineWidth, cached->blockHeight};
 }
 
 #else
+
+std::shared_ptr<const SkiaTextLayout> AcquireSkiaTextLayout(
+    const wchar_t*,
+    uint32_t,
+    float,
+    float,
+    TextWrapMode,
+    bool,
+    bool,
+    bool,
+    uint16_t,
+    const std::wstring&,
+    float) {
+    return nullptr;
+}
 
 bool CreateSkiaTextLayout(const wchar_t*,
                           uint32_t,

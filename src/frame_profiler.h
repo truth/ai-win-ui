@@ -37,6 +37,8 @@ struct FrameSample {
     double reactApplyMs = 0.0;
     double reactE2eMs = -1.0; // < 0 when frame has no originating React event
     double startupMs = -1.0;  // >= 0 once on the first content-ready paint
+    int dirtyRectCount = 0;
+    double dirtyAreaPct = 100.0;
     const char* trigger = "";
 };
 
@@ -68,7 +70,7 @@ public:
         }
         m_csv.open(path, std::ios::binary | std::ios::trunc);
         if (m_csv) {
-            m_csv << "frame,t_ms,trigger,resize_ms,layout_ms,layout_count,render_ms,present_ms,paint_ms,latency_ms,interval_ms,react_js_ms,react_apply_ms,react_e2e_ms,startup_ms\n";
+            m_csv << "frame,t_ms,trigger,resize_ms,layout_ms,layout_count,render_ms,present_ms,paint_ms,latency_ms,interval_ms,react_js_ms,react_apply_ms,react_e2e_ms,startup_ms,dirty_rects,dirty_area_pct\n";
         }
     }
 
@@ -108,6 +110,11 @@ public:
         ++m_pendingLayoutCount;
     }
 
+    void SetDirtyInfo(int rectCount, double areaPct) {
+        m_pendingDirtyRectCount = rectCount;
+        m_pendingDirtyAreaPct = areaPct;
+    }
+
     void BeginPaint() { m_paintBegin = NowMs(); }
     void MarkRenderBegin() { m_renderBegin = NowMs(); }
     void MarkRenderEnd() { m_renderEnd = NowMs(); }
@@ -130,6 +137,8 @@ public:
             s.startupMs = std::max(0.0, end - m_hostStartMs);
             m_startupRecorded = true;
         }
+        s.dirtyRectCount = m_pendingDirtyRectCount;
+        s.dirtyAreaPct = m_pendingDirtyAreaPct;
         s.trigger = m_pendingInputMs >= 0.0
             ? m_pendingTrigger
             : ((m_pendingReactTrigger && m_pendingReactTrigger[0]) ? m_pendingReactTrigger : "invalidate");
@@ -144,12 +153,13 @@ public:
             if (m_startMs <= 0.0) {
                 m_startMs = end;
             }
-            char line[400];
+            char line[440];
             std::snprintf(line, sizeof(line),
-                "%llu,%.3f,%s,%.3f,%.3f,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+                "%llu,%.3f,%s,%.3f,%.3f,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%d,%.2f\n",
                 static_cast<unsigned long long>(m_frameIndex), end - m_startMs, s.trigger,
                 s.resizeMs, s.layoutMs, s.layoutCount, s.renderMs, s.presentMs, s.paintMs,
-                s.latencyMs, s.intervalMs, s.reactJsMs, s.reactApplyMs, s.reactE2eMs, s.startupMs);
+                s.latencyMs, s.intervalMs, s.reactJsMs, s.reactApplyMs, s.reactE2eMs, s.startupMs,
+                s.dirtyRectCount, s.dirtyAreaPct);
             m_csv << line;
             m_csv.flush();
         }
@@ -163,6 +173,8 @@ public:
         m_pendingReactApplyMs = 0.0;
         m_pendingReactOriginMs = -1.0;
         m_pendingReactTrigger = "";
+        m_pendingDirtyRectCount = 0;
+        m_pendingDirtyAreaPct = 100.0;
     }
 
     size_t Size() const { return m_size; }
@@ -223,6 +235,8 @@ private:
     double m_pendingReactApplyMs = 0.0;
     double m_pendingReactOriginMs = -1.0;
     const char* m_pendingReactTrigger = "";
+    int m_pendingDirtyRectCount = 0;
+    double m_pendingDirtyAreaPct = 100.0;
 
     std::ofstream m_csv;
 };

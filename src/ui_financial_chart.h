@@ -241,6 +241,7 @@ protected:
 
     void Render(IRenderer& renderer) override {
         const Rect bounds = Bounds();
+        if (!renderer.IntersectsDirtyRect(bounds)) return;
         if (bounds.Width() <= 10.0f || bounds.Height() <= 10.0f) return;
 
         // 检查尺寸或位置是否有改变，若改变则重建几何缓存
