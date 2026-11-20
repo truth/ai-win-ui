@@ -1,4 +1,5 @@
 #include "application.h"
+#include "dirty_region.h"
 #include "frame_profiler.h"
 #include "host_options.h"
 #include "react_bridge_iface.h"
@@ -791,7 +792,10 @@ public:
         } else {
             return false;
         }
-        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        el->InvalidateSelf(4.0f);
+        if (m_batchUpdateDepth == 0 && m_hwnd) {
+            FlushPendingDirtyInvalidate();
+        }
         return true;
     }
 
@@ -807,7 +811,10 @@ public:
         } else {
             return false;
         }
-        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        el->InvalidateSelf(4.0f);
+        if (m_batchUpdateDepth == 0 && m_hwnd) {
+            FlushPendingDirtyInvalidate();
+        }
         return true;
     }
 
@@ -833,11 +840,11 @@ public:
         if (!chart) return false;
         chart->ClearPoints();
         chart->SetPreClose(preClose);
-        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        if (m_batchUpdateDepth == 0 && m_hwnd) FlushPendingDirtyInvalidate();
         return true;
     }
 
-    bool AppendFinancialChartPoint(const std::string& name, float price, float leadPrice, float volume, bool isUp, const std::string& timeStr) {
+    bool AppendFinancialChartPoint(const std::string& name, float price, float leadPrice, float volume, bool isUp, const char* timeStr) {
         if (!m_root) return false;
         auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
         if (!chart) return false;
@@ -848,7 +855,7 @@ public:
         pt.isUp = isUp;
         pt.timeStr = timeStr;
         chart->AppendPoint(pt);
-        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        if (m_batchUpdateDepth == 0 && m_hwnd) FlushPendingDirtyInvalidate();
         return true;
     }
 
@@ -857,7 +864,7 @@ public:
         auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
         if (!chart) return false;
         chart->SetThemeMode(modern);
-        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        if (m_batchUpdateDepth == 0 && m_hwnd) FlushPendingDirtyInvalidate();
         return true;
     }
     bool SetFinancialChartMode(const std::string& name, int mode) {
@@ -865,7 +872,7 @@ public:
         auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
         if (!chart) return false;
         chart->SetChartMode(mode == 1 ? FinancialChartMode::Candlestick : FinancialChartMode::TimeSharing);
-        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        if (m_batchUpdateDepth == 0 && m_hwnd) FlushPendingDirtyInvalidate();
         return true;
     }
 
@@ -874,11 +881,11 @@ public:
         auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
         if (!chart) return false;
         chart->SetCandles({});
-        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        if (m_batchUpdateDepth == 0 && m_hwnd) FlushPendingDirtyInvalidate();
         return true;
     }
 
-    bool AppendFinancialChartCandle(const std::string& name, const std::string& date, float open, float high, float low, float close, float volume, float ma5, float ma10, float ma20) {
+    bool AppendFinancialChartCandle(const std::string& name, const char* date, float open, float high, float low, float close, float volume, float ma5, float ma10, float ma20) {
         if (!m_root) return false;
         auto* chart = dynamic_cast<FinancialChart*>(m_root->FindElementByName(name));
         if (!chart) return false;
@@ -893,7 +900,7 @@ public:
         c.ma10 = ma10;
         c.ma20 = ma20;
         chart->AppendCandle(c);
-        if (m_hwnd) InvalidateRect(m_hwnd, nullptr, FALSE);
+        if (m_batchUpdateDepth == 0 && m_hwnd) FlushPendingDirtyInvalidate();
         return true;
     }
 
@@ -2094,6 +2101,18 @@ private:
         OutputDebugStringW((L"[TextDump] wrote " + outPathW + L"\n").c_str());
     }
 
+    Rect ComputeDevToolsOverlayRect(float pad = 0.0f) const {
+        constexpr int kDevToolsLineCount = 8;
+        const float lineH = 16.0f;
+        const float overlayW = 430.0f;
+        const float overlayH = 10.0f + lineH * static_cast<float>(kDevToolsLineCount);
+        const float left = std::max(10.0f, m_viewportWidth - overlayW - 10.0f);
+        const float right = std::max(10.0f + overlayW, m_viewportWidth - 10.0f);
+        const float top = 10.0f;
+        const float bottom = 10.0f + overlayH;
+        return Rect::Make(left - pad, top - pad, right + pad, bottom + pad);
+    }
+
     void DrawFrameStatsOverlay(IRenderer& renderer) {
         using ai_win_ui::FramePhaseStats;
         using ai_win_ui::FrameSample;
@@ -2144,13 +2163,7 @@ private:
         }
 
         const float lineH = 16.0f;
-        const float overlayW = 430.0f;
-        const float overlayH = 10.0f + lineH * static_cast<float>(lines.size());
-        const Rect devRect = Rect::Make(
-            std::max(10.0f, m_viewportWidth - overlayW - 10.0f),
-            10.0f,
-            std::max(10.0f + overlayW, m_viewportWidth - 10.0f),
-            10.0f + overlayH);
+        const Rect devRect = ComputeDevToolsOverlayRect();
         renderer.FillRoundedRect(devRect, Color{0.05f, 0.08f, 0.12f, 0.92f}, 6.0f);
         renderer.DrawRoundedRect(devRect, Color{0.2f, 0.6f, 1.0f, 0.85f}, 1.0f, 6.0f);
 
@@ -2166,63 +2179,101 @@ private:
     }
 
     void AccumulateDirtyRect(const Rect& rect) {
-        if (rect.right <= rect.left || rect.bottom <= rect.top) {
-            return;
-        }
-        if (!m_hasPendingDirtyRect) {
-            m_pendingDirtyRect = rect;
-            m_hasPendingDirtyRect = true;
-        } else {
-            m_pendingDirtyRect.left = std::min(m_pendingDirtyRect.left, rect.left);
-            m_pendingDirtyRect.top = std::min(m_pendingDirtyRect.top, rect.top);
-            m_pendingDirtyRect.right = std::max(m_pendingDirtyRect.right, rect.right);
-            m_pendingDirtyRect.bottom = std::max(m_pendingDirtyRect.bottom, rect.bottom);
-        }
+        m_pendingDirtyRegion.AddRect(rect);
     }
 
     void FlushPendingDirtyInvalidate() {
         if (!m_hwnd) {
-            m_hasPendingDirtyRect = false;
+            m_pendingDirtyRegion.Clear();
             return;
         }
         const bool supportsPartial = (m_renderer && m_renderer->Backend() == RendererBackend::Skia);
-        if (supportsPartial && m_hasPendingDirtyRect && !m_windowChrome.IsLayered() && !m_uiContext.showDevTools) {
-            RECT rc{
-                std::max<LONG>(0, static_cast<LONG>(std::floor(m_pendingDirtyRect.left))),
-                std::max<LONG>(0, static_cast<LONG>(std::floor(m_pendingDirtyRect.top))),
-                static_cast<LONG>(std::ceil(m_pendingDirtyRect.right)),
-                static_cast<LONG>(std::ceil(m_pendingDirtyRect.bottom))
-            };
-            m_hasPendingDirtyRect = false;
-            InvalidateRect(m_hwnd, &rc, FALSE);
-        } else {
-            m_hasPendingDirtyRect = false;
-            InvalidateRect(m_hwnd, nullptr, FALSE);
+        if (supportsPartial && !m_pendingDirtyRegion.IsEmpty() && !m_pendingDirtyRegion.IsFull() &&
+            !m_windowChrome.IsLayered()) {
+            if (m_uiContext.showDevTools) {
+                m_pendingDirtyRegion.AddRect(ComputeDevToolsOverlayRect(2.0f));
+            }
+            m_pendingDirtyRegion.NormalizeForViewport(m_viewportWidth, m_viewportHeight);
+            if (!m_pendingDirtyRegion.IsEmpty() && !m_pendingDirtyRegion.IsFull()) {
+                for (const Rect& r : m_pendingDirtyRegion.Rects()) {
+                    const RECT rc = ToGdiRect(r);
+                    if (rc.right > rc.left && rc.bottom > rc.top) {
+                        InvalidateRect(m_hwnd, &rc, FALSE);
+                    }
+                }
+                m_pendingDirtyRegion.Clear();
+                return;
+            }
         }
+        m_pendingDirtyRegion.Clear();
+        InvalidateRect(m_hwnd, nullptr, FALSE);
     }
 
     void OnPaint() {
+        const bool supportsPartial = (m_renderer && m_renderer->Backend() == RendererBackend::Skia);
+        ai_win_ui::DirtyRegion paintDirtyRegion;
+        if (m_isInitialized && supportsPartial && !m_windowChrome.IsLayered() &&
+            m_viewportWidth > 0.0f && m_viewportHeight > 0.0f) {
+            HRGN updateRgn = CreateRectRgn(0, 0, 0, 0);
+            if (updateRgn) {
+                const int rgnType = GetUpdateRgn(m_hwnd, updateRgn, FALSE);
+                if (rgnType == SIMPLEREGION || rgnType == COMPLEXREGION) {
+                    const DWORD bytes = GetRegionData(updateRgn, 0, nullptr);
+                    if (bytes >= sizeof(RGNDATAHEADER)) {
+                        std::vector<uint8_t> buffer(bytes);
+                        auto* data = reinterpret_cast<RGNDATA*>(buffer.data());
+                        if (GetRegionData(updateRgn, bytes, data) > 0 && data->rdh.nCount > 0) {
+                            const auto* rects = reinterpret_cast<const RECT*>(data->Buffer);
+                            for (DWORD i = 0; i < data->rdh.nCount; ++i) {
+                                if (rects[i].right > rects[i].left && rects[i].bottom > rects[i].top) {
+                                    paintDirtyRegion.AddRect(Rect::Make(
+                                        static_cast<float>(rects[i].left),
+                                        static_cast<float>(rects[i].top),
+                                        static_cast<float>(rects[i].right),
+                                        static_cast<float>(rects[i].bottom)));
+                                }
+                            }
+                        }
+                    }
+                }
+                DeleteObject(updateRgn);
+            }
+        }
+
         PAINTSTRUCT ps{};
         BeginPaint(m_hwnd, &ps);
 
         if (m_isInitialized && m_renderer) {
             m_frameProfiler.BeginPaint();
-            const float paintW = static_cast<float>(ps.rcPaint.right - ps.rcPaint.left);
-            const float paintH = static_cast<float>(ps.rcPaint.bottom - ps.rcPaint.top);
-            const bool supportsPartial = (m_renderer && m_renderer->Backend() == RendererBackend::Skia);
-            const bool isPartialPaint = supportsPartial &&
-                !m_windowChrome.IsLayered() &&
-                !m_uiContext.showDevTools &&
-                paintW > 0.0f && paintH > 0.0f &&
-                (paintW < m_viewportWidth - 2.0f || paintH < m_viewportHeight - 2.0f);
-            if (isPartialPaint) {
-                m_renderer->SetDirtyRect(Rect::Make(
-                    static_cast<float>(ps.rcPaint.left),
-                    static_cast<float>(ps.rcPaint.top),
-                    static_cast<float>(ps.rcPaint.right),
-                    static_cast<float>(ps.rcPaint.bottom)));
+            if (supportsPartial && !m_windowChrome.IsLayered()) {
+                if (paintDirtyRegion.IsEmpty()) {
+                    const float paintW = static_cast<float>(ps.rcPaint.right - ps.rcPaint.left);
+                    const float paintH = static_cast<float>(ps.rcPaint.bottom - ps.rcPaint.top);
+                    if (m_viewportWidth > 2.0f && m_viewportHeight > 2.0f &&
+                        paintW > 0.0f && paintH > 0.0f &&
+                        (paintW < m_viewportWidth - 2.0f || paintH < m_viewportHeight - 2.0f)) {
+                        paintDirtyRegion.AddRect(Rect::Make(
+                            static_cast<float>(ps.rcPaint.left),
+                            static_cast<float>(ps.rcPaint.top),
+                            static_cast<float>(ps.rcPaint.right),
+                            static_cast<float>(ps.rcPaint.bottom)));
+                    } else {
+                        paintDirtyRegion.SetFull();
+                    }
+                }
+                paintDirtyRegion.NormalizeForViewport(m_viewportWidth, m_viewportHeight);
+                if (!paintDirtyRegion.IsEmpty() && !paintDirtyRegion.IsFull()) {
+                    m_renderer->SetDirtyRects(paintDirtyRegion.Rects());
+                    m_frameProfiler.SetDirtyInfo(
+                        static_cast<int>(paintDirtyRegion.Rects().size()),
+                        paintDirtyRegion.CoverageRatio(m_viewportWidth, m_viewportHeight) * 100.0);
+                } else {
+                    m_renderer->ClearDirtyRect();
+                    m_frameProfiler.SetDirtyInfo(0, 100.0);
+                }
             } else {
                 m_renderer->ClearDirtyRect();
+                m_frameProfiler.SetDirtyInfo(0, 100.0);
             }
 
             // Layered present clears to transparent so desktop shows in empty regions.
@@ -2272,8 +2323,13 @@ private:
             m_renderer->ClearDirtyRect();
             m_frameProfiler.EndPaint();
             if (m_uiContext.showDevTools && m_frameStatsLive) {
-                // Keep overlay numbers fresh without user input.
-                InvalidateRect(m_hwnd, nullptr, FALSE);
+                // Keep overlay numbers fresh without forcing full-screen Skia repaints.
+                if (supportsPartial && !m_windowChrome.IsLayered()) {
+                    const RECT devRc = ToGdiRect(ComputeDevToolsOverlayRect(2.0f));
+                    InvalidateRect(m_hwnd, &devRc, FALSE);
+                } else {
+                    InvalidateRect(m_hwnd, nullptr, FALSE);
+                }
             }
         }
 
@@ -2393,15 +2449,15 @@ private:
             return;
         }
 
-        m_hasPendingDirtyRect = false;
+        m_pendingDirtyRegion.Clear();
         UIElement* prevFocus = m_focusedElement;
         m_mouseCaptureTarget = m_root->FindHitElementAt(x, y);
         if (m_root->OnMouseDown(x, y)) {
             UpdateImeWindow();
-            if (prevFocus == focusTarget && m_hasPendingDirtyRect) {
+            if (prevFocus == focusTarget && !m_pendingDirtyRegion.IsEmpty()) {
                 FlushPendingDirtyInvalidate();
             } else {
-                m_hasPendingDirtyRect = false;
+                m_pendingDirtyRegion.Clear();
                 InvalidateRect(m_hwnd, nullptr, FALSE);
             }
         }
@@ -2999,13 +3055,25 @@ private:
             case WM_CHAR:
             case WM_IME_CHAR:
                 if (OnTextChar(static_cast<wchar_t>(wParam))) {
-                    InvalidateRect(m_hwnd, nullptr, FALSE);
+                    if (m_focusedElement) {
+                        m_pendingDirtyRegion.Clear();
+                        m_focusedElement->InvalidateSelf(6.0f);
+                        FlushPendingDirtyInvalidate();
+                    } else {
+                        InvalidateRect(m_hwnd, nullptr, FALSE);
+                    }
                     return 0;
                 }
                 break;
             case WM_UNICHAR:
                 if (OnUnicodeChar(wParam)) {
-                    InvalidateRect(m_hwnd, nullptr, FALSE);
+                    if (m_focusedElement) {
+                        m_pendingDirtyRegion.Clear();
+                        m_focusedElement->InvalidateSelf(6.0f);
+                        FlushPendingDirtyInvalidate();
+                    } else {
+                        InvalidateRect(m_hwnd, nullptr, FALSE);
+                    }
                     return 0;
                 }
                 break;
@@ -3047,7 +3115,7 @@ private:
                         if (dtMs > 100) dtMs = 100;
                         m_lastTickMs = now;
                         
-                        m_hasPendingDirtyRect = false;
+                        m_pendingDirtyRegion.Clear();
                         if (m_root->OnTimer(wParam, dtMs)) {
                             FlushPendingDirtyInvalidate();
                         }
@@ -3316,8 +3384,7 @@ private:
     uint32_t m_lastTickMs = 0;
     ai_win_ui::FrameProfiler m_frameProfiler;
     bool m_frameStatsLive = false;
-    Rect m_pendingDirtyRect{};
-    bool m_hasPendingDirtyRect = false;
+    ai_win_ui::DirtyRegion m_pendingDirtyRegion;
 };
 
 class HostDropTarget : public IDropTarget {

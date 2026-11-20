@@ -146,6 +146,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         SyncQuickSetToStyle();
         StyleState state = GetCurrentState();
         if (m_dragging) {
@@ -453,6 +459,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
         Color shellBg = background;
         Color shellBorder = borderColor;
@@ -867,6 +879,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
         Color shellBg = background;
         Color shellBorder = borderColor;

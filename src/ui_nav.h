@@ -229,6 +229,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         // Ensure page layout is current even if only paint ran after a tab switch.
         if (m_bounds.Width() > 1.0f && m_bounds.Height() > 1.0f) {
             LayoutTabPages();

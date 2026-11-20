@@ -228,6 +228,16 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        if (!m_animBackground.active && !m_animBorder.active && m_lastStyleState == GetCurrentState()) {
+            const float pad = (m_style.base.decoration.has_value() && m_style.base.decoration->shadow.enabled)
+                ? ScaleValue(std::max(24.0f, m_style.base.decoration->shadow.blur * 2.0f + 4.0f))
+                : ScaleValue(6.0f);
+            if (!renderer.IntersectsDirtyRect(Rect{
+                    m_bounds.left - pad, m_bounds.top - pad,
+                    m_bounds.right + pad, m_bounds.bottom + pad})) {
+                return;
+            }
+        }
         SyncQuickSetToStyle();
         const StyleSpec resolved = m_style.Resolve(GetCurrentState());
         BoxDecoration deco = ResolveAnimatedDecoration(resolved);
@@ -789,6 +799,7 @@ public:
         if (now - m_lastBlink >= 500) {
             m_showCaret = !m_showCaret;
             m_lastBlink = now;
+            InvalidateSelf(4.0f);
             return true;
         }
         return false;
@@ -851,6 +862,16 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        if (!m_animBackground.active && !m_animBorder.active && m_lastStyleState == GetCurrentState()) {
+            const float pad = (m_style.base.decoration.has_value() && m_style.base.decoration->shadow.enabled)
+                ? ScaleValue(std::max(24.0f, m_style.base.decoration->shadow.blur * 2.0f + 4.0f))
+                : ScaleValue(6.0f);
+            if (!renderer.IntersectsDirtyRect(Rect{
+                    m_bounds.left - pad, m_bounds.top - pad,
+                    m_bounds.right + pad, m_bounds.bottom + pad})) {
+                return;
+            }
+        }
         SyncQuickSetToStyle();
         const StyleSpec resolved = m_style.Resolve(GetCurrentState());
         BoxDecoration deco = resolved.decoration.value_or(BoxDecoration{});
@@ -1127,6 +1148,16 @@ public:
     }
 
     void Render(IRenderer& renderer) override {
+        if (!m_animBackground.active && !m_animBorder.active && m_lastStyleState == GetCurrentState()) {
+            const float pad = (m_style.base.decoration.has_value() && m_style.base.decoration->shadow.enabled)
+                ? ScaleValue(std::max(24.0f, m_style.base.decoration->shadow.blur * 2.0f + 4.0f))
+                : ScaleValue(6.0f);
+            if (!renderer.IntersectsDirtyRect(Rect{
+                    m_bounds.left - pad, m_bounds.top - pad,
+                    m_bounds.right + pad, m_bounds.bottom + pad})) {
+                return;
+            }
+        }
         SyncQuickSetToStyle();
         const StyleSpec resolved = m_style.Resolve(GetCurrentState());
         BoxDecoration deco = resolved.decoration.value_or(BoxDecoration{});
@@ -1337,6 +1368,16 @@ public:
     }
 
     void Render(IRenderer& renderer) override {
+        if (!m_animBackground.active && !m_animBorder.active && m_lastStyleState == GetCurrentState()) {
+            const float pad = (m_style.base.decoration.has_value() && m_style.base.decoration->shadow.enabled)
+                ? ScaleValue(std::max(24.0f, m_style.base.decoration->shadow.blur * 2.0f + 4.0f))
+                : ScaleValue(6.0f);
+            if (!renderer.IntersectsDirtyRect(Rect{
+                    m_bounds.left - pad, m_bounds.top - pad,
+                    m_bounds.right + pad, m_bounds.bottom + pad})) {
+                return;
+            }
+        }
         SyncQuickSetToStyle();
         const StyleSpec resolved = m_style.Resolve(GetCurrentState());
         BoxDecoration deco = resolved.decoration.value_or(BoxDecoration{});
@@ -1595,6 +1636,16 @@ public:
     }
 
     void Render(IRenderer& renderer) override {
+        if (!m_animBackground.active && !m_animBorder.active && m_lastStyleState == GetCurrentState()) {
+            const float pad = (m_style.base.decoration.has_value() && m_style.base.decoration->shadow.enabled)
+                ? ScaleValue(std::max(24.0f, m_style.base.decoration->shadow.blur * 2.0f + 4.0f))
+                : ScaleValue(6.0f);
+            if (!renderer.IntersectsDirtyRect(Rect{
+                    m_bounds.left - pad, m_bounds.top - pad,
+                    m_bounds.right + pad, m_bounds.bottom + pad})) {
+                return;
+            }
+        }
         SyncQuickSetToStyle();
         StyleState state = GetCurrentState();
         if (m_dragging) {

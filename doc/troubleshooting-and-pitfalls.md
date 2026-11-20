@@ -11,6 +11,7 @@
 4. [高频数据更新与 Yoga 全树重排风暴 (Batch Update)](#4-高频数据更新与-yoga-全树重排风暴-batch-update)
 5. [DPI 缩放与几何排版转储排查技巧 (Measure Dump)](#5-dpi-缩放与几何排版转储排查技巧-measure-dump)
 6. [Windows GUI 进程生命周期与文件锁 (Process Management)](#6-windows-gui-进程生命周期与文件锁-process-management)
+7. [Skia Debug 软光栅陷阱与 SkTextBlob 缓存生命周期 (Skia Perf & Cache Safety)](#7-skia-debug-软光栅陷阱与-sktextblob-缓存生命周期-skia-perf--cache-safety)
 
 ---
 
@@ -64,8 +65,11 @@
 - **Skia**：使用内存持久的离屏 Surface/Bitmap，非脏区保留着上一帧的完整像素，仅擦除并重绘脏矩形即可。
 
 ### 避坑守则
-1. **无持久离屏缓冲的后端不得使用跨帧跳过绘制**：在 `src/ui_host.cpp` 中，仅对 Skia 启用 `IntersectsDirtyRect`，Direct2D 保持全量提交。
-2. **144Hz 高刷性能靠几何缓存**：对于图表等重型绘制组件（K 线、分时线），必须引入**几何点集缓存（Geometry Cache）**。图表重绘时只绘制已排版好的几何缓存点集（耗时 < 0.1ms），即便 Direct2D 帧帧全绘，CPU/GPU 占用依然极低，完全可以轻松跑满 144Hz。
+1. **无持久离屏缓冲的后端不得使用跨帧跳过绘制**：Direct2D 始终保持全量提交（`SetDirtyRects({})`），绝不启用 `IntersectsDirtyRect` 跳过绘制。
+2. **Skia 多脏矩形管线边界 (`DirtyRegion` + `GetUpdateRgn` + `RenderOverlay`)**：
+   - `UiHost::OnPaint()` 必须在调用 `BeginPaint()`（会清空并合并系统 update region）**之前**通过 `GetUpdateRgn` + `GetRegionData` 提取离散 Win32 脏矩形，交由 `ai_win_ui::DirtyRegion`（上限 `8` 块、`>85%` 自动退化全帧）传递给 `SkiaRenderer` 执行 `SkRegion` 裁剪与逐块 `BitBlt` 上屏。
+   - **浮层 `RenderOverlay` 不得被脏矩形错误剔除**：如 `Popup::Render` 可按 `IntersectsDirtyRect` 跳过，但 `RenderOverlay`（下拉弹出框、Tooltip 等跨层浮层）在脏区未覆盖宿主父区域时仍需按浮层自身逻辑绘制。
+3. **144Hz 高刷性能靠几何缓存**：对于图表等重型绘制组件（K 线、分时线），必须引入**几何点集缓存（Geometry Cache）**。图表重绘时只绘制已排版好的几何缓存点集（耗时 < 0.1ms），即便 Direct2D 帧帧全绘，CPU/GPU 占用依然极低，完全可以轻松跑满 144Hz。
 
 ---
 
@@ -132,3 +136,17 @@ $out = (Resolve-Path "scratch").Path + "\stock_dump.ndjson"
      ```
 3. **文件路径使用绝对路径**：
    - 环境变量（如 `AI_WIN_UI_MEASURE_DUMP`）在子进程读取时，其当前工作目录为 exe 所在目录，相对路径会导致文件生成到 `build/` 内部而非项目根目录。必须始终使用 `(Resolve-Path ...).Path` 解析为绝对路径。
+
+---
+
+## 7. Skia Debug 软光栅陷阱与 SkTextBlob 缓存生命周期 (Skia Perf & Cache Safety)
+
+### 踩坑表现
+1. 运行 Skia 后端体感卡顿（单帧 `render > 100 ms`，而 Direct2D 仅 `10+ ms`）；
+2. 光标闪烁或输入框打字时触发整块屏幕甚至静态 K 线图重绘；
+3. 进程退出析构渲染器时发生 Skia 引用计数或字体管理器析构顺序异常。
+
+### 避坑守则
+1. **禁止用 Debug 构建评估 Skia 渲染耗时**：`Debug-x64/skia.lib` 关闭了编译优化与 SIMD 加速，软光栅耗时约为 `Release` 的 ~28 倍；所有帧率与耗时基准测试必须使用 `-Configuration Release`（`.\build.ps1 -Configuration Release`）。
+2. **光标闪烁与字符输入必须精确标脏**：`TextInput::OnTimer`、`RichTextBox::OnTimer` 及 `WM_CHAR` 处理器必须调用 `InvalidateSelf(4.0f~6.0f)` 仅标脏自身局部矩形，禁止调用整窗 `Invalidate()`；F12 DevTools 实时统计浮层在 Skia 下仅标脏右上角 HUD 区域。
+3. **`SkiaRenderer` 成员声明与析构顺序**：持有多帧复用 Skia 资源（如 `SkTextBlob` 4096 项 LRU 缓存、`SkDashPathEffect` 缓存、`FontMetrics` 缓存）的容器成员必须声明在 `m_fontMgr` 与 `m_defaultTypeface` **之后**，并在 `~SkiaRenderer()` 中显式 `.clear()`，保证所有 `sk_sp<SkTextBlob>` 先于字体管理器销毁。

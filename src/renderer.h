@@ -175,21 +175,69 @@ public:
     }
     virtual void DrawSvg(SvgHandle svg, const Rect& rect, bool hasTint, const Color& tint) = 0;
 
-    // Phase 2: Dirty Rect BBox Culling
-    virtual void SetDirtyRect(const Rect& rect) { m_dirtyRect = rect; m_hasDirtyRect = true; }
-    virtual void ClearDirtyRect() { m_hasDirtyRect = false; }
+    // Phase 2+: Dirty Rect / Multi-Rect Region BBox Culling (Skia software backend only)
+    virtual void SetDirtyRect(const Rect& rect) {
+        if (rect.right <= rect.left || rect.bottom <= rect.top) {
+            ClearDirtyRect();
+            return;
+        }
+        m_dirtyRect = rect;
+        m_dirtyRects.assign(1, rect);
+        m_hasDirtyRect = true;
+    }
+    virtual void SetDirtyRects(const std::vector<Rect>& rects) {
+        m_dirtyRects.clear();
+        m_hasDirtyRect = false;
+        m_dirtyRect = Rect{};
+        for (const auto& r : rects) {
+            if (r.right <= r.left || r.bottom <= r.top) {
+                continue;
+            }
+            if (!m_hasDirtyRect) {
+                m_dirtyRect = r;
+                m_hasDirtyRect = true;
+            } else {
+                m_dirtyRect.left = std::min(m_dirtyRect.left, r.left);
+                m_dirtyRect.top = std::min(m_dirtyRect.top, r.top);
+                m_dirtyRect.right = std::max(m_dirtyRect.right, r.right);
+                m_dirtyRect.bottom = std::max(m_dirtyRect.bottom, r.bottom);
+            }
+            m_dirtyRects.push_back(r);
+        }
+    }
+    virtual void ClearDirtyRect() {
+        m_hasDirtyRect = false;
+        m_dirtyRect = Rect{};
+        m_dirtyRects.clear();
+    }
     virtual bool HasDirtyRect() const { return m_hasDirtyRect; }
     virtual Rect GetDirtyRect() const { return m_dirtyRect; }
+    virtual const std::vector<Rect>& GetDirtyRects() const { return m_dirtyRects; }
     virtual bool IntersectsDirtyRect(const Rect& rect) const {
         if (!m_hasDirtyRect) return true;
-        return !(rect.right < m_dirtyRect.left ||
-                 rect.left > m_dirtyRect.right ||
-                 rect.bottom < m_dirtyRect.top ||
-                 rect.top > m_dirtyRect.bottom);
+        if (rect.right < m_dirtyRect.left ||
+            rect.left > m_dirtyRect.right ||
+            rect.bottom < m_dirtyRect.top ||
+            rect.top > m_dirtyRect.bottom) {
+            return false;
+        }
+        if (m_dirtyRects.size() <= 1) {
+            return true;
+        }
+        for (const auto& d : m_dirtyRects) {
+            if (!(rect.right < d.left ||
+                  rect.left > d.right ||
+                  rect.bottom < d.top ||
+                  rect.top > d.bottom)) {
+                return true;
+            }
+        }
+        return false;
     }
 
 protected:
     Rect m_dirtyRect{};
+    std::vector<Rect> m_dirtyRects;
     bool m_hasDirtyRect = false;
 };
 

@@ -18,6 +18,7 @@
 #include "include/core/SkPathEffect.h"
 #include "include/core/SkPoint.h"
 #include "include/core/SkRRect.h"
+#include "include/core/SkRegion.h"
 #include "include/core/SkSamplingOptions.h"
 #include "include/core/SkStream.h"
 #include "include/core/SkSize.h"
@@ -35,6 +36,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <cwchar>
 #include <list>
 #include <memory>
 #include <string>
@@ -63,53 +65,6 @@ SkRRect ToSkRRect(const Rect& rect, const CornerRadius& r) {
     };
     rrect.setRectRadii(ToSkRect(rect), radii);
     return rrect;
-}
-
-void DrawSimpleTextWithFallback(SkCanvas* canvas,
-                                const std::wstring& text,
-                                float x,
-                                float baseline,
-                                float fontSize,
-                                SkTypeface* defaultTypeface,
-                                SkFontMgr* fontMgr,
-                                const SkPaint& paint) {
-    if (!canvas || text.empty()) {
-        return;
-    }
-
-    const uint32_t len = static_cast<uint32_t>(text.size());
-    if (skia_font::TypefaceSupportsText(defaultTypeface, text.c_str(), len)) {
-        SkFont font = skia_font::CreateSkiaFont(fontSize, defaultTypeface);
-        skia_font::StackUtf8Converter<> utf8(text.c_str(), len);
-        if (!utf8.empty()) {
-            canvas->drawSimpleText(
-                utf8.c_str(),
-                utf8.size(),
-                SkTextEncoding::kUTF8,
-                x,
-                baseline,
-                font,
-                paint);
-        }
-        return;
-    }
-
-    float runX = x;
-    skia_font::IterateTextRuns(fontMgr, defaultTypeface, text.c_str(), len, [&](const wchar_t* runText, uint32_t runLen, SkTypeface* typeface) {
-        SkFont font = skia_font::CreateSkiaFont(fontSize, typeface);
-        skia_font::StackUtf8Converter<> runUtf8(runText, runLen);
-        if (!runUtf8.empty()) {
-            canvas->drawSimpleText(
-                runUtf8.c_str(),
-                runUtf8.size(),
-                SkTextEncoding::kUTF8,
-                runX,
-                baseline,
-                font,
-                paint);
-            runX += font.measureText(runUtf8.c_str(), runUtf8.size(), SkTextEncoding::kUTF8);
-        }
-    });
 }
 
 class SkiaBitmapResource final : public BitmapResource {
@@ -162,6 +117,12 @@ private:
 class SkiaRenderer final : public IRenderer {
 public:
     ~SkiaRenderer() override {
+        m_textBlobMap.clear();
+        m_textBlobList.clear();
+        m_fontMetricsCache.clear();
+        m_dashEffectCache.clear();
+        m_shadowCache.clear();
+        m_svgPathCache.clear();
         ReleasePresentSurface();
     }
 
@@ -225,8 +186,38 @@ public:
         canvas->resetMatrix();
         canvas->restoreToCount(1);
         if (HasDirtyRect() && m_presentMode == PresentMode::Hwnd && !m_surfaceNeedsFullPaint) {
+            const auto& dirtyRects = GetDirtyRects();
             canvas->save();
-            canvas->clipRect(ToSkRect(GetDirtyRect()), false);
+            if (dirtyRects.size() <= 1) {
+                canvas->clipRect(ToSkRect(GetDirtyRect()), false);
+            } else {
+                constexpr size_t kStackRectCap = 16;
+                SkIRect stackRects[kStackRectCap];
+                std::vector<SkIRect> heapRects;
+                SkIRect* rects = stackRects;
+                if (dirtyRects.size() > kStackRectCap) {
+                    heapRects.resize(dirtyRects.size());
+                    rects = heapRects.data();
+                }
+                int count = 0;
+                for (const Rect& d : dirtyRects) {
+                    SkIRect ir = SkIRect::MakeLTRB(
+                        std::max(0, static_cast<int>(std::floor(d.left))),
+                        std::max(0, static_cast<int>(std::floor(d.top))),
+                        std::min(static_cast<int>(m_width), static_cast<int>(std::ceil(d.right))),
+                        std::min(static_cast<int>(m_height), static_cast<int>(std::ceil(d.bottom))));
+                    if (!ir.isEmpty()) {
+                        rects[count++] = ir;
+                    }
+                }
+                if (count > 0) {
+                    SkRegion clipRegion;
+                    clipRegion.setRects(rects, count);
+                    canvas->clipRegion(clipRegion, SkClipOp::kIntersect);
+                } else {
+                    canvas->clipRect(ToSkRect(GetDirtyRect()), false);
+                }
+            }
             canvas->drawColor(ToSkColor(clearColor), SkBlendMode::kSrc);
         } else {
             ClearDirtyRect();
@@ -257,6 +248,9 @@ public:
     }
 
     void FillRect(const Rect& rect, const Color& color) override {
+        if (!IntersectsDirtyRect(Rect::Make(rect.left - 1.0f, rect.top - 1.0f, rect.right + 1.0f, rect.bottom + 1.0f))) {
+            return;
+        }
         if (SkCanvas* canvas = Canvas()) {
             SkPaint paint;
             paint.setColor(ToSkColor(color));
@@ -267,6 +261,9 @@ public:
     }
 
     void FillRoundedRect(const Rect& rect, const Color& color, float radius) override {
+        if (!IntersectsDirtyRect(Rect::Make(rect.left - 1.0f, rect.top - 1.0f, rect.right + 1.0f, rect.bottom + 1.0f))) {
+            return;
+        }
         if (SkCanvas* canvas = Canvas()) {
             SkPaint paint;
             paint.setColor(ToSkColor(color));
@@ -277,6 +274,9 @@ public:
     }
 
     void FillRRect(const Rect& rect, const CornerRadius& radii, const Color& color) override {
+        if (!IntersectsDirtyRect(Rect::Make(rect.left - 1.0f, rect.top - 1.0f, rect.right + 1.0f, rect.bottom + 1.0f))) {
+            return;
+        }
         if (SkCanvas* canvas = Canvas()) {
             SkPaint paint;
             paint.setColor(ToSkColor(color));
@@ -291,6 +291,9 @@ public:
                             const Color& start,
                             const Color& end,
                             float angleDegrees) override {
+        if (!IntersectsDirtyRect(Rect::Make(rect.left - 1.0f, rect.top - 1.0f, rect.right + 1.0f, rect.bottom + 1.0f))) {
+            return;
+        }
         if (SkCanvas* canvas = Canvas()) {
             const float cx = (rect.left + rect.right) * 0.5f;
             const float cy = (rect.top + rect.bottom) * 0.5f;
@@ -323,20 +326,26 @@ public:
                         float offsetY,
                         float blur,
                         const Color& color) override {
+        if (color.a <= 0.001f) {
+            return;
+        }
+        const float blurPx = std::max(0.0f, blur);
+        const SkRect shadowRect = SkRect::MakeLTRB(
+            rect.left + offsetX,
+            rect.top + offsetY,
+            rect.right + offsetX,
+            rect.bottom + offsetY);
+        const float sigma = blurPx * 0.45f;
+        const float dirtyPad = (sigma > 0.25f) ? (sigma * 3.0f + 4.0f) : 2.0f;
+        if (!IntersectsDirtyRect(Rect::Make(
+                shadowRect.left() - dirtyPad, shadowRect.top() - dirtyPad,
+                shadowRect.right() + dirtyPad, shadowRect.bottom() + dirtyPad))) {
+            return;
+        }
         if (SkCanvas* canvas = Canvas()) {
-            if (color.a <= 0.001f) {
-                return;
-            }
-            const float blurPx = std::max(0.0f, blur);
-            const SkRect shadowRect = SkRect::MakeLTRB(
-                rect.left + offsetX,
-                rect.top + offsetY,
-                rect.right + offsetX,
-                rect.bottom + offsetY);
 
             // Visual Rendering v2 + P1 Shadow Raster Cache:
             // Cache blurred shadow as an offscreen SkImage keyed by quantized size, radius, blur, and color.
-            const float sigma = blurPx * 0.45f;
             if (sigma > 0.25f) {
                 const float w = rect.Width();
                 const float h = rect.Height();
@@ -418,6 +427,10 @@ public:
     }
 
     void DrawRect(const Rect& rect, const Color& color, float strokeWidth) override {
+        const float pad = strokeWidth * 0.5f + 1.5f;
+        if (!IntersectsDirtyRect(Rect::Make(rect.left - pad, rect.top - pad, rect.right + pad, rect.bottom + pad))) {
+            return;
+        }
         if (SkCanvas* canvas = Canvas()) {
             SkPaint paint;
             paint.setColor(ToSkColor(color));
@@ -429,6 +442,10 @@ public:
     }
 
     void DrawRoundedRect(const Rect& rect, const Color& color, float strokeWidth, float radius) override {
+        const float pad = strokeWidth * 0.5f + 1.5f;
+        if (!IntersectsDirtyRect(Rect::Make(rect.left - pad, rect.top - pad, rect.right + pad, rect.bottom + pad))) {
+            return;
+        }
         if (SkCanvas* canvas = Canvas()) {
             SkPaint paint;
             paint.setColor(ToSkColor(color));
@@ -440,6 +457,10 @@ public:
     }
 
     void DrawRRect(const Rect& rect, const CornerRadius& radii, const Color& color, float strokeWidth) override {
+        const float pad = strokeWidth * 0.5f + 1.5f;
+        if (!IntersectsDirtyRect(Rect::Make(rect.left - pad, rect.top - pad, rect.right + pad, rect.bottom + pad))) {
+            return;
+        }
         if (SkCanvas* canvas = Canvas()) {
             SkPaint paint;
             paint.setColor(ToSkColor(color));
@@ -451,6 +472,12 @@ public:
     }
 
     void DrawLine(const PointF& start, const PointF& end, const Color& color, float strokeWidth) override {
+        const float pad = strokeWidth * 0.5f + 2.0f;
+        if (!IntersectsDirtyRect(Rect::Make(
+                std::min(start.x, end.x) - pad, std::min(start.y, end.y) - pad,
+                std::max(start.x, end.x) + pad, std::max(start.y, end.y) + pad))) {
+            return;
+        }
         if (SkCanvas* canvas = Canvas()) {
             SkPaint paint;
             paint.setColor(ToSkColor(color));
@@ -467,14 +494,35 @@ public:
                         float strokeWidth,
                         float dashLength,
                         float gapLength) override {
+        const float pad = strokeWidth * 0.5f + 2.0f;
+        if (!IntersectsDirtyRect(Rect::Make(
+                std::min(start.x, end.x) - pad, std::min(start.y, end.y) - pad,
+                std::max(start.x, end.x) + pad, std::max(start.y, end.y) + pad))) {
+            return;
+        }
         if (SkCanvas* canvas = Canvas()) {
             SkPaint paint;
             paint.setColor(ToSkColor(color));
             paint.setStyle(SkPaint::kStroke_Style);
             paint.setStrokeWidth(strokeWidth);
             paint.setAntiAlias(true);
-            const SkScalar intervals[2] = {std::max(1.0f, dashLength), std::max(1.0f, gapLength)};
-            paint.setPathEffect(SkDashPathEffect::Make(intervals, 2, 0.0f));
+            const float d = std::max(1.0f, dashLength);
+            const float g = std::max(1.0f, gapLength);
+            const uint64_t key =
+                (static_cast<uint64_t>(static_cast<uint32_t>(std::lround(d * 100.0f))) << 32) |
+                static_cast<uint64_t>(static_cast<uint32_t>(std::lround(g * 100.0f)));
+            sk_sp<SkPathEffect> effect;
+            if (auto it = m_dashEffectCache.find(key); it != m_dashEffectCache.end()) {
+                effect = it->second;
+            } else {
+                const SkScalar intervals[2] = {d, g};
+                effect = SkDashPathEffect::Make(intervals, 2, 0.0f);
+                if (m_dashEffectCache.size() >= 64) {
+                    m_dashEffectCache.clear();
+                }
+                m_dashEffectCache.emplace(key, effect);
+            }
+            paint.setPathEffect(std::move(effect));
             canvas->drawLine(start.x, start.y, end.x, end.y, paint);
         }
     }
@@ -622,83 +670,132 @@ public:
                    const Color& color,
                    float fontSize,
                    const TextRenderOptions& options) override {
-        if (SkCanvas* canvas = Canvas()) {
-            if (!text || len == 0 || rect.Width() <= 0.0f || rect.Height() <= 0.0f) {
-                return;
+        if (!text || len == 0 || fontSize <= 0.0f || rect.Width() <= 0.0f || rect.Height() <= 0.0f) {
+            return;
+        }
+        if (!IntersectsDirtyRect(Rect::Make(
+                rect.left - 2.0f, rect.top - 2.0f,
+                rect.right + 2.0f, rect.bottom + 2.0f))) {
+            return;
+        }
+
+        SkCanvas* canvas = Canvas();
+        if (!canvas) {
+            return;
+        }
+
+        EnsureFontManager();
+
+        const uint16_t effectiveWeight = options.EffectiveWeight();
+        sk_sp<SkTypeface> styleFace = m_defaultTypeface;
+        if (options.bold || options.italic || effectiveWeight != 400 || !options.fontFamily.empty()) {
+            styleFace = skia_font::CreateDefaultTypeface(
+                m_fontMgr.get(), options.bold, options.italic, effectiveWeight, options.fontFamily);
+            if (!styleFace) {
+                styleFace = m_defaultTypeface;
             }
+        }
+        if (!styleFace) {
+            return;
+        }
 
-            EnsureFontManager();
+        SkPaint paint;
+        paint.setColor(ToSkColor(color));
+        paint.setStyle(SkPaint::kFill_Style);
+        paint.setAntiAlias(true);
 
-            const uint16_t effectiveWeight = options.EffectiveWeight();
-            sk_sp<SkTypeface> styleFace = m_defaultTypeface;
-            if (options.bold || options.italic || effectiveWeight != 400 || !options.fontFamily.empty()) {
-                styleFace = skia_font::CreateDefaultTypeface(
-                    m_fontMgr.get(), options.bold, options.italic, effectiveWeight, options.fontFamily);
-                if (!styleFace) {
-                    styleFace = m_defaultTypeface;
+        const bool hasNewline =
+            (std::wmemchr(text, L'\n', len) != nullptr) ||
+            (std::wmemchr(text, L'\r', len) != nullptr);
+        if (!hasNewline) {
+            const TextBlobCacheValue& entry = GetOrCreateTextBlob(styleFace.get(), fontSize, text, len);
+            const float widthBudget = std::max(1.0f, rect.Width());
+            const bool fitsSingleLine =
+                (options.wrap == TextWrapMode::NoWrap && !options.ellipsis) ||
+                (options.wrap == TextWrapMode::Wrap && (widthBudget <= 1.0f || entry.width <= widthBudget)) ||
+                (options.wrap == TextWrapMode::NoWrap && options.ellipsis && entry.width <= widthBudget + 0.5f);
+            if (fitsSingleLine) {
+                if (!entry.blob) {
+                    return;
                 }
-            }
-
-            SkiaTextLayout layout;
-            if (!CreateSkiaTextLayout(
-                text,
-                len,
-                fontSize,
-                std::max(1.0f, rect.Width()),
-                options.wrap,
-                &layout,
-                options.bold,
-                options.italic,
-                options.ellipsis,
-                effectiveWeight,
-                options.fontFamily,
-                options.lineHeightFactor)) {
-                return;
-            }
-            if (layout.lines.empty()) {
-                return;
-            }
-            float startTop = rect.top;
-            if (options.verticalAlign == TextVerticalAlign::Center) {
-                startTop = rect.top + std::max(0.0f, (rect.Height() - layout.blockHeight) * 0.5f);
-            } else if (options.verticalAlign == TextVerticalAlign::End) {
-                startTop = rect.bottom - layout.blockHeight;
-            }
-
-            canvas->save();
-            canvas->clipRect(ToSkRect(rect), true);
-
-            SkPaint paint;
-            paint.setColor(ToSkColor(color));
-            paint.setStyle(SkPaint::kFill_Style);
-            paint.setAntiAlias(true);
-
-            for (size_t i = 0; i < layout.lines.size(); ++i) {
-                const float baseline = startTop + layout.ascent + static_cast<float>(i) * layout.lineHeight;
-                if (baseline - layout.ascent > rect.bottom) {
-                    break;
+                const CachedFontMetrics metrics = GetOrCreateFontMetrics(styleFace.get(), fontSize);
+                float startTop = rect.top;
+                if (options.verticalAlign == TextVerticalAlign::Center) {
+                    startTop = rect.top + std::max(0.0f, (rect.Height() - metrics.textHeight) * 0.5f);
+                } else if (options.verticalAlign == TextVerticalAlign::End) {
+                    startTop = rect.bottom - metrics.textHeight;
                 }
+                const float baseline = startTop + metrics.ascent;
 
                 float drawX = rect.left;
                 if (options.horizontalAlign == TextHorizontalAlign::Center) {
-                    drawX = rect.left + std::max(0.0f, (rect.Width() - layout.lines[i].width) * 0.5f);
+                    drawX = rect.left + std::max(0.0f, (rect.Width() - entry.width) * 0.5f);
                 } else if (options.horizontalAlign == TextHorizontalAlign::End) {
-                    drawX = rect.right - layout.lines[i].width;
+                    drawX = rect.right - entry.width;
                 }
 
-                DrawSimpleTextWithFallback(
-                    canvas,
-                    layout.lines[i].text,
-                    drawX,
-                    baseline,
-                    fontSize,
-                    styleFace.get(),
-                    m_fontMgr.get(),
-                    paint);
+                canvas->save();
+                canvas->clipRect(ToSkRect(rect), false);
+                canvas->drawTextBlob(entry.blob.get(), drawX, baseline, paint);
+                canvas->restore();
+                return;
+            }
+        }
+
+        std::shared_ptr<const SkiaTextLayout> layout = AcquireSkiaTextLayout(
+            text,
+            len,
+            fontSize,
+            std::max(1.0f, rect.Width()),
+            options.wrap,
+            options.bold,
+            options.italic,
+            options.ellipsis,
+            effectiveWeight,
+            options.fontFamily,
+            options.lineHeightFactor);
+        if (!layout || layout->lines.empty()) {
+            return;
+        }
+
+        float startTop = rect.top;
+        if (options.verticalAlign == TextVerticalAlign::Center) {
+            startTop = rect.top + std::max(0.0f, (rect.Height() - layout->blockHeight) * 0.5f);
+        } else if (options.verticalAlign == TextVerticalAlign::End) {
+            startTop = rect.bottom - layout->blockHeight;
+        }
+
+        canvas->save();
+        canvas->clipRect(ToSkRect(rect), false);
+
+        for (size_t i = 0; i < layout->lines.size(); ++i) {
+            const float baseline = startTop + layout->ascent + static_cast<float>(i) * layout->lineHeight;
+            if (baseline - layout->ascent > rect.bottom) {
+                break;
+            }
+            const auto& line = layout->lines[i];
+            if (line.text.empty()) {
+                continue;
             }
 
-            canvas->restore();
+            float drawX = rect.left;
+            if (options.horizontalAlign == TextHorizontalAlign::Center) {
+                drawX = rect.left + std::max(0.0f, (rect.Width() - line.width) * 0.5f);
+            } else if (options.horizontalAlign == TextHorizontalAlign::End) {
+                drawX = rect.right - line.width;
+            }
+
+            const TextBlobCacheValue& lineEntry = GetOrCreateTextBlob(
+                styleFace.get(),
+                fontSize,
+                line.text.c_str(),
+                static_cast<uint32_t>(line.text.size()));
+            if (lineEntry.blob) {
+                canvas->drawTextBlob(lineEntry.blob.get(), drawX, baseline, paint);
+            }
         }
+
+        canvas->restore();
     }
 
     Size GetBitmapSize(BitmapHandle bitmap) override {
@@ -911,32 +1008,252 @@ private:
         if (!dc) {
             return;
         }
-        int bx = 0;
-        int by = 0;
-        int bw = static_cast<int>(m_width);
-        int bh = static_cast<int>(m_height);
         if (HasDirtyRect()) {
-            const Rect d = GetDirtyRect();
-            bx = std::max(0, static_cast<int>(std::floor(d.left)));
-            by = std::max(0, static_cast<int>(std::floor(d.top)));
-            const int br = std::min(static_cast<int>(m_width), static_cast<int>(std::ceil(d.right)));
-            const int bb = std::min(static_cast<int>(m_height), static_cast<int>(std::ceil(d.bottom)));
-            bw = std::max(0, br - bx);
-            bh = std::max(0, bb - by);
-        }
-        if (bw > 0 && bh > 0) {
+            for (const Rect& d : GetDirtyRects()) {
+                const int bx = std::max(0, static_cast<int>(std::floor(d.left)));
+                const int by = std::max(0, static_cast<int>(std::floor(d.top)));
+                const int br = std::min(static_cast<int>(m_width), static_cast<int>(std::ceil(d.right)));
+                const int bb = std::min(static_cast<int>(m_height), static_cast<int>(std::ceil(d.bottom)));
+                const int bw = br - bx;
+                const int bh = bb - by;
+                if (bw > 0 && bh > 0) {
+                    BitBlt(
+                        dc,
+                        bx,
+                        by,
+                        bw,
+                        bh,
+                        m_memDC,
+                        bx,
+                        by,
+                        SRCCOPY);
+                }
+            }
+        } else if (m_width > 0 && m_height > 0) {
             BitBlt(
                 dc,
-                bx,
-                by,
-                bw,
-                bh,
+                0,
+                0,
+                static_cast<int>(m_width),
+                static_cast<int>(m_height),
                 m_memDC,
-                bx,
-                by,
+                0,
+                0,
                 SRCCOPY);
         }
         ReleaseDC(m_hwnd, dc);
+    }
+
+    struct TextBlobCacheKey {
+        uint32_t typefaceId = 0;
+        int32_t fontSizeQ = 0;
+        std::wstring text;
+
+        bool operator==(const TextBlobCacheKey& o) const {
+            return typefaceId == o.typefaceId && fontSizeQ == o.fontSizeQ && text == o.text;
+        }
+    };
+
+    struct TextBlobCacheKeyHash {
+        size_t operator()(const TextBlobCacheKey& k) const {
+            size_t h = std::hash<std::wstring>{}(k.text);
+            h ^= std::hash<uint32_t>{}(k.typefaceId) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            h ^= std::hash<int32_t>{}(k.fontSizeQ) + 0x9e3779b9 + (h << 6) + (h >> 2);
+            return h;
+        }
+    };
+
+    struct TextBlobCacheValue {
+        sk_sp<SkTextBlob> blob;
+        float width = 0.0f;
+    };
+
+    struct TextBlobLruEntry {
+        TextBlobCacheKey key;
+        TextBlobCacheValue value;
+    };
+
+    struct FontMetricsCacheKey {
+        uint32_t typefaceId = 0;
+        int32_t fontSizeQ = 0;
+
+        bool operator==(const FontMetricsCacheKey& o) const {
+            return typefaceId == o.typefaceId && fontSizeQ == o.fontSizeQ;
+        }
+    };
+
+    struct FontMetricsCacheKeyHash {
+        size_t operator()(const FontMetricsCacheKey& k) const {
+            return (static_cast<size_t>(k.typefaceId) * 2654435761u) ^
+                   (static_cast<size_t>(static_cast<uint32_t>(k.fontSizeQ)) << 1);
+        }
+    };
+
+    struct CachedFontMetrics {
+        float ascent = 0.0f;
+        float descent = 0.0f;
+        float spacing = 0.0f;
+        float textHeight = 0.0f;
+    };
+
+    CachedFontMetrics GetOrCreateFontMetrics(SkTypeface* typeface, float fontSize) {
+        const uint32_t tid = typeface ? typeface->uniqueID() : 0u;
+        const int32_t fsQ = static_cast<int32_t>(std::lround(fontSize * 64.0f));
+        const FontMetricsCacheKey key{tid, fsQ};
+        if (auto it = m_fontMetricsCache.find(key); it != m_fontMetricsCache.end()) {
+            return it->second;
+        }
+        SkFont font = skia_font::CreateSkiaFont(fontSize, typeface);
+        SkFontMetrics metrics{};
+        font.getMetrics(&metrics);
+        CachedFontMetrics out;
+        out.ascent = std::isfinite(metrics.fAscent) ? -metrics.fAscent : fontSize * 0.8f;
+        out.descent = std::isfinite(metrics.fDescent) ? metrics.fDescent : fontSize * 0.25f;
+        out.textHeight = out.ascent + out.descent;
+        out.spacing = std::max(font.getSpacing(), out.textHeight);
+        if (m_fontMetricsCache.size() >= 256) {
+            m_fontMetricsCache.clear();
+        }
+        m_fontMetricsCache.emplace(key, out);
+        return out;
+    }
+
+    sk_sp<SkTextBlob> BuildLineTextBlob(SkTypeface* defaultTypeface,
+                                        float fontSize,
+                                        const wchar_t* text,
+                                        uint32_t len,
+                                        float* outWidth) {
+        if (outWidth) {
+            *outWidth = 0.0f;
+        }
+        if (!text || len == 0 || fontSize <= 0.0f) {
+            return nullptr;
+        }
+
+        constexpr uint32_t kStackCap = 128;
+        if (defaultTypeface) {
+            SkFont defaultFont = skia_font::CreateSkiaFont(fontSize, defaultTypeface);
+            SkGlyphID stackGlyphs[kStackCap];
+            std::vector<SkGlyphID> heapGlyphs;
+            SkGlyphID* glyphs = stackGlyphs;
+            if (len > kStackCap) {
+                heapGlyphs.resize(len);
+                glyphs = heapGlyphs.data();
+            }
+            const int glyphCount = defaultFont.textToGlyphs(
+                text,
+                static_cast<size_t>(len) * sizeof(wchar_t),
+                SkTextEncoding::kUTF16,
+                glyphs,
+                static_cast<int>(len));
+            if (glyphCount > 0) {
+                bool allSupported = true;
+                for (int i = 0; i < glyphCount; ++i) {
+                    if (glyphs[i] == 0) {
+                        allSupported = false;
+                        break;
+                    }
+                }
+                if (allSupported) {
+                    SkScalar stackWidths[kStackCap];
+                    std::vector<SkScalar> heapWidths;
+                    SkScalar* widths = stackWidths;
+                    if (static_cast<uint32_t>(glyphCount) > kStackCap) {
+                        heapWidths.resize(static_cast<size_t>(glyphCount));
+                        widths = heapWidths.data();
+                    }
+                    defaultFont.getWidths(glyphs, glyphCount, widths);
+                    SkTextBlobBuilder builder;
+                    const SkTextBlobBuilder::RunBuffer& run = builder.allocRunPosH(defaultFont, glyphCount, 0.0f);
+                    std::memcpy(run.glyphs, glyphs, static_cast<size_t>(glyphCount) * sizeof(SkGlyphID));
+                    float x = 0.0f;
+                    for (int i = 0; i < glyphCount; ++i) {
+                        run.pos[i] = x;
+                        x += widths[i];
+                    }
+                    if (outWidth) {
+                        *outWidth = x;
+                    }
+                    return builder.make();
+                }
+            }
+        }
+
+        SkTextBlobBuilder builder;
+        float runX = 0.0f;
+        std::vector<SkGlyphID> runHeapGlyphs;
+        std::vector<SkScalar> runHeapWidths;
+        skia_font::IterateTextRuns(
+            m_fontMgr.get(),
+            defaultTypeface,
+            text,
+            len,
+            [&](const wchar_t* runText, uint32_t runLen, SkTypeface* runFace) {
+                SkFont runFont = skia_font::CreateSkiaFont(fontSize, runFace);
+                SkGlyphID runStackGlyphs[kStackCap];
+                SkGlyphID* runGlyphs = runStackGlyphs;
+                if (runLen > kStackCap) {
+                    runHeapGlyphs.resize(runLen);
+                    runGlyphs = runHeapGlyphs.data();
+                }
+                const int runGlyphCount = runFont.textToGlyphs(
+                    runText,
+                    static_cast<size_t>(runLen) * sizeof(wchar_t),
+                    SkTextEncoding::kUTF16,
+                    runGlyphs,
+                    static_cast<int>(runLen));
+                if (runGlyphCount <= 0) {
+                    return;
+                }
+                SkScalar runStackWidths[kStackCap];
+                SkScalar* runWidths = runStackWidths;
+                if (static_cast<uint32_t>(runGlyphCount) > kStackCap) {
+                    runHeapWidths.resize(static_cast<size_t>(runGlyphCount));
+                    runWidths = runHeapWidths.data();
+                }
+                runFont.getWidths(runGlyphs, runGlyphCount, runWidths);
+                const SkTextBlobBuilder::RunBuffer& run = builder.allocRunPosH(runFont, runGlyphCount, 0.0f);
+                std::memcpy(run.glyphs, runGlyphs, static_cast<size_t>(runGlyphCount) * sizeof(SkGlyphID));
+                for (int i = 0; i < runGlyphCount; ++i) {
+                    run.pos[i] = runX;
+                    runX += runWidths[i];
+                }
+            });
+        if (outWidth) {
+            *outWidth = runX;
+        }
+        return builder.make();
+    }
+
+    const TextBlobCacheValue& GetOrCreateTextBlob(SkTypeface* typeface,
+                                                  float fontSize,
+                                                  const wchar_t* text,
+                                                  uint32_t len) {
+        static const TextBlobCacheValue s_empty{};
+        if (!text || len == 0 || fontSize <= 0.0f) {
+            return s_empty;
+        }
+        m_blobLookupKey.typefaceId = typeface ? typeface->uniqueID() : 0u;
+        m_blobLookupKey.fontSizeQ = static_cast<int32_t>(std::lround(fontSize * 64.0f));
+        m_blobLookupKey.text.assign(text, len);
+
+        if (auto it = m_textBlobMap.find(m_blobLookupKey); it != m_textBlobMap.end()) {
+            m_textBlobList.splice(m_textBlobList.begin(), m_textBlobList, it->second);
+            return it->second->value;
+        }
+
+        TextBlobCacheValue built;
+        built.blob = BuildLineTextBlob(typeface, fontSize, text, len, &built.width);
+
+        if (m_textBlobList.size() >= kMaxTextBlobCacheSize) {
+            auto last = std::prev(m_textBlobList.end());
+            m_textBlobMap.erase(last->key);
+            m_textBlobList.pop_back();
+        }
+        TextBlobCacheKey storedKey = m_blobLookupKey;
+        m_textBlobList.push_front(TextBlobLruEntry{storedKey, std::move(built)});
+        m_textBlobMap.emplace(std::move(storedKey), m_textBlobList.begin());
+        return m_textBlobList.front().value;
     }
 
     bool RecreateSurface() {
@@ -1032,6 +1349,13 @@ private:
     sk_sp<SkSurface> m_surface;
     sk_sp<SkFontMgr> m_fontMgr;
     sk_sp<SkTypeface> m_defaultTypeface;
+    // Declared AFTER m_fontMgr and m_defaultTypeface so cached blobs release before COM/FontMgr teardown.
+    static constexpr size_t kMaxTextBlobCacheSize = 4096;
+    std::list<TextBlobLruEntry> m_textBlobList;
+    std::unordered_map<TextBlobCacheKey, std::list<TextBlobLruEntry>::iterator, TextBlobCacheKeyHash> m_textBlobMap;
+    TextBlobCacheKey m_blobLookupKey;
+    std::unordered_map<FontMetricsCacheKey, CachedFontMetrics, FontMetricsCacheKeyHash> m_fontMetricsCache;
+    std::unordered_map<uint64_t, sk_sp<SkPathEffect>> m_dashEffectCache;
     SkSamplingOptions m_bitmapSampling{SkFilterMode::kLinear, SkMipmapMode::kLinear};
     struct SvgCacheEntry {
         std::string key;

@@ -52,14 +52,18 @@
 ## 相关文档
 
 - `doc/README.md`：文档索引与现状快照
+- `doc/plan/2026-11-20-skia-textblob-and-multi-dirty-rect.md`：**Skia 文本 `SkTextBlob` 缓存与多脏矩形渲染优化方案**（UTF-16 直通度量、`DirtyRegion` + `SkRegion` 裁剪与局部 `BitBlt`）
+- `doc/reports/2026-11-20-skia-opt-before-after-report.md` / `.html`：**Skia 优化前后 Release 实测对比报告**（Stock Terminal / 60Hz 压测 / Day-K 多脏矩形）
 - `doc/plan/2026-11-20-react-jsx-native-ui.md`：**React JSX 原生 UI 架构与同花顺股票终端方案**（QuickJS-ng + 双线程整型协议）
+- `doc/reports/2026-11-20-react-vs-xml-perf-report.md` / `.html`：**React (QuickJS-ng) vs XML (C++) 性能评估对比报告**
 - `doc/plan/2026-07-15-directui-productization-personas.md`：**产品化路线 · 分人物（R/L/C/S/H/Q）**（Wave1 已收口，Wave2 进行中）
 - `doc/plan/2026-07-16-embed-api-v1.md`：H5 嵌入 API 设计草案
 - `doc/layout-spec.md`：**布局 XML/JSON 规则**（含 `$style`、`$color`、ellipsis、VirtualListBox、Popup）
 - `doc/style-catalog.md`：样式目录 `import` / `extend` / 引用语法
 - `doc/window-chrome.md`：自定义标题栏与 layered 异形窗
 - `doc/resource-packaging.md`：资源打包与加载方案
-- `doc/skia-integration.md`：Skia 集成 + R5 已知差 + R6 ellipsis
+- `doc/skia-integration.md`：Skia 集成与性能架构（`SkTextBlob` LRU、UTF-16 度量、`DirtyRegion`、R5/R6/R7/R8）
+- `doc/troubleshooting-and-pitfalls.md`：**核心排坑与架构避坑指南**（Thickness、默认内边距、D2D 全帧边界、BatchUpdate、Skia Debug 软光栅）
 - `doc/mvp-roadmap.md`：MVP 与迭代规划
 - `doc/mvp-acceptance.md`：手工验收（含 Wave2 检查表）
 
@@ -98,6 +102,24 @@ return host->Run();
 ```
 
 详细架构与接口说明见：`doc/plan/2026-11-20-react-jsx-native-ui.md`。
+
+## Skia 性能优化与基准压测
+
+> 提示：Debug 构建链接未优化的 `Debug-x64/skia.lib`（软光栅耗时约为 Release 的 ~28×），性能压测与交互体验评测请统一使用 `-Configuration Release`。
+
+```powershell
+# 1. 构建 Release 并运行 Skia 专项单元测试（DirtyRegion + UTF-16 度量 + LRU 缓存）
+.\build.ps1 -Configuration Release
+.\build\Release\skia_unit_test.exe
+
+# 2. 运行 XML vs React Release 性能对比基准（Stock Terminal + 60Hz 100格 + 极速打字）
+.\scripts\bench_react_vs_xml.ps1 -Renderer both -Configuration Release
+
+# 3. 运行 Day-K 500ms 四角分散更新多脏矩形专项压测
+.\scripts\bench_skia_dirty_region.ps1 -Renderer both -Configuration Release
+```
+
+详见设计文档 `doc/plan/2026-11-20-skia-textblob-and-multi-dirty-rect.md` 与实测报告 `doc/reports/2026-11-20-skia-opt-before-after-report.md`（及 `.html` 可视化报告）。
 
 ## 本地 CI（Q8）+ GitHub 绿勾
 

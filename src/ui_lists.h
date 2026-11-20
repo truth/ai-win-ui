@@ -160,6 +160,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         const StyleSpec shell = m_style.Resolve(GetCurrentState());
         BoxDecoration deco = shell.decoration.value_or(BoxDecoration{});
         if (!shell.decoration.has_value()) {
@@ -513,6 +519,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         const StyleSpec shell = m_style.Resolve(GetCurrentState());
         BoxDecoration deco = shell.decoration.value_or(BoxDecoration{});
         if (!shell.decoration.has_value()) {
@@ -948,6 +960,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         const StyleSpec shell = m_style.Resolve(m_hasFocus ? StyleState::Focused : StyleState::Normal);
         Color shellBg = background;
         Color shellBorder = borderColor;

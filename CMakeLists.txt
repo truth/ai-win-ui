@@ -285,6 +285,22 @@ if(AI_WIN_UI_BUILD_SAMPLES)
     # XML 60Hz 100-cell benchmark target
     ai_win_ui_add_app(perf_stress_xml samples/perf_stress_xml/main.cpp)
 
+    # DirtyRegion & Skia text UTF-16 / LRU unit tests
+    add_executable(skia_unit_test samples/skia_unit_test/main.cpp)
+    target_link_libraries(skia_unit_test PRIVATE ai_win_ui_lib)
+    target_include_directories(skia_unit_test PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+    )
+    if(AI_WIN_UI_ENABLE_SKIA AND AI_WIN_UI_SKIA_PROVIDER STREQUAL "local-sdk")
+        target_include_directories(skia_unit_test PRIVATE "${_skia_inc}")
+        set_property(TARGET skia_unit_test PROPERTY
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif()
+    if(MSVC)
+        target_compile_options(skia_unit_test PRIVATE /utf-8 /wd4819)
+    endif()
+
     ai_win_ui_add_app(embed_host samples/embed_host/main.cpp)
 
     # 便签 — sticky-notes desktop app (multi-file).

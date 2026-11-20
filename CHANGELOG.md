@@ -7,6 +7,23 @@ Versioning follows [SemVer](https://semver.org/) (`AI_WIN_UI_VERSION_*` in `incl
 
 ## [Unreleased]
 
+### Added
+
+- **React JSX Native UI (`feature/react-jsx-ui`)**
+  - Vendored `QuickJS-ng v0.18.0` C worker thread + `ai_win_ui_react` dual-thread bridge with typed integer `MutationBatch` protocol (`nodeId` / `NodeTypeId` / `PropId`)
+  - Minimal TypeScript React reconciler & hooks (`jsx`/`Fragment`, hooks, keyed diff, 19 native primitives including `<FinancialChart>` + `useWindowKeyDown`)
+  - Optimistic input echo guard (`eventSeq`/`ackSeq`), visual-only batch fast path (`EndBatchUpdate(false)`), React Showcase & Flush-style Stock Terminal apps, `react_unit_test`, and `scripts/bench_react_vs_xml.ps1`
+- **Skia Multi-Dirty-Rect & Text Diagnostics (`feature/skia-textblob-dirty-region`)**
+  - `ai_win_ui::DirtyRegion` (`src/dirty_region.h`, max 8 rects, adjacent coalescing, 85% full-repaint threshold) & `IRenderer::SetDirtyRects` / `GetDirtyRects`
+  - `dirty_rects,dirty_area_pct` columns in `FrameProfiler` CSV output, `samples/skia_unit_test/` (4 tests), and `scripts/bench_skia_dirty_region.ps1`
+
+### Performance
+
+- **Skia Text Pipeline & Partial Repaint (`feature/skia-textblob-dirty-region`)**
+  - UTF-16 direct batch width measurement (`SkFont::textToGlyphs(..., kUTF16)` + `getWidths`), zero-copy 4096-entry LRU `AcquireSkiaTextLayout`, and 4096-entry `SkTextBlob` LRU cache (`allocRunPosH`) + single-line `DrawTextW` fast path + `FontMetrics`/`SkDashPathEffect` caches
+  - Win32 `GetUpdateRgn`/`GetRegionData` extraction prior to `BeginPaint`, `SkRegion` clipping + per-rect `BitBlt` presentation on Skia (Direct2D strictly preserved as full-frame), widget `IntersectsDirtyRect` culling, caret-only blink invalidation (`InvalidateSelf(4.0f)`), F12 corner HUD clipping, and batched updates in `samples/stock_terminal/main.cpp`
+  - Release gains vs `12fa270`: full-frame `resizeSweep` render `-27.6%` (XML) / `-21.3%` (React), Stock XML `tick500ms` paint `-70.3%` (`4.932 -> 1.464 ms`), `typingChar` paint `-83.5%~-83.9%`, and Day-K disjoint-corner XML Skia `paint 0.336 ms` (`3.84%` dirty area, **20.8×** faster than Direct2D `6.976 ms`)
+
 ## [0.3.2] — 2026-09-26
 
 ### Added

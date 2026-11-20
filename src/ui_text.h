@@ -251,6 +251,7 @@ public:
         if (now - m_lastBlink >= 500) {
             m_showCaret = !m_showCaret;
             m_lastBlink = now;
+            InvalidateSelf(4.0f);
             return true;
         }
         return false;
@@ -276,6 +277,12 @@ protected:
 
 public:
     void Render(IRenderer& renderer) override {
+        const float dirtyPad = ScaleValue(4.0f);
+        if (!renderer.IntersectsDirtyRect(Rect{
+                m_bounds.left - dirtyPad, m_bounds.top - dirtyPad,
+                m_bounds.right + dirtyPad, m_bounds.bottom + dirtyPad})) {
+            return;
+        }
         if (m_styleFromLayout) {
             // Layout set background/textColor/borderColor explicitly (see LockColors);
             // push them into m_style so they win over whatever ApplyThemeDefaults

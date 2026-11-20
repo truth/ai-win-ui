@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Skia 文本 SkTextBlob 缓存与多脏矩形优化 — Release 实测对比报告</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --before: #94a3b8;
+      --before-soft: #f1f5f9;
+      --after: #10b981;
+      --after-soft: #ecfdf5;
+      --skia: #0ea5e9;
+      --d2d: #6366f1;
+      --accent: #4f46e5;
+      --warn: #f59e0b;
+      --warn-soft: #fffbeb;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.58;
+      padding: 28px 20px 64px;
+    }
+    .container { max-width: 1220px; margin: 0 auto; }
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #0c4a6e 52%, #065f46 100%);
+      color: #ffffff;
+      border-radius: 18px;
+      padding: 28px 32px;
+      margin-bottom: 22px;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
+    }
+    .pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 11px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+    .pill.green { background: #10b981; }
+    .pill.blue { background: #0284c7; }
+    .hero h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
+    .hero p { margin: 0; font-size: 13.5px; color: rgba(255, 255, 255, 0.88); }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(245px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+    }
+    .kpi-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+    .kpi-val { font-size: 23px; font-weight: 800; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
+    .kpi-sub { font-size: 12px; color: #475569; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+    .badge.good { background: var(--after-soft); color: #047857; }
+    .badge.info { background: #e0f2fe; color: #0369a1; }
+    .badge.warn { background: var(--warn-soft); color: #b45309; }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .filter-group {
+      display: inline-flex;
+      background: #e2e8f0;
+      padding: 4px;
+      border-radius: 10px;
+      gap: 4px;
+      flex-wrap: wrap;
+    }
+    .filter-btn {
+      border: none;
+      background: transparent;
+      padding: 7px 14px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+    }
+    .filter-btn.active {
+      background: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    }
+    .legend { display: flex; gap: 16px; font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      margin-right: 6px;
+    }
+    .dot.before { background: var(--before); }
+    .dot.after { background: var(--after); }
+    .dot.skia { background: var(--skia); }
+    .dot.d2d { background: var(--d2d); }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.03);
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 17.5px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sec-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: #e0e7ff;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 16px; }
+    .bar-chart { display: flex; flex-direction: column; gap: 13px; }
+    .bar-group { padding-bottom: 10px; border-bottom: 1px dashed #e2e8f0; }
+    .bar-group:last-child { border-bottom: none; padding-bottom: 0; }
+    .bar-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; color: #1e293b; display: flex; justify-content: space-between; gap: 8px; }
+    .bar-row { display: grid; grid-template-columns: 112px 1fr 118px; align-items: center; gap: 10px; margin-bottom: 4px; font-size: 12px; }
+    .bar-track {
+      height: 12px;
+      background: #f1f5f9;
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+    }
+    .bar-fill { height: 100%; border-radius: 999px; transition: width 0.25s ease; }
+    .bar-fill.before { background: linear-gradient(90deg, #94a3b8, #64748b); }
+    .bar-fill.after { background: linear-gradient(90deg, #34d399, #059669); }
+    .bar-fill.skia { background: linear-gradient(90deg, #38bdf8, #0284c7); }
+    .bar-fill.d2d { background: linear-gradient(90deg, #818cf8, #4f46e5); }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    th {
+      background: #f8fafc;
+      color: #475569;
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    tr:last-child td { border-bottom: none; }
+    .num { font-family: "Cascadia Mono", Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .delta-good { color: #047857; font-weight: 700; }
+    .note {
+      margin-top: 12px;
+      padding: 11px 14px;
+      border-radius: 10px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      font-size: 12.5px;
+      color: #334155;
+    }
+    ul.insights { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; color: #334155; }
+    ul.insights li { margin-bottom: 8px; }
+    code {
+      font-family: "Cascadia Mono", Consolas, monospace;
+      background: #f1f5f9;
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <div class="pill-row">
+        <span class="pill green">7/7 CI PASS · 4/4 SKIA UNIT TESTS · 3/3 REACT TESTS</span>
+        <span class="pill blue">Release x64 同口径实测对比</span>
+        <span class="pill">Base 12fa270 → Opt 1f1af45</span>
+        <span class="pill">2026-11-20</span>
+      </div>
+      <h1>Skia 文本 SkTextBlob 缓存与多脏矩形渲染优化 — Release 实测对比报告</h1>
+      <p>Skia UTF-16 直通度量 + 4096 项真 LRU SkiaTextLayout / SkTextBlob 缓存 + ai_win_ui::DirtyRegion 多矩形 SkRegion 裁剪 &amp; 局部 BitBlt · 严格保持 Direct2D 全帧不变式</p>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Day-K 四角分散更新 (XML Skia)</div>
+        <div class="kpi-val">0.336 ms <span class="badge good">快 20.8×</span></div>
+        <div class="kpi-sub">6 rects · 仅 3.84% 脏区面积（vs D2D 6.976 ms；React Skia 2.343 ms，快 2.65×）</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">快速连续输入绘制 (`typingChar`)</div>
+        <div class="kpi-val">-83.5% <span class="badge good">6.06× ~ 6.22×</span></div>
+        <div class="kpi-sub">XML paint 0.975 → 0.161 ms (lat -63.3%) · React paint 1.027 → 0.165 ms (lat -61.3%)</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">股票终端 500ms 行情 Tick</div>
+        <div class="kpi-val">-70.3% <span class="badge good">3.37× (XML)</span></div>
+        <div class="kpi-sub">XML paint 4.932 → 1.464 ms (render -70.7%) · React paint 4.824 → 3.531 ms (-26.8%)</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">100% 全帧纯文本增益 (`resizeSweep`)</div>
+        <div class="kpi-val">-27.6% <span class="badge info">无裁剪纯缓存</span></div>
+        <div class="kpi-sub">XML render 7.335 → 5.308 ms · React render 6.785 → 5.340 ms (-21.3%) · hotkeyTheme -39.2%</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="sec-tag">1</span>Release 基准实测对照（`12fa270`, 优化前 Skia vs Direct2D）</h2>
+      <div class="note" style="margin-top:0;margin-bottom:12px;">
+        <strong>Debug vs Release 上下文</strong>（<code>modern_components_v2.xml</code>）：Skia Debug 链接未优化的 <code>Debug-x64/skia.lib</code> 存在约 28× 软光栅惩罚（拖拽 <code>render 135.93 ms</code> / <code>latency 194.14 ms</code>）；切换至 Release 后降至 <code>render 4.41 ms</code> / <code>latency 8.86 ms</code>。下表全部为优化前 Release 同口径实测数据：
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>套件与指标</th>
+              <th>XML Skia</th>
+              <th>React Skia</th>
+              <th>XML Direct2D</th>
+              <th>React Direct2D</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Stock Terminal 冷启动 / 工作集内存</td><td class="num">46.961 ms / 30.36 MB</td><td class="num">45.468 ms / 32.31 MB</td><td class="num">97.940 ms / 63.21 MB</td><td class="num">83.403 ms / 65.16 MB</td></tr>
+            <tr><td>Stock 500ms Tick (<code>render / paint</code>)</td><td class="num">4.224 / 4.932 ms</td><td class="num">4.199 / 4.824 ms</td><td class="num">6.414 / 6.735 ms</td><td class="num">5.810 / 6.123 ms</td></tr>
+            <tr><td>Stock 60Hz Hover (<code>render / p95 / paint</code>)</td><td class="num">5.237 / 9.462 / 6.304 ms</td><td class="num">4.969 / 6.879 / 5.720 ms</td><td class="num">6.007 / 7.980 / 6.288 ms</td><td class="num">5.987 / 7.210 / 6.352 ms</td></tr>
+            <tr><td>Stock 周期切换 <code>periodClick</code> (<code>paint / lat|e2e</code>)</td><td class="num">5.737 / 6.278 ms</td><td class="num">3.053 / 9.081 ms</td><td class="num">6.784 / 7.339 ms</td><td class="num">5.939 / 12.605 ms</td></tr>
+            <tr><td>Stock 主题切换 <code>hotkeyTheme</code> (<code>paint / lat|e2e</code>)</td><td class="num">6.662 / 6.744 ms</td><td class="num">5.836 / 10.106 ms</td><td class="num">6.295 / 6.406 ms</td><td class="num">6.825 / 11.604 ms</td></tr>
+            <tr><td>Stock <code>resizeSweep</code> (<code>render / paint / lat</code>)</td><td class="num">7.335 / 8.348 / 12.208 ms</td><td class="num">6.785 / 7.967 / 12.183 ms</td><td class="num">6.640 / 6.970 / 12.786 ms</td><td class="num">6.257 / 6.642 / 11.532 ms</td></tr>
+            <tr><td>Stress 100-Cell 60Hz (<code>FPS / paint avg</code>)</td><td class="num">41.95 FPS / 0.744 ms</td><td class="num">59.44 FPS / 0.698 ms</td><td class="num">42.07 FPS / 0.780 ms</td><td class="num">59.72 FPS / 0.819 ms</td></tr>
+            <tr><td>Stress <code>typingChar</code> (<code>paint / latency</code>)</td><td class="num">0.975 / 1.140 ms</td><td class="num">1.027 / 1.221 ms</td><td class="num">0.816 / 0.987 ms</td><td class="num">0.895 / 1.076 ms</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="toolbar">
+      <div class="filter-group" id="suiteFilter">
+        <button class="filter-btn active" data-filter="all">全部 Skia 场景</button>
+        <button class="filter-btn" data-filter="stock_xml">同花顺终端 (XML Skia)</button>
+        <button class="filter-btn" data-filter="stock_react">同花顺终端 (React Skia)</button>
+        <button class="filter-btn" data-filter="stress">60Hz 压测与输入</button>
+      </div>
+      <div class="legend">
+        <span><i class="dot before"></i>优化前 (12fa270)</span>
+        <span><i class="dot after"></i>优化后 (SkTextBlob + DirtyRegion)</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="sec-tag">2</span>Skia 优化前后 Release 实测对比（越低越好）</h2>
+      <div class="bar-chart" id="beforeAfterBars"></div>
+      <div style="overflow-x:auto; margin-top:16px;">
+        <table>
+          <thead>
+            <tr>
+              <th>模式</th>
+              <th>测试场景</th>
+              <th>指标</th>
+              <th>Before (12fa270)</th>
+              <th>After (1f1af45)</th>
+              <th>变化幅度 / 加速比</th>
+              <th>备注 / CSV 脏区观测</th>
+            </tr>
+          </thead>
+          <tbody id="beforeAfterTable"></tbody>
+        </table>
+      </div>
+      <div class="note">
+        <strong>Direct2D 对照 sanity check：</strong>After 压测同步执行了 Direct2D 全套场景（Stock XML <code>tick500ms paint 5.962 ms</code>、<code>resizeSweep 6.572 ms</code>；React <code>tick500ms 6.865 ms</code>、<code>resizeSweep 7.544 ms</code>；Stress 60Hz <code>paint 0.811~0.876 ms</code>），严格维持全帧提交与零视觉回退；另外在 <code>stock_react_skia.csv</code> 中观测到 24 帧局部失效 <code>trigger=invalidate</code> 平均仅 <code>0.96 rects</code>、<code>4.56%</code> 面积（<code>render 0.090 ms</code> / <code>paint 0.192 ms</code>）。
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="sec-tag">3</span>Day-K（日 K 线）500ms 四角分散更新多脏矩形专项对比（12 帧/项）</h2>
+      <div class="grid-2">
+        <div>
+          <div class="legend" style="margin-bottom:10px;">
+            <span><i class="dot skia"></i>Skia (多脏矩形裁剪 + 局部 BitBlt)</span>
+            <span><i class="dot d2d"></i>Direct2D (100% 全帧基线)</span>
+          </div>
+          <div class="bar-chart" id="daykBars"></div>
+        </div>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th>模式 &amp; 后端</th>
+                <th>脏矩形数</th>
+                <th>脏区面积%</th>
+                <th>render avg (p95)</th>
+                <th>present avg</th>
+                <th>paint avg (p95)</th>
+                <th>对比 D2D</th>
+              </tr>
+            </thead>
+            <tbody id="daykTable"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="sec-tag">4</span>工程验证矩阵与核心结论</h2>
+      <div class="grid-2">
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr><th>验证项目</th><th>执行命令 / 范围</th><th>结果</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Release 构建</td><td><code>.\build.ps1 -Configuration Release</code></td><td class="delta-good">0 Error / 0 Warning</td></tr>
+              <tr><td>Debug 构建</td><td><code>.\build.ps1 -Configuration Debug</code></td><td class="delta-good">0 Error / 0 Warning</td></tr>
+              <tr><td>Skia 单元测试</td><td><code>skia_unit_test.exe</code>（Release &amp; Debug）</td><td class="delta-good">4/4 PASS</td></tr>
+              <tr><td>React 单元测试</td><td><code>react_unit_test.exe</code>（Release &amp; Debug）</td><td class="delta-good">3/3 PASS</td></tr>
+              <tr><td>本地 CI 全套回归</td><td><code>.\scripts\run_ci_local.ps1 -SkipBuild</code></td><td class="delta-good">7/7 PASS (48.0s)</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul class="insights">
+          <li><strong>无裁剪全帧场景稳定提速 `-21%~-39%`</strong>：100% 重绘的 <code>resizeSweep</code> 与 <code>hotkeyTheme</code> 验证了 <code>SkTextBlob</code> 4096 项 LRU 缓存、UTF-16 批量度量及单行快路径的纯文本管线收益。</li>
+          <li><strong>高频微更新进入 `0.1~0.3 ms` 区间</strong>：快速输入 <code>typingChar</code> 绘制耗时直降 <code>-83.5%~-83.9%</code>（端到端输入延迟仅 <code>0.418~0.472 ms</code>）；Day-K XML 多角离散刷新仅覆盖 <code>3.84%</code> 画面，<code>paint 0.336 ms</code> 较 Direct2D 快 <strong>20.8×</strong>。</li>
+          <li><strong>双后端架构边界清晰</strong>：Direct2D 严格坚持全帧重绘（Rule #3），双后端在 3 组 Measure Goldens 上与 Yoga 排版度量 100% 对齐。</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const ROWS = [
+      { group: "stock_xml", mode: "XML Skia", scene: "500ms 行情 Tick (n=32)", metric: "paintMs avg", before: 4.932, after: 1.464, max: 11, delta: "-70.3% (3.37×)", note: "render 4.224 → 1.239 ms (-70.7%)" },
+      { group: "stock_xml", mode: "XML Skia", scene: "主题切换 hotkeyTheme (100%全帧)", metric: "renderMs avg", before: 5.888, after: 3.579, max: 11, delta: "-39.2% (1.65×)", note: "paint 6.662 → 4.156 ms (-37.6%)" },
+      { group: "stock_xml", mode: "XML Skia", scene: "周期切换 periodClick (n=10)", metric: "latencyMs p95", before: 10.991, after: 6.956, max: 11, delta: "-36.7%", note: "avg paint 5.737 → 4.299 ms (-25.1%)" },
+      { group: "stock_xml", mode: "XML Skia", scene: "拖拽缩放 resizeSweep (100%全帧)", metric: "renderMs avg", before: 7.335, after: 5.308, max: 11, delta: "-27.6% (1.38×)", note: "latency 12.208 → 10.096 ms (-17.3%)" },
+      { group: "stock_xml", mode: "XML Skia", scene: "60Hz 悬停 hover60Hz (n=60)", metric: "paintMs p95", before: 12.808, after: 8.788, max: 13.5, delta: "-31.4%", note: "render avg 5.237 → 4.780 ms (-8.7%)" },
+
+      { group: "stock_react", mode: "React Skia", scene: "500ms 行情 Tick (n=16)", metric: "renderMs avg", before: 4.199, after: 2.976, max: 11, delta: "-29.1% (1.41×)", note: "paint 4.824 → 3.531 ms (-26.8%)" },
+      { group: "stock_react", mode: "React Skia", scene: "拖拽缩放 resizeSweep (100%全帧)", metric: "renderMs avg", before: 6.785, after: 5.340, max: 11, delta: "-21.3% (1.27×)", note: "latency 12.183 → 9.946 ms (-18.4%)" },
+      { group: "stock_react", mode: "React Skia", scene: "60Hz 悬停 hover60Hz (n=60)", metric: "renderMs p95", before: 6.879, after: 5.510, max: 11, delta: "-19.9%", note: "paint avg 5.720 → 4.819 ms (-15.8%)" },
+      { group: "stock_react", mode: "React Skia", scene: "周期切换 periodClick (n=10)", metric: "reactE2eMs p95", before: 13.608, after: 10.503, max: 14.5, delta: "-22.8%", note: "avg reactE2e 9.081 → 8.876 ms (-2.3%)" },
+      { group: "stock_react", mode: "React Skia", scene: "主题切换 hotkeyTheme (100%全帧)", metric: "reactE2eMs p95", before: 13.779, after: 11.897, max: 14.5, delta: "-13.7%", note: "render avg 5.090 → 4.600 ms (-9.6%)" },
+
+      { group: "stress", mode: "XML Skia", scene: "60Hz 100格批刷新 batch60Hz", metric: "renderMs avg", before: 0.483, after: 0.328, max: 1.4, delta: "-32.1%", note: "paint 0.744 → 0.568 ms · CSV 1.95 rects / 47.78% area" },
+      { group: "stress", mode: "XML Skia", scene: "快速连续打字 typingChar (n=40)", metric: "paintMs avg", before: 0.975, after: 0.161, max: 1.4, delta: "-83.5% (6.06×)", note: "latency 1.140 → 0.418 ms (-63.3%) · CSV 1.02 rects / 3.54% area" },
+      { group: "stress", mode: "React Skia", scene: "60Hz 100格批刷新 batch60Hz", metric: "renderMs avg", before: 0.467, after: 0.356, max: 1.4, delta: "-23.8%", note: "paint 0.698 → 0.612 ms · CSV 2 rects / 51.75% area" },
+      { group: "stress", mode: "React Skia", scene: "快速连续打字 typingChar (n=40)", metric: "paintMs avg", before: 1.027, after: 0.165, max: 1.4, delta: "-83.9% (6.22×)", note: "latency 1.221 → 0.472 ms (-61.3%) · CSV 1 rect / 2.29% area" }
+    ];
+
+    const DAYK = [
+      { label: "XML + Skia", rects: "6", area: "3.84%", render: "0.197 (0.244)", present: "0.104", paintNum: 0.336, paint: "0.336 (0.439)", ratio: "paint 快 20.8×", cls: "skia" },
+      { label: "XML + Direct2D", rects: "0 (全帧)", area: "100%", render: "6.575 (9.966)", present: "0.393", paintNum: 6.976, paint: "6.976 (10.567)", ratio: "1.0× 基线", cls: "d2d" },
+      { label: "React + Skia", rects: "8", area: "56.66%", render: "1.824 (2.566)", present: "0.292", paintNum: 2.343, paint: "2.343 (3.086)", ratio: "paint 快 2.65×", cls: "skia" },
+      { label: "React + Direct2D", rects: "0 (全帧)", area: "100%", render: "5.843 (6.869)", present: "0.351", paintNum: 6.201, paint: "6.201 (7.330)", ratio: "1.0× 基线", cls: "d2d" }
+    ];
+
+    let activeFilter = "all";
+
+    function renderFilterSection() {
+      const filtered = activeFilter === "all" ? ROWS : ROWS.filter(r => r.group === activeFilter);
+      document.getElementById("beforeAfterBars").innerHTML = filtered.map(r => `
+        <div class="bar-group">
+          <div class="bar-title">
+            <span>[${r.mode}] ${r.scene} · <code>${r.metric}</code></span>
+            <span class="delta-good">${r.delta}</span>
+          </div>
+          <div class="bar-row">
+            <span>Before (12fa270)</span>
+            <div class="bar-track"><div class="bar-fill before" style="width:${Math.min(100, r.before / r.max * 100)}%"></div></div>
+            <span class="num">${r.before.toFixed(3)} ms</span>
+          </div>
+          <div class="bar-row">
+            <span>After (1f1af45)</span>
+            <div class="bar-track"><div class="bar-fill after" style="width:${Math.min(100, r.after / r.max * 100)}%"></div></div>
+            <span class="num"><strong>${r.after.toFixed(3)} ms</strong></span>
+          </div>
+        </div>
+      `).join("");
+
+      document.getElementById("beforeAfterTable").innerHTML = filtered.map(r => `
+        <tr>
+          <td>${r.mode}</td>
+          <td>${r.scene}</td>
+          <td><code>${r.metric}</code></td>
+          <td class="num">${r.before.toFixed(3)} ms</td>
+          <td class="num"><strong>${r.after.toFixed(3)} ms</strong></td>
+          <td class="delta-good">${r.delta}</td>
+          <td>${r.note}</td>
+        </tr>
+      `).join("");
+    }
+
+    function renderDayK() {
+      const maxP = 7.5;
+      document.getElementById("daykBars").innerHTML = DAYK.map(d => `
+        <div class="bar-group">
+          <div class="bar-title">
+            <span>${d.label} (dirtyArea ${d.area}, rects ${d.rects})</span>
+            <span class="${d.cls === "skia" ? "delta-good" : ""}">${d.ratio}</span>
+          </div>
+          <div class="bar-row">
+            <span>单帧 paintMs</span>
+            <div class="bar-track"><div class="bar-fill ${d.cls}" style="width:${Math.min(100, d.paintNum / maxP * 100)}%"></div></div>
+            <span class="num"><strong>${d.paintNum.toFixed(3)} ms</strong></span>
+          </div>
+        </div>
+      `).join("");
+
+      document.getElementById("daykTable").innerHTML = DAYK.map(d => `
+        <tr>
+          <td><strong>${d.label}</strong></td>
+          <td class="num">${d.rects}</td>
+          <td class="num">${d.area}</td>
+          <td class="num">${d.render}</td>
+          <td class="num">${d.present}</td>
+          <td class="num"><strong>${d.paint}</strong></td>
+          <td class="${d.cls === "skia" ? "delta-good" : ""}">${d.ratio}</td>
+        </tr>
+      `).join("");
+    }
+
+    document.querySelectorAll(".filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        activeFilter = btn.getAttribute("data-filter");
+        renderFilterSection();
+      });
+    });
+
+    renderFilterSection();
+    renderDayK();
+  </script>
+</body>
+</html>
