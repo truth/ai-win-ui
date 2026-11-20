@@ -118,6 +118,30 @@ return host->Run();
 - `.\build.ps1 -Configuration Release -Clean`
 - `.\build.ps1 -Run`
 
+### 清理编译缓存
+
+使用 `clean.ps1` 或 Windows 命令行入口 `clean.cmd`，只清理、不重新编译：
+
+```powershell
+# 预览待清理目录，不删除文件
+.\clean.ps1 -WhatIf
+
+# 删除编译产物及 CMake 缓存，下次构建会重新配置
+.\clean.ps1
+# 或在 cmd 中运行：clean.cmd
+
+# 同时删除 dist/ 打包产物
+.\clean.ps1 -IncludeDist
+```
+
+默认清理 `build/`（包含所有 CMake presets 输出）、`build_test/`、
+`test_parser/build/` 和 `.tmp-build/`；不存在的目录自动跳过。
+保留 `third_party/`、`lib/`、`resource/`、`vcpkg_installed/` 和默认的 `dist/`，
+不会删除已准备的第三方依赖。脚本以自身所在目录为基准，可以从其他工作目录调用，
+支持 `-Confirm` 逐项确认；检测到清理目录或其内容包含链接时拒绝清理，避免误删链接目标。
+运行前请先结束构建和相关程序，避免文件占用导致清理失败。
+与 `build.ps1 -Clean` 不同，clean 脚本不会在清理后立即重新构建。
+
 ## 自定义标题栏 / 异形窗口 / 样式目录
 
 默认仍使用系统标题栏。
