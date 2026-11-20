@@ -56,6 +56,7 @@ struct IReactBridge {
 using ReactBridgeFactory = std::unique_ptr<IReactBridge> (*)(
     IReactHostSurface& surface,
     const std::string& bundlePath,
+    const std::string& inlineBundleUtf8,
     bool watchMode);
 
 void RegisterReactBridgeFactory(ReactBridgeFactory factory);

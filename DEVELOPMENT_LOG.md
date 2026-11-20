@@ -2,6 +2,11 @@
 
 ## 2026-11-20
 
+- **React 双模式资源打包支持：外置 `assets.zip` 与单文件 EXE 内嵌 (`RT_RCDATA` + `inlineReactBundle`)**（分支 `feature/react-zip-and-exe-packaging`）
+  - **零拷贝内存 ZIP 解析 (`src/zip_resource_provider.h/.cpp`)**：新增 `mz_zip_reader_init_mem` 与 `ZipResourceProvider(const void*, size_t)`，支持直接从 Win32 `LockResource` 只读内存块解析 `Stored` ZIP 资源；
+  - **三级资源回退链与内联 JS 入口 (`src/ui_host.cpp`, `include/ai_win_ui/host.h`, `src/react/*`)**：`UiHost` 按 `外置 assets.zip` → `内嵌 EXE RT_RCDATA ("AI_WIN_UI_ASSETS_ZIP")` → `外置 resource/` 顺序回退（`--watch` 仍优先命中磁盘）；`HostCreateInfo` 新增 `inlineReactBundle` 支持直接编入 UTF-8 JS；
+  - **CMake 与打包脚本 (`CMakeLists.txt`, `scripts/package_react_app.ps1`)**：新增 `AI_WIN_UI_EMBED_ASSETS_ZIP` 编译选项及 `-Mode zip | exe | both` 一键打包脚本；`react_unit_test`（4/4 PASS）、`skia_unit_test`（4/4 PASS）、`run_ci_local.ps1 -SkipBuild`（7/7 PASS），且 `dist/react_stock/{zip,exe}` 在无 `resource/` 目录下均无头实测通过（262 节点，退出码 0）。
+
 - **Skia 文本 `SkTextBlob` 缓存与多脏矩形渲染优化 (Skia TextBlob LRU Cache & Multi-Dirty-Rect v1)**（分支 `feature/skia-textblob-dirty-region`，暂未合并）
   - **多脏矩形管线 (`DirtyRegion` + `SkRegion` + 局部 `BitBlt`)**：
     1. 新增 [`src/dirty_region.h`](src/dirty_region.h)（`ai_win_ui::DirtyRegion`：`kMaxRects = 8`、`kAdjacentMergeWasteArea = 2048.0f`、`kFullRepaintAreaRatio = 0.85f`），并在 [`src/renderer.h`](src/renderer.h) 扩展 `SetDirtyRects` / `GetDirtyRects` 与 `O(1)` 外接框前置过滤。

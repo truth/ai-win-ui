@@ -170,6 +170,7 @@ Full detail: `doc/layout-spec.md` + `doc/style-catalog.md`.
 - `scripts/build_react.ps1` — compile `.tsx` to QuickJS-ready `.bundle.js` via `bun build` (supports `-Watch`)
 - `scripts/run_react_demo.ps1` — build & run the React JSX Showcase (`-Renderer skia|direct2d`, `-Watch`)
 - **`scripts/run_stock_react.ps1`** — build & run the React Flush-style Stock Terminal (`-Renderer skia|direct2d`, `-Watch`)
+- **`scripts/package_react_app.ps1`** — package React apps in external `assets.zip` mode, single-file EXE `RT_RCDATA` embedded mode, or both (`-App showcase|stock`, `-Mode zip|exe|both`)
 - **`scripts/bench_react_vs_xml.ps1`** — automated XML vs React Release benchmark suite (Stock Terminal + 60Hz 100-Cell Stress + Rapid Typing)
 - **`scripts/bench_skia_dirty_region.ps1`** — automated Day-K 500ms disjoint-corner multi-dirty-rect Release benchmark
 

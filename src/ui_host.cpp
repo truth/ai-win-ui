@@ -660,6 +660,9 @@ public:
         m_reactBundlePath = std::move(bundlePathUtf8);
         m_reactWatch = watchMode;
     }
+    void SetInlineReactBundle(std::string bundleUtf8) {
+        m_inlineReactBundle = std::move(bundleUtf8);
+    }
     void SetInlineLayout(std::string utf8, bool isJson) {
         m_inlineLayoutXml = std::move(utf8);
         m_inlineLayoutIsJson = isJson;
@@ -1456,13 +1459,37 @@ private:
         const std::wstring zipPath = baseDir.empty() ? L"assets.zip" : baseDir + L"\\assets.zip";
         const std::wstring resourceDir = baseDir.empty() ? L"resource" : baseDir + L"\\resource";
 
+        std::unique_ptr<IResourceProvider> chainedProvider;
+        auto appendProvider = [&chainedProvider](std::unique_ptr<IResourceProvider> next) {
+            if (!next) return;
+            if (!chainedProvider) {
+                chainedProvider = std::move(next);
+            } else {
+                chainedProvider = std::make_unique<FallbackResourceProvider>(std::move(chainedProvider), std::move(next));
+            }
+        };
+
         auto zipProvider = std::make_unique<ZipResourceProvider>(zipPath);
-        auto dirProvider = std::make_unique<DirectoryResourceProvider>(resourceDir);
         if (zipProvider->IsValid()) {
-            m_resourceProvider = std::make_unique<FallbackResourceProvider>(std::move(zipProvider), std::move(dirProvider));
-        } else {
-            m_resourceProvider = std::move(dirProvider);
+            appendProvider(std::move(zipProvider));
         }
+
+        // Probe optional Stored assets.zip embedded inside the executable (RT_RCDATA).
+        const HMODULE resModule = m_instance ? m_instance : GetModuleHandleW(nullptr);
+        if (HRSRC resInfo = FindResourceW(resModule, L"AI_WIN_UI_ASSETS_ZIP", RT_RCDATA)) {
+            if (HGLOBAL resData = LoadResource(resModule, resInfo)) {
+                const DWORD resSize = SizeofResource(resModule, resInfo);
+                if (const void* resPtr = LockResource(resData); resPtr && resSize >= 22) {
+                    auto embeddedZip = std::make_unique<ZipResourceProvider>(resPtr, static_cast<size_t>(resSize));
+                    if (embeddedZip->IsValid()) {
+                        appendProvider(std::move(embeddedZip));
+                    }
+                }
+            }
+        }
+
+        appendProvider(std::make_unique<DirectoryResourceProvider>(resourceDir));
+        m_resourceProvider = std::move(chainedProvider);
         m_uiContext.resourceProvider = m_resourceProvider.get();
 
         m_uiContext.eventResolver = [this](const std::string& eventId) -> UIEventHandler {
@@ -1643,16 +1670,16 @@ private:
                     reactBundle = requestedUtf8;
                 }
             }
-            if (!reactBundle.empty()) {
+            if (!reactBundle.empty() || !m_inlineReactBundle.empty()) {
                 if (auto factory = ai_win_ui::GetReactBridgeFactory()) {
                     auto placeholder = std::make_unique<Panel>();
                     placeholder->padding = Thickness{0, 0, 0, 0};
                     placeholder->background = ColorFromHex(0x0B121A);
                     m_root = std::move(placeholder);
                     m_reactSurface = std::make_unique<ReactSurfaceAdapter>(*this);
-                    m_reactBridge = factory(*m_reactSurface, reactBundle, m_reactWatch);
+                    m_reactBridge = factory(*m_reactSurface, reactBundle, m_inlineReactBundle, m_reactWatch);
                     if (m_reactBridge) {
-                        m_activeLayoutPath = reactBundle;
+                        m_activeLayoutPath = !reactBundle.empty() ? reactBundle : "inline.react.js";
                         UpdateWindowTitle();
                         return;
                     }
@@ -3282,6 +3309,7 @@ private:
 
     // Embedder hooks (set via Set* before Initialize).
     std::string m_reactBundlePath;
+    std::string m_inlineReactBundle;
     bool m_reactWatch = false;
     bool m_reactInitialCommitDone = false;
     uint32_t m_reactWatchAccumMs = 0;
@@ -3618,6 +3646,9 @@ std::unique_ptr<Host> Host::Create(HINSTANCE instance, const HostCreateInfo& inf
             WideCharToMultiByte(CP_UTF8, 0, info.reactBundlePath, -1, utf8.data(), sz, nullptr, nullptr);
         }
         impl->host->SetReactBundle(std::move(utf8), info.reactWatch);
+    }
+    if (info.inlineReactBundle && info.inlineReactBundle[0]) {
+        impl->host->SetInlineReactBundle(info.inlineReactBundle);
     }
     if (info.inlineLayoutXml && info.inlineLayoutXml[0]) {
         impl->host->SetInlineLayout(info.inlineLayoutXml, info.inlineLayoutIsJson);

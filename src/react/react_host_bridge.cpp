@@ -14,8 +14,9 @@ namespace {
 std::unique_ptr<IReactBridge> CreateReactBridge(
     IReactHostSurface& surface,
     const std::string& bundlePath,
+    const std::string& inlineBundleUtf8,
     bool watchMode) {
-    return std::make_unique<ReactHostBridge>(surface, bundlePath, watchMode);
+    return std::make_unique<ReactHostBridge>(surface, bundlePath, inlineBundleUtf8, watchMode);
 }
 
 std::string ReadAllFileBytes(const std::filesystem::path& p) {
@@ -32,8 +33,15 @@ void RegisterWithHost() {
     ai_win_ui::RegisterReactBridgeFactory(&CreateReactBridge);
 }
 
-ReactHostBridge::ReactHostBridge(IReactHostSurface& surface, std::string bundlePath, bool watchMode)
-    : m_surface(surface), m_bundlePath(std::move(bundlePath)), m_watchMode(watchMode) {
+ReactHostBridge::ReactHostBridge(
+    IReactHostSurface& surface,
+    std::string bundlePath,
+    std::string inlineBundleUtf8,
+    bool watchMode)
+    : m_surface(surface),
+      m_bundlePath(std::move(bundlePath)),
+      m_inlineBundleUtf8(std::move(inlineBundleUtf8)),
+      m_watchMode(watchMode) {
     m_registry = std::make_unique<ReactNodeRegistry>(m_surface, [this](UiEvent&& ev) {
         if (m_jsRuntime && !m_destroyed.load(std::memory_order_acquire)) {
             m_jsRuntime->PostUiEvent(std::move(ev));
@@ -65,6 +73,11 @@ bool ReactHostBridge::LoadBundleContent(
     bool& outIsFile,
     std::filesystem::file_time_type& outMtime) const {
     outIsFile = false;
+    if (!m_inlineBundleUtf8.empty() && !m_watchMode) {
+        outScriptUtf8 = m_inlineBundleUtf8;
+        outSourceName = m_bundlePath.empty() ? "inline.bundle.js" : m_bundlePath;
+        return true;
+    }
     std::error_code ec;
     const std::filesystem::path direct(m_bundlePath);
     if (std::filesystem::exists(direct, ec) && std::filesystem::is_regular_file(direct, ec)) {

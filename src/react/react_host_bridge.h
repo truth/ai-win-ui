@@ -19,7 +19,11 @@ void RegisterWithHost();
 
 class ReactHostBridge final : public IReactBridge {
 public:
-    ReactHostBridge(IReactHostSurface& surface, std::string bundlePath, bool watchMode);
+    ReactHostBridge(
+        IReactHostSurface& surface,
+        std::string bundlePath,
+        std::string inlineBundleUtf8,
+        bool watchMode);
     ~ReactHostBridge() override;
 
     void OnCommitMessage() override;
@@ -34,6 +38,7 @@ private:
 
     IReactHostSurface& m_surface;
     std::string m_bundlePath;
+    std::string m_inlineBundleUtf8;
     bool m_watchMode = false;
     bool m_isFileBacked = false;
     std::filesystem::file_time_type m_lastWriteTime{};

@@ -79,6 +79,10 @@ struct HostCreateInfo {
     // and dev hot-reload flag (--watch).
     const wchar_t* reactBundlePath = nullptr;
     bool reactWatch = false;
+
+    // Optional in-memory UTF-8 React bundle script (for embedding JS directly into C++).
+    // When non-null and !reactWatch, runs directly without disk or ZIP lookup.
+    const char* inlineReactBundle = nullptr;
 };
 
 // One retained UI window (top-level or child of HostCreateInfo::parent).

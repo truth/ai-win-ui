@@ -1,9 +1,11 @@
 #include "react_bridge_iface.h"
+#include "react_host_bridge.h"
 #include "react_js_runtime.h"
 #include "react_node_registry.h"
 #include "react_protocol.h"
 #include "layout_engine.h"
 #include "ui.h"
+#include "zip_resource_provider.h"
 
 #include <cassert>
 #include <cstdio>
@@ -31,7 +33,8 @@ public:
     UIContext& Context() override { return m_context; }
     Theme* GetTheme() const override { return nullptr; }
     StyleCatalog* GetStyleCatalog() const override { return nullptr; }
-    IResourceProvider* GetResourceProvider() const override { return nullptr; }
+    IResourceProvider* GetResourceProvider() const override { return resourceProvider; }
+    IResourceProvider* resourceProvider = nullptr;
 
     void SetRootElement(std::unique_ptr<UIElement> root) override {
         m_root = std::move(root);
@@ -504,6 +507,110 @@ bool TestStockTerminalBundleAndFinancialChart() {
     return true;
 }
 
+std::vector<uint8_t> BuildSingleEntryStoredZip(const std::string& entryName, const std::string& content) {
+    auto write16 = [](std::vector<uint8_t>& buf, uint16_t v) {
+        buf.push_back(static_cast<uint8_t>(v & 0xFF));
+        buf.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+    };
+    auto write32 = [](std::vector<uint8_t>& buf, uint32_t v) {
+        buf.push_back(static_cast<uint8_t>(v & 0xFF));
+        buf.push_back(static_cast<uint8_t>((v >> 8) & 0xFF));
+        buf.push_back(static_cast<uint8_t>((v >> 16) & 0xFF));
+        buf.push_back(static_cast<uint8_t>((v >> 24) & 0xFF));
+    };
+    uint32_t crc = 0xFFFFFFFFu;
+    for (unsigned char ch : content) {
+        crc ^= ch;
+        for (int b = 0; b < 8; ++b) {
+            crc = (crc & 1u) ? ((crc >> 1) ^ 0xEDB88320u) : (crc >> 1);
+        }
+    }
+    crc ^= 0xFFFFFFFFu;
+
+    const uint32_t sz = static_cast<uint32_t>(content.size());
+    const uint16_t nameLen = static_cast<uint16_t>(entryName.size());
+    std::vector<uint8_t> zip;
+
+    // Local file header
+    write32(zip, 0x04034b50u);
+    write16(zip, 20);
+    write16(zip, 0);
+    write16(zip, 0);
+    write16(zip, 0);
+    write16(zip, 0);
+    write32(zip, crc);
+    write32(zip, sz);
+    write32(zip, sz);
+    write16(zip, nameLen);
+    write16(zip, 0);
+    zip.insert(zip.end(), entryName.begin(), entryName.end());
+    zip.insert(zip.end(), content.begin(), content.end());
+
+    const uint32_t cdOffset = static_cast<uint32_t>(zip.size());
+    // Central directory header
+    write32(zip, 0x02014b50u);
+    write16(zip, 20);
+    write16(zip, 20);
+    write16(zip, 0);
+    write16(zip, 0);
+    write16(zip, 0);
+    write16(zip, 0);
+    write32(zip, crc);
+    write32(zip, sz);
+    write32(zip, sz);
+    write16(zip, nameLen);
+    write16(zip, 0);
+    write16(zip, 0);
+    write16(zip, 0);
+    write16(zip, 0);
+    write32(zip, 0);
+    write32(zip, 0);
+    zip.insert(zip.end(), entryName.begin(), entryName.end());
+
+    const uint32_t cdSize = static_cast<uint32_t>(zip.size()) - cdOffset;
+    // EOCD
+    write32(zip, 0x06054b50u);
+    write16(zip, 0);
+    write16(zip, 0);
+    write16(zip, 1);
+    write16(zip, 1);
+    write32(zip, cdSize);
+    write32(zip, cdOffset);
+    write16(zip, 0);
+    return zip;
+}
+
+bool TestMemoryZipAndInlineReactBundle() {
+    auto check = [](bool cond, const char* msg) -> bool {
+        if (!cond) {
+            std::printf("  [FAIL] %s\n", msg);
+            return false;
+        }
+        return true;
+    };
+    const std::string fakeBundle = "var __zipLoaded = 1;";
+    const std::vector<uint8_t> zipBytes =
+        BuildSingleEntryStoredZip("react/in_mem.bundle.js", fakeBundle);
+
+    ZipResourceProvider memZip(zipBytes.data(), zipBytes.size());
+    if (!check(memZip.IsValid(), "in-memory ZipResourceProvider is valid")) return false;
+    if (!check(memZip.Exists("react/in_mem.bundle.js"), "in-memory ZIP finds react bundle")) return false;
+    if (!check(memZip.LoadText("react/in_mem.bundle.js") == fakeBundle, "in-memory ZIP LoadText parity")) return false;
+
+    // Verify ReactHostBridge inline bundle path + teardown without disk files
+    FakeSurface surface;
+    surface.resourceProvider = &memZip;
+    ai_win_ui::react::ReactHostBridge inlineBridge(surface, "inline.bundle.js", "var __ok = 1;", false);
+    inlineBridge.OnHostDestroyed();
+
+    // Verify ReactHostBridge ZIP resource-provider fallback path
+    ai_win_ui::react::ReactHostBridge zipBridge(surface, "react/in_mem.bundle.js", "", false);
+    zipBridge.OnHostDestroyed();
+
+    std::printf("[PASS] TestMemoryZipAndInlineReactBundle (zipBytes=%zu)\n", zipBytes.size());
+    return true;
+}
+
 } // namespace
 
 int main() {
@@ -517,6 +624,10 @@ int main() {
     }
     if (!TestStockTerminalBundleAndFinancialChart()) {
         std::printf("FAILED: TestStockTerminalBundleAndFinancialChart\n");
+        return 1;
+    }
+    if (!TestMemoryZipAndInlineReactBundle()) {
+        std::printf("FAILED: TestMemoryZipAndInlineReactBundle\n");
         return 1;
     }
     std::printf("ALL REACT UNIT TESTS PASSED\n");

@@ -45,6 +45,7 @@ struct mz_zip_archive_tag {
 };
 
 mz_uint64 mz_zip_reader_init_file(mz_zip_archive* pArchive, const char* pFilename, mz_uint flags);
+mz_uint64 mz_zip_reader_init_mem(mz_zip_archive* pArchive, const void* pMem, size_t size, mz_uint flags);
 void mz_zip_reader_end(mz_zip_archive* pArchive);
 int mz_zip_reader_get_num_files(mz_zip_archive* pArchive);
 int mz_zip_reader_file_stat(mz_zip_archive* pArchive, int file_index, mz_zip_archive_file_stat* pStat);
@@ -76,7 +77,9 @@ struct ZipFileEntry {
 };
 
 struct ZipState {
-    std::vector<uint8_t> data;
+    std::vector<uint8_t> ownedData;
+    const uint8_t* ptr = nullptr;
+    size_t size = 0;
     std::vector<ZipFileEntry> entries;
 };
 
@@ -108,15 +111,15 @@ static uint16_t ReadLE16(const uint8_t* data) {
 }
 
 static bool ParseCentralDirectory(ZipState& state) {
-    const size_t size = state.data.size();
-    if (size < 22) {
+    const size_t size = state.size;
+    if (!state.ptr || size < 22) {
         return false;
     }
 
     const uint32_t kEndOfCentralDir = 0x06054b50;
     size_t pos = size - 22;
     while (pos != SIZE_MAX) {
-        if (ReadLE32(&state.data[pos]) == kEndOfCentralDir) {
+        if (ReadLE32(state.ptr + pos) == kEndOfCentralDir) {
             break;
         }
         if (pos == 0) {
@@ -128,11 +131,11 @@ static bool ParseCentralDirectory(ZipState& state) {
         return false;
     }
 
-    const uint8_t* eocd = &state.data[pos];
+    const uint8_t* eocd = state.ptr + pos;
     uint16_t total_entries = ReadLE16(eocd + 10);
-    uint16_t cd_size = ReadLE16(eocd + 12);
+    uint32_t cd_size = ReadLE32(eocd + 12);
     uint32_t cd_offset = ReadLE32(eocd + 16);
-    if (cd_offset + cd_size > size) {
+    if (static_cast<uint64_t>(cd_offset) + cd_size > size) {
         return false;
     }
 
@@ -142,7 +145,7 @@ static bool ParseCentralDirectory(ZipState& state) {
         if (entryPos + 46 > size) {
             return false;
         }
-        const uint8_t* header = &state.data[entryPos];
+        const uint8_t* header = state.ptr + entryPos;
         if (ReadLE32(header) != kCentralDirSig) {
             return false;
         }
@@ -193,23 +196,23 @@ static void* ExtractFileToHeap(ZipState* state, int fileIndex, size_t* pSize) {
         return nullptr;
     }
     const ZipFileEntry& entry = state->entries[fileIndex];
-    if (entry.local_header_offset + 30 > state->data.size()) {
+    if (entry.local_header_offset + 30 > state->size) {
         return nullptr;
     }
-    const uint8_t* header = state->data.data() + entry.local_header_offset;
+    const uint8_t* header = state->ptr + entry.local_header_offset;
     if (ReadLE32(header) != 0x04034b50) {
         return nullptr;
     }
     uint16_t fileNameLen = ReadLE16(header + 26);
     uint16_t extraLen = ReadLE16(header + 28);
     size_t dataOffset = entry.local_header_offset + 30 + fileNameLen + extraLen;
-    if (dataOffset + entry.comp_size > state->data.size()) {
+    if (dataOffset + entry.comp_size > state->size) {
         return nullptr;
     }
     if (entry.method == 0) {
         void* out = mz_malloc(entry.comp_size);
         if (!out) return nullptr;
-        memcpy(out, state->data.data() + dataOffset, entry.comp_size);
+        memcpy(out, state->ptr + dataOffset, entry.comp_size);
         if (pSize) *pSize = entry.comp_size;
         return out;
     }
@@ -234,10 +237,28 @@ mz_uint64 mz_zip_reader_init_file(mz_zip_archive* pArchive, const char* pFilenam
         MultiByteToWideChar(CP_UTF8, 0, pFilename, -1, filePath.data(), size);
     }
     ZipState* state = new ZipState();
-    if (!ReadAllBytes(filePath, state->data)) {
+    if (!ReadAllBytes(filePath, state->ownedData)) {
         delete state;
         return 0;
     }
+    state->ptr = state->ownedData.data();
+    state->size = state->ownedData.size();
+    if (!ParseCentralDirectory(*state)) {
+        delete state;
+        return 0;
+    }
+    pArchive->m_pState = state;
+    return state->entries.size();
+}
+
+mz_uint64 mz_zip_reader_init_mem(mz_zip_archive* pArchive, const void* pMem, size_t size, mz_uint flags) {
+    (void)flags;
+    if (!pArchive || !pMem || size < 22) {
+        return 0;
+    }
+    ZipState* state = new ZipState();
+    state->ptr = static_cast<const uint8_t*>(pMem);
+    state->size = size;
     if (!ParseCentralDirectory(*state)) {
         delete state;
         return 0;
@@ -343,6 +364,23 @@ ZipResourceProvider::ZipResourceProvider(std::wstring zipFilePath)
     mz_zip_archive* archive = new mz_zip_archive();
     memset(archive, 0, sizeof(*archive));
     const size_t fileCount = mz_zip_reader_init_file(archive, utf8Path.c_str(), 0);
+    if (fileCount > 0) {
+        m_archive = archive;
+        m_isValid = true;
+    } else {
+        mz_zip_reader_end(archive);
+        delete archive;
+    }
+}
+
+ZipResourceProvider::ZipResourceProvider(const void* memoryData, size_t memorySize)
+    : m_archive(nullptr), m_isValid(false) {
+    if (!memoryData || memorySize < 22) {
+        return;
+    }
+    mz_zip_archive* archive = new mz_zip_archive();
+    memset(archive, 0, sizeof(*archive));
+    const size_t fileCount = mz_zip_reader_init_mem(archive, memoryData, memorySize, 0);
     if (fileCount > 0) {
         m_archive = archive;
         m_isValid = true;

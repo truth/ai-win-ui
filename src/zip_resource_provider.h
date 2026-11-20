@@ -7,6 +7,7 @@
 class ZipResourceProvider : public IResourceProvider {
 public:
     explicit ZipResourceProvider(std::wstring zipFilePath);
+    ZipResourceProvider(const void* memoryData, size_t memorySize);
     ~ZipResourceProvider();
 
     bool IsValid() const;
