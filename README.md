@@ -36,17 +36,23 @@
 
 - `doc/`：设计文档与集成说明
 - `lib/`：预编译依赖库存放位置
+- `react/`：零冗余 TypeScript React 运行时与 JSX 示例工程
+  - `react/runtime/`：自研微型 Reconciler、Hooks 与 19 个原生组件类型定义（含 `<FinancialChart>`）
+  - `react/demos/`：`react_showcase.tsx` 综合展示页与 `stock_terminal/` 同花顺股票终端
 - `resource/`：运行时资源目录
   - `resource/layouts/`：布局定义（XML / JSON）
+  - `resource/react/`：Bun 打包生成的 QuickJS-ng 运行时 `.bundle.js`
   - `resource/styles/`：跨文件命名样式（JSON catalog，`$style.xxx`）
   - `resource/themes/`：主题 tokens（`$color.x` 等）
   - `resource/images/` / `resource/icons/`：位图与 SVG
-- `src/`：源代码
+- `src/`：源代码（含 `src/react/` 双线程原生桥接层）
+- `third_party/`：第三方依赖源码（含内置 `third_party/quickjs-ng/` v0.18.0）
 - `build/`：CMake 构建输出
 
 ## 相关文档
 
 - `doc/README.md`：文档索引与现状快照
+- `doc/plan/2026-11-20-react-jsx-native-ui.md`：**React JSX 原生 UI 架构与同花顺股票终端方案**（QuickJS-ng + 双线程整型协议）
 - `doc/plan/2026-07-15-directui-productization-personas.md`：**产品化路线 · 分人物（R/L/C/S/H/Q）**（Wave1 已收口，Wave2 进行中）
 - `doc/plan/2026-07-16-embed-api-v1.md`：H5 嵌入 API 设计草案
 - `doc/layout-spec.md`：**布局 XML/JSON 规则**（含 `$style`、`$color`、ellipsis、VirtualListBox、Popup）
@@ -72,6 +78,26 @@ return host->Run();
 - 示例：`samples/sticky_notes`（便签）— 内联布局 XML + 托盘 + 多个浮动 layered 窗口 + 管理器  
   → `build/Debug/sticky_notes.exe`，说明见 `samples/sticky_notes/README.md`
 - 说明：`doc/plan/2026-07-16-embed-api-v1.md`、`CHANGELOG.md`
+
+## React JSX 原生 UI 与股票终端
+
+采用内置 **QuickJS-ng v0.18.0** + **双线程整型 `MutationBatch` 协议** + **自研轻量 TS 运行时**（无 React Native / DOM 冗余 JS），JSX 直连 C++ Yoga 排版与 Skia/Direct2D 绘制：
+
+```powershell
+# 1. 编译 TSX Bundle（支持 -Watch）
+.\scripts\build_react.ps1
+
+# 2. 启动 React JSX Showcase 演示（支持 -Watch 热重载 / -Renderer direct2d）
+.\scripts\run_react_demo.ps1 -Renderer skia
+
+# 3. 启动 React 版同花顺金融终端（含 500ms 零重排实时行情、分时/K线与键盘精灵）
+.\scripts\run_stock_react.ps1 -Renderer skia
+
+# 4. 运行 React 桥接与组件单元测试
+.\build\Debug\react_unit_test.exe
+```
+
+详细架构与接口说明见：`doc/plan/2026-11-20-react-jsx-native-ui.md`。
 
 ## 本地 CI（Q8）+ GitHub 绿勾
 
@@ -181,6 +207,7 @@ return host->Run();
 | `AI_WIN_UI_THEME` | 主题 JSON |
 | `AI_WIN_UI_STYLES` | 额外合并的 styles JSON |
 | `AI_WIN_UI_SIZE` | 客户区 `WxH`（异形小窗） |
+| `AI_WIN_UI_REACT` | 次级/子进程扩展隔离变量（或用 `--react <bundle.js>` 启动 `.bundle.js`） |
 
 布局里 `style` 的三种写法与 XML/JSON 差异见 `doc/layout-spec.md`、`doc/style-catalog.md`。
 Chrome / 多进程异形见 `doc/window-chrome.md`。

@@ -1,6 +1,7 @@
 #include "react_host_bridge.h"
 
 #include "application.h"
+#include "frame_profiler.h"
 #include "resource_provider.h"
 
 #include <fstream>
@@ -130,7 +131,13 @@ void ReactHostBridge::OnCommitMessage() {
         batches.swap(m_commitQueue);
     }
     for (auto& batch : batches) {
+        const char* trigger = batch.commitTrigger;
+        const double jsMs = batch.jsExecMs;
+        const double originMs = batch.originEventMs;
+        const double applyBegin = ai_win_ui::FrameProfiler::NowMs();
         m_registry->ApplyBatch(std::move(batch));
+        const double applyMs = std::max(0.0, ai_win_ui::FrameProfiler::NowMs() - applyBegin);
+        m_surface.RecordReactCommitTiming(trigger, jsMs, applyMs, originMs);
     }
 }
 
@@ -185,6 +192,23 @@ void ReactHostBridge::TickHotReload() {
         OutputDebugStringA(("[ReactHostBridge] Hot-reloading bundle: " + target.string() + "\n").c_str());
         ReloadBundle();
     }
+}
+
+bool ReactHostBridge::OnKeyDown(WPARAM keyCode, bool isTextInputFocused) {
+    if (m_destroyed.load(std::memory_order_acquire) || !m_jsRuntime) {
+        return false;
+    }
+    if (isTextInputFocused && keyCode != VK_F5 && keyCode != VK_ESCAPE) {
+        return false;
+    }
+    UiEvent ev;
+    ev.nodeId = 0;
+    ev.type = EventTypeId::KeyDown;
+    ev.intVal = static_cast<int32_t>(keyCode);
+    ev.boolVal = isTextInputFocused;
+    ev.timestampMs = ai_win_ui::FrameProfiler::NowMs();
+    m_jsRuntime->PostUiEvent(std::move(ev));
+    return false;
 }
 
 } // namespace ai_win_ui::react

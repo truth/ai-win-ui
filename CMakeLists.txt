@@ -282,6 +282,9 @@ if(AI_WIN_UI_BUILD_SAMPLES)
     # 金融看盘终端 — stock_terminal sample
     ai_win_ui_add_app(stock_terminal samples/stock_terminal/main.cpp)
 
+    # XML 60Hz 100-cell benchmark target
+    ai_win_ui_add_app(perf_stress_xml samples/perf_stress_xml/main.cpp)
+
     ai_win_ui_add_app(embed_host samples/embed_host/main.cpp)
 
     # 便签 — sticky-notes desktop app (multi-file).

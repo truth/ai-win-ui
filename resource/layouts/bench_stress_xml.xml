@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Panel direction="column" padding="10,10,10,10" spacing="6" background="#0B111A" alignItems="stretch">
+  <Panel direction="row" height="32" padding="0,0,0,0" spacing="10" alignItems="center">
+    <Label text="XML vs React 60Hz Stress Board (100 Fixed Cells + Rapid Typing)" fontSize="14" color="#E2E8F0" bold="true" width="430" height="22" />
+    <Label id="stress_tick_label" text="Ticks: 0 | Sum: 0.00" fontSize="13" color="#38BDF8" width="210" height="22" />
+    <TextInput id="stress_input" text="" placeholder="Type rapid characters..." width="300" height="26" fontSize="12" background="#162032" textColor="#F8FAFC" borderColor="#334155" />
+  </Panel>
+
+  <Panel direction="column" padding="4,4,4,4" spacing="4" background="#0F172A" alignItems="stretch">
+    <Panel direction="row" height="24" padding="0,0,0,0" spacing="4" alignItems="center">
+      <Label id="cell_0" text="100.00" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_1" text="100.13" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_2" text="100.26" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_3" text="100.39" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_4" text="100.52" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_5" text="100.65" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_6" text="100.78" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_7" text="100.91" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_8" text="101.04" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_9" text="101.17" fontSize="12" color="#22C55E" width="92" height="22" />
+    </Panel>
+    <Panel direction="row" height="24" padding="0,0,0,0" spacing="4" alignItems="center">
+      <Label id="cell_10" text="101.30" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_11" text="101.43" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_12" text="101.56" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_13" text="101.69" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_14" text="101.82" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_15" text="101.95" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_16" text="102.08" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_17" text="102.21" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_18" text="102.34" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_19" text="102.47" fontSize="12" color="#22C55E" width="92" height="22" />
+    </Panel>
+    <Panel direction="row" height="24" padding="0,0,0,0" spacing="4" alignItems="center">
+      <Label id="cell_20" text="102.60" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_21" text="102.73" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_22" text="102.86" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_23" text="102.99" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_24" text="103.12" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_25" text="103.25" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_26" text="103.38" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_27" text="103.51" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_28" text="103.64" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_29" text="103.77" fontSize="12" color="#22C55E" width="92" height="22" />
+    </Panel>
+    <Panel direction="row" height="24" padding="0,0,0,0" spacing="4" alignItems="center">
+      <Label id="cell_30" text="103.90" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_31" text="104.03" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_32" text="104.16" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_33" text="104.29" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_34" text="104.42" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_35" text="104.55" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_36" text="104.68" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_37" text="104.81" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_38" text="104.94" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_39" text="105.07" fontSize="12" color="#22C55E" width="92" height="22" />
+    </Panel>
+    <Panel direction="row" height="24" padding="0,0,0,0" spacing="4" alignItems="center">
+      <Label id="cell_40" text="105.20" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_41" text="105.33" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_42" text="105.46" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_43" text="105.59" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_44" text="105.72" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_45" text="105.85" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_46" text="105.98" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_47" text="106.11" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_48" text="106.24" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_49" text="106.37" fontSize="12" color="#22C55E" width="92" height="22" />
+    </Panel>
+    <Panel direction="row" height="24" padding="0,0,0,0" spacing="4" alignItems="center">
+      <Label id="cell_50" text="106.50" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_51" text="106.63" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_52" text="106.76" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_53" text="106.89" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_54" text="107.02" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_55" text="107.15" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_56" text="107.28" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_57" text="107.41" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_58" text="107.54" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_59" text="107.67" fontSize="12" color="#22C55E" width="92" height="22" />
+    </Panel>
+    <Panel direction="row" height="24" padding="0,0,0,0" spacing="4" alignItems="center">
+      <Label id="cell_60" text="107.80" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_61" text="107.93" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_62" text="108.06" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_63" text="108.19" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_64" text="108.32" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_65" text="108.45" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_66" text="108.58" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_67" text="108.71" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_68" text="108.84" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_69" text="108.97" fontSize="12" color="#22C55E" width="92" height="22" />
+    </Panel>
+    <Panel direction="row" height="24" padding="0,0,0,0" spacing="4" alignItems="center">
+      <Label id="cell_70" text="109.10" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_71" text="109.23" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_72" text="109.36" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_73" text="109.49" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_74" text="109.62" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_75" text="109.75" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_76" text="109.88" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_77" text="110.01" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_78" text="110.14" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_79" text="110.27" fontSize="12" color="#22C55E" width="92" height="22" />
+    </Panel>
+    <Panel direction="row" height="24" padding="0,0,0,0" spacing="4" alignItems="center">
+      <Label id="cell_80" text="110.40" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_81" text="110.53" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_82" text="110.66" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_83" text="110.79" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_84" text="110.92" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_85" text="111.05" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_86" text="111.18" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_87" text="111.31" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_88" text="111.44" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_89" text="111.57" fontSize="12" color="#22C55E" width="92" height="22" />
+    </Panel>
+    <Panel direction="row" height="24" padding="0,0,0,0" spacing="4" alignItems="center">
+      <Label id="cell_90" text="111.70" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_91" text="111.83" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_92" text="111.96" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_93" text="112.09" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_94" text="112.22" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_95" text="112.35" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_96" text="112.48" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_97" text="112.61" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_98" text="112.74" fontSize="12" color="#22C55E" width="92" height="22" />
+      <Label id="cell_99" text="112.87" fontSize="12" color="#22C55E" width="92" height="22" />
+    </Panel>
+  </Panel>
+</Panel>
+

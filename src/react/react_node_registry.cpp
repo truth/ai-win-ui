@@ -1,5 +1,6 @@
 #include "react_node_registry.h"
 
+#include "frame_profiler.h"
 #include "layout_parser.h"
 #include "style_catalog.h"
 #include "theme.h"
@@ -217,6 +218,9 @@ void ReactNodeRegistry::CreateNode(uint32_t nodeId, NodeTypeId typeId) {
         case NodeTypeId::TreeItem:
             el = std::make_unique<TreeItem>();
             break;
+        case NodeTypeId::FinancialChart:
+            el = std::make_unique<FinancialChart>();
+            break;
         default:
             return;
     }
@@ -362,6 +366,13 @@ void ReactNodeRegistry::SetRoot(uint32_t nodeId) {
     m_surface.SetRootElement(std::move(rootOwned));
 }
 
+void ReactNodeRegistry::EmitEvent(UiEvent&& ev) {
+    ev.timestampMs = ai_win_ui::FrameProfiler::NowMs();
+    if (m_eventSink) {
+        m_eventSink(std::move(ev));
+    }
+}
+
 void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
     auto it = m_nodes.find(nodeId);
     if (it == m_nodes.end() || !it->second.ptr) {
@@ -380,7 +391,7 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
                         ev.nodeId = nodeId;
                         ev.type = EventTypeId::Click;
                         ev.eventSeq = NextEventSeq(nodeId);
-                        if (m_eventSink) m_eventSink(std::move(ev));
+                        EmitEvent(std::move(ev));
                     });
                 } else {
                     btn->SetOnClick(nullptr);
@@ -397,7 +408,7 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
                         ev.type = EventTypeId::TextChanged;
                         ev.eventSeq = NextEventSeq(nodeId);
                         ev.strVal = Utf16ToUtf8(txt);
-                        if (m_eventSink) m_eventSink(std::move(ev));
+                        EmitEvent(std::move(ev));
                     };
                 } else {
                     ti->onTextChanged = nullptr;
@@ -409,7 +420,7 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
                         ev.type = EventTypeId::Submit;
                         ev.eventSeq = NextEventSeq(nodeId);
                         ev.strVal = Utf16ToUtf8(txt);
-                        if (m_eventSink) m_eventSink(std::move(ev));
+                        EmitEvent(std::move(ev));
                     };
                 } else {
                     ti->onSubmit = nullptr;
@@ -426,7 +437,7 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
                         ev.type = EventTypeId::Change;
                         ev.eventSeq = NextEventSeq(nodeId);
                         ev.boolVal = sw->checked;
-                        if (m_eventSink) m_eventSink(std::move(ev));
+                        EmitEvent(std::move(ev));
                     };
                 } else {
                     sw->onChange = nullptr;
@@ -443,7 +454,7 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
                         ev.type = EventTypeId::Change;
                         ev.eventSeq = NextEventSeq(nodeId);
                         ev.boolVal = checked;
-                        if (m_eventSink) m_eventSink(std::move(ev));
+                        EmitEvent(std::move(ev));
                     };
                 } else {
                     cb->onChange = nullptr;
@@ -460,7 +471,7 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
                         ev.type = EventTypeId::Change;
                         ev.eventSeq = NextEventSeq(nodeId);
                         ev.numVal = static_cast<double>(val);
-                        if (m_eventSink) m_eventSink(std::move(ev));
+                        EmitEvent(std::move(ev));
                     };
                 } else {
                     sl->onChange = nullptr;
@@ -476,7 +487,7 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
                         ev.nodeId = nodeId;
                         ev.type = EventTypeId::Click;
                         ev.eventSeq = NextEventSeq(nodeId);
-                        if (m_eventSink) m_eventSink(std::move(ev));
+                        EmitEvent(std::move(ev));
                     };
                 } else {
                     bi->onClick = nullptr;
@@ -494,7 +505,7 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
                         ev.eventSeq = NextEventSeq(nodeId);
                         ev.intVal = page;
                         ev.intVal2 = pageSize;
-                        if (m_eventSink) m_eventSink(std::move(ev));
+                        EmitEvent(std::move(ev));
                     };
                 } else {
                     pg->onPageChange = nullptr;
@@ -514,7 +525,7 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
                         ev.eventSeq = NextEventSeq(nodeId);
                         ev.intVal = static_cast<int32_t>(itemNodeId);
                         ev.strVal = Utf16ToUtf8(label);
-                        if (m_eventSink) m_eventSink(std::move(ev));
+                        EmitEvent(std::move(ev));
                     };
                 } else {
                     tv->onSelect = nullptr;
@@ -529,7 +540,7 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
                         ev.eventSeq = NextEventSeq(nodeId);
                         ev.intVal = static_cast<int32_t>(itemNodeId);
                         ev.boolVal = checked;
-                        if (m_eventSink) m_eventSink(std::move(ev));
+                        EmitEvent(std::move(ev));
                     };
                 } else {
                     tv->onCheck = nullptr;
@@ -1560,6 +1571,48 @@ void ReactNodeRegistry::ApplyProp(
             }
             break;
         }
+        case NodeTypeId::FinancialChart: {
+            auto* fc = static_cast<FinancialChart*>(el);
+            switch (prop) {
+                case PropId::ChartMode: {
+                    const std::string m = ToLowerAscii(op.strVal);
+                    if (m == "candlestick" || m == "kline") {
+                        fc->SetChartMode(FinancialChartMode::Candlestick);
+                    } else {
+                        fc->SetChartMode(FinancialChartMode::TimeSharing);
+                    }
+                    touchPaint();
+                    break;
+                }
+                case PropId::PreClose:
+                    fc->SetPreClose(static_cast<float>(op.numVal));
+                    touchPaint();
+                    break;
+                case PropId::ModernTheme:
+                    fc->SetThemeMode(op.boolVal);
+                    touchPaint();
+                    break;
+                case PropId::ShowCrosshair:
+                    fc->showCrosshair = op.boolVal;
+                    touchPaint();
+                    break;
+                case PropId::ShowHeaderInfo:
+                    fc->showHeaderInfo = op.boolVal;
+                    touchPaint();
+                    break;
+                case PropId::SymbolName:
+                    fc->symbolName = LayoutParser::Utf8ToUtf16(op.strVal);
+                    touchPaint();
+                    break;
+                case PropId::PeriodLabel:
+                    fc->periodLabel = LayoutParser::Utf8ToUtf16(op.strVal);
+                    touchPaint();
+                    break;
+                default:
+                    break;
+            }
+            break;
+        }
         default:
             break;
     }
@@ -1633,6 +1686,69 @@ void ReactNodeRegistry::ApplyBatch(MutationBatch&& batch) {
                 ResetTree();
                 structuralOrLayoutChanged = true;
                 break;
+            case MutationOpType::ChartSetPoints: {
+                if (auto* fc = dynamic_cast<FinancialChart*>(FindNode(op.nodeId))) {
+                    std::vector<FinancialPoint> pts;
+                    pts.reserve(op.chartPoints.size());
+                    for (const auto& p : op.chartPoints) {
+                        FinancialPoint fp;
+                        fp.price = p.price;
+                        fp.leadPrice = p.leadPrice;
+                        fp.avgPrice = p.avgPrice;
+                        fp.volume = p.volume;
+                        fp.indicator1 = p.indicator1;
+                        fp.indicator2 = p.indicator2;
+                        fp.isUp = p.isUp;
+                        fp.timeStr = p.timeStr;
+                        pts.push_back(std::move(fp));
+                    }
+                    fc->SetPoints(std::move(pts));
+                }
+                break;
+            }
+            case MutationOpType::ChartAppendPoint: {
+                if (!op.chartPoints.empty()) {
+                    if (auto* fc = dynamic_cast<FinancialChart*>(FindNode(op.nodeId))) {
+                        const auto& p = op.chartPoints.front();
+                        FinancialPoint fp;
+                        fp.price = p.price;
+                        fp.leadPrice = p.leadPrice;
+                        fp.avgPrice = p.avgPrice;
+                        fp.volume = p.volume;
+                        fp.indicator1 = p.indicator1;
+                        fp.indicator2 = p.indicator2;
+                        fp.isUp = p.isUp;
+                        fp.timeStr = p.timeStr;
+                        if (op.boolVal) {
+                            fc->UpdateLastPoint(fp);
+                        } else {
+                            fc->AppendPoint(fp);
+                        }
+                    }
+                }
+                break;
+            }
+            case MutationOpType::ChartSetCandles: {
+                if (auto* fc = dynamic_cast<FinancialChart*>(FindNode(op.nodeId))) {
+                    std::vector<CandleBar> bars;
+                    bars.reserve(op.chartCandles.size());
+                    for (const auto& c : op.chartCandles) {
+                        CandleBar cb;
+                        cb.date = c.date;
+                        cb.open = c.open;
+                        cb.high = c.high;
+                        cb.low = c.low;
+                        cb.close = c.close;
+                        cb.volume = c.volume;
+                        cb.ma5 = c.ma5;
+                        cb.ma10 = c.ma10;
+                        cb.ma20 = c.ma20;
+                        bars.push_back(std::move(cb));
+                    }
+                    fc->SetCandles(std::move(bars));
+                }
+                break;
+            }
         }
     }
 

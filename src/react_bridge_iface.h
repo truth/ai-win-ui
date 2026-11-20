@@ -36,6 +36,11 @@ struct IReactHostSurface {
         const std::wstring& chrome,
         const std::wstring& size) = 0;
     virtual void NotifyFirstReactCommitReady() = 0;
+    virtual void RecordReactCommitTiming(
+        const char* /*trigger*/,
+        double /*jsMs*/,
+        double /*applyMs*/,
+        double /*originEventMs*/) {}
 };
 
 struct IReactBridge {
@@ -45,6 +50,7 @@ struct IReactBridge {
     virtual void OnHostDestroyed() = 0;
     virtual bool ReloadBundle() = 0;
     virtual void TickHotReload() = 0;
+    virtual bool OnKeyDown(WPARAM /*keyCode*/, bool /*isTextInputFocused*/) { return false; }
 };
 
 using ReactBridgeFactory = std::unique_ptr<IReactBridge> (*)(

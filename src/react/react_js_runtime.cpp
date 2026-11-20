@@ -1,4 +1,5 @@
 #include "react_js_runtime.h"
+#include "frame_profiler.h"
 
 extern "C" {
 #include "quickjs.h"
@@ -309,6 +310,155 @@ JSValue JsNativeOpenDemo(JSContext* ctx, JSValueConst, int argc, JSValueConst* a
     return JS_UNDEFINED;
 }
 
+float ReadJsPropFloat(JSContext* ctx, JSValueConst obj, const char* name, float fallback = 0.0f) {
+    JSValue v = JS_GetPropertyStr(ctx, obj, name);
+    double out = static_cast<double>(fallback);
+    if (!JS_IsUndefined(v) && !JS_IsNull(v)) {
+        JS_ToFloat64(ctx, &out, v);
+    }
+    JS_FreeValue(ctx, v);
+    return static_cast<float>(out);
+}
+
+bool ReadJsPropBool(JSContext* ctx, JSValueConst obj, const char* name, bool fallback = false) {
+    JSValue v = JS_GetPropertyStr(ctx, obj, name);
+    bool out = fallback;
+    if (!JS_IsUndefined(v) && !JS_IsNull(v)) {
+        const int b = JS_ToBool(ctx, v);
+        if (b >= 0) out = (b != 0);
+    }
+    JS_FreeValue(ctx, v);
+    return out;
+}
+
+std::string ReadJsPropStr(JSContext* ctx, JSValueConst obj, const char* name) {
+    JSValue v = JS_GetPropertyStr(ctx, obj, name);
+    std::string out;
+    if (!JS_IsUndefined(v) && !JS_IsNull(v)) {
+        size_t len = 0;
+        const char* s = JS_ToCStringLen(ctx, &len, v);
+        if (s) {
+            out.assign(s, len);
+            JS_FreeCString(ctx, s);
+        }
+    }
+    JS_FreeValue(ctx, v);
+    return out;
+}
+
+bool ReadPointFromJs(JSContext* ctx, JSValueConst obj, ChartPointData& out) {
+    if (!JS_IsObject(obj)) return false;
+    out.price = ReadJsPropFloat(ctx, obj, "price");
+    out.leadPrice = ReadJsPropFloat(ctx, obj, "leadPrice");
+    out.avgPrice = ReadJsPropFloat(ctx, obj, "avgPrice");
+    out.volume = ReadJsPropFloat(ctx, obj, "volume");
+    out.indicator1 = ReadJsPropFloat(ctx, obj, "indicator1");
+    out.indicator2 = ReadJsPropFloat(ctx, obj, "indicator2");
+    out.isUp = ReadJsPropBool(ctx, obj, "isUp", true);
+    out.timeStr = ReadJsPropStr(ctx, obj, "timeStr");
+    return true;
+}
+
+bool ReadCandleFromJs(JSContext* ctx, JSValueConst obj, ChartCandleData& out) {
+    if (!JS_IsObject(obj)) return false;
+    out.date = ReadJsPropStr(ctx, obj, "date");
+    out.open = ReadJsPropFloat(ctx, obj, "open");
+    out.high = ReadJsPropFloat(ctx, obj, "high");
+    out.low = ReadJsPropFloat(ctx, obj, "low");
+    out.close = ReadJsPropFloat(ctx, obj, "close");
+    out.volume = ReadJsPropFloat(ctx, obj, "volume");
+    out.ma5 = ReadJsPropFloat(ctx, obj, "ma5");
+    out.ma10 = ReadJsPropFloat(ctx, obj, "ma10");
+    out.ma20 = ReadJsPropFloat(ctx, obj, "ma20");
+    return true;
+}
+
+JSValue JsNativeChartSetPoints(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 2) return JS_UNDEFINED;
+    uint32_t nodeId = 0;
+    if (JS_ToUint32(ctx, &nodeId, argv[0]) != 0 || !JS_IsObject(argv[1])) {
+        return JS_UNDEFINED;
+    }
+    JSValue lenVal = JS_GetPropertyStr(ctx, argv[1], "length");
+    uint32_t len = 0;
+    JS_ToUint32(ctx, &len, lenVal);
+    JS_FreeValue(ctx, lenVal);
+    const uint32_t count = std::min<uint32_t>(len, 100000u);
+
+    MutationOp op;
+    op.type = MutationOpType::ChartSetPoints;
+    op.nodeId = nodeId;
+    op.chartPoints.reserve(count);
+    for (uint32_t i = 0; i < count; ++i) {
+        JSValue item = JS_GetPropertyUint32(ctx, argv[1], i);
+        ChartPointData pt;
+        if (ReadPointFromJs(ctx, item, pt)) {
+            op.chartPoints.push_back(std::move(pt));
+        }
+        JS_FreeValue(ctx, item);
+    }
+    if (auto* rt = GetRt(ctx)) {
+        rt->NativePushOp(std::move(op));
+    }
+    return JS_UNDEFINED;
+}
+
+JSValue JsNativeChartAppendPoint(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 2) return JS_UNDEFINED;
+    uint32_t nodeId = 0;
+    if (JS_ToUint32(ctx, &nodeId, argv[0]) != 0 || !JS_IsObject(argv[1])) {
+        return JS_UNDEFINED;
+    }
+    bool replaceLast = false;
+    if (argc >= 3) {
+        const int b = JS_ToBool(ctx, argv[2]);
+        if (b > 0) replaceLast = true;
+    }
+    ChartPointData pt;
+    if (!ReadPointFromJs(ctx, argv[1], pt)) {
+        return JS_UNDEFINED;
+    }
+    if (auto* rt = GetRt(ctx)) {
+        MutationOp op;
+        op.type = MutationOpType::ChartAppendPoint;
+        op.nodeId = nodeId;
+        op.boolVal = replaceLast;
+        op.chartPoints.push_back(std::move(pt));
+        rt->NativePushOp(std::move(op));
+    }
+    return JS_UNDEFINED;
+}
+
+JSValue JsNativeChartSetCandles(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 2) return JS_UNDEFINED;
+    uint32_t nodeId = 0;
+    if (JS_ToUint32(ctx, &nodeId, argv[0]) != 0 || !JS_IsObject(argv[1])) {
+        return JS_UNDEFINED;
+    }
+    JSValue lenVal = JS_GetPropertyStr(ctx, argv[1], "length");
+    uint32_t len = 0;
+    JS_ToUint32(ctx, &len, lenVal);
+    JS_FreeValue(ctx, lenVal);
+    const uint32_t count = std::min<uint32_t>(len, 100000u);
+
+    MutationOp op;
+    op.type = MutationOpType::ChartSetCandles;
+    op.nodeId = nodeId;
+    op.chartCandles.reserve(count);
+    for (uint32_t i = 0; i < count; ++i) {
+        JSValue item = JS_GetPropertyUint32(ctx, argv[1], i);
+        ChartCandleData bar;
+        if (ReadCandleFromJs(ctx, item, bar)) {
+            op.chartCandles.push_back(std::move(bar));
+        }
+        JS_FreeValue(ctx, item);
+    }
+    if (auto* rt = GetRt(ctx)) {
+        rt->NativePushOp(std::move(op));
+    }
+    return JS_UNDEFINED;
+}
+
 JSValue JsNativeLog(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
     std::ostringstream oss;
     oss << "[ReactJS]";
@@ -457,26 +607,58 @@ void ReactJsRuntime::RequestReload(std::string newBundleUtf8, std::string source
     m_cv.notify_one();
 }
 
+const char* EventTypeToTrigger(EventTypeId type) {
+    switch (type) {
+        case EventTypeId::Click: return "react_click";
+        case EventTypeId::KeyDown: return "react_key";
+        case EventTypeId::TextChanged:
+        case EventTypeId::Submit:
+        case EventTypeId::Change:
+        case EventTypeId::PageChange:
+        case EventTypeId::TreeSelect:
+        case EventTypeId::TreeCheck:
+            return "react_input";
+        default:
+            return "react_event";
+    }
+}
+
 bool ReactJsRuntime::InitSynchronouslyForTest() {
     return InitQuickJs();
 }
 
 bool ReactJsRuntime::EvalSynchronouslyForTest(const std::string& scriptUtf8, const std::string& sourceName) {
+    m_activeOriginEventMs = 0.0;
+    m_activeTrigger = "react_init";
+    m_activeJsStartMs = ai_win_ui::FrameProfiler::NowMs();
     const bool ok = EvalScript(scriptUtf8, sourceName);
     DrainMicrotasks();
+    m_activeJsStartMs = 0.0;
+    m_activeTrigger = "";
     return ok;
 }
 
 bool ReactJsRuntime::DispatchEventSynchronouslyForTest(const UiEvent& ev) {
+    m_activeOriginEventMs = ev.timestampMs;
+    m_activeTrigger = EventTypeToTrigger(ev.type);
+    m_activeJsStartMs = ai_win_ui::FrameProfiler::NowMs();
     DispatchEventToJs(ev);
     DrainMicrotasks();
+    m_activeOriginEventMs = 0.0;
+    m_activeJsStartMs = 0.0;
+    m_activeTrigger = "";
     return true;
 }
 
 bool ReactJsRuntime::StepTimersAndJobsSynchronouslyForTest(int64_t advanceMs) {
     m_testClockOffsetMs += std::max<int64_t>(0, advanceMs);
+    m_activeOriginEventMs = 0.0;
+    m_activeTrigger = "react_timer";
+    m_activeJsStartMs = ai_win_ui::FrameProfiler::NowMs();
     FireDueTimers();
     DrainMicrotasks();
+    m_activeJsStartMs = 0.0;
+    m_activeTrigger = "";
     return true;
 }
 
@@ -487,6 +669,9 @@ void ReactJsRuntime::ShutdownSynchronouslyForTest() {
 void ReactJsRuntime::NativeBeginBatch() {
     m_pendingBatch.ops.clear();
     m_pendingBatch.needsLayout = false;
+    m_pendingBatch.originEventMs = 0.0;
+    m_pendingBatch.jsExecMs = 0.0;
+    m_pendingBatch.commitTrigger = "";
     m_inBatch = true;
 }
 
@@ -496,6 +681,12 @@ void ReactJsRuntime::NativePushOp(MutationOp&& op) {
         if (op.type == MutationOpType::SetRoot) {
             single.needsLayout = true;
         }
+        single.originEventMs = m_activeOriginEventMs;
+        single.commitTrigger = m_activeTrigger;
+        if (m_activeJsStartMs > 0.0) {
+            single.jsExecMs = std::max(0.0, ai_win_ui::FrameProfiler::NowMs() - m_activeJsStartMs);
+        }
+        m_activeOriginEventMs = 0.0;
         single.ops.push_back(std::move(op));
         if (m_commitSink) m_commitSink(std::move(single));
         return;
@@ -507,11 +698,20 @@ void ReactJsRuntime::NativeEndBatch(bool needsLayout) {
     if (!m_inBatch) return;
     m_inBatch = false;
     m_pendingBatch.needsLayout = m_pendingBatch.needsLayout || needsLayout;
+    m_pendingBatch.originEventMs = m_activeOriginEventMs;
+    m_pendingBatch.commitTrigger = m_activeTrigger;
+    if (m_activeJsStartMs > 0.0) {
+        m_pendingBatch.jsExecMs = std::max(0.0, ai_win_ui::FrameProfiler::NowMs() - m_activeJsStartMs);
+    }
+    m_activeOriginEventMs = 0.0;
     if (!m_pendingBatch.ops.empty() && m_commitSink) {
         m_commitSink(std::move(m_pendingBatch));
     }
     m_pendingBatch.ops.clear();
     m_pendingBatch.needsLayout = false;
+    m_pendingBatch.originEventMs = 0.0;
+    m_pendingBatch.jsExecMs = 0.0;
+    m_pendingBatch.commitTrigger = "";
 }
 
 uint32_t ReactJsRuntime::AddTimerFromJs(JSContext* ctx, void* jsFuncPtr, int64_t delayMs, bool isInterval) {
@@ -619,6 +819,9 @@ void ReactJsRuntime::RegisterNativeBindings() {
     bindFn("endBatch", &JsNativeEndBatch, 1);
     bindFn("setTitle", &JsNativeSetTitle, 1);
     bindFn("openDemo", &JsNativeOpenDemo, 3);
+    bindFn("chartSetPoints", &JsNativeChartSetPoints, 2);
+    bindFn("chartAppendPoint", &JsNativeChartAppendPoint, 3);
+    bindFn("chartSetCandles", &JsNativeChartSetCandles, 2);
     bindFn("log", &JsNativeLog, 2);
 
     JS_SetPropertyStr(m_ctx, global, "__aiNative", nativeObj);
@@ -800,8 +1003,13 @@ int64_t ReactJsRuntime::NextTimerDelayMs() const {
 
 void ReactJsRuntime::WorkerMain(std::string initialBundle, std::string sourceName) {
     if (InitQuickJs()) {
+        m_activeOriginEventMs = 0.0;
+        m_activeTrigger = "react_init";
+        m_activeJsStartMs = ai_win_ui::FrameProfiler::NowMs();
         EvalScript(initialBundle, sourceName);
         DrainMicrotasks();
+        m_activeJsStartMs = 0.0;
+        m_activeTrigger = "";
     }
 
     while (true) {
@@ -845,19 +1053,35 @@ void ReactJsRuntime::WorkerMain(std::string initialBundle, std::string sourceNam
                 m_commitSink(std::move(resetBatch));
             }
             if (InitQuickJs()) {
+                m_activeOriginEventMs = 0.0;
+                m_activeTrigger = "react_init";
+                m_activeJsStartMs = ai_win_ui::FrameProfiler::NowMs();
                 EvalScript(reloadCode, reloadName);
                 DrainMicrotasks();
+                m_activeJsStartMs = 0.0;
+                m_activeTrigger = "";
             }
             continue;
         }
 
         for (const auto& ev : pendingEvents) {
+            m_activeOriginEventMs = ev.timestampMs;
+            m_activeTrigger = EventTypeToTrigger(ev.type);
+            m_activeJsStartMs = ai_win_ui::FrameProfiler::NowMs();
             DispatchEventToJs(ev);
             DrainMicrotasks();
+            m_activeOriginEventMs = 0.0;
+            m_activeJsStartMs = 0.0;
+            m_activeTrigger = "";
         }
 
+        m_activeOriginEventMs = 0.0;
+        m_activeTrigger = "react_timer";
+        m_activeJsStartMs = ai_win_ui::FrameProfiler::NowMs();
         FireDueTimers();
         DrainMicrotasks();
+        m_activeJsStartMs = 0.0;
+        m_activeTrigger = "";
     }
 
     DestroyQuickJs();

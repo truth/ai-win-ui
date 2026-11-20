@@ -80,6 +80,17 @@ public:
         InvalidateSelf(0.0f);
     }
 
+    void UpdateLastPoint(const FinancialPoint& pt) {
+        if (m_points.empty()) {
+            AppendPoint(pt);
+            return;
+        }
+        m_points.back() = pt;
+        m_geometryDirty = true;
+        RecalculateScale();
+        InvalidateSelf(0.0f);
+    }
+
     void ClearPoints() {
         m_points.clear();
         m_hoverIndex = -1;
@@ -127,6 +138,8 @@ public:
     bool showCrosshair = true;
     bool showHeaderInfo = true;
     bool modernTheme = false;
+    std::wstring symbolName = L"上证指数";
+    std::wstring periodLabel = L"日线 ▼";
 
     void SetThemeMode(bool modern) {
         modernTheme = modern;
@@ -672,7 +685,8 @@ private:
         Color valCol = diff >= 0 ? upCol : downCol;
 
         wchar_t buf[256];
-        swprintf_s(buf, L"上证指数 领先: %.2f  最新: %.2f  涨跌: %+.2f (%+.2f%%)  总手: %.0f  时间: %hs",
+        swprintf_s(buf, L"%ls 领先: %.2f  最新: %.2f  涨跌: %+.2f (%+.2f%%)  总手: %.0f  时间: %hs",
+                   symbolName.empty() ? L"上证指数" : symbolName.c_str(),
                    cur.leadPrice, cur.price, diff, pct, cur.volume,
                    cur.timeStr.empty() ? "15:00" : cur.timeStr.c_str());
 
@@ -805,10 +819,11 @@ private:
         opt.horizontalAlign = TextHorizontalAlign::Start;
         opt.verticalAlign = TextVerticalAlign::Center;
 
-        // 1. 主图顶部胶囊标签: "日线 ▼" + 均线数值 (对齐参考图)
+        // 1. 主图顶部胶囊标签: 周期文案 + 均线数值 (对齐参考图)
+        const wchar_t* periodTxt = periodLabel.empty() ? L"日线 ▼" : periodLabel.c_str();
         Rect badgeRect = Rect::Make(bounds.left + 8.0f, bounds.top + 3.0f, bounds.left + 58.0f, bounds.top + 21.0f);
         renderer.FillRoundedRect(badgeRect, ColorFromHex(0x8A6D00), 3.0f);
-        renderer.DrawTextW(L"日线 ▼", 4, badgeRect, ColorFromHex(0xFFFFFF), 10.5f, opt);
+        renderer.DrawTextW(periodTxt, static_cast<UINT32>(wcslen(periodTxt)), badgeRect, ColorFromHex(0xFFFFFF), 10.5f, opt);
 
         wchar_t ma5Buf[32], ma10Buf[32], ma20Buf[32];
         swprintf_s(ma5Buf, L"5: %.2f", cur.ma5);

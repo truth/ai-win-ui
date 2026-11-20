@@ -76,11 +76,11 @@ public:
     std::wstring lastTitle;
 };
 
-std::string LoadShowcaseBundle() {
+std::string LoadBundleFile(const char* relPath) {
     const std::filesystem::path candidates[] = {
-        std::filesystem::path("resource/react/react_demo.bundle.js"),
-        std::filesystem::path("../resource/react/react_demo.bundle.js"),
-        std::filesystem::path("../../resource/react/react_demo.bundle.js"),
+        std::filesystem::path(relPath),
+        std::filesystem::path("..") / relPath,
+        std::filesystem::path("../..") / relPath,
     };
     for (const auto& p : candidates) {
         if (std::filesystem::exists(p)) {
@@ -91,6 +91,10 @@ std::string LoadShowcaseBundle() {
         }
     }
     return {};
+}
+
+std::string LoadShowcaseBundle() {
+    return LoadBundleFile("resource/react/react_demo.bundle.js");
 }
 
 bool TestEventSeqSuppressionAndRegistry() {
@@ -409,6 +413,97 @@ bool TestShowcaseBundleExecutionAndDiff() {
     return true;
 }
 
+bool TestStockTerminalBundleAndFinancialChart() {
+    using namespace ai_win_ui::react;
+    auto check = [](bool cond, const char* msg) -> bool {
+        if (!cond) std::printf("[FAIL] %s\n", msg);
+        return cond;
+    };
+
+    const std::string bundle = LoadBundleFile("resource/react/stock_terminal.bundle.js");
+    if (bundle.empty()) {
+        std::printf("[FAIL] Missing resource/react/stock_terminal.bundle.js\n");
+        return false;
+    }
+
+    FakeSurface surface;
+    std::vector<UiEvent> emitted;
+    ReactNodeRegistry reg(surface, [&](UiEvent&& ev) { emitted.push_back(std::move(ev)); });
+    ReactJsRuntime js([&](MutationBatch&& batch) {
+        reg.ApplyBatch(std::move(batch));
+    });
+
+    if (!check(js.InitSynchronouslyForTest(), "stock InitSynchronouslyForTest")) return false;
+    if (!check(js.EvalSynchronouslyForTest(bundle, "stock_terminal.bundle.js"), "stock EvalSynchronouslyForTest")) {
+        return false;
+    }
+
+    auto* fc = dynamic_cast<FinancialChart*>(surface.RootElement() ? surface.RootElement()->FindElementByName("stock_chart") : nullptr);
+    if (!check(fc != nullptr, "stock_chart FinancialChart* located")) return false;
+    if (!check(fc->GetChartMode() == FinancialChartMode::TimeSharing, "initial mode is TimeSharing")) return false;
+    if (!check(fc->PointCount() >= 200, "initial PointCount >= 200")) return false;
+    if (!check(surface.lastTitle.find(L"同花顺金融终端") != std::wstring::npos, "window title synced")) return false;
+
+    // 500ms tick updates price, ticks and appends 1 point WITHOUT triggering Yoga relayout.
+    const int layoutBeforeTick = surface.layoutCount;
+    const size_t pointsBeforeTick = fc->PointCount();
+    js.StepTimersAndJobsSynchronouslyForTest(550);
+    if (!check(fc->PointCount() == pointsBeforeTick + 1, "500ms tick appended chart point")) {
+        return false;
+    }
+    if (surface.layoutCount != layoutBeforeTick) {
+        std::printf("[FAIL] 500ms tick triggered Yoga layout (%d -> %d)\n", layoutBeforeTick, surface.layoutCount);
+        return false;
+    }
+
+    // Locate period bar -> 2nd child is Day K button ("日K")
+    Button* dayKBtn = nullptr;
+    auto findPeriodBar = [&](auto& self, UIElement* node) -> void {
+        if (dayKBtn || !node) return;
+        const auto& ch = node->Children();
+        for (size_t i = 0; i + 1 < ch.size(); ++i) {
+            if (ch[i + 1].get() == fc) {
+                if (auto* periodBar = dynamic_cast<Panel*>(ch[i].get())) {
+                    if (periodBar->Children().size() >= 2) {
+                        dayKBtn = dynamic_cast<Button*>(periodBar->Children()[1].get());
+                    }
+                }
+                return;
+            }
+        }
+        for (const auto& c : ch) self(self, c.get());
+    };
+    findPeriodBar(findPeriodBar, surface.RootElement());
+    if (!check(dayKBtn != nullptr, "located Day K button")) return false;
+
+    const Rect b = dayKBtn->Bounds();
+    const float cx = (b.left + b.right) * 0.5f;
+    const float cy = (b.top + b.bottom) * 0.5f;
+    const size_t evBeforeClick = emitted.size();
+    dayKBtn->OnMouseDown(cx, cy);
+    dayKBtn->OnMouseUp(cx, cy);
+    if (!check(emitted.size() == evBeforeClick + 1, "Day K click emitted")) return false;
+    js.DispatchEventSynchronouslyForTest(emitted.back());
+
+    if (!check(fc->GetChartMode() == FinancialChartMode::Candlestick, "switched to Candlestick")) return false;
+    if (!check(fc->CandleCount() == 90, "loaded 90 Day K candles")) return false;
+
+    // Hotkey 'T' switches theme cleanly
+    if (!check(!fc->modernTheme, "initial chart theme is classic")) return false;
+    UiEvent keyT{};
+    keyT.nodeId = 0;
+    keyT.type = EventTypeId::KeyDown;
+    keyT.intVal = 'T';
+    keyT.boolVal = false;
+    js.DispatchEventSynchronouslyForTest(keyT);
+    if (!check(fc->modernTheme, "hotkey T toggled Modern theme")) return false;
+
+    js.ShutdownSynchronouslyForTest();
+    std::printf("[PASS] TestStockTerminalBundleAndFinancialChart (nodes=%zu, candles=%zu)\n",
+                reg.NodeCount(), fc->CandleCount());
+    return true;
+}
+
 } // namespace
 
 int main() {
@@ -418,6 +513,10 @@ int main() {
     }
     if (!TestShowcaseBundleExecutionAndDiff()) {
         std::printf("FAILED: TestShowcaseBundleExecutionAndDiff\n");
+        return 1;
+    }
+    if (!TestStockTerminalBundleAndFinancialChart()) {
+        std::printf("FAILED: TestStockTerminalBundleAndFinancialChart\n");
         return 1;
     }
     std::printf("ALL REACT UNIT TESTS PASSED\n");

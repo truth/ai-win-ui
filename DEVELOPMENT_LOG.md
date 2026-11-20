@@ -5,14 +5,15 @@
 - **React JSX 声明式 UI 运行时与双线程原生桥接 (React JSX Native UI v1)**（分支 `feature/react-jsx-ui`，暂未合并 `master`）
   - **零冗余 JS 运行时与引擎集成**：
     1. **Vendored QuickJS-ng (`v0.18.0`)** (`third_party/quickjs-ng/`)：引入 20 个纯 C 核心文件并构建静态库 `quickjs_ng`；通过 `src/react_bridge_iface.h` 纯虚接口与 `AI_WIN_UI_ENABLE_REACT=ON` 实现与 `ai_win_ui_lib` 完全解耦。
-    2. **自研微型 TypeScript React 运行时** (`react/runtime/`)：实现 `jsx`/`jsxs`/`Fragment`、`useState`/`useReducer`/`useEffect`/`useLayoutEffect`/`useMemo`/`useCallback`/`useRef`/`createContext`/`useContext` 与 Keyed VNode Diff；映射 18 个原生组件并内建 `Thickness` (`{x,y,left,top,right,bottom}` -> L,T,R,B) 与 React `<Panel>` 默认零内边距防护；借助 Bun (`1.3.6`) 实现 20ms 打包，运行时 minified 仅 **15.40 KB**（完整 Showcase 仅 **24.46 KB**）。
+    2. **自研微型 TypeScript React 运行时** (`react/runtime/`)：实现 `jsx`/`jsxs`/`Fragment`、`useState`/`useReducer`/`useEffect`/`useLayoutEffect`/`useMemo`/`useCallback`/`useRef`/`createContext`/`useContext`/`useWindowKeyDown` 与 Keyed VNode Diff；映射 19 个原生组件（含 `<FinancialChart>`）与 `<Spacer>`，内建 `Thickness` (`{x,y,left,top,right,bottom}` -> L,T,R,B) 与 React `<Panel>` 默认零内边距防护；借助 Bun (`1.3.6`) 实现 20ms 打包，运行时 minified 仅 **15.40 KB**（完整 Showcase 仅 **24.46 KB**，同花顺股票终端含行情引擎仅 **41.53 KB**）。
   - **双线程 Fabric 风格 Bridge (`ai_win_ui_react`)**：
     1. **专用 JS 工作线程 + 整型指令协议** (`src/react/`)：不走 RNW 式 JSON 字符串与 JS 侧 Yoga/桥接层，直接以整型 `nodeId` / `NodeTypeId` / `PropId` / `MutationBatch` 通过 `CommitQueue` + `PostMessageW(kMsgReactCommit)` 驱动 UI 线程 `ReactNodeRegistry`。
     2. **乐观 UI 优先 + `eventSeq`/`ackSeq` 抑制 + 快路径**：`TextInput`/`Slider`/`Switch`/`Checkbox`/`Pagination` 0ms 响应输入并以 per-node `eventSeq` 过滤 JS 过期回显；固定尺寸视觉属性更新走 `EndBatchUpdate(false)` 跳过 Yoga 重排；新增 `TextInput::SetTextPreserveCaret` 保持光标稳定。
   - **示例集成、热重载与测试**：
     - 创建 React Showcase (`react/demos/react_showcase.tsx` -> `resource/react/react_demo.bundle.js`)、独立示例 `samples/react_demo/`、`--react` / `--watch` 热重载参数及 `resource/layouts/demo_gallery.xml` 画廊入口；
-    - 新增单元测试 `samples/react_unit_test/main.cpp`，验证 `eventSeq` 过期拦截、视觉快路径、`InsertBefore` 重排、Keyed 列表反转/新增与 QuickJS 零泄漏销毁；
-    - `build.ps1` 编译 0 Error / 0 Warning，Skia & Direct2D（1280x840，91 节点 0 塌陷）无头冒烟正常，`run_ci_local.ps1 -SkipBuild` **7/7 项 100% PASS**。
+    - 新增 React 同花顺金融终端重写版 (`react/demos/stock_terminal/` -> `resource/react/stock_terminal.bundle.js`，minified 仅 **41.53 KB**)：在 C++ Bridge (`ai_win_ui_react`) 与 TS Runtime 暴露第 19 个原生控件 `<FinancialChart>`（整型 O(1) 增量点位追加 `chartAppendPoint` + 全量 `chartSetPoints`/`chartSetCandles`，零 JSON 序列化）与窗口级快捷键 `useWindowKeyDown`（`T` 双主题切换 / `F5` 分时刷新 / `ESC` 收起检索）；完整复刻顶部菜单/操作栏、左垂直快捷条、多周期切换（分时/日K/周K/月K/分钟线）、高密度 10×2 盘口、权重股贡献度点击切股、固定槽位短线精灵、跨市场状态栏与键盘精灵检索；
+    - 新增单元测试 `samples/react_unit_test/main.cpp`，验证 `eventSeq` 过期拦截、视觉快路径、`InsertBefore` 重排、Keyed 列表反转/新增、QuickJS 零泄漏销毁，以及股票终端 500ms Tick 零 Yoga 重排、日 K 线切换和 `T` 热键主题切换（`nodes=262, candles=90`）；
+    - `build.ps1` 编译 0 Error / 0 Warning，Skia & Direct2D（1280x840 showcase / 1280x820 stock_terminal 262 节点 0 塌陷）无头冒烟正常，`run_ci_local.ps1 -SkipBuild` **7/7 项 100% PASS**。
   - **设计归档**：
     - 归档设计方案至 [`doc/plan/2026-11-20-react-jsx-native-ui.md`](doc/plan/2026-11-20-react-jsx-native-ui.md)。
 

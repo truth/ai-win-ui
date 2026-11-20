@@ -221,6 +221,7 @@ public:
     }
 
     bool Initialize(HINSTANCE instance, int cmdShow) {
+        m_frameProfiler.MarkHostStart();
         m_instance = instance;
         m_cmdShow = cmdShow;
 
@@ -410,6 +411,7 @@ public:
         OnResize();
         LogEffectiveEnv();
         if (!m_reactBridge) {
+            m_frameProfiler.MarkContentReady();
             MaybeDumpMeasureTree();
             MaybeDumpTextMetrics();
         }
@@ -2987,6 +2989,12 @@ private:
                     InvalidateRect(m_hwnd, nullptr, FALSE);
                     return 0;
                 }
+                if (m_reactBridge) {
+                    const bool textInputFocused = (dynamic_cast<TextInput*>(m_focusedElement) != nullptr);
+                    if (m_reactBridge->OnKeyDown(wParam, textInputFocused)) {
+                        return 0;
+                    }
+                }
                 break;
             case WM_CHAR:
             case WM_IME_CHAR:
@@ -3138,6 +3146,13 @@ private:
         void NotifyFirstReactCommitReady() override {
             m_host.OnFirstReactCommitReady();
         }
+        void RecordReactCommitTiming(
+            const char* trigger,
+            double jsMs,
+            double applyMs,
+            double originEventMs) override {
+            m_host.m_frameProfiler.MarkReactCommit(trigger, jsMs, applyMs, originEventMs);
+        }
     private:
         UiHost& m_host;
     };
@@ -3183,6 +3198,7 @@ private:
     void OnFirstReactCommitReady() {
         if (!m_reactInitialCommitDone) {
             m_reactInitialCommitDone = true;
+            m_frameProfiler.MarkContentReady();
             MaybeDumpMeasureTree();
             MaybeDumpTextMetrics();
         }

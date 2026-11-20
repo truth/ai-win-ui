@@ -19,6 +19,7 @@ export const enum NodeType {
   Pagination = 16,
   TreeView = 17,
   TreeItem = 18,
+  FinancialChart = 19,
 }
 
 export const enum Prop {
@@ -129,6 +130,14 @@ export const enum Prop {
   OnText = 134,
   OffText = 135,
   LabelText = 136,
+
+  ChartMode = 140,
+  PreClose = 141,
+  ModernTheme = 142,
+  ShowCrosshair = 143,
+  ShowHeaderInfo = 144,
+  SymbolName = 145,
+  PeriodLabel = 146,
 }
 
 export const enum EventType {
@@ -139,6 +148,7 @@ export const enum EventType {
   PageChange = 5,
   TreeSelect = 6,
   TreeCheck = 7,
+  KeyDown = 8,
 }
 
 export const enum EventMask {
@@ -170,6 +180,7 @@ export const TAG_TO_NODE_TYPE: Record<string, NodeType> = {
   Pagination: NodeType.Pagination,
   TreeView: NodeType.TreeView,
   TreeItem: NodeType.TreeItem,
+  FinancialChart: NodeType.FinancialChart,
 };
 
 export interface ThicknessObject {

@@ -54,6 +54,7 @@ private:
         bool& outNeedsPaint,
         std::unordered_set<TreeView*>& dirtyTrees);
     void ApplyEventMask(uint32_t nodeId, uint32_t mask);
+    void EmitEvent(UiEvent&& ev);
 
     uint32_t NextEventSeq(uint32_t nodeId);
     TreeView* FindOwningTreeView(uint32_t nodeId) const;

@@ -15,5 +15,6 @@ export {
   useReducer,
   useRef,
   useState,
+  useWindowKeyDown,
 } from "./reconciler.ts";
 

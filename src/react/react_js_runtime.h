@@ -70,6 +70,9 @@ private:
     CommitSink m_commitSink;
     MutationBatch m_pendingBatch;
     bool m_inBatch = false;
+    double m_activeOriginEventMs = 0.0;
+    double m_activeJsStartMs = 0.0;
+    const char* m_activeTrigger = "";
 
     JSRuntime* m_rt = nullptr;
     JSContext* m_ctx = nullptr;

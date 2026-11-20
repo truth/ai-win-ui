@@ -26,6 +26,7 @@ public:
     void OnHostDestroyed() override;
     bool ReloadBundle() override;
     void TickHotReload() override;
+    bool OnKeyDown(WPARAM keyCode, bool isTextInputFocused) override;
 
 private:
     bool LoadBundleContent(std::string& outScriptUtf8, std::string& outSourceName, bool& outIsFile, std::filesystem::file_time_type& outMtime) const;

@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>React (QuickJS-ng) vs XML (C++) 性能评估对比报告</title>
+  <style>
+    :root {
+      --bg: #f6f8fb;
+      --card: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --muted: #64748b;
+      --xml: #2563eb;
+      --xml-soft: #eff6ff;
+      --react: #10b981;
+      --react-soft: #ecfdf5;
+      --warn: #f59e0b;
+      --warn-soft: #fffbeb;
+      --accent: #4f46e5;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.58;
+      padding: 28px 20px 64px;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .hero {
+      background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 55%, #065f46 100%);
+      color: #ffffff;
+      border-radius: 18px;
+      padding: 28px 32px;
+      margin-bottom: 22px;
+      box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18);
+    }
+    .pill-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      font-size: 12px;
+      font-weight: 600;
+      padding: 4px 11px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+    .pill.green { background: #10b981; }
+    .hero h1 { margin: 0 0 8px; font-size: 24px; font-weight: 800; }
+    .hero p { margin: 0; font-size: 13.5px; color: rgba(255, 255, 255, 0.85); }
+
+    .toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+    .filter-group {
+      display: inline-flex;
+      background: #e2e8f0;
+      padding: 4px;
+      border-radius: 10px;
+      gap: 4px;
+    }
+    .filter-btn {
+      border: none;
+      background: transparent;
+      padding: 7px 14px;
+      border-radius: 7px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #475569;
+      cursor: pointer;
+    }
+    .filter-btn.active {
+      background: #ffffff;
+      color: #0f172a;
+      box-shadow: 0 2px 6px rgba(15, 23, 42, 0.08);
+    }
+    .legend { display: flex; gap: 16px; font-size: 13px; font-weight: 600; }
+    .dot {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      margin-right: 6px;
+    }
+    .dot.xml { background: var(--xml); }
+    .dot.react { background: var(--react); }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(225px, 1fr));
+      gap: 14px;
+      margin-bottom: 22px;
+    }
+    .kpi {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      box-shadow: 0 3px 10px rgba(15, 23, 42, 0.03);
+    }
+    .kpi-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+    .kpi-val { font-size: 24px; font-weight: 800; margin: 6px 0 4px; font-variant-numeric: tabular-nums; }
+    .kpi-sub { font-size: 12px; color: #475569; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 700;
+      vertical-align: middle;
+    }
+    .badge.good { background: var(--react-soft); color: #047857; }
+    .badge.info { background: var(--xml-soft); color: #1d4ed8; }
+    .badge.warn { background: var(--warn-soft); color: #b45309; }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 22px 24px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 14px rgba(15, 23, 42, 0.03);
+    }
+    .card h2 {
+      margin: 0 0 14px;
+      font-size: 17.5px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .sec-tag {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      border-radius: 8px;
+      background: #e0e7ff;
+      color: var(--accent);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .bar-chart { display: flex; flex-direction: column; gap: 14px; }
+    .bar-group { padding-bottom: 10px; border-bottom: 1px dashed #e2e8f0; }
+    .bar-group:last-child { border-bottom: none; padding-bottom: 0; }
+    .bar-title { font-size: 13px; font-weight: 700; margin-bottom: 6px; color: #1e293b; }
+    .bar-row { display: grid; grid-template-columns: 128px 1fr 90px; align-items: center; gap: 10px; margin-bottom: 4px; font-size: 12px; }
+    .bar-track {
+      height: 12px;
+      background: #f1f5f9;
+      border-radius: 999px;
+      overflow: hidden;
+      display: flex;
+    }
+    .bar-fill { height: 100%; border-radius: 999px; transition: width 0.25s ease; }
+    .bar-fill.xml { background: linear-gradient(90deg, #3b82f6, #1d4ed8); }
+    .bar-fill.react { background: linear-gradient(90deg, #34d399, #059669); }
+    .bar-seg-js { background: #f59e0b; height: 100%; }
+    .bar-seg-apply { background: #8b5cf6; height: 100%; }
+    .bar-seg-paint { background: #10b981; height: 100%; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 12.5px; margin-top: 8px; }
+    th, td { padding: 9px 10px; border-bottom: 1px solid var(--border); text-align: left; }
+    th {
+      background: #f8fafc;
+      color: #475569;
+      font-size: 11.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    tr:last-child td { border-bottom: none; }
+    .num { font-family: "Cascadia Mono", Consolas, monospace; font-variant-numeric: tabular-nums; }
+    .grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 16px; }
+    ul.insights { margin: 8px 0 0; padding-left: 18px; font-size: 13.5px; color: #334155; }
+    ul.insights li { margin-bottom: 8px; }
+    code {
+      font-family: "Cascadia Mono", Consolas, monospace;
+      background: #f1f5f9;
+      padding: 1px 6px;
+      border-radius: 5px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="hero">
+      <div class="pill-row">
+        <span class="pill green">8/8 BENCHMARKS PASSED</span>
+        <span class="pill">Release × {Skia, Direct2D}</span>
+        <span class="pill">QuickJS-ng v0.18.0 + Typed MutationBatch</span>
+        <span class="pill">2026-11-20</span>
+      </div>
+      <h1>React (QuickJS-ng) vs XML (C++) 刷新性能与响应速度评估报告</h1>
+      <p>Intel Core i7-1165G7 · 15.7 GB RAM · NVIDIA MX450 · Windows 10 (125% DPI) · 同构股票终端 + 60Hz 100格看板压测</p>
+    </div>
+
+    <div class="toolbar">
+      <div class="filter-group" id="backendFilter">
+        <button class="filter-btn active" data-filter="skia">Skia (Release)</button>
+        <button class="filter-btn" data-filter="direct2d">Direct2D (Release)</button>
+      </div>
+      <div class="legend">
+        <span><i class="dot xml"></i>XML + C++ (Native)</span>
+        <span><i class="dot react"></i>React JSX (QuickJS-ng)</span>
+      </div>
+    </div>
+
+    <div class="kpi-grid" id="kpiGrid"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <h2><span class="sec-tag">1</span>响应速度与刷帧延迟对比（越低越好）</h2>
+        <div class="bar-chart" id="latencyBars"></div>
+      </div>
+
+      <div class="card">
+        <h2><span class="sec-tag">2</span>React 交互异步链路耗时拆解（毫秒）</h2>
+        <p style="font-size:12.5px;color:#64748b;margin:0 0 12px;">
+          端到端延迟 = QuickJS Diff (橙) + UI Apply (紫) + UI Render/Present (绿) + 线程调度排队
+        </p>
+        <div class="bar-chart" id="breakdownBars"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="sec-tag">3</span>Suite 1 — 同花顺金融终端全场景实测数据 (`1280×820`)</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>测试场景</th>
+              <th>后端</th>
+              <th>模式</th>
+              <th>样本数</th>
+              <th>JS Diff (ms)</th>
+              <th>C++ Apply (ms)</th>
+              <th>Yoga 重排</th>
+              <th>UI Render (ms)</th>
+              <th>Paint (ms)</th>
+              <th>端到端延迟 avg / p95 / max</th>
+            </tr>
+          </thead>
+          <tbody id="stockTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="sec-tag">4</span>Suite 2 — 60Hz 100格高频更新 + 极速打字压测 (`1000×700`)</h2>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>压力项</th>
+              <th>后端</th>
+              <th>模式</th>
+              <th>帧数 / 实测 FPS</th>
+              <th>JS Diff (avg/p95)</th>
+              <th>C++ Apply</th>
+              <th>Yoga 重排</th>
+              <th>Render (avg/p95)</th>
+              <th>Paint (avg/p95)</th>
+              <th>关键延迟 avg / p95</th>
+            </tr>
+          </thead>
+          <tbody id="stressTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2><span class="sec-tag">5</span>客观结论与工程优化建议</h2>
+      <ul class="insights">
+        <li><strong>UI 线程 Apply 几乎零成本 (`0.01~0.07 ms`)</strong>：采用整型二进制 `MutationBatch` 与视觉快路径后，即使每 16ms 批量修改 100 个数值节点，UI 线程 `apply_ms` 仅 `0.038~0.040 ms` 且 `layoutTotal = 0`。</li>
+        <li><strong>纯原生手势/缩放在 React 模式下 ZERO JS 税</strong>：60Hz 图表十字光标跟随 (`~6.0–6.6 ms`) 与 60Hz 窗口缩放 (`~11.5–12.2 ms`) 由 C++ 独立完成，JS 线程占用为 `0 ms`。</li>
+        <li><strong>乐观 UI 打字仅 ~1.1 ms（0ms 心理阻尼）</strong>：连续 `WM_CHAR` 击键立即渲染耗时 `1.08–1.22 ms`（XML 为 `0.99–1.14 ms`）；React 后台异步状态校验在 `2.5–3.2 ms` 内静默完成并通过 `eventSeq` 过滤过期回显。</li>
+        <li><strong>React JSX 额外开销主要在纯 JS Diff（约 `+2.8 ~ +5.3 ms`）</strong>：262 节点金融终端整树 Reconcile 在 QuickJS 下耗时 `3.5~9.1 ms`，总交互响应保持在 `9.1~12.6 ms`（低于一帧 16.6ms 预算）。</li>
+        <li><strong>高频 60Hz 定时精准度优于 Win32 `SetTimer`</strong>：React 独立 Worker 线程配合 `PostMessage` 稳跑 **`59.44–59.72 FPS`**，而共享 UI 线程 `SetTimer(16ms)` 受 Windows 15.6ms 量子合并限制掉到 `~42.0 FPS`。</li>
+        <li><strong>内存与冷启动代价极低</strong>：内嵌 QuickJS-ng + 自研 TS 运行时仅新增 **`+1.8 ~ +2.0 MB`** 常驻内存；冷启动首个内容帧耗时 `45.5 ms`（Skia），与 XML (`47.0 ms`) 持平。</li>
+        <li><strong>下一步可挖掘红利</strong>：在 TS 运行时引入 `React.memo` 剪枝可把 262 节点主题/周期切换时的 JS Diff 从 `4~9 ms` 压至 `&lt; 1.5 ms`；同时消除图表 500ms Tick 伴随的次级 `invalidate` 帧，可使空转绘制减半。</li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    const BENCH = {
+      skia: {
+        stock: {
+          xml: { startup: 46.961, ws: 30.36, priv: 12.36, tickN: 32, tickJs: 0, tickApply: 0, tickRender: 4.224, tickPaint: 4.932, tickP95: 7.502, hoverRender: 5.237, hoverPaint: 6.304, hoverLat: 6.571, hoverP95: 12.885, clickJs: 0, clickApply: 0, clickRender: 4.877, clickPaint: 5.737, clickE2e: 6.278, clickP95: 10.991, clickMax: 10.991, keyJs: 0, keyApply: 0, keyRender: 5.888, keyPaint: 6.662, keyE2e: 6.744, keyP95: 10.087, keyMax: 10.087, resizeLat: 12.208, resizeP95: 14.007, resizeRender: 7.335, resizeLayout: 3.782 },
+          react: { startup: 45.468, ws: 32.31, priv: 14.14, tickN: 16, tickJs: 3.744, tickApply: 0.033, tickRender: 4.199, tickPaint: 4.824, tickP95: 7.19, hoverRender: 4.969, hoverPaint: 5.72, hoverLat: 6.01, hoverP95: 8.201, clickJs: 4.755, clickApply: 0.018, clickRender: 2.715, clickPaint: 3.053, clickE2e: 9.081, clickP95: 13.608, clickMax: 13.608, keyJs: 8.223, keyApply: 0.069, keyRender: 5.09, keyPaint: 5.836, keyE2e: 10.106, keyP95: 13.779, keyMax: 13.779, resizeLat: 12.183, resizeP95: 15.928, resizeRender: 6.785, resizeLayout: 4.131 }
+        },
+        stress: {
+          xml: { startup: 29.025, ws: 26.04, priv: 8.59, frames: 168, fps: 41.95, jsAvg: 0, jsP95: 0, applyAvg: 0, renderAvg: 0.483, renderP95: 0.656, paintAvg: 0.744, paintP95: 1.007, charAvg: 1.14, charP95: 1.525, charMax: 1.724, reactInputAvg: 0, reactInputP95: 0 },
+          react: { startup: 29.183, ws: 27.46, priv: 9.47, frames: 238, fps: 59.44, jsAvg: 1.518, jsP95: 2.106, applyAvg: 0.04, renderAvg: 0.467, renderP95: 0.57, paintAvg: 0.698, paintP95: 0.865, charAvg: 1.221, charP95: 1.894, charMax: 2.002, reactInputAvg: 2.519, reactInputP95: 3.611 }
+        }
+      },
+      direct2d: {
+        stock: {
+          xml: { startup: 97.94, ws: 63.21, priv: 53.67, tickN: 32, tickJs: 0, tickApply: 0, tickRender: 6.414, tickPaint: 6.735, tickP95: 10.486, hoverRender: 6.007, hoverPaint: 6.288, hoverLat: 6.604, hoverP95: 8.375, clickJs: 0, clickApply: 0, clickRender: 6.418, clickPaint: 6.784, clickE2e: 7.339, clickP95: 10.86, clickMax: 10.86, keyJs: 0, keyApply: 0, keyRender: 5.979, keyPaint: 6.295, keyE2e: 6.406, keyP95: 7.09, keyMax: 7.09, resizeLat: 12.786, resizeP95: 16.864, resizeRender: 6.64, resizeLayout: 5.628 },
+          react: { startup: 83.403, ws: 65.16, priv: 52.66, tickN: 16, tickJs: 3.538, tickApply: 0.032, tickRender: 5.81, tickPaint: 6.123, tickP95: 7.072, hoverRender: 5.987, hoverPaint: 6.352, hoverLat: 6.624, hoverP95: 8.138, clickJs: 4.162, clickApply: 0.014, clickRender: 5.592, clickPaint: 5.939, clickE2e: 12.605, clickP95: 19.606, clickMax: 19.606, keyJs: 9.073, keyApply: 0.065, keyRender: 6.442, keyPaint: 6.825, keyE2e: 11.604, keyP95: 12.973, keyMax: 12.973, resizeLat: 11.532, resizeP95: 13.419, resizeRender: 6.257, resizeLayout: 4.714 }
+        },
+        stress: {
+          xml: { startup: 132.102, ws: 63.96, priv: 47.44, frames: 168, fps: 42.07, jsAvg: 0, jsP95: 0, applyAvg: 0, renderAvg: 0.504, renderP95: 0.623, paintAvg: 0.78, paintP95: 0.951, charAvg: 0.987, charP95: 1.447, charMax: 1.577, reactInputAvg: 0, reactInputP95: 0 },
+          react: { startup: 64.354, ws: 56.41, priv: 45.36, frames: 239, fps: 59.72, jsAvg: 2.227, jsP95: 3.357, applyAvg: 0.038, renderAvg: 0.52, renderP95: 0.714, paintAvg: 0.819, paintP95: 1.15, charAvg: 1.076, charP95: 1.345, charMax: 1.48, reactInputAvg: 3.164, reactInputP95: 4.3 }
+        }
+      }
+    };
+
+    let activeBackend = "skia";
+
+    function renderAll() {
+      const d = BENCH[activeBackend];
+      const stXml = d.stock.xml, stReact = d.stock.react;
+      const srXml = d.stress.xml, srReact = d.stress.react;
+
+      document.getElementById("kpiGrid").innerHTML = `
+        <div class="kpi">
+          <div class="kpi-label">60Hz 100格压测帧率</div>
+          <div class="kpi-val">${srReact.fps} <span class="badge good">满帧 60Hz</span></div>
+          <div class="kpi-sub">React ${srReact.frames} 帧 vs XML ${srXml.fps} FPS (${srXml.frames} 帧)</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">周期点击端到端延迟</div>
+          <div class="kpi-val">${stReact.clickE2e.toFixed(2)} ms <span class="badge info">XML ${stXml.clickE2e.toFixed(2)} ms</span></div>
+          <div class="kpi-sub">QuickJS Diff ${stReact.clickJs.toFixed(2)}ms · Apply ${stReact.clickApply.toFixed(3)}ms</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">极速连续输入首帧回显</div>
+          <div class="kpi-val">${srReact.charAvg.toFixed(2)} ms <span class="badge good">0ms 乐观输入</span></div>
+          <div class="kpi-sub">XML ${srXml.charAvg.toFixed(2)}ms · JS 校验全程 ${srReact.reactInputAvg.toFixed(2)}ms</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">股票终端冷启动 &amp; 内存</div>
+          <div class="kpi-val">${stReact.startup.toFixed(1)} ms <span class="badge warn">+${(stReact.ws - stXml.ws).toFixed(2)} MB</span></div>
+          <div class="kpi-sub">XML 启动 ${stXml.startup.toFixed(1)}ms · 内存 ${stReact.ws} vs ${stXml.ws} MB</div>
+        </div>
+      `;
+
+      const barSpecs = [
+        { label: "股票终端 500ms Tick 单帧绘制 (paint_ms)", x: stXml.tickPaint, r: stReact.tickPaint, max: 14 },
+        { label: "60Hz 十字光标跟随延迟 (hover latency)", x: stXml.hoverLat, r: stReact.hoverLat, max: 14 },
+        { label: "日K ↔ 分时 切换点击响应 (E2E)", x: stXml.clickE2e, r: stReact.clickE2e, max: 14 },
+        { label: "快捷键 'T' 主题切换响应 (E2E)", x: stXml.keyE2e, r: stReact.keyE2e, max: 14 },
+        { label: "60Hz 窗口缩放端到端延迟 (resize)", x: stXml.resizeLat, r: stReact.resizeLat, max: 14 },
+        { label: "100 格压力连打响应 (char UI latency)", x: srXml.charAvg, r: srReact.charAvg, max: 14 }
+      ];
+      document.getElementById("latencyBars").innerHTML = barSpecs.map(s => `
+        <div class="bar-group">
+          <div class="bar-title">${s.label}</div>
+          <div class="bar-row"><span>XML (C++)</span><div class="bar-track"><div class="bar-fill xml" style="width:${Math.min(100, s.x / s.max * 100)}%"></div></div><span class="num">${s.x.toFixed(2)} ms</span></div>
+          <div class="bar-row"><span>React (QJS)</span><div class="bar-track"><div class="bar-fill react" style="width:${Math.min(100, s.r / s.max * 100)}%"></div></div><span class="num">${s.r.toFixed(2)} ms</span></div>
+        </div>
+      `).join("");
+
+      const bdSpecs = [
+        { label: "500ms Tick 刷新 (js + apply + paint)", js: stReact.tickJs, app: stReact.tickApply, paint: stReact.tickPaint, total: stReact.tickJs + stReact.tickApply + stReact.tickPaint },
+        { label: "日K ↔ 分时 点击 (React E2E = " + stReact.clickE2e.toFixed(2) + " ms)", js: stReact.clickJs, app: stReact.clickApply, paint: stReact.clickPaint, total: stReact.clickE2e },
+        { label: "快捷键 'T' 切主题 (React E2E = " + stReact.keyE2e.toFixed(2) + " ms)", js: stReact.keyJs, app: stReact.keyApply, paint: stReact.keyPaint, total: stReact.keyE2e },
+        { label: "60Hz 100格更新 (js + apply + paint)", js: srReact.jsAvg, app: srReact.applyAvg, paint: srReact.paintAvg, total: srReact.jsAvg + srReact.applyAvg + srReact.paintAvg },
+        { label: "极速打字异步调和 (React E2E = " + srReact.reactInputAvg.toFixed(2) + " ms)", js: srReact.jsAvg, app: srReact.applyAvg, paint: srReact.paintAvg, total: srReact.reactInputAvg }
+      ];
+      const maxBd = 18;
+      document.getElementById("breakdownBars").innerHTML = bdSpecs.map(b => `
+        <div class="bar-group">
+          <div class="bar-title">${b.label}</div>
+          <div class="bar-row">
+            <span>阶段占比</span>
+            <div class="bar-track">
+              <div class="bar-seg-js" style="width:${(b.js / maxBd * 100).toFixed(1)}%" title="JS ${b.js.toFixed(2)}ms"></div>
+              <div class="bar-seg-apply" style="width:${Math.max(0.5, b.app / maxBd * 100).toFixed(1)}%" title="Apply ${b.app.toFixed(3)}ms"></div>
+              <div class="bar-seg-paint" style="width:${(b.paint / maxBd * 100).toFixed(1)}%" title="Paint ${b.paint.toFixed(2)}ms"></div>
+            </div>
+            <span class="num">${b.total.toFixed(2)} ms</span>
+          </div>
+        </div>
+      `).join("");
+
+      const stockRows = [];
+      for (const bName of ["skia", "direct2d"]) {
+        const s = BENCH[bName].stock;
+        const bLabel = bName === "skia" ? "Skia" : "Direct2D";
+        const pushRow = (sc, m, n, js, app, lay, ren, pnt, lat) => {
+          stockRows.push(`<tr><td>${sc}</td><td>${bLabel}</td><td>${m}</td><td class="num">${n}</td><td class="num">${js}</td><td class="num">${app}</td><td class="num">${lay}</td><td class="num">${ren}</td><td class="num">${pnt}</td><td class="num"><strong>${lat}</strong></td></tr>`);
+        };
+        pushRow("500ms Tick 刷新", "XML", s.xml.tickN, "0.000", "0.000", "0", s.xml.tickRender.toFixed(3), s.xml.tickPaint.toFixed(3), `${s.xml.tickPaint.toFixed(3)} / ${s.xml.tickP95.toFixed(3)} (paint)`);
+        pushRow("500ms Tick 刷新", "React", s.react.tickN, s.react.tickJs.toFixed(3), s.react.tickApply.toFixed(3), "0", s.react.tickRender.toFixed(3), s.react.tickPaint.toFixed(3), `${s.react.tickPaint.toFixed(3)} / ${s.react.tickP95.toFixed(3)} (paint)`);
+        pushRow("60Hz 光标 Hover", "XML", 60, "0.000", "0.000", "0", s.xml.hoverRender.toFixed(3), s.xml.hoverPaint.toFixed(3), `${s.xml.hoverLat.toFixed(3)} / ${s.xml.hoverP95.toFixed(3)}`);
+        pushRow("60Hz 光标 Hover", "React", 60, "0.000", "0.000", "0", s.react.hoverRender.toFixed(3), s.react.hoverPaint.toFixed(3), `${s.react.hoverLat.toFixed(3)} / ${s.react.hoverP95.toFixed(3)}`);
+        pushRow("日K ↔ 分时 点击", "XML", 10, "0.000", "0.000", "0", s.xml.clickRender.toFixed(3), s.xml.clickPaint.toFixed(3), `${s.xml.clickE2e.toFixed(3)} / ${s.xml.clickP95.toFixed(3)} / ${s.xml.clickMax.toFixed(3)}`);
+        pushRow("日K ↔ 分时 点击", "React", 10, s.react.clickJs.toFixed(3), s.react.clickApply.toFixed(3), "0", s.react.clickRender.toFixed(3), s.react.clickPaint.toFixed(3), `${s.react.clickE2e.toFixed(3)} / ${s.react.clickP95.toFixed(3)} / ${s.react.clickMax.toFixed(3)}`);
+        pushRow("快捷键 'T' 主题", "XML", 6, "0.000", "0.000", "0", s.xml.keyRender.toFixed(3), s.xml.keyPaint.toFixed(3), `${s.xml.keyE2e.toFixed(3)} / ${s.xml.keyP95.toFixed(3)} / ${s.xml.keyMax.toFixed(3)}`);
+        pushRow("快捷键 'T' 主题", "React", 6, s.react.keyJs.toFixed(3), s.react.keyApply.toFixed(3), "0", s.react.keyRender.toFixed(3), s.react.keyPaint.toFixed(3), `${s.react.keyE2e.toFixed(3)} / ${s.react.keyP95.toFixed(3)} / ${s.react.keyMax.toFixed(3)}`);
+        pushRow("60Hz 窗口 Resize", "XML", 41, "0.000", "0.000", "41", s.xml.resizeRender.toFixed(3), "—", `${s.xml.resizeLat.toFixed(3)} / ${s.xml.resizeP95.toFixed(3)}`);
+        pushRow("60Hz 窗口 Resize", "React", 41, "0.000", "0.000", "41", s.react.resizeRender.toFixed(3), "—", `${s.react.resizeLat.toFixed(3)} / ${s.react.resizeP95.toFixed(3)}`);
+      }
+      document.getElementById("stockTableBody").innerHTML = stockRows.join("");
+
+      const stressRows = [];
+      for (const bName of ["skia", "direct2d"]) {
+        const s = BENCH[bName].stress;
+        const bLabel = bName === "skia" ? "Skia" : "Direct2D";
+        stressRows.push(`<tr><td>60Hz 100格批量更新</td><td>${bLabel}</td><td>XML</td><td class="num">${s.xml.frames} (${s.xml.fps} FPS)</td><td class="num">0 / 0</td><td class="num">0.000</td><td class="num">0</td><td class="num">${s.xml.renderAvg.toFixed(3)} / ${s.xml.renderP95.toFixed(3)}</td><td class="num">${s.xml.paintAvg.toFixed(3)} / ${s.xml.paintP95.toFixed(3)}</td><td class="num">${s.xml.paintAvg.toFixed(3)} / ${s.xml.paintP95.toFixed(3)} (paint)</td></tr>`);
+        stressRows.push(`<tr><td>60Hz 100格批量更新</td><td>${bLabel}</td><td>React</td><td class="num"><strong>${s.react.frames} (${s.react.fps} FPS)</strong></td><td class="num">${s.react.jsAvg.toFixed(3)} / ${s.react.jsP95.toFixed(3)}</td><td class="num">${s.react.applyAvg.toFixed(3)}</td><td class="num">0</td><td class="num">${s.react.renderAvg.toFixed(3)} / ${s.react.renderP95.toFixed(3)}</td><td class="num">${s.react.paintAvg.toFixed(3)} / ${s.react.paintP95.toFixed(3)}</td><td class="num">${s.react.paintAvg.toFixed(3)} / ${s.react.paintP95.toFixed(3)} (paint)</td></tr>`);
+        stressRows.push(`<tr><td>40 次连续击键 (char)</td><td>${bLabel}</td><td>XML</td><td class="num">40</td><td class="num">0 / 0</td><td class="num">0.000</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">UI ${s.xml.charAvg.toFixed(3)} / ${s.xml.charP95.toFixed(3)} ms</td></tr>`);
+        stressRows.push(`<tr><td>40 次连续击键 (char+JS)</td><td>${bLabel}</td><td>React</td><td class="num">40 + 40</td><td class="num">1.53–2.08 avg</td><td class="num">0.010</td><td class="num">0</td><td class="num">—</td><td class="num">—</td><td class="num">UI ${s.react.charAvg.toFixed(3)}/${s.react.charP95.toFixed(3)} · JS E2E ${s.react.reactInputAvg.toFixed(3)}/${s.react.reactInputP95.toFixed(3)} ms</td></tr>`);
+      }
+      document.getElementById("stressTableBody").innerHTML = stressRows.join("");
+    }
+
+    document.querySelectorAll(".filter-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        activeBackend = btn.getAttribute("data-filter");
+        renderAll();
+      });
+    });
+
+    renderAll();
+  </script>
+</body>
+</html>
+

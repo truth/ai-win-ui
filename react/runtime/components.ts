@@ -1,4 +1,4 @@
-import type { ChildNode, ComponentFn } from "./jsx-runtime.ts";
+import { createElement, type ChildNode, type ComponentFn } from "./jsx-runtime.ts";
 import type { ColorInput, ThicknessInput } from "./protocol.ts";
 
 export interface CommonProps {
@@ -280,6 +280,48 @@ export interface TreeItemProps extends CommonProps {
   children?: ChildNode;
 }
 
+export interface FinancialPointData {
+  price: number;
+  leadPrice: number;
+  avgPrice?: number;
+  volume: number;
+  indicator1?: number;
+  indicator2?: number;
+  isUp: boolean;
+  timeStr: string;
+}
+
+export interface CandleBarData {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  ma5: number;
+  ma10: number;
+  ma20: number;
+}
+
+export interface FinancialChartProps extends CommonProps {
+  mode?: "timeshare" | "candlestick";
+  preClose?: number;
+  modernTheme?: boolean;
+  showCrosshair?: boolean;
+  showHeaderInfo?: boolean;
+  symbolName?: string;
+  periodLabel?: string;
+  points?: FinancialPointData[];
+  candles?: CandleBarData[];
+}
+
+export interface SpacerProps {
+  width?: number;
+  height?: number;
+  flexGrow?: number;
+  flexBasis?: number;
+}
+
 declare global {
   namespace JSX {
     interface IntrinsicElements {
@@ -301,6 +343,7 @@ declare global {
       Pagination: PaginationProps;
       TreeView: TreeViewProps;
       TreeItem: TreeItemProps;
+      FinancialChart: FinancialChartProps;
     }
   }
 }
@@ -323,4 +366,15 @@ export const BreadcrumbItem = "BreadcrumbItem" as unknown as ComponentFn<Breadcr
 export const Pagination = "Pagination" as unknown as ComponentFn<PaginationProps>;
 export const TreeView = "TreeView" as unknown as ComponentFn<TreeViewProps>;
 export const TreeItem = "TreeItem" as unknown as ComponentFn<TreeItemProps>;
+export const FinancialChart = "FinancialChart" as unknown as ComponentFn<FinancialChartProps>;
+
+export function Spacer(props: SpacerProps) {
+  return createElement("Panel", {
+    width: props.width,
+    height: props.height,
+    flexGrow: props.flexGrow,
+    flexBasis: props.flexBasis,
+    padding: 0,
+  });
+}
 

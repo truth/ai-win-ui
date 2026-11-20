@@ -84,7 +84,8 @@
     BreadcrumbItem: 15 /* BreadcrumbItem */,
     Pagination: 16 /* Pagination */,
     TreeView: 17 /* TreeView */,
-    TreeItem: 18 /* TreeItem */
+    TreeItem: 18 /* TreeItem */,
+    FinancialChart: 19 /* FinancialChart */
   };
   function parseColor(value) {
     if (typeof value === "number") {
@@ -241,7 +242,14 @@
     barThickness: { id: 133 /* BarThickness */, kind: 1 /* Num */ },
     onText: { id: 134 /* OnText */, kind: 5 /* Str */ },
     offText: { id: 135 /* OffText */, kind: 5 /* Str */ },
-    label: { id: 136 /* LabelText */, kind: 5 /* Str */ }
+    label: { id: 136 /* LabelText */, kind: 5 /* Str */ },
+    mode: { id: 140 /* ChartMode */, kind: 5 /* Str */ },
+    preClose: { id: 141 /* PreClose */, kind: 1 /* Num */ },
+    modernTheme: { id: 142 /* ModernTheme */, kind: 2 /* Bool */ },
+    showCrosshair: { id: 143 /* ShowCrosshair */, kind: 2 /* Bool */ },
+    showHeaderInfo: { id: 144 /* ShowHeaderInfo */, kind: 2 /* Bool */ },
+    symbolName: { id: 145 /* SymbolName */, kind: 5 /* Str */ },
+    periodLabel: { id: 146 /* PeriodLabel */, kind: 5 /* Str */ }
   };
   var TEXT_CHILDREN_TYPES = new Set([
     3 /* Label */,
@@ -264,6 +272,7 @@
   var nodeTypes = new Map;
   var nodeLastSeq = new Map;
   var contextStacks = new Map;
+  var windowKeyListeners = new Set;
   var rootMount = null;
   function extractInlineText(children) {
     if (children === undefined || children === null || typeof children === "boolean") {
@@ -450,6 +459,30 @@
     }
     return false;
   }
+  function syncChartSeriesProps(nodeId, prevProps, nextProps) {
+    const n = nativeApi();
+    if (nextProps.points !== undefined && !Object.is(prevProps?.points, nextProps.points)) {
+      const prevPts = prevProps?.points;
+      const nextPts = nextProps.points;
+      if (Array.isArray(prevPts) && prevPts.length > 0 && Array.isArray(nextPts) && nextPts.length > 0) {
+        const L = prevPts.length;
+        if (nextPts.length === L + 1 && nextPts[0] === prevPts[0] && nextPts[L - 1] === prevPts[L - 1]) {
+          n.chartAppendPoint(nodeId, nextPts[L], false);
+        } else if (nextPts.length === L && nextPts[0] === prevPts[0] && (L === 1 || nextPts[L - 2] === prevPts[L - 2])) {
+          n.chartAppendPoint(nodeId, nextPts[L - 1], true);
+        } else {
+          n.chartSetPoints(nodeId, nextPts);
+        }
+      } else if (Array.isArray(nextPts)) {
+        n.chartSetPoints(nodeId, nextPts);
+      }
+    }
+    if (nextProps.candles !== undefined && !Object.is(prevProps?.candles, nextProps.candles)) {
+      if (Array.isArray(nextProps.candles)) {
+        n.chartSetCandles(nodeId, nextProps.candles);
+      }
+    }
+  }
   function applyPropsDiff(nodeId, nodeType, prevProps, nextProps) {
     const ackSeq = nodeLastSeq.get(nodeId) ?? 0;
     if (!prevProps) {
@@ -457,6 +490,9 @@
         if (PROP_META[k]) {
           emitSingleProp(nodeId, k, nextProps[k], ackSeq);
         }
+      }
+      if (nodeType === 19 /* FinancialChart */) {
+        syncChartSeriesProps(nodeId, null, nextProps);
       }
       syncEvents(nodeId, null, nextProps);
       return;
@@ -479,6 +515,9 @@
         emitSingleProp(nodeId, k, "", ackSeq);
       else if (k === "active" && nodeType === 15 /* BreadcrumbItem */)
         emitSingleProp(nodeId, k, false, 0);
+    }
+    if (nodeType === 19 /* FinancialChart */) {
+      syncChartSeriesProps(nodeId, prevProps, nextProps);
     }
     syncEvents(nodeId, prevProps, nextProps);
   }
@@ -981,6 +1020,9 @@
         if (payload.int > 0) {
           nodeHandlers.get(payload.int)?.onCheck?.(payload.bool, payload.str, payload.int);
         }
+        break;
+      case 8 /* KeyDown */:
+        windowKeyListeners.forEach((fn) => fn(payload.int, payload.bool));
         break;
     }
   };

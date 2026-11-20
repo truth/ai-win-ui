@@ -33,6 +33,10 @@ struct FrameSample {
     double paintMs = 0.0;
     double latencyMs = -1.0;  // < 0 when the frame was not triggered by input
     double intervalMs = 0.0;
+    double reactJsMs = 0.0;
+    double reactApplyMs = 0.0;
+    double reactE2eMs = -1.0; // < 0 when frame has no originating React event
+    double startupMs = -1.0;  // >= 0 once on the first content-ready paint
     const char* trigger = "";
 };
 
@@ -64,7 +68,28 @@ public:
         }
         m_csv.open(path, std::ios::binary | std::ios::trunc);
         if (m_csv) {
-            m_csv << "frame,t_ms,trigger,resize_ms,layout_ms,layout_count,render_ms,present_ms,paint_ms,latency_ms,interval_ms\n";
+            m_csv << "frame,t_ms,trigger,resize_ms,layout_ms,layout_count,render_ms,present_ms,paint_ms,latency_ms,interval_ms,react_js_ms,react_apply_ms,react_e2e_ms,startup_ms\n";
+        }
+    }
+
+    void MarkHostStart() {
+        m_hostStartMs = NowMs();
+        m_contentReady = false;
+        m_startupRecorded = false;
+    }
+
+    void MarkContentReady() {
+        m_contentReady = true;
+    }
+
+    void MarkReactCommit(const char* trigger, double jsMs, double applyMs, double originEventMs) {
+        m_pendingReactJsMs += jsMs;
+        m_pendingReactApplyMs += applyMs;
+        if (originEventMs > 0.0 && m_pendingReactOriginMs < 0.0) {
+            m_pendingReactOriginMs = originEventMs;
+        }
+        if (m_pendingInputMs < 0.0 && trigger && trigger[0]) {
+            m_pendingReactTrigger = trigger;
         }
     }
 
@@ -98,7 +123,16 @@ public:
         s.paintMs = std::max(0.0, end - m_paintBegin);
         s.latencyMs = m_pendingInputMs >= 0.0 ? end - m_pendingInputMs : -1.0;
         s.intervalMs = m_lastPresentMs > 0.0 ? end - m_lastPresentMs : 0.0;
-        s.trigger = m_pendingInputMs >= 0.0 ? m_pendingTrigger : "invalidate";
+        s.reactJsMs = m_pendingReactJsMs;
+        s.reactApplyMs = m_pendingReactApplyMs;
+        s.reactE2eMs = m_pendingReactOriginMs > 0.0 ? std::max(0.0, end - m_pendingReactOriginMs) : -1.0;
+        if (m_contentReady && !m_startupRecorded && m_hostStartMs > 0.0) {
+            s.startupMs = std::max(0.0, end - m_hostStartMs);
+            m_startupRecorded = true;
+        }
+        s.trigger = m_pendingInputMs >= 0.0
+            ? m_pendingTrigger
+            : ((m_pendingReactTrigger && m_pendingReactTrigger[0]) ? m_pendingReactTrigger : "invalidate");
         m_lastPresentMs = end;
 
         m_history[m_head] = s;
@@ -110,12 +144,12 @@ public:
             if (m_startMs <= 0.0) {
                 m_startMs = end;
             }
-            char line[320];
+            char line[400];
             std::snprintf(line, sizeof(line),
-                "%llu,%.3f,%s,%.3f,%.3f,%d,%.3f,%.3f,%.3f,%.3f,%.3f\n",
+                "%llu,%.3f,%s,%.3f,%.3f,%d,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
                 static_cast<unsigned long long>(m_frameIndex), end - m_startMs, s.trigger,
                 s.resizeMs, s.layoutMs, s.layoutCount, s.renderMs, s.presentMs, s.paintMs,
-                s.latencyMs, s.intervalMs);
+                s.latencyMs, s.intervalMs, s.reactJsMs, s.reactApplyMs, s.reactE2eMs, s.startupMs);
             m_csv << line;
             m_csv.flush();
         }
@@ -125,6 +159,10 @@ public:
         m_pendingLayoutCount = 0;
         m_pendingInputMs = -1.0;
         m_pendingTrigger = "";
+        m_pendingReactJsMs = 0.0;
+        m_pendingReactApplyMs = 0.0;
+        m_pendingReactOriginMs = -1.0;
+        m_pendingReactTrigger = "";
     }
 
     size_t Size() const { return m_size; }
@@ -178,6 +216,13 @@ private:
     double m_renderEnd = 0.0;
     double m_lastPresentMs = 0.0;
     double m_startMs = 0.0;
+    double m_hostStartMs = 0.0;
+    bool m_contentReady = false;
+    bool m_startupRecorded = false;
+    double m_pendingReactJsMs = 0.0;
+    double m_pendingReactApplyMs = 0.0;
+    double m_pendingReactOriginMs = -1.0;
+    const char* m_pendingReactTrigger = "";
 
     std::ofstream m_csv;
 };

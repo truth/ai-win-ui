@@ -66,6 +66,7 @@ older design snapshot.
   - archived examples: declarative style v1, theme tokens, layered window v2
 - `doc/reports/`
   - dated test and QA regression reports
+  - **React (QuickJS-ng) vs XML (C++) Performance Evaluation Report (MD + HTML):** `2026-11-20-react-vs-xml-perf-report.md` / `2026-11-20-react-vs-xml-perf-report.html`
   - **Frame Profiler & Smoothness Optimization Report (MD + HTML):** `2026-11-02-frame-profiler-and-smoothness-report.md` / `2026-11-02-frame-profiler-and-smoothness-report.html`
   - **Modular Parsers Test Report:** `2026-10-31-modular-parsers-test-report.md`
 
@@ -91,7 +92,7 @@ abstractions:
 | **UiHost / multi-host** | **`src/ui_host.h`**, `src/ui_host_input.cpp`, `src/ui_host_overlay.cpp`, `src/application.*`, **`src/frame_profiler.h`** (F12 per-phase frame profiler & CSV export) |
 | Animation & Reactive | `src/animation_controller.*`, `<ai_win_ui/observable.h>` |
 | **C-API Interop** | **`<ai_win_ui/c_api.h>`**, `src/c_api.cpp` |
-| **React JSX UI** | **`third_party/quickjs-ng/`** (QuickJS-ng v0.18.0), `src/react_bridge_iface.h`, **`src/react/*`** (`ai_win_ui_react`), **`react/runtime/*`** (TS reconciler + 18 JSX primitives), `react/demos/react_showcase.tsx`, `samples/react_demo/`, `samples/react_unit_test/` |
+| **React JSX UI** | **`third_party/quickjs-ng/`** (QuickJS-ng v0.18.0), `src/react_bridge_iface.h`, **`src/react/*`** (`ai_win_ui_react`), **`react/runtime/*`** (TS reconciler + 19 JSX primitives incl. `FinancialChart` + `Spacer` + `useWindowKeyDown`), `react/demos/react_showcase.tsx`, **`react/demos/stock_terminal/*`**, `samples/react_demo/`, `samples/react_unit_test/`, `scripts/{build_react,run_react_demo,run_stock_react}.ps1` |
 | Host impl (TU) | `src/main.cpp` (`class UiHost`) |
 
 The app currently supports:
@@ -118,6 +119,7 @@ The app currently supports:
   - Smooth Catmull-Rom spline curves (`smooth="true"`), vertical linear gradient area fills, rounded pill bar charts with highlight badges, and Pie/Donut ring charts (`type="pie|donut"`)
 - custom chrome + **layered** per-pixel alpha windows; multi-process shaped demos
 - external SVG files via `SvgIcon` on Skia (`SkSVGDOM`)
+- **React JSX Native UI** (`AI_WIN_UI_ENABLE_REACT=ON`): vendored `QuickJS-ng v0.18.0` worker thread + typed `MutationBatch` dual-thread bridge driving 19 native JSX controls (including `<FinancialChart>` + `useWindowKeyDown`), optimistic inputs with `eventSeq` echo guard, `--react` / `--watch` hot reload, plus React Showcase and Flush-style Stock Terminal apps
 
 ### Layout / style rule impact (quick reference)
 
@@ -157,8 +159,14 @@ Full detail: `doc/layout-spec.md` + `doc/style-catalog.md`.
 - **`resource/layouts/text_ellipsis_cases.xml`** — R6 Label ellipsis
 - **`resource/layouts/gradient_shadow_demo.xml`** — R7 gradient + soft shadow
 - **`resource/layouts/svg_tint_demo.xml`** — R8 SvgIcon tint + cache
+- **`resource/react/react_demo.bundle.js`** — React TSX runtime showcase (Hooks, TreeView, Keyed diff, 144Hz stress)
+- **`resource/react/stock_terminal.bundle.js`** — React Flush-style Stock Terminal (`<FinancialChart>`, 500ms zero-relayout ticks, Keyboard Genie)
 
 ## Launcher Scripts
+
+- `scripts/build_react.ps1` — compile `.tsx` to QuickJS-ready `.bundle.js` via `bun build` (supports `-Watch`)
+- `scripts/run_react_demo.ps1` — build & run the React JSX Showcase (`-Renderer skia|direct2d`, `-Watch`)
+- **`scripts/run_stock_react.ps1`** — build & run the React Flush-style Stock Terminal (`-Renderer skia|direct2d`, `-Watch`)
 
 - `scripts/run_layout_demo.ps1` — generic launcher (aliases include
   `style-catalog`, `shaped-hub`, `table-components`, …)

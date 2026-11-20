@@ -27,6 +27,9 @@ interface NativeBridge {
   endBatch(needsLayout: boolean): void;
   setTitle(title: string): void;
   openDemo(layoutPath: string, chrome?: string, size?: string): void;
+  chartSetPoints(nodeId: number, points: any[]): void;
+  chartAppendPoint(nodeId: number, point: any, replaceLast: boolean): void;
+  chartSetCandles(nodeId: number, candles: any[]): void;
 }
 
 declare const __aiNative: NativeBridge;
@@ -211,6 +214,14 @@ const PROP_META: Record<string, PropMeta> = {
   onText: { id: Prop.OnText, kind: PropKind.Str },
   offText: { id: Prop.OffText, kind: PropKind.Str },
   label: { id: Prop.LabelText, kind: PropKind.Str },
+
+  mode: { id: Prop.ChartMode, kind: PropKind.Str },
+  preClose: { id: Prop.PreClose, kind: PropKind.Num },
+  modernTheme: { id: Prop.ModernTheme, kind: PropKind.Bool },
+  showCrosshair: { id: Prop.ShowCrosshair, kind: PropKind.Bool },
+  showHeaderInfo: { id: Prop.ShowHeaderInfo, kind: PropKind.Bool },
+  symbolName: { id: Prop.SymbolName, kind: PropKind.Str },
+  periodLabel: { id: Prop.PeriodLabel, kind: PropKind.Str },
 };
 
 const TEXT_CHILDREN_TYPES = new Set<NodeType>([
@@ -238,6 +249,7 @@ const nodeHandlers = new Map<number, HandlerEntry>();
 const nodeTypes = new Map<number, NodeType>();
 const nodeLastSeq = new Map<number, number>();
 const contextStacks = new Map<symbol, any[]>();
+const windowKeyListeners = new Set<(keyCode: number, isTextInputFocused: boolean) => void>();
 let rootMount: MountedNode | null = null;
 
 function extractInlineText(children: ChildNode): string | undefined {
@@ -428,6 +440,39 @@ function propValuesEqual(a: any, b: any): boolean {
   return false;
 }
 
+function syncChartSeriesProps(
+  nodeId: number,
+  prevProps: Record<string, any> | null,
+  nextProps: Record<string, any>
+): void {
+  const n = nativeApi();
+  if (nextProps.points !== undefined && !Object.is(prevProps?.points, nextProps.points)) {
+    const prevPts = prevProps?.points as any[] | undefined;
+    const nextPts = nextProps.points as any[];
+    if (Array.isArray(prevPts) && prevPts.length > 0 && Array.isArray(nextPts) && nextPts.length > 0) {
+      const L = prevPts.length;
+      if (nextPts.length === L + 1 && nextPts[0] === prevPts[0] && nextPts[L - 1] === prevPts[L - 1]) {
+        n.chartAppendPoint(nodeId, nextPts[L], false);
+      } else if (
+        nextPts.length === L &&
+        nextPts[0] === prevPts[0] &&
+        (L === 1 || nextPts[L - 2] === prevPts[L - 2])
+      ) {
+        n.chartAppendPoint(nodeId, nextPts[L - 1], true);
+      } else {
+        n.chartSetPoints(nodeId, nextPts);
+      }
+    } else if (Array.isArray(nextPts)) {
+      n.chartSetPoints(nodeId, nextPts);
+    }
+  }
+  if (nextProps.candles !== undefined && !Object.is(prevProps?.candles, nextProps.candles)) {
+    if (Array.isArray(nextProps.candles)) {
+      n.chartSetCandles(nodeId, nextProps.candles);
+    }
+  }
+}
+
 function applyPropsDiff(
   nodeId: number,
   nodeType: NodeType,
@@ -440,6 +485,9 @@ function applyPropsDiff(
       if (PROP_META[k]) {
         emitSingleProp(nodeId, k, nextProps[k], ackSeq);
       }
+    }
+    if (nodeType === NodeType.FinancialChart) {
+      syncChartSeriesProps(nodeId, null, nextProps);
     }
     syncEvents(nodeId, null, nextProps);
     return;
@@ -460,6 +508,10 @@ function applyPropsDiff(
     if (k === "disabled") emitSingleProp(nodeId, k, false, 0);
     else if (k === "tooltip" || k === "text" || k === "placeholder") emitSingleProp(nodeId, k, "", ackSeq);
     else if (k === "active" && nodeType === NodeType.BreadcrumbItem) emitSingleProp(nodeId, k, false, 0);
+  }
+
+  if (nodeType === NodeType.FinancialChart) {
+    syncChartSeriesProps(nodeId, prevProps, nextProps);
   }
 
   syncEvents(nodeId, prevProps, nextProps);
@@ -1043,6 +1095,20 @@ export function openDemo(layoutPath: string, chrome = "", size = ""): void {
   nativeApi().openDemo(layoutPath, chrome, size);
 }
 
+export function useWindowKeyDown(handler: (keyCode: number, isTextInputFocused: boolean) => void): void {
+  const fnRef = useRef(handler);
+  fnRef.current = handler;
+  useEffect(() => {
+    const listener = (keyCode: number, isTextInputFocused: boolean) => {
+      fnRef.current(keyCode, isTextInputFocused);
+    };
+    windowKeyListeners.add(listener);
+    return () => {
+      windowKeyListeners.delete(listener);
+    };
+  }, []);
+}
+
 // Single global event entry point called from C++ QuickJS worker thread.
 (globalThis as any).__dispatchEvent = function __dispatchEvent(
   nodeId: number,
@@ -1087,6 +1153,9 @@ export function openDemo(layoutPath: string, chrome = "", size = ""): void {
       if (payload.int > 0) {
         nodeHandlers.get(payload.int)?.onCheck?.(payload.bool, payload.str, payload.int);
       }
+      break;
+    case EventType.KeyDown:
+      windowKeyListeners.forEach((fn) => fn(payload.int, payload.bool));
       break;
   }
 };

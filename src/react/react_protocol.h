@@ -25,6 +25,7 @@ enum class NodeTypeId : uint16_t {
     Pagination = 16,
     TreeView = 17,
     TreeItem = 18,
+    FinancialChart = 19,
 };
 
 enum class PropId : uint16_t {
@@ -142,6 +143,15 @@ enum class PropId : uint16_t {
     OnText = 134,
     OffText = 135,
     LabelText = 136,
+
+    // FinancialChart
+    ChartMode = 140,
+    PreClose = 141,
+    ModernTheme = 142,
+    ShowCrosshair = 143,
+    ShowHeaderInfo = 144,
+    SymbolName = 145,
+    PeriodLabel = 146,
 };
 
 enum class EventTypeId : uint8_t {
@@ -152,6 +162,7 @@ enum class EventTypeId : uint8_t {
     PageChange = 5,
     TreeSelect = 6,
     TreeCheck = 7,
+    KeyDown = 8,
 };
 
 namespace EventMask {
@@ -180,6 +191,32 @@ enum class MutationOpType : uint8_t {
     SetWindowTitle = 13,
     OpenDemo = 14,
     ResetTree = 15,
+    ChartSetPoints = 16,
+    ChartAppendPoint = 17,
+    ChartSetCandles = 18,
+};
+
+struct ChartPointData {
+    float price = 0.0f;
+    float leadPrice = 0.0f;
+    float avgPrice = 0.0f;
+    float volume = 0.0f;
+    float indicator1 = 0.0f;
+    float indicator2 = 0.0f;
+    bool isUp = true;
+    std::string timeStr;
+};
+
+struct ChartCandleData {
+    std::string date;
+    float open = 0.0f;
+    float high = 0.0f;
+    float low = 0.0f;
+    float close = 0.0f;
+    float volume = 0.0f;
+    float ma5 = 0.0f;
+    float ma10 = 0.0f;
+    float ma20 = 0.0f;
 };
 
 struct MutationOp {
@@ -200,11 +237,16 @@ struct MutationOp {
     std::string strVal;
     std::string strVal2;
     std::string strVal3;
+    std::vector<ChartPointData> chartPoints;
+    std::vector<ChartCandleData> chartCandles;
 };
 
 struct MutationBatch {
     std::vector<MutationOp> ops;
     bool needsLayout = false;
+    double originEventMs = 0.0;
+    double jsExecMs = 0.0;
+    const char* commitTrigger = "";
 };
 
 struct UiEvent {
@@ -215,6 +257,7 @@ struct UiEvent {
     int32_t intVal = 0;
     int32_t intVal2 = 0;
     double numVal = 0.0;
+    double timestampMs = 0.0;
     std::string strVal;
 };
 
