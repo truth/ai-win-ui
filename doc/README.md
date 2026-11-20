@@ -67,7 +67,7 @@ older design snapshot.
   - archived examples: declarative style v1, theme tokens, layered window v2
 - `doc/reports/`
   - dated test and QA regression reports
-  - **Skia TextBlob & Multi-Dirty-Rect Optimization Report:** `2026-11-20-skia-opt-before-after-report.md`
+  - **Skia TextBlob & Multi-Dirty-Rect Optimization Report (MD + HTML):** `2026-11-20-skia-opt-before-after-report.md` / `2026-11-20-skia-opt-before-after-report.html`
   - **React (QuickJS-ng) vs XML (C++) Performance Evaluation Report (MD + HTML):** `2026-11-20-react-vs-xml-perf-report.md` / `2026-11-20-react-vs-xml-perf-report.html`
   - **Frame Profiler & Smoothness Optimization Report (MD + HTML):** `2026-11-02-frame-profiler-and-smoothness-report.md` / `2026-11-02-frame-profiler-and-smoothness-report.html`
   - **Modular Parsers Test Report:** `2026-10-31-modular-parsers-test-report.md`
@@ -121,6 +121,7 @@ The app currently supports:
   - Smooth Catmull-Rom spline curves (`smooth="true"`), vertical linear gradient area fills, rounded pill bar charts with highlight badges, and Pie/Donut ring charts (`type="pie|donut"`)
 - custom chrome + **layered** per-pixel alpha windows; multi-process shaped demos
 - external SVG files via `SvgIcon` on Skia (`SkSVGDOM`)
+- **Skia Performance Pipeline**: UTF-16 direct batch text measurement (`textToGlyphs` + `getWidths`), 4096-entry zero-copy `AcquireSkiaTextLayout` & `SkTextBlob` LRU caches, single-line `DrawTextW` fast path, and `DirtyRegion` multi-dirty-rect clipping (`SkRegion` + per-rect `BitBlt`, keeping Direct2D strictly full-frame)
 - **React JSX Native UI** (`AI_WIN_UI_ENABLE_REACT=ON`): vendored `QuickJS-ng v0.18.0` worker thread + typed `MutationBatch` dual-thread bridge driving 19 native JSX controls (including `<FinancialChart>` + `useWindowKeyDown`), optimistic inputs with `eventSeq` echo guard, `--react` / `--watch` hot reload, plus React Showcase and Flush-style Stock Terminal apps
 
 ### Layout / style rule impact (quick reference)
@@ -169,6 +170,8 @@ Full detail: `doc/layout-spec.md` + `doc/style-catalog.md`.
 - `scripts/build_react.ps1` — compile `.tsx` to QuickJS-ready `.bundle.js` via `bun build` (supports `-Watch`)
 - `scripts/run_react_demo.ps1` — build & run the React JSX Showcase (`-Renderer skia|direct2d`, `-Watch`)
 - **`scripts/run_stock_react.ps1`** — build & run the React Flush-style Stock Terminal (`-Renderer skia|direct2d`, `-Watch`)
+- **`scripts/bench_react_vs_xml.ps1`** — automated XML vs React Release benchmark suite (Stock Terminal + 60Hz 100-Cell Stress + Rapid Typing)
+- **`scripts/bench_skia_dirty_region.ps1`** — automated Day-K 500ms disjoint-corner multi-dirty-rect Release benchmark
 
 - `scripts/run_layout_demo.ps1` — generic launcher (aliases include
   `style-catalog`, `shaped-hub`, `table-components`, …)

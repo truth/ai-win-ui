@@ -14,7 +14,7 @@
   - **单元测试、压测与 Release 实测**：
     - [`src/frame_profiler.h`](src/frame_profiler.h) 增加 `dirty_rects,dirty_area_pct` 指标列；新增 [`samples/skia_unit_test/main.cpp`](samples/skia_unit_test/main.cpp)（**4/4 PASS**）与 [`scripts/bench_skia_dirty_region.ps1`](scripts/bench_skia_dirty_region.ps1)；`react_unit_test` **3/3 PASS**，`run_ci_local.ps1 -SkipBuild` **7/7 PASS**；
     - Release 实测：纯全帧 `resizeSweep` 渲染降 **`-27.6%`**（XML）/ **`-21.3%`**（React），Stock XML `tick500ms` `paint` 降 **`-70.3%`**（`4.932 -> 1.464 ms`），快速输入 `typingChar` `paint` 降 **`-83.5% ~ -83.9%`**（端到端 `latency -61.3% ~ -63.3%`），Day-K 四角分散更新 XML Skia `dirtyArea 3.84%`、`paint 0.336 ms`（较 Direct2D `6.976 ms` 快 **20.8×**；React Skia `2.343 ms`，快 **2.65×**）。
-    - 归档设计方案至 [`doc/plan/2026-11-20-skia-textblob-and-multi-dirty-rect.md`](doc/plan/2026-11-20-skia-textblob-and-multi-dirty-rect.md)，实测报告至 [`doc/reports/2026-11-20-skia-opt-before-after-report.md`](doc/reports/2026-11-20-skia-opt-before-after-report.md)。
+    - 归档设计方案至 [`doc/plan/2026-11-20-skia-textblob-and-multi-dirty-rect.md`](doc/plan/2026-11-20-skia-textblob-and-multi-dirty-rect.md)，实测报告至 [`doc/reports/2026-11-20-skia-opt-before-after-report.md`](doc/reports/2026-11-20-skia-opt-before-after-report.md)（可视化版：[`doc/reports/2026-11-20-skia-opt-before-after-report.html`](doc/reports/2026-11-20-skia-opt-before-after-report.html)），并同步更新 [`README.md`](README.md)、[`doc/README.md`](doc/README.md)、[`doc/skia-integration.md`](doc/skia-integration.md)、[`doc/troubleshooting-and-pitfalls.md`](doc/troubleshooting-and-pitfalls.md) 与 [`CHANGELOG.md`](CHANGELOG.md)。
 
 - **React JSX 声明式 UI 运行时与双线程原生桥接 (React JSX Native UI v1)**（分支 `feature/react-jsx-ui`，暂未合并 `master`）
   - **零冗余 JS 运行时与引擎集成**：

@@ -2,7 +2,8 @@
 
 - **日期**：2026-11-20
 - **对比基线 (Before)**：`feature/react-jsx-ui` @ `12fa270`（`build/bench/react_vs_xml/summary.json`）
-- **优化分支 (After)**：`feature/skia-textblob-dirty-region`（`build/bench/skia_opt_after/summary.json` & `build/bench/skia_dirty_dayk/dayk_summary.json`）
+- **优化分支 (After)**：`feature/skia-textblob-dirty-region` @ `1f1af45`（`build/bench/skia_opt_after/summary.json` & `build/bench/skia_dirty_dayk/dayk_summary.json`）
+- **交互式可视化报告**：[`doc/reports/2026-11-20-skia-opt-before-after-report.html`](2026-11-20-skia-opt-before-after-report.html)
 - **测试脚本**：`.\scripts\bench_react_vs_xml.ps1 -Renderer both -Configuration Release` 与 `.\scripts\bench_skia_dirty_region.ps1 -Renderer both -Configuration Release`
 
 ---

@@ -161,20 +161,16 @@ powershell -ExecutionPolicy Bypass -File .\scripts\run_layout_demo.ps1 `
 
 ## Current Implementation Snapshot
 
-The current `renderer_skia.cpp` is intentionally small but real.
+`renderer_skia.cpp`, `skia_font_shared.h`, `skia_text_layout.cpp`, and `dirty_region.h` together implement a full-featured retained UI raster backend:
 
-Implemented today:
-
-- raster surface creation via `SkSurfaces::WrapPixels`
-- frame clear
-- filled and stroked rectangles
-- filled and stroked rounded rectangles
+- raster surface creation via `SkSurfaces::WrapPixels` with 64px-stepped DIB reuse on resize
+- `DirtyRegion` (up to 8 rects) + `SkRegion` clip (`clipRegion`) and per-rect `BitBlt` presentation on HWND
+- filled and stroked rectangles, rounded rectangles, linear gradients (`FillLinearGradient`), polygons, and true Gaussian blur soft shadows (`SkMaskFilter::MakeBlur`)
 - rounded clipping via save/clip/restore
-- encoded image decode via `SkImages::DeferredFromEncodedData`
-- image draw into destination rect with explicit linear sampling
-- wrapped UTF-8 text draw using `SkFont`, subpixel/LCD-oriented font settings,
-  manual line breaking, clipping, and baseline calculation
-- **SVG rendering via `SkSVGDOM`** (see below)
+- encoded image decode via `SkImages::DeferredFromEncodedData` and image draw with explicit linear sampling
+- UTF-16 batch text measurement (`SkFont::textToGlyphs(..., kUTF16)` + `getWidths`), zero-copy 4096-entry LRU `AcquireSkiaTextLayout`, and 4096-entry `SkTextBlob` LRU cache (`allocRunPosH`) with single-line fast path and CJK font fallback
+- `FontMetrics` and `SkDashPathEffect` caches
+- **SVG rendering via `SkSVGDOM`** with path-keyed handle cache and tint color filter (Wave2 **R8**)
 
 ### SVG via SkSVGDOM
 
@@ -218,7 +214,28 @@ unaffected.
 - presentation is CPU/raster only (no GPU present path yet)
 - bitmap scaling quality can differ slightly from Direct2D (linear sampling policy)
 - the `vcpkg` Skia path still is not the preferred delivery route in this repo
-- SVG v1: no tint, no handle cache, no SMIL (Direct2D shows placeholder)
+- mousemove crosshair hover currently still marks full-window invalidation on Stock Terminal (see Phase 2 roadmap in `doc/plan/2026-11-20-skia-textblob-and-multi-dirty-rect.md`)
+
+## Performance Architecture (SkTextBlob Cache & Multi-Dirty-Rect)
+
+### Debug vs Release Performance Cliff
+
+- `third_party/skia-m124/out/Debug-x64/skia.lib` is built unoptimized; on complex pages (`modern_components_v2.xml`), Skia Debug renders in `~135.9 ms` while Skia Release renders in `~4.4 ms` (**~30× faster**).
+- Always run performance benchmarks, frame profiling, and interactive demos with `-Configuration Release`.
+
+### UTF-16 Direct Text Pipeline & LRU Caches
+
+1. **UTF-16 Batch Measurement (`src/skia_font_shared.h`)**: `MeasureTextWidthWithFallback` calls `SkFont::textToGlyphs(..., SkTextEncoding::kUTF16)` and `SkFont::getWidths` using a 128-entry stack buffer before falling back to `MatchTypefaceForCharacter` + UTF-16 `measureText`, eliminating per-draw `WideCharToMultiByte` UTF-8 conversions and per-char `unicharToGlyph` calls.
+2. **Zero-Copy Text Layout Cache (`src/skia_text_layout.h`, `src/skia_text_layout.cpp`)**: `AcquireSkiaTextLayout(...)` returns `std::shared_ptr<const SkiaTextLayout>` from a 4096-entry true LRU cache (`std::list` + `std::unordered_map`) with a reusable `s_lookupKey` and `lineHeightFactorQ` hash mixing.
+3. **`SkTextBlob` LRU & Single-Line Fast Path (`src/renderer_skia.cpp`)**: `DrawTextW` bypasses `SkiaTextLayout` for single-line non-wrapping text that fits within `maxWidth`, draws cached `SkTextBlob` objects built with `SkTextBlobBuilder::allocRunPosH` (up to 4096 entries, supporting single-run UTF-16 and multi-run CJK fallback), uses non-AA `clipRect(..., false)`, and caches `SkFontMetrics` and `SkDashPathEffect`. Caches are declared after `m_fontMgr` / `m_defaultTypeface` and cleared explicitly in `~SkiaRenderer()`.
+
+### Multi-Dirty-Rect (`DirtyRegion`)
+
+- **`ai_win_ui::DirtyRegion` (`src/dirty_region.h`)**: Caps disjoint dirty rectangles at `kMaxRects = 8`, merges nearby rectangles when wasted gap area `<= 2048 px²` (`kAdjacentMergeWasteArea`), greedily coalesces beyond 8 rects, and degrades cleanly to full-frame repaint once dirty coverage exceeds `85%` (`kFullRepaintAreaRatio`).
+- **Win32 Region Preservation (`src/ui_host.cpp`)**: `OnPaint()` extracts Win32 update rectangles via `GetUpdateRgn` + `GetRegionData` **before** calling `BeginPaint()`, passing normalized dirty rects through `IRenderer::SetDirtyRects`.
+- **`SkRegion` Clipping & Per-Rect `BitBlt` (`src/renderer_skia.cpp`)**: `BeginFrame` clips via `canvas->clipRegion(...)`, drawing primitives and widgets short-circuit on `IntersectsDirtyRect`, and `PresentHwnd` blits only dirty rectangles via `BitBlt`.
+- **Direct2D Invariant (Rule #3)**: Direct2D uses a DXGI swap chain and stays strictly full-frame (`SetDirtyRects({})`).
+- **Tests & Benchmarks**: Verified by `samples/skia_unit_test/` (4 tests), `scripts/bench_react_vs_xml.ps1`, and `scripts/bench_skia_dirty_region.ps1` (see `doc/plan/2026-11-20-skia-textblob-and-multi-dirty-rect.md` and `doc/reports/2026-11-20-skia-opt-before-after-report.md`).
 
 ## Known Skia ↔ Direct2D differences (Wave1 · R5)
 
