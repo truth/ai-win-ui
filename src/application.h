@@ -11,6 +11,7 @@
 namespace ai_win_ui {
 
 constexpr UINT kMsgOpenDemoHost = WM_APP + 40;
+constexpr UINT kMsgReactCommit = WM_APP + 41;
 
 class Application {
 public:

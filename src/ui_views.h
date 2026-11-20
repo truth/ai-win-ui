@@ -612,12 +612,6 @@ public:
     }
 
     void AddChild(std::unique_ptr<UIElement> child) override {
-        if (!child) return;
-        if (auto* ti = dynamic_cast<TreeItem*>(child.get())) {
-            std::shared_ptr<TreeItem> sp(static_cast<TreeItem*>(child.release()));
-            AddSubItem(sp);
-            return;
-        }
         UIElement::AddChild(std::move(child));
     }
 };
@@ -672,6 +666,8 @@ public:
     }
 
     bool IsFocusable() const override { return true; }
+    bool IsLayoutLeaf() const override { return true; }
+    void LockColors() { m_styleFromLayout = true; }
 
     bool OnFocus() override {
         if (!m_hasFocus) {
@@ -711,6 +707,9 @@ public:
             if (selectedIndex > 0) {
                 SetSelectedPath(visible[static_cast<size_t>(selectedIndex - 1)].path);
                 EnsureSelectedVisible(visible);
+                if (onSelect) {
+                    if (Node* n = GetNode(m_selectedPath)) onSelect(m_selectedPath, n->label);
+                }
                 return true;
             }
             return false;
@@ -719,6 +718,9 @@ public:
             if (selectedIndex + 1 < static_cast<int>(visible.size())) {
                 SetSelectedPath(visible[static_cast<size_t>(selectedIndex + 1)].path);
                 EnsureSelectedVisible(visible);
+                if (onSelect) {
+                    if (Node* n = GetNode(m_selectedPath)) onSelect(m_selectedPath, n->label);
+                }
                 return true;
             }
             return false;
@@ -726,11 +728,17 @@ public:
         if (keyCode == VK_HOME) {
             SetSelectedPath(visible.front().path);
             EnsureSelectedVisible(visible);
+            if (onSelect) {
+                if (Node* n = GetNode(m_selectedPath)) onSelect(m_selectedPath, n->label);
+            }
             return true;
         }
         if (keyCode == VK_END) {
             SetSelectedPath(visible.back().path);
             EnsureSelectedVisible(visible);
+            if (onSelect) {
+                if (Node* n = GetNode(m_selectedPath)) onSelect(m_selectedPath, n->label);
+            }
             return true;
         }
 
@@ -742,6 +750,7 @@ public:
         if (keyCode == VK_LEFT) {
             if (!selected->children.empty() && selected->expanded) {
                 selected->expanded = false;
+                if (selected->sourceItem) selected->sourceItem->expanded = false;
                 return true;
             }
             if (m_selectedPath.size() > 1) {
@@ -749,6 +758,9 @@ public:
                 parentPath.pop_back();
                 SetSelectedPath(parentPath);
                 EnsureSelectedVisible(BuildVisibleNodes());
+                if (onSelect) {
+                    if (Node* n = GetNode(m_selectedPath)) onSelect(m_selectedPath, n->label);
+                }
                 return true;
             }
             return false;
@@ -757,6 +769,7 @@ public:
         if (keyCode == VK_RIGHT) {
             if (!selected->children.empty() && !selected->expanded) {
                 selected->expanded = true;
+                if (selected->sourceItem) selected->sourceItem->expanded = true;
                 return true;
             }
             if (!selected->children.empty()) {
@@ -764,6 +777,9 @@ public:
                 childPath.push_back(0);
                 SetSelectedPath(childPath);
                 EnsureSelectedVisible(BuildVisibleNodes());
+                if (onSelect) {
+                    if (Node* n = GetNode(m_selectedPath)) onSelect(m_selectedPath, n->label);
+                }
                 return true;
             }
             return false;
@@ -772,6 +788,7 @@ public:
         if (keyCode == VK_SPACE || keyCode == VK_RETURN) {
             if (!selected->children.empty()) {
                 selected->expanded = !selected->expanded;
+                if (selected->sourceItem) selected->sourceItem->expanded = selected->expanded;
                 return true;
             }
             return false;
@@ -801,11 +818,17 @@ public:
 
         if (entry.node && !entry.node->children.empty() && ToggleGlyphRect(entry.depth, rowIndex).Contains(x, y)) {
             entry.node->expanded = !entry.node->expanded;
+            if (entry.node->sourceItem) {
+                entry.node->sourceItem->expanded = entry.node->expanded;
+            }
             InvalidateSelf(4.0f);
             return true;
         }
         if (showCheckBox && entry.node && CheckBoxRect(entry.depth, rowIndex).Contains(x, y)) {
             entry.node->isChecked = !entry.node->isChecked;
+            if (entry.node->sourceItem) {
+                entry.node->sourceItem->isChecked = entry.node->isChecked;
+            }
             InvalidateSelf(4.0f);
             if (onCheck) onCheck(entry.path, entry.node->isChecked);
             return true;
@@ -1119,29 +1142,62 @@ public:
         bool expanded = true;
         std::string icon;
         bool isChecked = false;
+        TreeItem* sourceItem = nullptr;
     };
 
     void AddChild(std::unique_ptr<UIElement> child) override {
-        if (!child) return;
-        if (auto* ti = dynamic_cast<TreeItem*>(child.get())) {
-            std::function<Node(TreeItem*)> convert = [&](TreeItem* it) -> Node {
-                Node n;
-                n.label = it->header;
-                n.icon = it->icon;
-                n.expanded = it->expanded;
-                n.isChecked = it->isChecked;
-                for (const auto& sub : it->subItems) {
-                    if (sub) n.children.push_back(convert(sub.get()));
-                }
-                return n;
-            };
-            m_roots.push_back(convert(ti));
-            if (m_selectedPath.empty() && !m_roots.empty()) {
-                m_selectedPath = std::vector<int>{0};
-            }
-            return;
-        }
         UIElement::AddChild(std::move(child));
+        RebuildNodesFromChildren();
+    }
+
+    void InsertChildBefore(std::unique_ptr<UIElement> child, const UIElement* before) override {
+        UIElement::InsertChildBefore(std::move(child), before);
+        RebuildNodesFromChildren();
+    }
+
+    std::unique_ptr<UIElement> RemoveChild(UIElement* child) override {
+        auto removed = UIElement::RemoveChild(child);
+        RebuildNodesFromChildren();
+        return removed;
+    }
+
+    void ClearChildren() override {
+        UIElement::ClearChildren();
+        RebuildNodesFromChildren();
+    }
+
+    void RebuildNodesFromChildren() {
+        m_roots.clear();
+        std::function<Node(TreeItem*)> convert = [&](TreeItem* it) -> Node {
+            Node n;
+            n.label = it->header;
+            n.icon = it->icon;
+            n.expanded = it->expanded;
+            n.isChecked = it->isChecked;
+            n.sourceItem = it;
+            for (const auto& child : it->Children()) {
+                if (auto* sub = dynamic_cast<TreeItem*>(child.get())) {
+                    n.children.push_back(convert(sub));
+                }
+            }
+            for (const auto& sub : it->subItems) {
+                if (sub) {
+                    n.children.push_back(convert(sub.get()));
+                }
+            }
+            return n;
+        };
+        for (const auto& child : m_children) {
+            if (auto* ti = dynamic_cast<TreeItem*>(child.get())) {
+                m_roots.push_back(convert(ti));
+            }
+        }
+        if (m_roots.empty()) {
+            m_selectedPath.clear();
+        } else if (m_selectedPath.empty() || !GetNode(m_selectedPath)) {
+            m_selectedPath = std::vector<int>{0};
+        }
+        InvalidateSelf(4.0f);
     }
 
 private:

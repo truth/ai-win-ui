@@ -436,6 +436,22 @@ public:
         m_caretPosition = m_text.size();
         ClearSelection();
     }
+    void SetTextPreserveCaret(std::wstring text) {
+        if (text == m_text) {
+            return;
+        }
+        m_text = std::move(text);
+        if (!m_hasFocus) {
+            m_caretPosition = m_text.size();
+            ClearSelection();
+        } else {
+            m_caretPosition = std::min(m_caretPosition, m_text.size());
+            m_selectionStart = std::min(m_selectionStart, m_text.size());
+            m_selectionEnd = std::min(m_selectionEnd, m_text.size());
+        }
+    }
+    std::function<void(const std::wstring&)> onTextChanged;
+    std::function<void(const std::wstring&)> onSubmit;
 
     static ComponentStyle DefaultStyle(const Theme* theme = nullptr) {
         ComponentStyle s;
@@ -491,10 +507,17 @@ public:
         const bool shiftDown = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
         const bool ctrlDown = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
         switch (keyCode) {
+            case VK_RETURN:
+                if (onSubmit) {
+                    onSubmit(m_text);
+                    return true;
+                }
+                break;
             case VK_BACK:
                 if (HasSelection()) {
                     DeleteSelection();
                     ResetCaretBlink();
+                    NotifyTextChanged();
                     return true;
                 }
                 if (m_caretPosition > 0) {
@@ -502,6 +525,7 @@ public:
                     --m_caretPosition;
                     ClearSelection();
                     ResetCaretBlink();
+                    NotifyTextChanged();
                     return true;
                 }
                 break;
@@ -509,11 +533,13 @@ public:
                 if (HasSelection()) {
                     DeleteSelection();
                     ResetCaretBlink();
+                    NotifyTextChanged();
                     return true;
                 }
                 if (m_caretPosition < m_text.size()) {
                     m_text.erase(m_caretPosition, 1);
                     ResetCaretBlink();
+                    NotifyTextChanged();
                     return true;
                 }
                 break;
@@ -613,6 +639,7 @@ public:
                                 ClearSelection();
                                 ResetCaretBlink();
                                 CloseClipboard();
+                                NotifyTextChanged();
                                 return true;
                             }
                         }
@@ -642,6 +669,7 @@ public:
                     }
                     DeleteSelection();
                     ResetCaretBlink();
+                    NotifyTextChanged();
                     return true;
                 }
                 break;
@@ -660,6 +688,7 @@ public:
             m_text.insert(m_caretPosition, 1, ch);
             ++m_caretPosition;
             ResetCaretBlink();
+            NotifyTextChanged();
             return true;
         }
         return false;
@@ -765,9 +794,28 @@ public:
         return false;
     }
 
+    void LockColors() { m_styleFromLayout = true; }
     void SetFontSize(float size) { fontSize = size; }
     void SetBackgroundColor(const Color& color) { background = color; }
+    void SetBorderColor(const Color& color) {
+        borderColor = color;
+        if (!m_style.base.decoration.has_value()) {
+            m_style.base.decoration = BoxDecoration{};
+        }
+        m_style.base.decoration->border.color = color;
+    }
+    void SetFocusBorderColor(const Color& color) {
+        focusBorderColor = color;
+        auto& focusedDecoration = m_style.overrides[static_cast<std::size_t>(StyleState::Focused)].decoration;
+        if (!focusedDecoration.has_value()) {
+            focusedDecoration = m_style.base.decoration.value_or(BoxDecoration{});
+        }
+        focusedDecoration->border.color = color;
+    }
     void SetTextColor(const Color& color) { textColor = color; }
+    void SetPlaceholder(std::wstring placeholder) { m_placeholder = std::move(placeholder); }
+    const std::wstring& Placeholder() const { return m_placeholder; }
+    void SetPlaceholderColor(const Color& color) { placeholderColor = color; }
     void SetCornerRadius(float radius) { cornerRadius = radius; }
 
     bool GetTextInputCaretRect(Rect& out) const override {
@@ -844,13 +892,23 @@ public:
             TextVerticalAlign::Center
         };
         const Color fg = resolved.foreground.value_or(textColor);
-        renderer.DrawTextW(
-            m_text.c_str(),
-            static_cast<UINT32>(m_text.size()),
-            lineRect,
-            fg,
-            ScaleValue(fontSize),
-            textOptions);
+        if (m_text.empty() && !m_placeholder.empty()) {
+            renderer.DrawTextW(
+                m_placeholder.c_str(),
+                static_cast<UINT32>(m_placeholder.size()),
+                lineRect,
+                placeholderColor,
+                ScaleValue(fontSize),
+                textOptions);
+        } else {
+            renderer.DrawTextW(
+                m_text.c_str(),
+                static_cast<UINT32>(m_text.size()),
+                lineRect,
+                fg,
+                ScaleValue(fontSize),
+                textOptions);
+        }
 
         if (m_hasFocus) {
             const Rect caretRect = CaretRect();
@@ -885,7 +943,15 @@ private:
 public:
 
 private:
+    void NotifyTextChanged() {
+        if (onTextChanged) {
+            onTextChanged(m_text);
+        }
+    }
+
     std::wstring m_text;
+    std::wstring m_placeholder;
+    Color placeholderColor = ColorFromHex(0x64748B);
     size_t m_caretPosition = 0;
     size_t m_selectionStart = 0;
     size_t m_selectionEnd = 0;
@@ -1032,6 +1098,9 @@ public:
     bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
         if (keyCode == VK_SPACE || keyCode == VK_RETURN) {
             m_checked = !m_checked;
+            if (onChange) {
+                onChange(m_checked);
+            }
             return true;
         }
         return false;
@@ -1122,6 +1191,9 @@ public:
         const bool hit = HitTest(x, y);
         if (m_pressed && hit) {
             m_checked = !m_checked;
+            if (onChange) {
+                onChange(m_checked);
+            }
         }
         m_pressed = false;
         return hit;
@@ -1138,6 +1210,10 @@ public:
     void SetText(std::wstring text) { m_text = std::move(text); }
     void SetChecked(bool checked) { m_checked = checked; }
     bool IsChecked() const { return m_checked; }
+    void SetTextColor(const Color& color) { textColor = color; }
+    void SetFontSize(float size) { fontSize = size; }
+    void LockColors() { m_styleFromLayout = true; }
+    std::function<void(bool)> onChange;
 
 private:
     std::wstring m_text;
@@ -1444,11 +1520,19 @@ public:
 
     bool OnKeyDown(WPARAM keyCode, LPARAM /*lParam*/) override {
         if (keyCode == VK_LEFT || keyCode == VK_DOWN) {
+            const float before = m_value;
             SetValue(m_value - m_step);
+            if (std::abs(m_value - before) > 1e-5f && onChange) {
+                onChange(m_value);
+            }
             return true;
         }
         if (keyCode == VK_RIGHT || keyCode == VK_UP) {
+            const float before = m_value;
             SetValue(m_value + m_step);
+            if (std::abs(m_value - before) > 1e-5f && onChange) {
+                onChange(m_value);
+            }
             return true;
         }
         return false;
@@ -1610,6 +1694,11 @@ public:
     void SetRange(float minValue, float maxValue) { m_min = minValue; m_max = maxValue; SetValue(m_value); }
     void SetValue(float value) { m_value = std::clamp(value, m_min, m_max); }
     void SetStep(float step) { m_step = std::max(0.001f, step); }
+    float Value() const { return m_value; }
+    float Min() const { return m_min; }
+    float Max() const { return m_max; }
+    void LockColors() { m_styleFromLayout = true; }
+    std::function<void(float)> onChange;
 
     // Legacy quick-set fields (still honored; synced into style before paint).
     float fontSize = 13.0f;
@@ -1660,7 +1749,11 @@ private:
         const float trackLeft = m_bounds.left + ScaleValue(14.0f);
         const float trackRight = m_bounds.right - ScaleValue(14.0f);
         const float ratio = std::clamp((x - trackLeft) / (trackRight - trackLeft), 0.0f, 1.0f);
+        const float before = m_value;
         SetValue(m_min + ratio * (m_max - m_min));
+        if (std::abs(m_value - before) > 1e-5f && onChange) {
+            onChange(m_value);
+        }
     }
 
     std::wstring m_label;

@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "jsxImportSource": "ai-win-ui",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "ai-win-ui": ["./runtime/index.ts"],
+      "ai-win-ui/jsx-runtime": ["./runtime/jsx-runtime.ts"],
+      "ai-win-ui/jsx-dev-runtime": ["./runtime/jsx-runtime.ts"]
+    }
+  },
+  "include": ["./runtime/**/*", "./demos/**/*"]
+}
+

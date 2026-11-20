@@ -84,6 +84,11 @@
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/modern_components_v2.xml||1280x860" height="32" />
         </Panel>
         <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
+          <Label text="React TSX Runtime" fontSize="14" color="#F2F6FB" />
+          <Label text="QuickJS-ng · Dual-Thread Batch · Hooks" fontSize="11" color="#8FA3B8" />
+          <Button text="Open" style="$style.primaryButton" onClick="openDemo:react/react_demo.bundle.js||1280x840" height="32" />
+        </Panel>
+        <Panel direction="column" background="#152033" cornerRadius="10" padding="12,10,12,10" spacing="6" alignItems="stretch">
           <Label text="Desktop Navigation" fontSize="14" color="#F2F6FB" />
           <Label text="TreeView · Breadcrumb · Pagination" fontSize="11" color="#8FA3B8" />
           <Button text="Open" style="$style.primaryButton" onClick="openDemo:layouts/desktop_navigation_demo.xml||1280x860" height="32" />

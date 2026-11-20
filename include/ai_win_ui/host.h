@@ -74,6 +74,11 @@ struct HostCreateInfo {
     // Optional app action sink for custom onClick / hover ids (see above).
     HostActionCallback onAction = nullptr;
     void* actionUser = nullptr;
+
+    // Optional QuickJS-ng React bundle path (e.g. L"react/react_demo.bundle.js" or fs path)
+    // and dev hot-reload flag (--watch).
+    const wchar_t* reactBundlePath = nullptr;
+    bool reactWatch = false;
 };
 
 // One retained UI window (top-level or child of HostCreateInfo::parent).

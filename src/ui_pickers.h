@@ -232,6 +232,10 @@ public:
         SetValue(m_value);
     }
     void SetValue(float value) { m_value = std::clamp(value, m_min, m_max); }
+    float Value() const { return m_value; }
+    float Min() const { return m_min; }
+    float Max() const { return m_max; }
+    void LockColors() { m_styleFromLayout = true; }
     void SetStep(float step) { m_step = std::max(0.001f, step); }
     void SetShowValueText(bool showValueText) { m_showValueText = showValueText; }
     void SetFillColor(Color color) {

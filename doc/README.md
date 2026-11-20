@@ -39,6 +39,7 @@ older design snapshot.
   - comparison of prebuilt Skia package options
 - `doc/plan/`
   - dated implementation plans (shipped and active)
+  - **React JSX Native UI (QuickJS-ng + Dual-Thread Bridge):** `2026-11-20-react-jsx-native-ui.md`
   - **Desktop Navigation & Data View Components v3 (TreeView, Breadcrumb, Pagination):** `2026-11-08-desktop-navigation-components.md`
   - **List Labels Height Collapse & Panel Padding Safety Fix:** `2026-11-03-fix-list-labels-height-collapse.md`
   - **Font Clipping & Direct2D Repaint Fix:** 2026-11-03-font-clipping-and-direct2d-repaint-fix.md
@@ -90,6 +91,7 @@ abstractions:
 | **UiHost / multi-host** | **`src/ui_host.h`**, `src/ui_host_input.cpp`, `src/ui_host_overlay.cpp`, `src/application.*`, **`src/frame_profiler.h`** (F12 per-phase frame profiler & CSV export) |
 | Animation & Reactive | `src/animation_controller.*`, `<ai_win_ui/observable.h>` |
 | **C-API Interop** | **`<ai_win_ui/c_api.h>`**, `src/c_api.cpp` |
+| **React JSX UI** | **`third_party/quickjs-ng/`** (QuickJS-ng v0.18.0), `src/react_bridge_iface.h`, **`src/react/*`** (`ai_win_ui_react`), **`react/runtime/*`** (TS reconciler + 18 JSX primitives), `react/demos/react_showcase.tsx`, `samples/react_demo/`, `samples/react_unit_test/` |
 | Host impl (TU) | `src/main.cpp` (`class UiHost`) |
 
 The app currently supports:

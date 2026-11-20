@@ -1,6 +1,7 @@
 #include "application.h"
 #include "frame_profiler.h"
 #include "host_options.h"
+#include "react_bridge_iface.h"
 #include "ui_host.h"
 #include "ai_win_ui/host.h"
 #include "ai_win_ui/observable.h"
@@ -27,6 +28,7 @@
 #include "uia_provider.h"
 
 #include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdint>
@@ -149,6 +151,8 @@ public:
     }
 
     ~UiHost() {
+        TeardownReactBridge();
+
         for (const auto& binding : m_bindings) {
             if (binding.first) {
                 binding.first->Unsubscribe(binding.second);
@@ -405,8 +409,10 @@ public:
         m_isInitialized = true;
         OnResize();
         LogEffectiveEnv();
-        MaybeDumpMeasureTree();
-        MaybeDumpTextMetrics();
+        if (!m_reactBridge) {
+            MaybeDumpMeasureTree();
+            MaybeDumpTextMetrics();
+        }
 
         // Layered windows stay invisible until the first UpdateLayeredWindow.
         // Force an initial paint while still hidden so the first ShowWindow has
@@ -465,6 +471,7 @@ public:
     }
 
     void TeardownWindow() {
+        TeardownReactBridge();
         m_isInitialized = false;
         m_focusedElement = nullptr;
         m_mouseCaptureTarget = nullptr;
@@ -572,12 +579,15 @@ public:
         wchar_t prevChromeBuf[512] = {};
         wchar_t prevSizeBuf[512] = {};
         wchar_t prevRendererBuf[512] = {};
+        wchar_t prevReactBuf[512] = {};
         const DWORD nLayout = GetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", prevLayoutBuf, 512);
         const DWORD nChrome = GetEnvironmentVariableW(L"AI_WIN_UI_CHROME", prevChromeBuf, 512);
         const DWORD nSize = GetEnvironmentVariableW(L"AI_WIN_UI_SIZE", prevSizeBuf, 512);
         const DWORD nRenderer = GetEnvironmentVariableW(L"AI_WIN_UI_RENDERER", prevRendererBuf, 512);
+        const DWORD nReact = GetEnvironmentVariableW(L"AI_WIN_UI_REACT", prevReactBuf, 512);
 
         SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", options.layout.c_str());
+        SetEnvironmentVariableW(L"AI_WIN_UI_REACT", nullptr);
         // Always set/clear chrome so secondary does not inherit hub chrome env.
         if (!options.chrome.empty() && options.chrome != L"system") {
             SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", options.chrome.c_str());
@@ -612,6 +622,7 @@ public:
         restore(L"AI_WIN_UI_CHROME", nChrome, prevChromeBuf);
         restore(L"AI_WIN_UI_SIZE", nSize, prevSizeBuf);
         restore(L"AI_WIN_UI_RENDERER", nRenderer, prevRendererBuf);
+        restore(L"AI_WIN_UI_REACT", nReact, prevReactBuf);
 
         if (!ok) {
             // Initialize already tore down the HWND on failure.
@@ -642,6 +653,10 @@ public:
     HWND GetHwnd() const { return m_hwnd; }
 
     // ---- Embedder hooks (set before Initialize) ---------------------------
+    void SetReactBundle(std::string bundlePathUtf8, bool watchMode) {
+        m_reactBundlePath = std::move(bundlePathUtf8);
+        m_reactWatch = watchMode;
+    }
     void SetInlineLayout(std::string utf8, bool isJson) {
         m_inlineLayoutXml = std::move(utf8);
         m_inlineLayoutIsJson = isJson;
@@ -1361,8 +1376,10 @@ private:
         const std::wstring prevChrome = GetEnvironmentValue(L"AI_WIN_UI_CHROME");
         const std::wstring prevSize = GetEnvironmentValue(L"AI_WIN_UI_SIZE");
         const std::wstring prevRenderer = GetEnvironmentValue(L"AI_WIN_UI_RENDERER");
+        const std::wstring prevReact = GetEnvironmentValue(L"AI_WIN_UI_REACT");
 
         SetEnvironmentVariableW(L"AI_WIN_UI_LAYOUT", layoutRelPath);
+        SetEnvironmentVariableW(L"AI_WIN_UI_REACT", nullptr);
         if (chrome.empty()) {
             SetEnvironmentVariableW(L"AI_WIN_UI_CHROME", nullptr);
         } else {
@@ -1422,6 +1439,7 @@ private:
         restore(L"AI_WIN_UI_CHROME", prevChrome);
         restore(L"AI_WIN_UI_SIZE", prevSize);
         restore(L"AI_WIN_UI_RENDERER", prevRenderer);
+        restore(L"AI_WIN_UI_REACT", prevReact);
     }
 
     void BuildUI() {
@@ -1593,6 +1611,49 @@ private:
         LoadTheme();
         LoadStyleCatalog();
 
+        // Check React JSX bundle (explicit API -> AI_WIN_UI_REACT -> .js AI_WIN_UI_LAYOUT).
+        {
+            auto endsWithJs = [](const std::string& p) -> bool {
+                if (p.size() < 3) return false;
+                const char a = static_cast<char>(std::tolower(static_cast<unsigned char>(p[p.size() - 3])));
+                const char b = static_cast<char>(std::tolower(static_cast<unsigned char>(p[p.size() - 2])));
+                const char c = static_cast<char>(std::tolower(static_cast<unsigned char>(p[p.size() - 1])));
+                return a == '.' && b == 'j' && c == 's';
+            };
+            std::string reactBundle = m_reactBundlePath;
+            if (reactBundle.empty()) {
+                const std::wstring envReact = GetEnvironmentValue(L"AI_WIN_UI_REACT");
+                if (!envReact.empty()) {
+                    reactBundle = Utf16ToUtf8(envReact);
+                }
+            }
+            if (reactBundle.empty()) {
+                const std::wstring requestedLayout = GetEnvironmentValue(L"AI_WIN_UI_LAYOUT");
+                const std::string requestedUtf8 = Utf16ToUtf8(requestedLayout);
+                if (endsWithJs(requestedUtf8)) {
+                    reactBundle = requestedUtf8;
+                }
+            }
+            if (!reactBundle.empty()) {
+                if (auto factory = ai_win_ui::GetReactBridgeFactory()) {
+                    auto placeholder = std::make_unique<Panel>();
+                    placeholder->padding = Thickness{0, 0, 0, 0};
+                    placeholder->background = ColorFromHex(0x0B121A);
+                    m_root = std::move(placeholder);
+                    m_reactSurface = std::make_unique<ReactSurfaceAdapter>(*this);
+                    m_reactBridge = factory(*m_reactSurface, reactBundle, m_reactWatch);
+                    if (m_reactBridge) {
+                        m_activeLayoutPath = reactBundle;
+                        UpdateWindowTitle();
+                        return;
+                    }
+                    m_reactSurface.reset();
+                } else {
+                    OutputDebugStringW(L"[React] AI_WIN_UI_REACT requested but no ReactBridgeFactory registered\n");
+                }
+            }
+        }
+
         // Embedder-supplied in-memory layout wins over env / file candidates.
         if (!m_inlineLayoutXml.empty()) {
             m_root = LayoutParser::BuildFromXmlText(m_uiContext, m_inlineLayoutXml, m_inlineLayoutIsJson);
@@ -1682,6 +1743,7 @@ private:
         SetEnvironmentVariableW(L"AI_WIN_UI_SIZE", nullptr);
         SetEnvironmentVariableW(L"AI_WIN_UI_THEME", nullptr);
         SetEnvironmentVariableW(L"AI_WIN_UI_STYLES", nullptr);
+        SetEnvironmentVariableW(L"AI_WIN_UI_REACT", nullptr);
         SetEnvironmentVariableW(L"AI_WIN_UI_MEASURE_DUMP", nullptr);
         SetEnvironmentVariableW(L"AI_WIN_UI_TEXT_DUMP", nullptr);
         OutputDebugStringW(L"[Env] AI_WIN_UI_IGNORE_ENV: cleared sticky layout/chrome/size/theme/styles/dumps\n");
@@ -2981,6 +3043,13 @@ private:
                         if (m_root->OnTimer(wParam, dtMs)) {
                             FlushPendingDirtyInvalidate();
                         }
+                        if (m_reactBridge && m_reactWatch) {
+                            m_reactWatchAccumMs += dtMs;
+                            if (m_reactWatchAccumMs >= 300) {
+                                m_reactWatchAccumMs = 0;
+                                m_reactBridge->TickHotReload();
+                            }
+                        }
                     }
                     return 0;
                 }
@@ -2995,6 +3064,11 @@ private:
                 return 0;
             case WM_ERASEBKGND:
                 return 1;
+            case ai_win_ui::kMsgReactCommit:
+                if (m_reactBridge) {
+                    m_reactBridge->OnCommitMessage();
+                }
+                return 0;
             case ai_win_ui::kMsgOpenDemoHost:
                 if (ai_win_ui::Application::HasPendingOpen()) {
                     ai_win_ui::Application::HasPendingOpen() = false;
@@ -3008,6 +3082,7 @@ private:
                 }
                 return 0;
             case WM_DESTROY:
+                TeardownReactBridge();
                 if (!m_tearingDown) {
                     KillTimer(hwnd, kUiTimerId);
                     KillTimer(hwnd, kQuitTimerId);
@@ -3028,7 +3103,106 @@ private:
         return DefWindowProcW(hwnd, msg, wParam, lParam);
     }
 
+    // React host surface adapter & lifecycle helpers.
+    class ReactSurfaceAdapter final : public ai_win_ui::IReactHostSurface {
+    public:
+        explicit ReactSurfaceAdapter(UiHost& host) : m_host(host) {}
+        HWND GetHwnd() const override { return m_host.m_hwnd; }
+        UIContext& Context() override { return m_host.m_uiContext; }
+        Theme* GetTheme() const override { return m_host.m_theme.get(); }
+        StyleCatalog* GetStyleCatalog() const override { return m_host.m_styleCatalog.get(); }
+        IResourceProvider* GetResourceProvider() const override { return m_host.m_resourceProvider.get(); }
+        void SetRootElement(std::unique_ptr<UIElement> root) override {
+            m_host.ApplyReactRootElement(std::move(root));
+        }
+        UIElement* RootElement() const override { return m_host.m_root.get(); }
+        void NotifySubtreeRemoving(UIElement* subtree) override {
+            m_host.NotifySubtreeRemoving(subtree);
+        }
+        void BeginBatchUpdate() override { m_host.BeginBatchUpdate(); }
+        void EndBatchUpdate(bool requestLayout) override { m_host.EndBatchUpdate(requestLayout); }
+        void SetWindowTitle(const std::wstring& title) override {
+            if (m_host.m_hwnd) {
+                SetWindowTextW(m_host.m_hwnd, title.c_str());
+            }
+        }
+        void RequestOpenDemo(
+            const std::wstring& layoutPath,
+            const std::wstring& chrome,
+            const std::wstring& size) override {
+            m_host.LaunchDemoHost(
+                layoutPath.c_str(),
+                chrome.empty() ? L"" : chrome.c_str(),
+                size.empty() ? nullptr : size.c_str());
+        }
+        void NotifyFirstReactCommitReady() override {
+            m_host.OnFirstReactCommitReady();
+        }
+    private:
+        UiHost& m_host;
+    };
+
+    void NotifySubtreeRemoving(UIElement* subtree) {
+        if (!subtree) {
+            return;
+        }
+        if (m_focusedElement && subtree->ContainsElement(m_focusedElement)) {
+            m_focusedElement->OnBlur();
+            m_focusedElement = nullptr;
+        }
+        if (m_mouseCaptureTarget && subtree->ContainsElement(m_mouseCaptureTarget)) {
+            m_mouseCaptureTarget = nullptr;
+        }
+    }
+
+    void ApplyReactRootElement(std::unique_ptr<UIElement> newRoot) {
+        std::string prevFocusedName;
+        if (m_focusedElement && !m_focusedElement->Name().empty()) {
+            prevFocusedName = m_focusedElement->Name();
+        }
+        if (m_root) {
+            NotifySubtreeRemoving(m_root.get());
+        }
+        m_root = std::move(newRoot);
+        if (m_root) {
+            m_root->SetContext(&m_uiContext);
+        }
+        ApplyChromeFromRootIfNeeded();
+        if (!prevFocusedName.empty() && m_root) {
+            if (UIElement* el = m_root->FindElementByName(prevFocusedName)) {
+                SetFocusedElement(el);
+            }
+        } else if (!m_focusedElement && m_root) {
+            if (UIElement* firstFocus = GetFirstFocusable()) {
+                m_focusedElement = firstFocus;
+                m_focusedElement->OnFocus();
+            }
+        }
+    }
+
+    void OnFirstReactCommitReady() {
+        if (!m_reactInitialCommitDone) {
+            m_reactInitialCommitDone = true;
+            MaybeDumpMeasureTree();
+            MaybeDumpTextMetrics();
+        }
+    }
+
+    void TeardownReactBridge() {
+        if (m_reactBridge) {
+            m_reactBridge->OnHostDestroyed();
+            m_reactBridge.reset();
+        }
+        m_reactSurface.reset();
+    }
+
     // Embedder hooks (set via Set* before Initialize).
+    std::string m_reactBundlePath;
+    bool m_reactWatch = false;
+    bool m_reactInitialCommitDone = false;
+    uint32_t m_reactWatchAccumMs = 0;
+    std::unique_ptr<ReactSurfaceAdapter> m_reactSurface;
+    std::unique_ptr<ai_win_ui::IReactBridge> m_reactBridge;
     std::string m_inlineLayoutXml;
     bool m_inlineLayoutIsJson = false;
     ai_win_ui::HostActionCallback m_actionCallback = nullptr;
@@ -3353,6 +3527,15 @@ std::unique_ptr<Host> Host::Create(HINSTANCE instance, const HostCreateInfo& inf
     impl->host = std::make_unique<UiHost>();
     impl->ownPump = info.ownMessagePump;
     impl->host->SetParentHwnd(info.parent);
+    if (info.reactBundlePath && info.reactBundlePath[0]) {
+        const int sz = WideCharToMultiByte(CP_UTF8, 0, info.reactBundlePath, -1, nullptr, 0, nullptr, nullptr);
+        std::string utf8;
+        if (sz > 1) {
+            utf8.resize(static_cast<size_t>(sz - 1));
+            WideCharToMultiByte(CP_UTF8, 0, info.reactBundlePath, -1, utf8.data(), sz, nullptr, nullptr);
+        }
+        impl->host->SetReactBundle(std::move(utf8), info.reactWatch);
+    }
     if (info.inlineLayoutXml && info.inlineLayoutXml[0]) {
         impl->host->SetInlineLayout(info.inlineLayoutXml, info.inlineLayoutIsJson);
     }
@@ -3520,6 +3703,18 @@ void Host::EndBatchUpdate(bool requestLayout) {
     if (m_impl && m_impl->host) {
         m_impl->host->EndBatchUpdate(requestLayout);
     }
+}
+
+namespace {
+std::atomic<ai_win_ui::ReactBridgeFactory> g_reactBridgeFactory{nullptr};
+} // namespace
+
+void RegisterReactBridgeFactory(ReactBridgeFactory factory) {
+    g_reactBridgeFactory.store(factory, std::memory_order_release);
+}
+
+ReactBridgeFactory GetReactBridgeFactory() {
+    return g_reactBridgeFactory.load(std::memory_order_acquire);
 }
 
 void Host::Invalidate() {

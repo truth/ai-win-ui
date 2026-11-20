@@ -1,7 +1,11 @@
 #include "ai_win_ui/host.h"
 #include "ai_win_ui/observable.h"
+#if defined(AI_WIN_UI_ENABLE_REACT)
+#include "react/react_host_bridge.h"
+#endif
 
 #include <Windows.h>
+#include <shellapi.h>
 #include <string>
 #include <vector>
 #include <memory>
@@ -52,6 +56,10 @@ static void OnAction(const char* actionId, void* userData) {
 
 // Thin executable entry — library body lives in ui_host.cpp (Wave3 H5b/H6).
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {
+#if defined(AI_WIN_UI_ENABLE_REACT)
+    ai_win_ui::react::RegisterWithHost();
+#endif
+
     AppState state;
     state.instance = instance;
 
@@ -59,6 +67,23 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {
     info.showCommand = cmdShow;
     info.onAction = OnAction;
     info.actionUser = &state;
+
+    std::wstring reactBundle;
+    int argc = 0;
+    if (LPWSTR* argv = CommandLineToArgvW(GetCommandLineW(), &argc)) {
+        for (int i = 1; i < argc; ++i) {
+            const std::wstring arg = argv[i];
+            if ((arg == L"--react" || arg == L"--bundle") && i + 1 < argc) {
+                reactBundle = argv[++i];
+            } else if (arg == L"--watch") {
+                info.reactWatch = true;
+            }
+        }
+        LocalFree(argv);
+    }
+    if (!reactBundle.empty()) {
+        info.reactBundlePath = reactBundle.c_str();
+    }
 
     // layout / chrome / size / renderer still come from AI_WIN_UI_* env (scripts, demos).
     auto host = ai_win_ui::Host::Create(instance, info);

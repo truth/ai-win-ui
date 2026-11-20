@@ -21,6 +21,7 @@ endif()
 
 option(AI_WIN_UI_ENABLE_SKIA "Build with Skia renderer backend (required for SVG)." ${_ai_win_ui_skia_autodetected})
 option(AI_WIN_UI_BUILD_SAMPLES "Build samples/embed_host" ON)
+option(AI_WIN_UI_ENABLE_REACT "Build embedded QuickJS-ng React JSX runtime" ON)
 set(AI_WIN_UI_SKIA_PROVIDER "none" CACHE STRING "How Skia should be discovered when AI_WIN_UI_ENABLE_SKIA is ON.")
 set_property(CACHE AI_WIN_UI_SKIA_PROVIDER PROPERTY STRINGS none vcpkg local-sdk)
 set(AI_WIN_UI_SKIA_DIR "" CACHE PATH "Optional root directory of a local Skia SDK or prebuilt package.")
@@ -207,7 +208,75 @@ function(ai_win_ui_add_app target_name source_file)
     )
 endfunction()
 
+if(AI_WIN_UI_ENABLE_REACT)
+    set(QUICKJS_NG_DIR "${CMAKE_SOURCE_DIR}/third_party/quickjs-ng")
+    add_library(quickjs_ng STATIC
+        "${QUICKJS_NG_DIR}/dtoa.c"
+        "${QUICKJS_NG_DIR}/libregexp.c"
+        "${QUICKJS_NG_DIR}/libunicode.c"
+        "${QUICKJS_NG_DIR}/quickjs.c"
+    )
+    set_target_properties(quickjs_ng PROPERTIES
+        C_STANDARD 11
+        C_STANDARD_REQUIRED ON
+        C_EXTENSIONS ON
+    )
+    target_include_directories(quickjs_ng PUBLIC "${QUICKJS_NG_DIR}")
+    target_compile_definitions(quickjs_ng PRIVATE
+        QUICKJS_NG_BUILD
+        WIN32_LEAN_AND_MEAN
+        _WIN32_WINNT=0x0601
+        _GNU_SOURCE
+        _CRT_SECURE_NO_WARNINGS
+    )
+    if(MSVC)
+        target_compile_options(quickjs_ng PRIVATE
+            /utf-8
+            /experimental:c11atomics
+            /wd4018 /wd4061 /wd4098 /wd4100 /wd4200 /wd4242 /wd4244 /wd4245
+            /wd4267 /wd4334 /wd4388 /wd4389 /wd4456 /wd4457 /wd4710
+            /wd4711 /wd4819 /wd4820 /wd4996 /wd5045
+        )
+    endif()
+    if(AI_WIN_UI_ENABLE_SKIA AND AI_WIN_UI_SKIA_PROVIDER STREQUAL "local-sdk")
+        set_property(TARGET quickjs_ng PROPERTY
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif()
+
+    add_library(ai_win_ui_react STATIC
+        src/react/react_node_registry.cpp
+        src/react/react_js_runtime.cpp
+        src/react/react_host_bridge.cpp
+    )
+    target_link_libraries(ai_win_ui_react PUBLIC ai_win_ui_lib quickjs_ng)
+    target_include_directories(ai_win_ui_react PUBLIC
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src
+        ${CMAKE_SOURCE_DIR}/src/react
+    )
+    target_compile_definitions(ai_win_ui_react PRIVATE
+        WIN32_LEAN_AND_MEAN
+        NOMINMAX
+        UNICODE
+        _UNICODE
+    )
+    if(MSVC)
+        target_compile_options(ai_win_ui_react PRIVATE /utf-8 /wd4819)
+    endif()
+    if(AI_WIN_UI_ENABLE_SKIA AND AI_WIN_UI_SKIA_PROVIDER STREQUAL "local-sdk")
+        set_property(TARGET ai_win_ui_react PROPERTY
+            MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+    endif()
+endif()
+
 ai_win_ui_add_app(ai_win_ui src/main.cpp)
+if(AI_WIN_UI_ENABLE_REACT)
+    target_link_libraries(ai_win_ui PRIVATE ai_win_ui_react)
+    target_compile_definitions(ai_win_ui PRIVATE AI_WIN_UI_ENABLE_REACT=1)
+    if(MSVC)
+        target_link_options(ai_win_ui PRIVATE "/STACK:8388608")
+    endif()
+endif()
 
 if(AI_WIN_UI_BUILD_SAMPLES)
     # 金融看盘终端 — stock_terminal sample
@@ -222,4 +291,34 @@ if(AI_WIN_UI_BUILD_SAMPLES)
         samples/sticky_notes/layout_gen.cpp
         samples/sticky_notes/app.rc
     )
+
+    if(AI_WIN_UI_ENABLE_REACT)
+        ai_win_ui_add_app(react_demo samples/react_demo/main.cpp)
+        target_link_libraries(react_demo PRIVATE ai_win_ui_react)
+        if(MSVC)
+            target_link_options(react_demo PRIVATE "/STACK:8388608")
+        endif()
+
+        add_executable(react_unit_test samples/react_unit_test/main.cpp)
+        target_link_libraries(react_unit_test PRIVATE ai_win_ui_react)
+        target_include_directories(react_unit_test PRIVATE
+            ${CMAKE_SOURCE_DIR}/include
+            ${CMAKE_SOURCE_DIR}/src
+            ${CMAKE_SOURCE_DIR}/src/react
+        )
+        if(MSVC)
+            target_compile_options(react_unit_test PRIVATE /utf-8 /wd4819)
+            target_link_options(react_unit_test PRIVATE "/STACK:8388608")
+        endif()
+        if(AI_WIN_UI_ENABLE_SKIA AND AI_WIN_UI_SKIA_PROVIDER STREQUAL "local-sdk")
+            set_property(TARGET react_unit_test PROPERTY
+                MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+        endif()
+        add_custom_command(TARGET react_unit_test POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${AI_WIN_UI_RESOURCE_DIR}"
+                "$<TARGET_FILE_DIR:react_unit_test>/resource"
+            COMMENT "Copying runtime resources next to react_unit_test"
+        )
+    endif()
 endif()

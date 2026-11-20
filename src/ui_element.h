@@ -313,6 +313,7 @@ public:
     bool IsHovered() const { return m_hovered; }
     bool IsPressed() const { return m_pressed; }
     bool IsDisabled() const { return m_disabled; }
+    void SetDisabled(bool disabled) { m_disabled = disabled; }
     void SetEnabled(bool enabled) { m_disabled = !enabled; }
 
     virtual StyleState GetCurrentState() const {
@@ -589,6 +590,56 @@ public:
         }
         m_children.emplace_back(std::move(child));
     }
+
+    virtual void InsertChildBefore(std::unique_ptr<UIElement> child, const UIElement* before) {
+        if (!child) {
+            return;
+        }
+        child->SetContext(m_context);
+        if (before) {
+            for (auto it = m_children.begin(); it != m_children.end(); ++it) {
+                if (it->get() == before) {
+                    m_children.insert(it, std::move(child));
+                    return;
+                }
+            }
+        }
+        m_children.emplace_back(std::move(child));
+    }
+
+    virtual std::unique_ptr<UIElement> RemoveChild(UIElement* child) {
+        if (!child) {
+            return nullptr;
+        }
+        for (auto it = m_children.begin(); it != m_children.end(); ++it) {
+            if (it->get() == child) {
+                std::unique_ptr<UIElement> owned = std::move(*it);
+                m_children.erase(it);
+                return owned;
+            }
+        }
+        return nullptr;
+    }
+
+    virtual void ClearChildren() {
+        m_children.clear();
+    }
+
+    bool ContainsElement(const UIElement* target) const {
+        if (!target) {
+            return false;
+        }
+        if (this == target) {
+            return true;
+        }
+        for (const auto& child : m_children) {
+            if (child && child->ContainsElement(target)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     std::vector<std::unique_ptr<UIElement>>& Children() { return m_children; }
     // Composite controls that own children for content (TabControl, etc.) should
     // override this to return true so Yoga measures them as opaque leaves.
