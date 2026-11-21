@@ -16,5 +16,6 @@ export {
   useRef,
   useState,
   useWindowKeyDown,
+  windowAction,
 } from "./reconciler.ts";
 

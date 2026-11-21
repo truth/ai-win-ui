@@ -17,58 +17,64 @@ export function HeroBanner({
       direction="row"
       alignItems="center"
       justifyContent="space-between"
-      background="#F8FAFC"
-      cornerRadius={18}
-      padding={[24, 18, 16, 20]}
-      height={145}
+      background="#FFFFFF"
+      cornerRadius={14}
+      padding={{ left: 22, top: 10, right: 18, bottom: 10 }}
+      spacing={12}
+      height={108}
+      minHeight={108}
     >
-      {/* Left text column */}
-      <Panel direction="column" justifyContent="center" padding={0} flexGrow={1}>
+      {/* Left Text Column */}
+      <Panel
+        direction="column"
+        justifyContent="center"
+        padding={0}
+        spacing={0}
+        flexGrow={1}
+        flexBasis={0}
+      >
         <Label
           text={`Hello ${studentName}!`}
-          fontSize={22}
+          fontSize={18}
           bold={true}
-          color="#0F172A"
+          color="#1E2538"
         />
-        <Panel height={6} padding={0} />
+        <Panel height={5} padding={0} />
         <Label
           text={`You have ${taskCount} new tasks. It is a lot of work for today! So let's start!`}
-          fontSize={12}
+          fontSize={11}
           color="#64748B"
         />
-        <Panel height={10} padding={0} />
+        <Panel height={8} padding={0} />
         <Panel
-          direction="row"
-          alignItems="center"
+          direction="column"
+          alignItems="start"
           padding={0}
+          spacing={1}
           onClick={onReview}
         >
-          <Label
-            text="review it"
-            fontSize={12}
-            bold={true}
-            color="#3751FE"
-          />
+          <Label text="review it" fontSize={11} fontWeight={600} color="#4F63CE" />
+          <Panel width={44} height={1} background="#4F63CE" padding={0} />
         </Panel>
       </Panel>
 
-      {/* Right 3D student illustration */}
+      {/* Right 3D Student Desk Illustration */}
       <Panel
-        direction="column"
+        direction="row"
         alignItems="center"
         justifyContent="center"
-        width={180}
-        height={130}
+        width={154}
+        minWidth={154}
+        height={96}
         padding={0}
       >
         <Image
           src="images/student_hero.png"
-          width={170}
-          height={125}
+          width={150}
+          height={94}
           stretch="uniform"
         />
       </Panel>
     </Panel>
   );
 }
-

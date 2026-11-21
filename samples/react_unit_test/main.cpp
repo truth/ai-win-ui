@@ -536,13 +536,30 @@ bool TestStudentDashboardBundleExecution() {
     if (!check(surface.lastTitle == L"Dashboard for student - Light mode", "window title set correctly")) return false;
     if (!check(reg.NodeCount() > 50, "student dashboard mounted rich node tree (>50 nodes)")) return false;
 
-    // Traverse and verify CircularProgress and Image nodes exist in the tree
+    // Arrange at typical 1.25x logical viewport and check zero collapsed leaves
+    surface.RootElement()->Measure(1024.0f, 650.0f);
+    surface.RootElement()->Arrange(Rect::Make(0.0f, 0.0f, 1024.0f, 650.0f));
+
     CircularProgress* foundCp = nullptr;
     Image* foundImg = nullptr;
+    Label* lessonsLabel = nullptr;
+    int zeroBoxLeaves = 0;
     auto findWidgets = [&](auto&& self, UIElement* el) -> void {
         if (!el) return;
-        if (!foundCp) foundCp = dynamic_cast<CircularProgress*>(el);
-        if (!foundImg) foundImg = dynamic_cast<Image*>(el);
+        if (auto* cp = dynamic_cast<CircularProgress*>(el)) {
+            if (!foundCp) foundCp = cp;
+            if (cp->Bounds().Width() <= 0.0f || cp->Bounds().Height() <= 0.0f) ++zeroBoxLeaves;
+        }
+        if (auto* img = dynamic_cast<Image*>(el)) {
+            if (!foundImg) foundImg = img;
+            if (img->Bounds().Width() <= 0.0f || img->Bounds().Height() <= 0.0f) ++zeroBoxLeaves;
+        }
+        if (auto* lbl = dynamic_cast<Label*>(el)) {
+            if (!lbl->Text().empty() && (lbl->Bounds().Width() <= 0.0f || lbl->Bounds().Height() <= 0.0f)) {
+                ++zeroBoxLeaves;
+            }
+            if (lbl->Text() == L"Lessons") lessonsLabel = lbl;
+        }
         for (const auto& child : el->Children()) {
             self(self, child.get());
         }
@@ -551,6 +568,23 @@ bool TestStudentDashboardBundleExecution() {
 
     if (!check(foundCp != nullptr, "found CircularProgress widget in student dashboard")) return false;
     if (!check(foundImg != nullptr, "found Image widget in student dashboard")) return false;
+    if (!check(zeroBoxLeaves == 0, "student dashboard zero collapsed content nodes")) return false;
+    if (!check(lessonsLabel != nullptr, "found Lessons sidebar label")) return false;
+
+    // Simulate clicking inside the Lessons label (child of clickable sidebar Panel)
+    const Rect lb = lessonsLabel->Bounds();
+    const float lx = (lb.left + lb.right) * 0.5f;
+    const float ly = (lb.top + lb.bottom) * 0.5f;
+    const size_t evBefore = emitted.size();
+    UIElement* captureTarget = surface.RootElement()->FindHitElementAt(lx, ly);
+    surface.RootElement()->OnMouseDown(lx, ly);
+    bool handledUp = captureTarget ? captureTarget->OnMouseUp(lx, ly) : false;
+    if (!handledUp) {
+        surface.RootElement()->OnMouseUp(lx, ly);
+    }
+    if (!check(emitted.size() == evBefore + 1, "sidebar Panel click emitted through child label")) return false;
+    js.DispatchEventSynchronouslyForTest(emitted.back());
+    if (!check(surface.lastTitle == L"Dashboard for student - lessons", "clicking Lessons updated title")) return false;
 
     js.StepTimersAndJobsSynchronouslyForTest(10);
     js.ShutdownSynchronouslyForTest();

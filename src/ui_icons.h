@@ -90,6 +90,12 @@ public:
         if (iconName == "x" || iconName == "close") {
             return "M18 6L6 18 M6 6l12 12";
         }
+        if (iconName == "minus" || iconName == "minimize") {
+            return "M5 12h14";
+        }
+        if (iconName == "square" || iconName == "maximize") {
+            return "M5 5h14v14H5z";
+        }
         if (iconName == "plus") {
             return "M12 5v14 M5 12h14";
         }

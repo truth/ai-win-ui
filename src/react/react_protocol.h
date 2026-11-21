@@ -49,6 +49,7 @@ enum class PropId : uint16_t {
     Tooltip = 15,
     StyleRef = 16,
     HitTestRole = 17,
+    WindowChrome = 18,
 
     // Panel / Container visual & flex
     Direction = 20,
@@ -200,6 +201,7 @@ enum class MutationOpType : uint8_t {
     ChartSetPoints = 16,
     ChartAppendPoint = 17,
     ChartSetCandles = 18,
+    WindowAction = 19,
 };
 
 struct ChartPointData {

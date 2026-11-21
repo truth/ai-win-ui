@@ -310,6 +310,22 @@ JSValue JsNativeOpenDemo(JSContext* ctx, JSValueConst, int argc, JSValueConst* a
     return JS_UNDEFINED;
 }
 
+JSValue JsNativeWindowAction(JSContext* ctx, JSValueConst, int argc, JSValueConst* argv) {
+    if (argc < 1) return JS_UNDEFINED;
+    size_t len = 0;
+    const char* s = JS_ToCStringLen(ctx, &len, argv[0]);
+    if (!s) return JS_UNDEFINED;
+    std::string act(s, len);
+    JS_FreeCString(ctx, s);
+    if (auto* rt = GetRt(ctx)) {
+        MutationOp op;
+        op.type = MutationOpType::WindowAction;
+        op.strVal = std::move(act);
+        rt->NativePushOp(std::move(op));
+    }
+    return JS_UNDEFINED;
+}
+
 float ReadJsPropFloat(JSContext* ctx, JSValueConst obj, const char* name, float fallback = 0.0f) {
     JSValue v = JS_GetPropertyStr(ctx, obj, name);
     double out = static_cast<double>(fallback);
@@ -819,6 +835,7 @@ void ReactJsRuntime::RegisterNativeBindings() {
     bindFn("endBatch", &JsNativeEndBatch, 1);
     bindFn("setTitle", &JsNativeSetTitle, 1);
     bindFn("openDemo", &JsNativeOpenDemo, 3);
+    bindFn("windowAction", &JsNativeWindowAction, 1);
     bindFn("chartSetPoints", &JsNativeChartSetPoints, 2);
     bindFn("chartAppendPoint", &JsNativeChartAppendPoint, 3);
     bindFn("chartSetCandles", &JsNativeChartSetCandles, 2);

@@ -44,6 +44,30 @@ public:
     AlignItems alignItems = AlignItems::Stretch;
     JustifyContent justifyContent = JustifyContent::Start;
     bool m_placeholderCleared = false;
+    std::function<void()> onClick;
+
+    bool OnMouseDown(float x, float y) override {
+        if (UIElement::OnMouseDown(x, y)) {
+            return true;
+        }
+        if (onClick && !IsDisabled() && m_bounds.Contains(x, y)) {
+            m_clickPressed = true;
+            return true;
+        }
+        return false;
+    }
+
+    bool OnMouseUp(float x, float y) override {
+        bool changed = UIElement::OnMouseUp(x, y);
+        if (m_clickPressed) {
+            m_clickPressed = false;
+            if (onClick && !IsDisabled() && m_bounds.Contains(x, y)) {
+                onClick();
+            }
+            return true;
+        }
+        return changed;
+    }
     
     // S4: when background came from $color.key, rebind on theme switch.
     void SetBackgroundToken(std::string key) { m_backgroundToken = std::move(key); }
@@ -370,6 +394,7 @@ public:
     }
 
     std::string m_backgroundToken;
+    bool m_clickPressed = false;
 
 private:
     void MeasureRowFallback(float availableWidth, float availableHeight) {

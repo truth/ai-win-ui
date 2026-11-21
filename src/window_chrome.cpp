@@ -89,7 +89,8 @@ void WindowChrome::ApplyWindowStyle(HWND hwnd) const {
     if (!hwnd) {
         return;
     }
-    SetWindowLongPtrW(hwnd, GWL_STYLE, static_cast<LONG_PTR>(WindowStyle()));
+    const DWORD visibleBit = static_cast<DWORD>(GetWindowLongPtrW(hwnd, GWL_STYLE)) & WS_VISIBLE;
+    SetWindowLongPtrW(hwnd, GWL_STYLE, static_cast<LONG_PTR>(WindowStyle() | visibleBit));
     SetWindowLongPtrW(hwnd, GWL_EXSTYLE, static_cast<LONG_PTR>(WindowExStyle()));
     SetWindowPos(
         hwnd,

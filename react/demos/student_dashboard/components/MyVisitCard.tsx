@@ -16,142 +16,90 @@ export function MyVisitCard({
   return (
     <Panel
       direction="column"
-      background="#FFFFFF"
-      cornerRadius={18}
-      padding={[20, 16, 20, 16]}
-      borderColor="#E2E8F0"
-      border={[1, 1, 1, 1]}
-      width={255}
-      minWidth={255}
-      maxWidth={255}
+      width={186}
+      minWidth={186}
+      maxWidth={186}
+      padding={0}
+      spacing={8}
+      alignItems="stretch"
     >
-      {/* Title & Month Dropdown */}
+      {/* External Title Row */}
       <Panel
         direction="row"
         alignItems="center"
         justifyContent="space-between"
+        height={22}
         padding={0}
       >
-        <Label text="My visit" fontSize={16} bold={true} color="#0F172A" />
+        <Label text="My visit" fontSize={13} bold={true} color="#1E2538" flexGrow={1} />
         <Panel
           direction="row"
           alignItems="center"
-          padding={[10, 4, 10, 4]}
-          cornerRadius={12}
-          background="#F8FAFC"
-          borderColor="#E2E8F0"
-          border={[1, 1, 1, 1]}
+          justifyContent="center"
+          width={84}
+          minWidth={84}
+          height={22}
+          padding={{ left: 8, right: 6 }}
+          cornerRadius={11}
+          background="#DCE2F2"
           spacing={4}
           onClick={onToggleMonth}
         >
-          <Label text={selectedMonth} fontSize={11} color="#64748B" />
-          <Icon name="chevron-down" size={12} color="#64748B" />
+          <Label text={selectedMonth} fontSize={10} fontWeight={500} color="#3D509B" />
+          <Icon name="chevron-down" size={10} color="#3D509B" />
         </Panel>
       </Panel>
 
-      <Panel height={16} padding={0} />
-
-      {/* 2-Column x 3-Row Grid of Circular Progress Indicators */}
+      {/* White Card Body (expands full bottom-column height) */}
       <Panel
         direction="column"
+        flexGrow={1}
+        flexBasis={0}
+        background="#FFFFFF"
+        cornerRadius={14}
+        padding={{ left: 10, top: 22, right: 10, bottom: 22 }}
+        justifyContent="space-between"
         alignItems="stretch"
-        spacing={14}
-        padding={0}
       >
-        {/* Row 1 */}
-        <Panel direction="row" justifyContent="space-around" padding={0}>
-          {data.slice(0, 2).map((item, idx) => (
-            <Panel
-              key={idx}
-              direction="column"
-              alignItems="center"
-              width={100}
-              padding={0}
-            >
-              <CircularProgress
-                value={item.percent}
-                size={60}
-                thickness={5.5}
-                color="#3751FE"
-                trackColor="#EEF2F6"
-                textColor="#0F172A"
-                showText={true}
-                fontSize={12}
-              />
-              <Panel height={6} padding={0} />
-              <Label
-                text={item.subject}
-                fontSize={10}
-                color="#64748B"
-                horizontalAlign="center"
-              />
-            </Panel>
-          ))}
-        </Panel>
-
-        {/* Row 2 */}
-        <Panel direction="row" justifyContent="space-around" padding={0}>
-          {data.slice(2, 4).map((item, idx) => (
-            <Panel
-              key={idx}
-              direction="column"
-              alignItems="center"
-              width={100}
-              padding={0}
-            >
-              <CircularProgress
-                value={item.percent}
-                size={60}
-                thickness={5.5}
-                color="#3751FE"
-                trackColor="#EEF2F6"
-                textColor="#0F172A"
-                showText={true}
-                fontSize={12}
-              />
-              <Panel height={6} padding={0} />
-              <Label
-                text={item.subject}
-                fontSize={10}
-                color="#64748B"
-                horizontalAlign="center"
-              />
-            </Panel>
-          ))}
-        </Panel>
-
-        {/* Row 3 */}
-        <Panel direction="row" justifyContent="space-around" padding={0}>
-          {data.slice(4, 6).map((item, idx) => (
-            <Panel
-              key={idx}
-              direction="column"
-              alignItems="center"
-              width={100}
-              padding={0}
-            >
-              <CircularProgress
-                value={item.percent}
-                size={60}
-                thickness={5.5}
-                color="#3751FE"
-                trackColor="#EEF2F6"
-                textColor="#0F172A"
-                showText={true}
-                fontSize={12}
-              />
-              <Panel height={6} padding={0} />
-              <Label
-                text={item.subject}
-                fontSize={10}
-                color="#64748B"
-                horizontalAlign="center"
-              />
-            </Panel>
-          ))}
-        </Panel>
+        {[0, 2, 4].map((rowStart) => (
+          <Panel
+            key={rowStart}
+            direction="row"
+            justifyContent="space-between"
+            padding={0}
+            spacing={6}
+          >
+            {data.slice(rowStart, rowStart + 2).map((item, idx) => (
+              <Panel
+                key={idx}
+                direction="column"
+                alignItems="center"
+                flexGrow={1}
+                flexBasis={0}
+                padding={0}
+                spacing={5}
+              >
+                <CircularProgress
+                  value={item.percent}
+                  size={52}
+                  thickness={5.5}
+                  color="#5C70E2"
+                  trackColor="#DCE2F5"
+                  textColor="#1E2538"
+                  showText={true}
+                  fontSize={11}
+                />
+                <Label
+                  text={item.subject}
+                  fontSize={9}
+                  color="#475569"
+                  horizontalAlign="center"
+                />
+              </Panel>
+            ))}
+          </Panel>
+        ))}
       </Panel>
     </Panel>
   );
 }
-

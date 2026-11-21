@@ -42,6 +42,7 @@ export const enum Prop {
   Tooltip = 15,
   StyleRef = 16,
   HitTestRole = 17,
+  WindowChrome = 18,
 
   Direction = 20,
   AlignItems = 21,
@@ -199,7 +200,11 @@ export interface ThicknessObject {
   bottom?: number;
 }
 
-export type ThicknessInput = number | ThicknessObject;
+export type ThicknessInput =
+  | number
+  | [number, number]
+  | [number, number, number, number]
+  | ThicknessObject;
 export type ColorInput = string | number;
 
 export function parseColor(value: ColorInput): number | string {
@@ -248,6 +253,14 @@ export function parseColor(value: ColorInput): number | string {
 export function normalizeThickness(v: ThicknessInput): [number, number, number, number] {
   if (typeof v === "number") {
     return [v, v, v, v];
+  }
+  if (Array.isArray(v)) {
+    if (v.length === 2) {
+      const hx = v[0] ?? 0;
+      const hy = v[1] ?? 0;
+      return [hx, hy, hx, hy];
+    }
+    return [v[0] ?? 0, v[1] ?? 0, v[2] ?? 0, v[3] ?? 0];
   }
   const hx = v.x ?? 0;
   const hy = v.y ?? 0;

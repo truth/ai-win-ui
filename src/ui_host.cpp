@@ -1055,6 +1055,14 @@ private:
         if (m_windowChrome.IsCustom()) {
             m_windowChrome.InitializeDwm(m_hwnd);
         }
+        if (m_hwnd) {
+            RECT rc{};
+            GetClientRect(m_hwnd, &rc);
+            m_viewportWidth = static_cast<float>(std::max<LONG>(0, rc.right - rc.left));
+            m_viewportHeight = static_cast<float>(std::max<LONG>(0, rc.bottom - rc.top));
+            m_uiContext.viewportWidth = m_viewportWidth;
+            m_uiContext.viewportHeight = m_viewportHeight;
+        }
         if (m_renderer) {
             m_renderer->SetPresentMode(
                 m_windowChrome.IsLayered() ? PresentMode::Layered : PresentMode::Hwnd);
@@ -2318,20 +2326,6 @@ private:
                 m_root->RenderOverlay(*m_renderer);
             }
             if (m_windowChrome.IsCustom() && m_viewportWidth > 1.0f && m_viewportHeight > 1.0f) {
-                // Dim caption on inactive windows. Prefer the card title strip when layered
-                // so transparent margins stay clear.
-                if (!m_uiContext.windowActive && m_captionBandHeight > 0.0f) {
-                    Rect dimRect = Rect::Make(0.0f, 0.0f, m_viewportWidth, m_captionBandHeight);
-                    if (m_windowChrome.IsLayered() && m_root && !m_root->Children().empty()) {
-                        const Rect card = m_root->Children().front()->Bounds();
-                        dimRect = Rect::Make(
-                            card.left,
-                            card.top,
-                            card.right,
-                            std::min(card.bottom, card.top + m_captionBandHeight));
-                    }
-                    m_renderer->FillRect(dimRect, Color{0.0f, 0.0f, 0.0f, 0.28f});
-                }
                 // Opaque custom chrome needs an edge; layered shapes define their own outline in UI.
                 if (!m_windowChrome.IsLayered()) {
                     const Rect edge = Rect::Make(0.5f, 0.5f, m_viewportWidth - 0.5f, m_viewportHeight - 0.5f);
@@ -2501,7 +2495,8 @@ private:
         if (m_mouseCaptureTarget) {
             handled = m_mouseCaptureTarget->OnMouseUp(x, y);
             m_mouseCaptureTarget = nullptr;
-        } else {
+        }
+        if (!handled) {
             handled = m_root->OnMouseUp(x, y);
         }
 

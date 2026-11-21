@@ -27,6 +27,7 @@ interface NativeBridge {
   endBatch(needsLayout: boolean): void;
   setTitle(title: string): void;
   openDemo(layoutPath: string, chrome?: string, size?: string): void;
+  windowAction(action: string): void;
   chartSetPoints(nodeId: number, points: any[]): void;
   chartAppendPoint(nodeId: number, point: any, replaceLast: boolean): void;
   chartSetCandles(nodeId: number, candles: any[]): void;
@@ -124,6 +125,7 @@ const PROP_META: Record<string, PropMeta> = {
   tooltip: { id: Prop.Tooltip, kind: PropKind.Str },
   styleRef: { id: Prop.StyleRef, kind: PropKind.Str },
   hitTest: { id: Prop.HitTestRole, kind: PropKind.Str },
+  windowChrome: { id: Prop.WindowChrome, kind: PropKind.Str },
 
   direction: { id: Prop.Direction, kind: PropKind.Str, layout: true },
   alignItems: { id: Prop.AlignItems, kind: PropKind.Str, layout: true },
@@ -1098,6 +1100,10 @@ export function setWindowTitle(title: string): void {
 
 export function openDemo(layoutPath: string, chrome = "", size = ""): void {
   nativeApi().openDemo(layoutPath, chrome, size);
+}
+
+export function windowAction(action: "minimize" | "maximize" | "close"): void {
+  nativeApi().windowAction(action);
 }
 
 export function useWindowKeyDown(handler: (keyCode: number, isTextInputFocused: boolean) => void): void {

@@ -2,6 +2,11 @@
 
 ## 2026-11-21
 
+- **学生仪表盘 UI 像素级对齐、`<Panel>` 原生点击与无原生标题栏支持**（分支 `feature/react-student-dashboard`）
+  - **运行时与输入底座修复**：[`react/runtime/protocol.ts`](react/runtime/protocol.ts) 的 `normalizeThickness` 新增 `[l, t, r, b]` 与 `[x, y]` 元组兼容，解决间距/边距归零问题；[`src/ui_panels.h`](src/ui_panels.h)、[`src/ui_host.cpp`](src/ui_host.cpp) 与 [`src/react/react_node_registry.cpp`](src/react/react_node_registry.cpp) 打通 `Panel::onClick` 及子控件命中抬起回退，点击侧边栏文字/图标即可触发切换；
+  - **无原生标题栏 (`windowChrome="custom"`) 与窗口动作**：React 协议与运行时扩展 `windowChrome` 属性及 `windowAction("minimize" | "maximize" | "close")`，[`src/ui_icons.h`](src/ui_icons.h) 补充 `minus`/`square` 图标；[`src/window_chrome.cpp`](src/window_chrome.cpp) `ApplyWindowStyle` 保留 `WS_VISIBLE` 位修复异步切换无边框后窗口隐藏，[`src/ui_host.cpp`](src/ui_host.cpp) 同步刷新视口并移除非激活态顶栏 28% 暗化遮罩；
+  - **UI 重构与实机核验**：双色蓝轨侧边栏 + 选中凹圆角、纯白胶囊搜索与右侧控制按钮、跨列 `Hello Grace!` Hero 卡片及外部标题行 `Performance` / `My visit` / `Linked Teachers` / `Calendar`（虚线时间轴与竖条）/ `Upcoming events` 一屏对齐；`react_unit_test.exe` **6/6 PASS**（98 节点、0 塌陷与侧边栏点击回调实测），零参数启动 `react_demo.exe` 截屏实测 `1298×867` 无标题栏呈现完整，ZIP 与单文件 EXE 双模打包均已刷新。
+
 - **React 高保真“学生仪表盘 (Student Dashboard)”全交互现代桌面应用落地**（分支 `feature/react-student-dashboard`）
   - **核心桥接与组件扩展 (`src/react/`, `react/runtime/`, `src/ui_icons.h`)**：
     1. 接入第 20 个原生控件 `<CircularProgress>`（环形进度与出勤率）与第 21 个原生控件 `<Image>`（离线/内嵌位图资源），支持 `src`/`source` 资源提供器加载、`cornerRadius` 圆角裁切与 `stretch` 适配模式；

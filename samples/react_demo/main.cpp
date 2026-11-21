@@ -28,6 +28,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {
 
     std::wstring bundlePath = L"react/react_demo.bundle.js";
     std::wstring size = L"1280x840";
+    std::wstring chrome;
     ai_win_ui::Backend backend = ai_win_ui::Backend::Default;
     bool watchMode = false;
 
@@ -39,6 +40,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {
             watchMode = true;
         } else if (args[i] == L"--size" && i + 1 < args.size()) {
             size = args[++i];
+        } else if (args[i] == L"--chrome" && i + 1 < args.size()) {
+            chrome = args[++i];
         } else if (args[i] == L"--renderer" && i + 1 < args.size()) {
             const auto& r = args[++i];
             if (r == L"skia") backend = ai_win_ui::Backend::Skia;
@@ -49,6 +52,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int cmdShow) {
     ai_win_ui::HostCreateInfo info{};
     info.reactBundlePath = bundlePath.c_str();
     info.reactWatch = watchMode;
+    info.chrome = chrome.empty() ? nullptr : chrome.c_str();
     info.size = size.c_str();
     info.renderer = backend;
     info.showCommand = cmdShow;

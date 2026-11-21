@@ -390,6 +390,24 @@ void ReactNodeRegistry::ApplyEventMask(uint32_t nodeId, uint32_t mask) {
     UIElement* el = entry.ptr;
 
     switch (entry.type) {
+        case NodeTypeId::Panel: {
+            if (auto* panel = dynamic_cast<Panel*>(el)) {
+                if (mask & EventMask::Click) {
+                    panel->onClick = [this, nodeId]() {
+                        UiEvent ev;
+                        ev.nodeId = nodeId;
+                        ev.type = EventTypeId::Click;
+                        ev.eventSeq = NextEventSeq(nodeId);
+                        EmitEvent(std::move(ev));
+                    };
+                    panel->SetCursor(CursorType::Hand);
+                } else {
+                    panel->onClick = nullptr;
+                    panel->SetCursor(CursorType::Auto);
+                }
+            }
+            break;
+        }
         case NodeTypeId::Button: {
             if (auto* btn = dynamic_cast<Button*>(el)) {
                 if (mask & EventMask::Click) {
@@ -668,6 +686,14 @@ void ReactNodeRegistry::ApplyProp(
             if (v == "caption") el->SetHitTestRole(UIElement::HitTestRole::Caption);
             else if (v == "client") el->SetHitTestRole(UIElement::HitTestRole::Client);
             else el->SetHitTestRole(UIElement::HitTestRole::Default);
+            return;
+        }
+        case PropId::WindowChrome: {
+            const std::string v = ToLowerAscii(op.strVal);
+            if (v == "custom") el->SetWindowChromeRequest(UIElement::WindowChromeRequest::Custom);
+            else if (v == "layered") el->SetWindowChromeRequest(UIElement::WindowChromeRequest::Layered);
+            else if (v == "system") el->SetWindowChromeRequest(UIElement::WindowChromeRequest::System);
+            else el->SetWindowChromeRequest(UIElement::WindowChromeRequest::Unspecified);
             return;
         }
         default:
@@ -1759,6 +1785,19 @@ void ReactNodeRegistry::ApplyBatch(MutationBatch&& batch) {
                     LayoutParser::Utf8ToUtf16(op.strVal2),
                     LayoutParser::Utf8ToUtf16(op.strVal3));
                 break;
+            case MutationOpType::WindowAction: {
+                if (HWND hwnd = m_surface.GetHwnd()) {
+                    const std::string act = ToLowerAscii(op.strVal);
+                    if (act == "minimize") {
+                        ShowWindow(hwnd, SW_MINIMIZE);
+                    } else if (act == "maximize" || act == "restore") {
+                        ShowWindow(hwnd, IsZoomed(hwnd) ? SW_RESTORE : SW_MAXIMIZE);
+                    } else if (act == "close") {
+                        PostMessageW(hwnd, WM_CLOSE, 0, 0);
+                    }
+                }
+                break;
+            }
             case MutationOpType::ResetTree:
                 dirtyTrees.clear();
                 ResetTree();

@@ -20,6 +20,7 @@ export interface CommonProps {
   tooltip?: string;
   styleRef?: string;
   hitTest?: "default" | "caption" | "client";
+  windowChrome?: "system" | "custom" | "layered";
 }
 
 export interface PanelProps extends CommonProps {
@@ -39,6 +40,7 @@ export interface PanelProps extends CommonProps {
   gradientStart?: ColorInput;
   gradientEnd?: ColorInput;
   gradientAngle?: number;
+  onClick?: () => void;
   children?: ChildNode;
 }
 
