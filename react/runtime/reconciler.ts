@@ -222,6 +222,11 @@ const PROP_META: Record<string, PropMeta> = {
   showHeaderInfo: { id: Prop.ShowHeaderInfo, kind: PropKind.Bool },
   symbolName: { id: Prop.SymbolName, kind: PropKind.Str },
   periodLabel: { id: Prop.PeriodLabel, kind: PropKind.Str },
+
+  textColor: { id: Prop.TextColor, kind: PropKind.Color },
+  src: { id: Prop.Src, kind: PropKind.Str },
+  source: { id: Prop.Src, kind: PropKind.Str },
+  stretch: { id: Prop.Variant, kind: PropKind.Str },
 };
 
 const TEXT_CHILDREN_TYPES = new Set<NodeType>([

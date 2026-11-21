@@ -13,7 +13,7 @@
 #>
 [CmdletBinding()]
 param(
-    [ValidateSet("showcase", "stock")]
+    [ValidateSet("showcase", "stock", "student")]
     [string]$App = "stock",
 
     [ValidateSet("zip", "exe", "both")]
@@ -150,7 +150,21 @@ function New-StoredZip {
 if (-not $SkipBunBuild) {
     $buildReactScript = Join-Path $PSScriptRoot "build_react.ps1"
     if (Test-Path $buildReactScript) {
-        & $buildReactScript
+        $entryFile = if ($App -eq "stock") {
+            "react/demos/stock_terminal/index.tsx"
+        } elseif ($App -eq "student") {
+            "react/demos/student_dashboard/index.tsx"
+        } else {
+            "react/demos/react_showcase.tsx"
+        }
+        $targetBundle = if ($App -eq "stock") {
+            "resource/react/stock_terminal.bundle.js"
+        } elseif ($App -eq "student") {
+            "resource/react/student_dashboard.bundle.js"
+        } else {
+            "resource/react/react_demo.bundle.js"
+        }
+        & $buildReactScript -Entry $entryFile -OutFile $targetBundle -Minify
         if ($LASTEXITCODE -ne 0) {
             throw "build_react.ps1 failed with exit code $LASTEXITCODE"
         }
@@ -159,6 +173,8 @@ if (-not $SkipBunBuild) {
 
 $bundleSource = if ($App -eq "stock") {
     Join-Path $RepoRoot "resource\react\stock_terminal.bundle.js"
+} elseif ($App -eq "student") {
+    Join-Path $RepoRoot "resource\react\student_dashboard.bundle.js"
 } else {
     Join-Path $RepoRoot "resource\react\react_demo.bundle.js"
 }
@@ -166,7 +182,13 @@ if (-not (Test-Path -LiteralPath $bundleSource)) {
     throw "Missing React bundle: $bundleSource"
 }
 
-$exeFileName = if ($App -eq "stock") { "stock_terminal_react.exe" } else { "react_demo.exe" }
+$exeFileName = if ($App -eq "stock") {
+    "stock_terminal_react.exe"
+} elseif ($App -eq "student") {
+    "student_dashboard.exe"
+} else {
+    "react_demo.exe"
+}
 
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 

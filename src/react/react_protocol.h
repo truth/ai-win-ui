@@ -26,6 +26,8 @@ enum class NodeTypeId : uint16_t {
     TreeView = 17,
     TreeItem = 18,
     FinancialChart = 19,
+    CircularProgress = 20,
+    Image = 21,
 };
 
 enum class PropId : uint16_t {
@@ -96,6 +98,7 @@ enum class PropId : uint16_t {
     InactiveColor = 71,
     HoverColor = 72,
     HighlightColor = 73,
+    TextColor = 74,
 
     // Badge / Avatar / Divider / Icon
     Variant = 80,
@@ -152,6 +155,9 @@ enum class PropId : uint16_t {
     ShowHeaderInfo = 144,
     SymbolName = 145,
     PeriodLabel = 146,
+
+    // Image / Media
+    Src = 150,
 };
 
 enum class EventTypeId : uint8_t {

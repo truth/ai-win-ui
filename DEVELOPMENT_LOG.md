@@ -1,5 +1,18 @@
 # 开发日志
 
+## 2026-11-21
+
+- **React 高保真“学生仪表盘 (Student Dashboard)”全交互现代桌面应用落地**（分支 `feature/react-student-dashboard`）
+  - **核心桥接与组件扩展 (`src/react/`, `react/runtime/`, `src/ui_icons.h`)**：
+    1. 接入第 20 个原生控件 `<CircularProgress>`（环形进度与出勤率）与第 21 个原生控件 `<Image>`（离线/内嵌位图资源），支持 `src`/`source` 资源提供器加载、`cornerRadius` 圆角裁切与 `stretch` 适配模式；
+    2. 扩充 Lucide 矢量图标库，补齐 `book`, `book-open`, `phone`, `log-out`, `graduation-cap`, `award`, `more-vertical`, `mail`, `cutout-corner-top`, `cutout-corner-bottom` 等矢量图标，保证自包含离线渲染；
+  - **独立 React 应用 (`react/demos/student_dashboard/`)**：
+    1. 像素级高保真复刻浅色现代学生仪表盘（Light mode）：深海蓝侧边栏与优雅凹圆角选中 Tab、顶部交互搜索栏与个人资料徽标、Hello Grace 问候卡片与 3D 书桌学习插图、Performance 6 门课双色柱状图、My visit 6 门课环形出勤指标网格、Linked Teachers 导师列表与快捷联系、Calendar 时间线日程卡片、Upcoming events 活动列表；
+    2. 完整真实响应式交互：导航 Tab 切换联动窗口标题、搜索框实时打字与多模块数据过滤、月份下拉切换（December/November）动态联动 Performance 柱状图与 My visit 环形图数据、日历日程卡片选中高亮切换；
+  - **单文件 EXE / ZIP 双模分发与自动化测试 (`scripts/package_react_app.ps1`, `samples/react_unit_test/main.cpp`)**：
+    1. `package_react_app.ps1` 扩展支持 `-App student -Mode both`，自动构建单文件独立 `student_dashboard.exe`（内嵌 `assets.zip`）与带外部 ZIP 的便携版；
+    2. 扩展单元测试覆盖 `CircularProgress`、`Image` 动态属性下发以及 `student_dashboard.bundle.js` 完整 275 节点语法执行与树挂载验证（**6/6 PASS**）。
+
 ## 2026-11-20
 
 - **React 双模式资源打包支持：外置 `assets.zip` 与单文件 EXE 内嵌 (`RT_RCDATA` + `inlineReactBundle`)**（分支 `feature/react-zip-and-exe-packaging`）

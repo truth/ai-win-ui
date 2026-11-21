@@ -178,6 +178,38 @@ public:
             outFilledDefault = true;
             return "M12 6a6 6 0 1 0 0 12 6 6 0 1 0 0-12z";
         }
+        if (iconName == "book" || iconName == "lessons") {
+            return "M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5z M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z M6 6h10 M6 10h10";
+        }
+        if (iconName == "book-open") {
+            return "M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z";
+        }
+        if (iconName == "phone") {
+            return "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z";
+        }
+        if (iconName == "log-out" || iconName == "logout") {
+            return "M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4 M16 17l5-5-5-5 M21 12H9";
+        }
+        if (iconName == "graduation-cap" || iconName == "school" || iconName == "smart") {
+            return "M22 10v6 M2 10l10-5 10 5-10 5z M6 12v5c3 3 9 3 12 0v-5";
+        }
+        if (iconName == "award" || iconName == "assessments") {
+            return "M12 15a7 7 0 1 0 0-14 7 7 0 0 0 0 14z M8.21 13.89L7 23l5-3 5 3-1.21-9.12";
+        }
+        if (iconName == "more-vertical") {
+            return "M12 12a1 1 0 1 0 0 1 1 1 0 0 0 0-1z M12 5a1 1 0 1 0 0 1 1 1 0 0 0 0-1z M12 19a1 1 0 1 0 0 1 1 1 0 0 0 0-1z";
+        }
+        if (iconName == "mail" || iconName == "email") {
+            return "M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z M22 6l-10 7L2 6";
+        }
+        if (iconName == "cutout-corner-top") {
+            outFilledDefault = true;
+            return "M 0 24 A 24 24 0 0 0 24 0 L 24 24 Z";
+        }
+        if (iconName == "cutout-corner-bottom") {
+            outFilledDefault = true;
+            return "M 0 0 A 24 24 0 0 1 24 24 L 24 0 Z";
+        }
         // Fallback: circle
         return "M12 4a8 8 0 1 0 0 16 8 8 0 1 0 0-16z";
     }

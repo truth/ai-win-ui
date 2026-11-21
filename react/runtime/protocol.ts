@@ -20,6 +20,8 @@ export const enum NodeType {
   TreeView = 17,
   TreeItem = 18,
   FinancialChart = 19,
+  CircularProgress = 20,
+  Image = 21,
 }
 
 export const enum Prop {
@@ -86,6 +88,7 @@ export const enum Prop {
   InactiveColor = 71,
   HoverColor = 72,
   HighlightColor = 73,
+  TextColor = 74,
 
   Variant = 80,
   Dot = 81,
@@ -138,6 +141,8 @@ export const enum Prop {
   ShowHeaderInfo = 144,
   SymbolName = 145,
   PeriodLabel = 146,
+
+  Src = 150,
 }
 
 export const enum EventType {
@@ -181,6 +186,8 @@ export const TAG_TO_NODE_TYPE: Record<string, NodeType> = {
   TreeView: NodeType.TreeView,
   TreeItem: NodeType.TreeItem,
   FinancialChart: NodeType.FinancialChart,
+  CircularProgress: NodeType.CircularProgress,
+  Image: NodeType.Image,
 };
 
 export interface ThicknessObject {

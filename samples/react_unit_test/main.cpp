@@ -507,6 +507,58 @@ bool TestStockTerminalBundleAndFinancialChart() {
     return true;
 }
 
+bool TestStudentDashboardBundleExecution() {
+    using namespace ai_win_ui::react;
+    auto check = [](bool cond, const char* msg) -> bool {
+        if (!cond) std::printf("[FAIL] %s\n", msg);
+        return cond;
+    };
+
+    const std::string bundle = LoadBundleFile("resource/react/student_dashboard.bundle.js");
+    if (bundle.empty()) {
+        std::printf("[FAIL] Missing resource/react/student_dashboard.bundle.js\n");
+        return false;
+    }
+
+    FakeSurface surface;
+    std::vector<UiEvent> emitted;
+    ReactNodeRegistry reg(surface, [&](UiEvent&& ev) { emitted.push_back(std::move(ev)); });
+    ReactJsRuntime js([&](MutationBatch&& batch) {
+        reg.ApplyBatch(std::move(batch));
+    });
+
+    if (!check(js.InitSynchronouslyForTest(), "student InitSynchronouslyForTest")) return false;
+    if (!check(js.EvalSynchronouslyForTest(bundle, "student_dashboard.bundle.js"), "student EvalSynchronouslyForTest")) {
+        return false;
+    }
+
+    if (!check(surface.RootElement() != nullptr, "surface has student root element")) return false;
+    if (!check(surface.lastTitle == L"Dashboard for student - Light mode", "window title set correctly")) return false;
+    if (!check(reg.NodeCount() > 50, "student dashboard mounted rich node tree (>50 nodes)")) return false;
+
+    // Traverse and verify CircularProgress and Image nodes exist in the tree
+    CircularProgress* foundCp = nullptr;
+    Image* foundImg = nullptr;
+    auto findWidgets = [&](auto&& self, UIElement* el) -> void {
+        if (!el) return;
+        if (!foundCp) foundCp = dynamic_cast<CircularProgress*>(el);
+        if (!foundImg) foundImg = dynamic_cast<Image*>(el);
+        for (const auto& child : el->Children()) {
+            self(self, child.get());
+        }
+    };
+    findWidgets(findWidgets, surface.RootElement());
+
+    if (!check(foundCp != nullptr, "found CircularProgress widget in student dashboard")) return false;
+    if (!check(foundImg != nullptr, "found Image widget in student dashboard")) return false;
+
+    js.StepTimersAndJobsSynchronouslyForTest(10);
+    js.ShutdownSynchronouslyForTest();
+
+    std::printf("[PASS] TestStudentDashboardBundleExecution (nodes=%zu)\n", reg.NodeCount());
+    return true;
+}
+
 std::vector<uint8_t> BuildSingleEntryStoredZip(const std::string& entryName, const std::string& content) {
     auto write16 = [](std::vector<uint8_t>& buf, uint16_t v) {
         buf.push_back(static_cast<uint8_t>(v & 0xFF));
@@ -611,9 +663,107 @@ bool TestMemoryZipAndInlineReactBundle() {
     return true;
 }
 
+bool TestCircularProgressAndImageNodes() {
+    auto check = [](bool cond, const char* msg) -> bool {
+        if (!cond) {
+            std::printf("  [FAIL] %s\n", msg);
+            return false;
+        }
+        return true;
+    };
+
+    FakeSurface surface;
+    ai_win_ui::react::ReactNodeRegistry registry(surface, nullptr);
+
+    ai_win_ui::react::MutationBatch b;
+    b.needsLayout = true;
+    b.ops.push_back({ai_win_ui::react::MutationOpType::CreateNode, 1, 0, 0, 0, 0, static_cast<uint16_t>(ai_win_ui::react::NodeTypeId::Panel)});
+    b.ops.push_back({ai_win_ui::react::MutationOpType::SetRoot, 1});
+
+    // CircularProgress node
+    b.ops.push_back({ai_win_ui::react::MutationOpType::CreateNode, 2, 0, 0, 0, 0, static_cast<uint16_t>(ai_win_ui::react::NodeTypeId::CircularProgress)});
+    {
+        ai_win_ui::react::MutationOp op;
+        op.type = ai_win_ui::react::MutationOpType::SetPropNum;
+        op.nodeId = 2;
+        op.propId = static_cast<uint16_t>(ai_win_ui::react::PropId::Value);
+        op.numVal = 85.0;
+        b.ops.push_back(std::move(op));
+    }
+    {
+        ai_win_ui::react::MutationOp op;
+        op.type = ai_win_ui::react::MutationOpType::SetPropNum;
+        op.nodeId = 2;
+        op.propId = static_cast<uint16_t>(ai_win_ui::react::PropId::Size);
+        op.numVal = 64.0;
+        b.ops.push_back(std::move(op));
+    }
+    {
+        ai_win_ui::react::MutationOp op;
+        op.type = ai_win_ui::react::MutationOpType::SetPropNum;
+        op.nodeId = 2;
+        op.propId = static_cast<uint16_t>(ai_win_ui::react::PropId::ThicknessVal);
+        op.numVal = 6.0;
+        b.ops.push_back(std::move(op));
+    }
+    {
+        ai_win_ui::react::MutationOp op;
+        op.type = ai_win_ui::react::MutationOpType::SetPropBool;
+        op.nodeId = 2;
+        op.propId = static_cast<uint16_t>(ai_win_ui::react::PropId::ShowValueText);
+        op.boolVal = true;
+        b.ops.push_back(std::move(op));
+    }
+    b.ops.push_back({ai_win_ui::react::MutationOpType::AppendChild, 2, 1});
+
+    // Image node
+    b.ops.push_back({ai_win_ui::react::MutationOpType::CreateNode, 3, 0, 0, 0, 0, static_cast<uint16_t>(ai_win_ui::react::NodeTypeId::Image)});
+    {
+        ai_win_ui::react::MutationOp op;
+        op.type = ai_win_ui::react::MutationOpType::SetPropNum;
+        op.nodeId = 3;
+        op.propId = static_cast<uint16_t>(ai_win_ui::react::PropId::CornerRadius);
+        op.numVal = 14.0;
+        b.ops.push_back(std::move(op));
+    }
+    {
+        ai_win_ui::react::MutationOp op;
+        op.type = ai_win_ui::react::MutationOpType::SetPropStr;
+        op.nodeId = 3;
+        op.propId = static_cast<uint16_t>(ai_win_ui::react::PropId::Variant);
+        op.strVal = "uniform";
+        b.ops.push_back(std::move(op));
+    }
+    b.ops.push_back({ai_win_ui::react::MutationOpType::AppendChild, 3, 1});
+
+    registry.ApplyBatch(std::move(b));
+
+    UIElement* cpEl = registry.FindNode(2);
+    if (!check(cpEl != nullptr, "node 2 exists")) return false;
+    auto* cp = dynamic_cast<CircularProgress*>(cpEl);
+    if (!check(cp != nullptr, "node 2 is CircularProgress")) return false;
+    if (!check(cp->value == 85.0f, "cp->value == 85.0")) return false;
+    if (!check(cp->size == 64.0f, "cp->size == 64.0")) return false;
+    if (!check(cp->thickness == 6.0f, "cp->thickness == 6.0")) return false;
+    if (!check(cp->showText == true, "cp->showText == true")) return false;
+
+    UIElement* imgEl = registry.FindNode(3);
+    if (!check(imgEl != nullptr, "node 3 exists")) return false;
+    auto* img = dynamic_cast<Image*>(imgEl);
+    if (!check(img != nullptr, "node 3 is Image")) return false;
+    if (!check(img->cornerRadius == 14.0f, "img->cornerRadius == 14.0")) return false;
+
+    std::printf("[PASS] TestCircularProgressAndImageNodes\n");
+    return true;
+}
+
 } // namespace
 
 int main() {
+    if (!TestCircularProgressAndImageNodes()) {
+        std::printf("FAILED: TestCircularProgressAndImageNodes\n");
+        return 1;
+    }
     if (!TestEventSeqSuppressionAndRegistry()) {
         std::printf("FAILED: TestEventSeqSuppressionAndRegistry\n");
         return 1;
@@ -624,6 +774,10 @@ int main() {
     }
     if (!TestStockTerminalBundleAndFinancialChart()) {
         std::printf("FAILED: TestStockTerminalBundleAndFinancialChart\n");
+        return 1;
+    }
+    if (!TestStudentDashboardBundleExecution()) {
+        std::printf("FAILED: TestStudentDashboardBundleExecution\n");
         return 1;
     }
     if (!TestMemoryZipAndInlineReactBundle()) {

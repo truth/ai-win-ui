@@ -2,6 +2,7 @@
 
 #include "frame_profiler.h"
 #include "layout_parser.h"
+#include "resource_provider.h"
 #include "style_catalog.h"
 #include "theme.h"
 #include "ui.h"
@@ -220,6 +221,12 @@ void ReactNodeRegistry::CreateNode(uint32_t nodeId, NodeTypeId typeId) {
             break;
         case NodeTypeId::FinancialChart:
             el = std::make_unique<FinancialChart>();
+            break;
+        case NodeTypeId::CircularProgress:
+            el = std::make_unique<CircularProgress>();
+            break;
+        case NodeTypeId::Image:
+            el = std::make_unique<Image>(L"");
             break;
         default:
             return;
@@ -1608,6 +1615,77 @@ void ReactNodeRegistry::ApplyProp(
                     fc->periodLabel = LayoutParser::Utf8ToUtf16(op.strVal);
                     touchPaint();
                     break;
+                default:
+                    break;
+            }
+            break;
+        }
+        case NodeTypeId::CircularProgress: {
+            auto* cp = static_cast<CircularProgress*>(el);
+            switch (prop) {
+                case PropId::Value:
+                    cp->value = static_cast<float>(op.numVal);
+                    touchPaint();
+                    break;
+                case PropId::Size:
+                    cp->size = static_cast<float>(op.numVal);
+                    touchLayout();
+                    break;
+                case PropId::ThicknessVal:
+                    cp->thickness = static_cast<float>(op.numVal);
+                    touchPaint();
+                    break;
+                case PropId::Color:
+                case PropId::Foreground:
+                    cp->color = ResolveColorOp(op, theme);
+                    touchPaint();
+                    break;
+                case PropId::TrackColor:
+                    cp->trackColor = ResolveColorOp(op, theme);
+                    touchPaint();
+                    break;
+                case PropId::TextColor:
+                    cp->textColor = ResolveColorOp(op, theme);
+                    touchPaint();
+                    break;
+                case PropId::ShowValueText:
+                    cp->showText = op.boolVal;
+                    touchPaint();
+                    break;
+                case PropId::FontSize:
+                    cp->fontSize = static_cast<float>(op.numVal);
+                    touchPaint();
+                    break;
+                default:
+                    break;
+            }
+            break;
+        }
+        case NodeTypeId::Image: {
+            auto* img = static_cast<Image*>(el);
+            switch (prop) {
+                case PropId::Src:
+                case PropId::Text: {
+                    if (IResourceProvider* provider = m_surface.GetResourceProvider()) {
+                        if (provider->Exists(op.strVal)) {
+                            img->SetImageData(provider->LoadBytes(op.strVal));
+                            touchPaint();
+                        }
+                    }
+                    break;
+                }
+                case PropId::CornerRadius:
+                    img->cornerRadius = static_cast<float>(op.numVal);
+                    touchPaint();
+                    break;
+                case PropId::Variant: {
+                    const std::string s = ToLowerAscii(op.strVal);
+                    if (s == "fill") img->stretch = Image::StretchMode::Fill;
+                    else if (s == "uniformtofill" || s == "uniform_to_fill") img->stretch = Image::StretchMode::UniformToFill;
+                    else img->stretch = Image::StretchMode::Uniform;
+                    touchPaint();
+                    break;
+                }
                 default:
                     break;
             }

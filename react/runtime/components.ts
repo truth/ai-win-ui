@@ -315,6 +315,24 @@ export interface FinancialChartProps extends CommonProps {
   candles?: CandleBarData[];
 }
 
+export interface CircularProgressProps extends CommonProps {
+  value?: number;
+  size?: number;
+  thickness?: number;
+  color?: ColorInput;
+  trackColor?: ColorInput;
+  textColor?: ColorInput;
+  showText?: boolean;
+  fontSize?: number;
+}
+
+export interface ImageProps extends CommonProps {
+  src?: string;
+  source?: string;
+  cornerRadius?: number;
+  stretch?: "fill" | "uniform" | "uniformToFill";
+}
+
 export interface SpacerProps {
   width?: number;
   height?: number;
@@ -344,6 +362,8 @@ declare global {
       TreeView: TreeViewProps;
       TreeItem: TreeItemProps;
       FinancialChart: FinancialChartProps;
+      CircularProgress: CircularProgressProps;
+      Image: ImageProps;
     }
   }
 }
@@ -367,6 +387,8 @@ export const Pagination = "Pagination" as unknown as ComponentFn<PaginationProps
 export const TreeView = "TreeView" as unknown as ComponentFn<TreeViewProps>;
 export const TreeItem = "TreeItem" as unknown as ComponentFn<TreeItemProps>;
 export const FinancialChart = "FinancialChart" as unknown as ComponentFn<FinancialChartProps>;
+export const CircularProgress = "CircularProgress" as unknown as ComponentFn<CircularProgressProps>;
+export const Image = "Image" as unknown as ComponentFn<ImageProps>;
 
 export function Spacer(props: SpacerProps) {
   return createElement("Panel", {
