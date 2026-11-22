@@ -190,6 +190,16 @@ $exeFileName = if ($App -eq "stock") {
     "react_demo.exe"
 }
 
+$appIconPath = if ($App -eq "student") {
+    Join-Path $RepoRoot "react\demos\student_dashboard\app.ico"
+} else {
+    ""
+}
+$iconCmakeArgs = @()
+if ($appIconPath -and (Test-Path -LiteralPath $appIconPath)) {
+    $iconCmakeArgs += "-DAI_WIN_UI_APP_ICON=$appIconPath"
+}
+
 New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 # Stage Stored assets.zip (maps chosen app bundle to react/react_demo.bundle.js so zero-arg launch works)
@@ -215,15 +225,20 @@ New-StoredZip -SourceDir $stageDir -DestinationZip $masterZip
 Remove-Item -Recurse -Force -LiteralPath $stageDir
 
 if ($Mode -eq "zip" -or $Mode -eq "both") {
-    if (-not (Test-Path (Join-Path $ResolvedBuildDir "CMakeCache.txt"))) {
-        Invoke-Step -CommandParts @("cmake", "-S", $RepoRoot, "-B", $ResolvedBuildDir)
+    $zipBuildDir = if ($iconCmakeArgs.Count -gt 0) {
+        Join-Path $ResolvedBuildDir ("zip_react_" + $App)
+    } else {
+        $ResolvedBuildDir
+    }
+    if (($iconCmakeArgs.Count -gt 0) -or (-not (Test-Path (Join-Path $zipBuildDir "CMakeCache.txt")))) {
+        Invoke-Step -CommandParts (@("cmake", "-S", $RepoRoot, "-B", $zipBuildDir) + $iconCmakeArgs)
     }
     Invoke-Step -CommandParts @(
-        "cmake", "--build", $ResolvedBuildDir,
+        "cmake", "--build", $zipBuildDir,
         "--config", $Configuration,
         "--target", "react_demo"
     )
-    $zipBuildExe = Join-Path (Join-Path $ResolvedBuildDir $Configuration) "react_demo.exe"
+    $zipBuildExe = Join-Path (Join-Path $zipBuildDir $Configuration) "react_demo.exe"
     if (-not (Test-Path -LiteralPath $zipBuildExe)) {
         throw "Built react_demo.exe not found at $zipBuildExe"
     }
@@ -236,10 +251,10 @@ if ($Mode -eq "zip" -or $Mode -eq "both") {
 
 if ($Mode -eq "exe" -or $Mode -eq "both") {
     $embedBuildDir = Join-Path $ResolvedBuildDir ("embed_react_" + $App)
-    Invoke-Step -CommandParts @(
+    Invoke-Step -CommandParts (@(
         "cmake", "-S", $RepoRoot, "-B", $embedBuildDir,
         "-DAI_WIN_UI_EMBED_ASSETS_ZIP=$masterZip"
-    )
+    ) + $iconCmakeArgs)
     Invoke-Step -CommandParts @(
         "cmake", "--build", $embedBuildDir,
         "--config", $Configuration,

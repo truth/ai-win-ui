@@ -241,6 +241,10 @@ public:
         wc.lpfnWndProc = &UiHost::WndProcSetup;
         wc.hInstance = instance;
         wc.lpszClassName = kWindowClassName;
+        wc.hIcon = static_cast<HICON>(LoadImageW(instance, MAKEINTRESOURCEW(1), IMAGE_ICON, 0, 0, LR_DEFAULTSIZE | LR_SHARED));
+        if (!wc.hIcon) {
+            wc.hIcon = LoadIconW(nullptr, IDI_APPLICATION);
+        }
         wc.hCursor = LoadCursor(nullptr, IDC_ARROW);
         wc.hbrBackground = reinterpret_cast<HBRUSH>(COLOR_WINDOW + 1);
         wc.style = CS_DBLCLKS;
